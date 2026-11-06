@@ -1,0 +1,5 @@
+# 任务夹落点（FR-10.4）
+
+团队收口产物按 `docs/myteam/<yyyyMMdd>-r<N>-<slug>/` 存放（PRD/技术方案/QA 报告/验收结论），随代码 review 入库。
+
+本目录平时为空，保留 `.gitkeep` 防止空目录丢失。
