@@ -1,6 +1,14 @@
 # dsh-plugin-myteam
 
+![license](https://img.shields.io/badge/license-MIT-blue)
+![tests](https://img.shields.io/badge/tests-410%20passing-brightgreen)
+![node](https://img.shields.io/badge/node-%E2%89%A522.18-informational)
+![dsh](https://img.shields.io/badge/dsh-0.2.1--rc.0%20~%200.3.0-informational)
+![tools](https://img.shields.io/badge/tools-42%20(Lead%2033%20%2B%20member%209)-blueviolet)
+
 DSH 宿主内的独立多智能体团队运行时插件：**一个 append-only 账本作为唯一权威，让「队长规划 + 成员执行」的团队协作完全可审计、可重建**。定位是通用 Agent 团队平台（不限于开发场景），内置「标准三人组」预置团队。
+
+> 与 DSH 官方 `@deepseek-ai/dsh-experimental-agent-team` 的关系与差异（12 维对照 + 10 条借鉴项）见 [docs/15-官方AgentTeam对照与借鉴.md](docs/15-官方AgentTeam对照与借鉴.md)。
 
 ## 目录结构
 
@@ -49,3 +57,7 @@ tools\boot-myteam.cmd
 - **M2-A1 技术债三件已提前清偿（CHG-59/60）**：commit 改增量 apply（先算后写，O(1)）/ team.json 决策 B 收口（不落盘，ADR-002 改写）/ `lib/build-manifest.json` + t42 守住 src↔lib 一致
 - **M2-A2 方案边界已 ADR 化（CHG-61）**：ADR-010 五问判据（常驻团队 / 临时委派 / 单 agent 能力）
 - 结构规范化记录：CHG-41（[docs/09-变更记录.md](docs/09-变更记录.md)）
+
+## 许可证
+
+[MIT](LICENSE) © 2026 morning-start
