@@ -1,0 +1,344 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="dsh-design" content="web">
+<title>预设 · 全局</title>
+<link rel="stylesheet" href="tokens.css">
+<link rel="stylesheet" href="app.css">
+</head>
+<body>
+<div class="win">
+
+  <!-- ══ DSH 宿主侧栏（真实结构：品牌 · 新会话 · 选项栏 · 工作区 · 用户）══ -->
+  <aside class="dsh-rail" aria-label="DSH 侧栏">
+    <div class="dsh-brand">
+      <svg class="icon whale" style="width:24px;height:24px" aria-hidden="true"><use href="icons.svg#i-whale"></use></svg>
+      <span class="wordmark">deepseek</span>
+      <span class="btag">HARNNESS</span>
+      <button class="icon-btn" aria-label="收起侧栏"><svg class="icon icon-16"><use href="icons.svg#i-panel"></use></svg></button>
+    </div>
+    <a class="dsh-newchat" href="conversation.html"><svg class="icon icon-16"><use href="icons.svg#i-plus"></use></svg>新会话</a>
+    <nav class="dsh-nav" aria-label="选项栏">
+      <a href="#"><svg class="icon icon-18"><use href="icons.svg#i-puzzle"></use></svg><span class="lbl">插件</span></a>
+      <a href="#"><svg class="icon icon-18"><use href="icons.svg#i-clock"></use></svg><span class="lbl">自动化任务</span></a>
+      <a href="shell.html" aria-current="page"><svg class="icon icon-18"><use href="icons.svg#i-people"></use></svg><span class="lbl">myteam</span></a>
+      <a href="#"><svg class="icon icon-18"><use href="icons.svg#i-grid"></use></svg><span class="lbl">更多</span></a>
+    </nav>
+    <div class="dsh-sec">
+      <span class="cap">工作区</span>
+      <span class="tools">
+        <button aria-label="搜索工作区"><svg class="icon icon-14"><use href="icons.svg#i-search"></use></svg></button>
+        <button aria-label="工作区视图"><svg class="icon icon-14"><use href="icons.svg#i-sliders"></use></svg></button>
+        <button aria-label="新建工作区"><svg class="icon icon-14"><use href="icons.svg#i-box"></use></svg></button>
+      </span>
+    </div>
+    <div class="dsh-ws">
+      <a class="dsh-ws-row"><svg class="icon icon-16"><use href="icons.svg#i-folder"></use></svg>storefront</a>
+      <a class="dsh-ws-row"><svg class="icon icon-16"><use href="icons.svg#i-folder"></use></svg>atlas-docs</a>
+      <a class="dsh-ws-row open"><svg class="icon icon-16"><use href="icons.svg#i-folder"></use></svg>harbor-web</a>
+      <a class="dsh-sess" href="conversation.html"><span class="t">结算页模块化</span><span class="tm">25 分钟</span></a>
+      <a class="dsh-sess" href="board.html"><span class="t">插件 v0.2 接口评审</span><span class="tm">2 小时</span></a>
+      <a class="dsh-sess"><span class="t">周报汇总</span><span class="tm">4 小时</span></a>
+      <a class="dsh-ws-row"><svg class="icon icon-16"><use href="icons.svg#i-folder"></use></svg>mocha-lab</a>
+      <a class="dsh-sess"><span class="t">构建脚本提速</span><span class="tm">22 分钟</span></a>
+      <a class="dsh-ws-row"><svg class="icon icon-16"><use href="icons.svg#i-folder"></use></svg>notes-vault</a>
+      <a class="dsh-ws-row"><svg class="icon icon-16"><use href="icons.svg#i-folder"></use></svg>infra-sandbox</a>
+      <a class="dsh-ws-row"><svg class="icon icon-16"><use href="icons.svg#i-folder"></use></svg>docs-migration</a>
+      <a class="dsh-ws-row"><svg class="icon icon-16"><use href="icons.svg#i-folder"></use></svg>archive-2025</a>
+    </div>
+    <div class="dsh-user"><span class="av">林</span><span class="nm">林岸</span></div>
+  </aside>
+
+  <main class="main">
+    <!-- ══ 面板顶栏（宿主面板级常驻）══ -->
+    <header class="panel-bar">
+      <b class="panel-name">myteam</b>
+      <div class="seg" role="group" aria-label="作用域">
+        <a href="global.html" aria-pressed="true">全局</a>
+        <a href="shell.html" aria-pressed="false">项目</a>
+      </div>
+      <button class="icon-btn" aria-label="刷新面板"><svg class="icon icon-16"><use href="icons.svg#i-refresh"></use></svg></button>
+    </header>
+        <!-- ══ 团队头（真实结构：← 全局 · 名称/ID · 状态 · 描述 · 行内统计 · 右侧动作）══ -->
+        <!-- ══ 全局层头（预设）══ -->
+        <!-- ══ 全局层头（预设）══ -->
+    <header class="teambar">
+      <a class="back-all" href="global.html"><svg class="icon icon-14"><use href="icons.svg#i-arrow-left"></use></svg>全局</a>
+      <span class="tb-title"><b>预设</b><span class="tid">全局 · 建团模板</span></span>
+      <span class="tb-goal">一组角色的编排加看板列、流程维度、门禁链；一条预设开一个团队</span>
+      <span class="tb-actions">
+        <button class="icon-btn" aria-label="刷新"><svg class="icon icon-14"><use href="icons.svg#i-refresh"></use></svg></button>
+      </span>
+    </header>
+
+        
+
+    <div class="page">
+      <div class="page-head">
+        <div>
+          <h2>预设库</h2>
+          <p>预设是团队模板：名册（队长 + N 个角色引用）加上看板列、流程维度、门禁链。新建团队时选一个，就得到一套现成的分工与流程。名册里存的是角色引用（聘任记录），不是副本 —— 改角色会立刻影响之后新建的团队，但不会影响已经聘任的实例。</p>
+        </div>
+        <div class="page-head-actions">
+          <button class="btn"><svg class="icon icon-14"><use href="icons.svg#i-plus"></use></svg>新建预设</button>
+        </div>
+      </div>
+
+      <!-- 三层作用域 -->
+      <div class="dsec-head" style="margin-bottom:var(--s2)">
+        <h4>三个来源</h4><span class="line"></span>
+        <span class="n">和角色库同一套分层规则</span>
+      </div>
+      <div class="layers" style="margin-bottom:var(--s3)">
+        <div class="layer">
+          <span class="layer-ico builtin"><svg class="icon icon-14"><use href="icons.svg#i-lock"></use></svg></span>
+          <div class="layer-main">
+            <div class="layer-title">内置<span class="src builtin">只读</span></div>
+            <div class="layer-path">plugin/config/presets · seed-once 写进项目一份，之后不覆盖你的改动</div>
+          </div>
+          <div class="layer-n">1<span>预设</span></div>
+          <button class="btn sm" style="flex:none">恢复默认</button>
+        </div>
+        <div class="layer">
+          <span class="layer-ico global"><svg class="icon icon-14"><use href="icons.svg#i-globe"></use></svg></span>
+          <div class="layer-main">
+            <div class="layer-title">全局<span class="src global">跨项目</span></div>
+            <div class="layer-path">../.dsh/myteam/presets · 换项目也带着，可复制进任意项目</div>
+          </div>
+          <div class="layer-n">1<span>预设</span></div>
+          <button class="btn sm" style="flex:none">看全部</button>
+        </div>
+        <div class="layer">
+          <span class="layer-ico project"><svg class="icon icon-14"><use href="icons.svg#i-folder"></use></svg></span>
+          <div class="layer-main">
+            <div class="layer-title">项目<span class="src project">可编辑 · 运行时真相</span></div>
+            <div class="layer-path">.team-workplace/config/presets · 新建团队时能选的只有这一层</div>
+          </div>
+          <div class="layer-n">2<span>预设</span></div>
+          <button class="btn sm" style="flex:none">看全部</button>
+        </div>
+      </div>
+
+      <p class="note info" style="margin-bottom:var(--s4)">
+        <svg class="icon icon-14"><use href="icons.svg#i-layers"></use></svg>
+        <span><b>预设只存差异覆写。</b>没写的字段沿用插件默认值 —— 所以升级插件后，你没改过的地方会跟着变好，改过的地方保持你的版本。数组是整条替换的：写了自己的看板列，就不会和默认列合并。</span>
+      </p>
+
+      <div class="filterbar">
+        <label class="field search" style="width:220px">
+          <svg class="icon icon-14" style="color:var(--muted)"><use href="icons.svg#i-search"></use></svg>
+          <input type="search" placeholder="搜预设名或用途" aria-label="搜索预设">
+        </label>
+        <div class="seg" role="group" aria-label="按来源筛选">
+          <button aria-pressed="true">全部 4</button>
+          <button aria-pressed="false">项目 2</button>
+          <button aria-pressed="false">全局 1</button>
+          <button aria-pressed="false">内置 1</button>
+        </div>
+        <span style="font-size:12px;color:var(--muted)">按作用域从近到远排列</span>
+      </div>
+
+      <!-- ── 项目层 ── -->
+      <div class="dsec-head" style="margin-bottom:var(--s2)">
+        <h4>项目 · 2</h4><span class="line"></span>
+        <span class="n">建团队时可选</span>
+      </div>
+      <div class="grid grid-2" style="margin-bottom:var(--s5)">
+
+        <article class="card hoverable" style="gap:var(--s3)">
+          <div class="card-top">
+            <span class="mavatar lead">队</span>
+            <div style="flex:1;min-width:0">
+              <div class="card-title"><span class="iname">dev-team</span> <span class="src project">项目</span></div>
+              <div class="card-sub">基础开发团队 · 已用于 1 个团队</div>
+            </div>
+          </div>
+
+          <div>
+            <div class="tmpl-k" style="margin-bottom:5px">名册 · 4</div>
+            <div class="rosterline">
+              <span class="mini-chip lead-chip"><span class="mavatar lead">队</span>captain</span>
+              <span class="mini-chip"><span class="mavatar a1">实</span>implementer</span>
+              <span class="mini-chip"><span class="mavatar a2">评</span>reviewer</span>
+              <span class="mini-chip"><span class="mavatar a3">需</span>req-validator</span>
+            </div>
+          </div>
+
+          <div class="tmpl">
+            <div class="tmpl-row">
+              <span class="tmpl-k">看板列</span>
+              <span class="tmpl-v colpreview">
+                <b>待规划</b><span class="ar">→</span><b>就绪</b><span class="ar">→</span><b>进行中</b><span class="ar">→</span><b>门禁</b><span class="ar">→</span><b>已完成</b>
+              </span>
+            </div>
+            <div class="tmpl-row">
+              <span class="tmpl-k">流程</span>
+              <span class="tmpl-v">按角色分组 · 蛇形排布</span>
+            </div>
+            <div class="tmpl-row">
+              <span class="tmpl-k">门禁</span>
+              <span class="tmpl-v">
+                <span class="mini-chip">审查</span><span class="mini-chip">命令验证</span><span class="mini-chip">存档</span>
+                <span style="color:var(--muted);margin-left:2px">命令超时 120s</span>
+              </span>
+            </div>
+          </div>
+
+          <div class="card-foot" style="border-top:1px solid var(--line-soft);padding-top:var(--s2)">
+            <a class="btn sm" href="new-team.html" style="text-decoration:none">用这个建团队</a>
+            <button class="btn ghost sm">编辑</button>
+            <button class="icon-btn" style="margin-left:auto;width:28px;height:28px" aria-label="预设操作"><svg class="icon icon-14"><use href="icons.svg#i-more"></use></svg></button>
+          </div>
+        </article>
+
+        <article class="card hoverable" style="gap:var(--s3)">
+          <div class="card-top">
+            <span class="mavatar lead">队</span>
+            <div style="flex:1;min-width:0">
+              <div class="card-title"><span class="iname">content-team</span> <span class="src project">项目</span></div>
+              <div class="card-sub">内容生产团队 · 还没有团队用它</div>
+            </div>
+          </div>
+
+          <div>
+            <div class="tmpl-k" style="margin-bottom:5px">名册 · 3</div>
+            <div class="rosterline">
+              <span class="mini-chip lead-chip"><span class="mavatar lead">队</span>captain</span>
+              <span class="mini-chip"><span class="mavatar a4">文</span>tech-writer</span>
+              <span class="mini-chip"><span class="mavatar a3">验</span>acceptor</span>
+            </div>
+          </div>
+
+          <div class="tmpl">
+            <div class="tmpl-row">
+              <span class="tmpl-k">看板列</span>
+              <span class="tmpl-v colpreview">
+                <b>选题</b><span class="ar">→</span><b>初稿</b><span class="ar">→</span><b>评审</b><span class="ar">→</span><b>定稿</b><span class="ar">→</span><b>已发布</b>
+              </span>
+            </div>
+            <div class="tmpl-row">
+              <span class="tmpl-k">流程</span>
+              <span class="tmpl-v">按阶段分组 · 线性排布</span>
+            </div>
+            <div class="tmpl-row">
+              <span class="tmpl-k">门禁</span>
+              <span class="tmpl-v">
+                <span class="mini-chip">审查</span><span class="mini-chip">存档</span>
+                <span style="color:var(--muted);margin-left:2px">命令门禁已关（写作没有可跑的测试）</span>
+              </span>
+            </div>
+          </div>
+
+          <div class="card-foot" style="border-top:1px solid var(--line-soft);padding-top:var(--s2)">
+            <a class="btn sm" href="new-team.html" style="text-decoration:none">用这个建团队</a>
+            <button class="btn ghost sm">编辑</button>
+            <button class="icon-btn" style="margin-left:auto;width:28px;height:28px" aria-label="预设操作"><svg class="icon icon-14"><use href="icons.svg#i-more"></use></svg></button>
+          </div>
+        </article>
+
+        <a class="card hoverable" href="presets.html" style="align-items:center;justify-content:center;text-align:center;min-height:180px;border-style:dashed;border-color:var(--line-strong);background:transparent;text-decoration:none;color:inherit">
+          <svg class="icon icon-20" style="color:var(--muted)"><use href="icons.svg#i-plus"></use></svg>
+          <span style="font-size:var(--fs-13);font-weight:600;margin-top:var(--s2)">新建预设</span>
+          <span style="font-size:12px;color:var(--muted);line-height:1.6;max-width:22em">从现有预设 fork 一份再改，比从零配快得多</span>
+        </a>
+
+      </div>
+
+      <!-- ── 全局层 ── -->
+      <div class="dsec-head" style="margin-bottom:var(--s2)">
+        <h4>全局 · 1</h4><span class="line"></span>
+        <span class="n">跨项目复用，本项目还没用</span>
+      </div>
+      <div class="grid grid-2" style="margin-bottom:var(--s5)">
+
+        <article class="card hoverable" style="gap:var(--s3)">
+          <div class="card-top">
+            <span class="mavatar lead">队</span>
+            <div style="flex:1;min-width:0">
+              <div class="card-title"><span class="iname">api-review</span> <span class="src global">全局</span></div>
+              <div class="card-sub">接口评审团队 · 本项目 0 个团队使用</div>
+            </div>
+          </div>
+
+          <div>
+            <div class="tmpl-k" style="margin-bottom:5px">名册 · 3</div>
+            <div class="rosterline">
+              <span class="mini-chip lead-chip"><span class="mavatar lead">队</span>captain</span>
+              <span class="mini-chip"><span class="mavatar a2">审</span>api-reviewer</span>
+              <span class="mini-chip"><span class="mavatar a2">评</span>reviewer</span>
+            </div>
+          </div>
+
+          <div class="tmpl">
+            <div class="tmpl-row">
+              <span class="tmpl-k">看板列</span>
+              <span class="tmpl-v colpreview">
+                <b>待评审</b><span class="ar">→</span><b>契约比对</b><span class="ar">→</span><b>结论</b><span class="ar">→</span><b>已归档</b>
+              </span>
+            </div>
+            <div class="tmpl-row">
+              <span class="tmpl-k">门禁</span>
+              <span class="tmpl-v"><span class="mini-chip">交叉审查</span><span class="mini-chip">存档</span></span>
+            </div>
+          </div>
+
+          <div class="card-foot" style="border-top:1px solid var(--line-soft);padding-top:var(--s2)">
+            <button class="btn sm">复制进项目</button>
+            <a class="btn ghost sm" href="roles.html" style="text-decoration:none">看用到的角色</a>
+            <button class="icon-btn" style="margin-left:auto;width:28px;height:28px" aria-label="预设操作"><svg class="icon icon-14"><use href="icons.svg#i-more"></use></svg></button>
+          </div>
+        </article>
+
+      </div>
+
+      <!-- ── 内置层 ── -->
+      <div class="dsec-head" style="margin-bottom:var(--s2)">
+        <h4>内置 · 1</h4><span class="line"></span>
+        <span class="n">随插件分发，不可改</span>
+      </div>
+      <div class="grid grid-2" style="margin-bottom:var(--s5)">
+
+        <article class="card" style="gap:var(--s3);background:var(--surface-2)">
+          <div class="card-top">
+            <span class="mavatar lead">队</span>
+            <div style="flex:1;min-width:0">
+              <div class="card-title"><span class="iname">standard-three</span> <span class="src builtin"><svg class="icon icon-14"><use href="icons.svg#i-lock"></use></svg>内置</span></div>
+              <div class="card-sub">标准三人组 · 队长没给名册时的兜底模板</div>
+            </div>
+          </div>
+
+          <div>
+            <div class="tmpl-k" style="margin-bottom:5px">名册 · 4</div>
+            <div class="rosterline">
+              <span class="mini-chip lead-chip"><span class="mavatar lead">队</span>captain</span>
+              <span class="mini-chip"><span class="mavatar a3">需</span>req-validator</span>
+              <span class="mini-chip"><span class="mavatar a1">开</span>developer</span>
+              <span class="mini-chip"><span class="mavatar a4">验</span>acceptor</span>
+            </div>
+          </div>
+
+          <p style="font-size:var(--fs-12);line-height:1.7;color:var(--muted);margin:0">
+            队长提交计划时没显式给名册，就按这个模板成团 —— 需求侧守门、开发侧执行、验收侧独立复核。把这三个内置角色拉进团队时，会自动复制进项目库。
+          </p>
+
+          <div class="card-foot" style="border-top:1px solid var(--line-soft);padding-top:var(--s2)">
+            <button class="btn sm">复制到项目</button>
+            <button class="btn ghost sm">恢复默认</button>
+            <span style="margin-left:auto;font-size:12px;color:var(--muted)">只读</span>
+          </div>
+        </article>
+
+      </div>
+
+      <p class="note">
+        <svg class="icon icon-14"><use href="icons.svg#i-alert"></use></svg>
+        <span>删预设会被挡住：只要还有团队是照它建的，就拒绝删除并列出占用方 —— 和角色的守门规则一样。想换流程，先改预设再让新团队用它，已经跑起来的团队不会跟着变。</span>
+      </p>
+    </div>
+
+  </main>
+</div>
+</body>
+</html>

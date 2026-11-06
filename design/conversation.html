@@ -1,0 +1,193 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="dsh-design" content="web">
+<title>队长会话 · 团队视图与工具卡</title>
+<link rel="stylesheet" href="tokens.css">
+<link rel="stylesheet" href="app.css">
+</head>
+<body>
+<div class="win">
+
+  <!-- ══ DSH 宿主侧栏（真实结构：品牌 · 新会话 · 选项栏 · 工作区 · 用户）══ -->
+  <aside class="dsh-rail" aria-label="DSH 侧栏">
+    <div class="dsh-brand">
+      <svg class="icon whale" style="width:24px;height:24px" aria-hidden="true"><use href="icons.svg#i-whale"></use></svg>
+      <span class="wordmark">deepseek</span>
+      <span class="btag">HARNNESS</span>
+      <button class="icon-btn" aria-label="收起侧栏"><svg class="icon icon-16"><use href="icons.svg#i-panel"></use></svg></button>
+    </div>
+    <a class="dsh-newchat" href="conversation.html"><svg class="icon icon-16"><use href="icons.svg#i-plus"></use></svg>新会话</a>
+    <nav class="dsh-nav" aria-label="选项栏">
+      <a href="#"><svg class="icon icon-18"><use href="icons.svg#i-puzzle"></use></svg><span class="lbl">插件</span></a>
+      <a href="#"><svg class="icon icon-18"><use href="icons.svg#i-clock"></use></svg><span class="lbl">自动化任务</span></a>
+      <a href="shell.html"><svg class="icon icon-18"><use href="icons.svg#i-people"></use></svg><span class="lbl">myteam</span></a>
+      <a href="#"><svg class="icon icon-18"><use href="icons.svg#i-grid"></use></svg><span class="lbl">更多</span></a>
+    </nav>
+    <div class="dsh-sec">
+      <span class="cap">工作区</span>
+      <span class="tools">
+        <button aria-label="搜索工作区"><svg class="icon icon-14"><use href="icons.svg#i-search"></use></svg></button>
+        <button aria-label="工作区视图"><svg class="icon icon-14"><use href="icons.svg#i-sliders"></use></svg></button>
+        <button aria-label="新建工作区"><svg class="icon icon-14"><use href="icons.svg#i-box"></use></svg></button>
+      </span>
+    </div>
+    <div class="dsh-ws">
+      <a class="dsh-ws-row"><svg class="icon icon-16"><use href="icons.svg#i-folder"></use></svg>storefront</a>
+      <a class="dsh-ws-row"><svg class="icon icon-16"><use href="icons.svg#i-folder"></use></svg>atlas-docs</a>
+      <a class="dsh-ws-row open"><svg class="icon icon-16"><use href="icons.svg#i-folder"></use></svg>harbor-web</a>
+      <a class="dsh-sess" aria-current="page" href="conversation.html"><span class="t">结算页模块化</span><span class="tm">25 分钟</span></a>
+      <a class="dsh-sess" href="board.html"><span class="t">插件 v0.2 接口评审</span><span class="tm">2 小时</span></a>
+      <a class="dsh-sess"><span class="t">周报汇总</span><span class="tm">4 小时</span></a>
+      <a class="dsh-ws-row"><svg class="icon icon-16"><use href="icons.svg#i-folder"></use></svg>mocha-lab</a>
+      <a class="dsh-sess"><span class="t">构建脚本提速</span><span class="tm">22 分钟</span></a>
+      <a class="dsh-ws-row"><svg class="icon icon-16"><use href="icons.svg#i-folder"></use></svg>notes-vault</a>
+      <a class="dsh-ws-row"><svg class="icon icon-16"><use href="icons.svg#i-folder"></use></svg>infra-sandbox</a>
+      <a class="dsh-ws-row"><svg class="icon icon-16"><use href="icons.svg#i-folder"></use></svg>docs-migration</a>
+      <a class="dsh-ws-row"><svg class="icon icon-16"><use href="icons.svg#i-folder"></use></svg>archive-2025</a>
+    </div>
+    <div class="dsh-user"><span class="av">林</span><span class="nm">林岸</span></div>
+  </aside>
+
+  <main class="main">
+    <div class="conv">
+
+      <!-- 会话头：conversation.view 的团队视图切换落点 -->
+      <header class="conv-head">
+        <div class="conv-title">
+          <span class="team-mark"><svg class="icon icon-14"><use href="icons.svg#i-hex"></use></svg></span>
+          <div>
+            <b>结算页模块化</b>
+            <span>队长 · 队长 · t-8f3a2c</span>
+          </div>
+        </div>
+
+        <div class="seg" role="group" aria-label="会话视图">
+          <button aria-pressed="true"><svg class="icon icon-14"><use href="icons.svg#i-message"></use></svg>对话</button>
+          <a href="roster.html" aria-pressed="false"><svg class="icon icon-14"><use href="icons.svg#i-people"></use></svg>团队视图</a>
+        </div>
+
+        <button class="icon-btn" aria-label="团队操作"><svg class="icon icon-14"><use href="icons.svg#i-more"></use></svg></button>
+      </header>
+
+      <div class="stream">
+        <div class="stream-inner">
+
+          <!-- 人 -->
+          <div class="turn">
+            <span class="turn-av human">你</span>
+            <div class="turn-body">
+              <div class="turn-meta"><b>你</b><span>21:12</span></div>
+              <p class="bubble">把结算页拆成独立模块，补齐回归测试并替换旧调用点。先给我看拆分计划再动手。</p>
+            </div>
+          </div>
+
+          <!-- 队长：计划工具卡 -->
+          <div class="turn">
+            <span class="turn-av lead">岚</span>
+            <div class="turn-body">
+              <div class="turn-meta"><b>队长 · 队长</b><span>21:13</span></div>
+              <p class="bubble">拆完了，11 个任务、5 个角色，其中 <code>t7</code> 是硬前置 —— 它不产出接口契约，后面的 UI 迁移会整个返工。计划已暂存，等你裁决。</p>
+
+              <!-- tool.call.toolview · myteam_plan_tasks -->
+              <div class="toolcard">
+                <div class="toolcard-head">
+                  <svg class="icon icon-14"><use href="icons.svg#i-terminal"></use></svg>
+                  <span class="tname">myteam_plan_tasks</span>
+                  <span class="tstat">· 11 个任务 · 5 个角色 · 3 轮门禁</span>
+                  <svg class="icon icon-14 chev"><use href="icons.svg#i-chevron-down"></use></svg>
+                </div>
+                <div class="toolcard-body">
+                  <div class="trow"><span class="tid">t7</span><span class="tt">抽结算服务边界与接口草案</span><span class="chip run"><span class="shape run"></span>进行中</span><span class="who">实现者</span></div>
+                  <div class="trow"><span class="tid">t6</span><span class="tt">结算页 UI 迁移到模块包</span><span class="chip run"><span class="shape run"></span>进行中</span><span class="who">实现者 2</span></div>
+                  <div class="trow"><span class="tid">t4</span><span class="tt">替换调用点并跑通 4 条冒烟</span><span class="chip gate"><span class="shape gate"></span>门禁待审</span><span class="who">验收员</span></div>
+                  <div class="trow"><span class="tid">t1</span><span class="tt">梳理结算页现有调用点清单</span><span class="chip idle"><span class="shape idle"></span>待规划</span><span class="who">需求验证</span></div>
+                  <div class="trow" style="color:var(--muted)"><span class="tid">…</span><span class="tt">另有 5 个任务</span></div>
+                </div>
+                <div class="toolcard-foot">
+                  <a class="btn sm" href="board.html">在面板打开</a>
+                  <a class="btn ghost sm" href="detail.html">看 t7 详情</a>
+                  <span style="margin-left:auto;font-size:12px;color:var(--muted)">账本已记录 · 21:13</span>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- 人 -->
+          <div class="turn">
+            <span class="turn-av human">你</span>
+            <div class="turn-body">
+              <div class="turn-meta"><b>你</b><span>21:20</span></div>
+              <p class="bubble">批准。t7 交付后先给我看一眼接口契约再往下派。</p>
+            </div>
+          </div>
+
+          <!-- 队长：审批 + 派活 -->
+          <div class="turn">
+            <span class="turn-av lead">岚</span>
+            <div class="turn-body">
+              <div class="turn-meta"><b>队长 · 队长</b><span>21:21</span></div>
+              <p class="bubble">已把 5 个角色拉进团队。t7 交付时我会把契约摘出来单独发你，未批准前不派 t6 之后的任务。</p>
+
+              <!-- tool.call.toolview · myteam_approve_plan -->
+              <div class="toolcard">
+                <div class="toolcard-head">
+                  <svg class="icon icon-14"><use href="icons.svg#i-check"></use></svg>
+                  <span class="tname">myteam_approve_plan</span>
+                  <span class="tstat">· 计划已批准，5 个角色的会话已创建</span>
+                  <svg class="icon icon-14 chev"><use href="icons.svg#i-chevron-right"></use></svg>
+                </div>
+              </div>
+
+              <!-- tool.call.toolview · myteam_peer_message（私讯）-->
+              <div class="toolcard">
+                <div class="toolcard-head">
+                  <svg class="icon icon-14"><use href="icons.svg#i-message"></use></svg>
+                  <span class="tname">myteam_peer_message</span>
+                  <span class="tstat">· 实现者 ⇠ 队长</span>
+                  <svg class="icon icon-14 chev"><use href="icons.svg#i-chevron-right"></use></svg>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- 人 -->
+          <div class="turn">
+            <span class="turn-av human">你</span>
+            <div class="turn-body">
+              <div class="turn-meta"><b>你</b><span>21:41</span></div>
+              <p class="bubble">评审者那个门禁超时我看一下，先别让他跳过。</p>
+            </div>
+          </div>
+
+        </div>
+      </div>
+
+      <!-- 输入区状态 chip（conversation.composer.dock · order 30）-->
+      <div class="dockrow">
+        <div class="dockrow-inner">
+          <a class="dockchip" href="board.html">
+            <span class="dot"></span>3 个角色在跑
+            <span class="vline"></span>
+            2 个门禁待审
+            <span class="go">→</span>
+          </a>
+          <span class="spacer"></span>
+        </div>
+      </div>
+
+      <div class="composer">
+        <div class="composer-box">
+          <textarea placeholder="对队长说点什么，或者用 /myteam+roleId 直接找某个角色"></textarea>
+          <button class="send-btn" aria-label="发送"><svg class="icon icon-14"><use href="icons.svg#i-send"></use></svg></button>
+        </div>
+        <p class="composer-hint">这个会话是 team 预设，队长会持续维护计划与账本。想让某个角色单独干活，输入 <span class="num">/myteam+reviewer</span>。<a href="guest.html">看单角色调用长什么样 →</a></p>
+      </div>
+
+    </div>
+  </main>
+</div>
+</body>
+</html>

@@ -1,0 +1,241 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="dsh-design" content="web">
+<title>队员 · 聘任记录</title>
+<link rel="stylesheet" href="tokens.css">
+<link rel="stylesheet" href="app.css">
+</head>
+<body>
+<div class="win">
+
+  <!-- ══ DSH 宿主侧栏（真实结构：品牌 · 新会话 · 选项栏 · 工作区 · 用户）══ -->
+  <aside class="dsh-rail" aria-label="DSH 侧栏">
+    <div class="dsh-brand">
+      <svg class="icon whale" style="width:24px;height:24px" aria-hidden="true"><use href="icons.svg#i-whale"></use></svg>
+      <span class="wordmark">deepseek</span>
+      <span class="btag">HARNNESS</span>
+      <button class="icon-btn" aria-label="收起侧栏"><svg class="icon icon-16"><use href="icons.svg#i-panel"></use></svg></button>
+    </div>
+    <a class="dsh-newchat" href="conversation.html"><svg class="icon icon-16"><use href="icons.svg#i-plus"></use></svg>新会话</a>
+    <nav class="dsh-nav" aria-label="选项栏">
+      <a href="#"><svg class="icon icon-18"><use href="icons.svg#i-puzzle"></use></svg><span class="lbl">插件</span></a>
+      <a href="#"><svg class="icon icon-18"><use href="icons.svg#i-clock"></use></svg><span class="lbl">自动化任务</span></a>
+      <a href="shell.html" aria-current="page"><svg class="icon icon-18"><use href="icons.svg#i-people"></use></svg><span class="lbl">myteam</span></a>
+      <a href="#"><svg class="icon icon-18"><use href="icons.svg#i-grid"></use></svg><span class="lbl">更多</span></a>
+    </nav>
+    <div class="dsh-sec">
+      <span class="cap">工作区</span>
+      <span class="tools">
+        <button aria-label="搜索工作区"><svg class="icon icon-14"><use href="icons.svg#i-search"></use></svg></button>
+        <button aria-label="工作区视图"><svg class="icon icon-14"><use href="icons.svg#i-sliders"></use></svg></button>
+        <button aria-label="新建工作区"><svg class="icon icon-14"><use href="icons.svg#i-box"></use></svg></button>
+      </span>
+    </div>
+    <div class="dsh-ws">
+      <a class="dsh-ws-row"><svg class="icon icon-16"><use href="icons.svg#i-folder"></use></svg>storefront</a>
+      <a class="dsh-ws-row"><svg class="icon icon-16"><use href="icons.svg#i-folder"></use></svg>atlas-docs</a>
+      <a class="dsh-ws-row open"><svg class="icon icon-16"><use href="icons.svg#i-folder"></use></svg>harbor-web</a>
+      <a class="dsh-sess" href="conversation.html"><span class="t">结算页模块化</span><span class="tm">25 分钟</span></a>
+      <a class="dsh-sess" href="board.html"><span class="t">插件 v0.2 接口评审</span><span class="tm">2 小时</span></a>
+      <a class="dsh-sess"><span class="t">周报汇总</span><span class="tm">4 小时</span></a>
+      <a class="dsh-ws-row"><svg class="icon icon-16"><use href="icons.svg#i-folder"></use></svg>mocha-lab</a>
+      <a class="dsh-sess"><span class="t">构建脚本提速</span><span class="tm">22 分钟</span></a>
+      <a class="dsh-ws-row"><svg class="icon icon-16"><use href="icons.svg#i-folder"></use></svg>notes-vault</a>
+      <a class="dsh-ws-row"><svg class="icon icon-16"><use href="icons.svg#i-folder"></use></svg>infra-sandbox</a>
+      <a class="dsh-ws-row"><svg class="icon icon-16"><use href="icons.svg#i-folder"></use></svg>docs-migration</a>
+      <a class="dsh-ws-row"><svg class="icon icon-16"><use href="icons.svg#i-folder"></use></svg>archive-2025</a>
+    </div>
+    <div class="dsh-user"><span class="av">林</span><span class="nm">林岸</span></div>
+  </aside>
+
+  <main class="main">
+    <!-- ══ 面板顶栏（宿主面板级常驻）══ -->
+    <header class="panel-bar">
+      <b class="panel-name">myteam</b>
+      <div class="seg" role="group" aria-label="作用域">
+        <a href="global.html" aria-pressed="false">全局</a>
+        <a href="shell.html" aria-pressed="true">项目</a>
+      </div>
+      <button class="icon-btn" aria-label="刷新面板"><svg class="icon icon-16"><use href="icons.svg#i-refresh"></use></svg></button>
+    </header>
+        <!-- ══ 团队头（真实结构：← 全局 · 名称/ID · 状态 · 描述 · 行内统计 · 右侧动作）══ -->
+    <header class="teambar">
+      <a class="back-all" href="shell.html"><svg class="icon icon-14"><use href="icons.svg#i-arrow-left"></use></svg>项目</a>
+      <span class="tb-title"><b>结算页模块化</b><span class="tid num">t-8f3a2c</span></span>
+      <span class="chip run"><span class="shape run"></span>运行中</span>
+      <span class="tb-goal">把结算页拆成独立模块，补齐回归测试并替换旧调用点</span>
+      <span class="tb-stats num">完成 3/11 · 进行中 2 · 门禁待审 2 · 角色 5</span>
+      <span class="tb-actions">
+        <button class="icon-btn" aria-label="刷新"><svg class="icon icon-14"><use href="icons.svg#i-refresh"></use></svg></button>
+        <button class="icon-btn" aria-label="团队操作"><svg class="icon icon-14"><use href="icons.svg#i-more"></use></svg></button>
+      </span>
+    </header>
+
+                            <nav class="tabbar" role="tablist">
+      <a class="tab" role="tab" href="roster.html" aria-selected="true">队员<span class="tc">(5)</span></a>
+      <a class="tab" role="tab" href="team-tasks.html" aria-selected="false">参与任务<span class="tc">(12)</span></a>
+      <a class="tab" role="tab" href="knowledge.html" aria-selected="false">知识<span class="tc">(23)</span></a>
+      <a class="tab" role="tab" href="audit.html" aria-selected="false">审计</a>
+      <a class="tab" role="tab" href="settings.html" aria-selected="false">设置</a>
+    </nav>
+
+    <div class="page">
+      <div class="page-head">
+        <div>
+          <h2>队员</h2>
+          <p>队员是角色与团队之间的聘任记录，不是独立实体：从角色库（全局 / 项目）挑一个角色拉进来，它就成为这个团队的队员，带召唤那一刻的角色快照；同一角色召唤多次，实例自动 <span class="num">-2</span> 编号，各跑各的会话。</p>
+        </div>
+        <div class="page-head-actions">
+          <button class="btn primary"><svg class="icon icon-14"><use href="icons.svg#i-plus"></use></svg>召唤角色</button>
+        </div>
+      </div>
+
+      <div class="note info" style="margin-bottom:var(--s3)">
+        <b style="white-space:nowrap">队员里没有队长</b> —— 队长就是你正在聊的那个 team 预设会话，它不是队员。队员列的是队长拉进来的角色，按各自的兴趣词认领任务。
+      </div>
+
+      <div class="grid grid-2">
+
+        <!-- 实现者：同一角色两个实例，一张角色卡 -->
+        <article class="card">
+          <div class="card-top">
+            <span class="mavatar a1">实</span>
+            <div style="flex:1;min-width:0">
+              <div class="card-title">实现者 <span class="mini-chip num">2 个实例</span></div>
+              <div class="card-sub num">claude-sonnet · 继承队长路由</div>
+              <div class="card-row" style="margin-top:5px"><span style="flex:none;color:var(--muted)">兴趣词</span><span class="mini-chip">结算</span><span class="mini-chip">模块边界</span><span class="mini-chip">灰度</span></div>
+            </div>
+            <span class="chip run"><span class="shape run"></span>运行中</span>
+          </div>
+          <div class="inst-row">
+            <span class="iname">implementer</span>
+            <span class="mini-chip">t7 抽结算服务边界</span>
+            <span class="right">交付 2/3 · 386k</span>
+          </div>
+          <div class="inst-row">
+            <span class="iname">implementer-2</span>
+            <span class="mini-chip">t6 结算页 UI 迁移</span>
+            <span class="right">交付 0/2 · 178k</span>
+          </div>
+          <div class="card-foot">
+            <span>两实例独立会话与上下文 · 角色更新不影响在跑实例</span>
+            <div style="margin-left:auto;display:flex;gap:4px">
+              <a class="icon-btn" href="member-menu.html" style="width:28px;height:28px" aria-label="实现者管理菜单"><svg class="icon icon-14"><use href="icons.svg#i-more"></use></svg></a>
+            </div>
+          </div>
+        </article>
+
+        <!-- 评审者：单实例，等门禁裁决；同角色在另一个团队也有聘任 -->
+        <article class="card">
+          <div class="card-top">
+            <span class="mavatar a2">评</span>
+            <div style="flex:1;min-width:0">
+              <div class="card-title">评审者</div>
+              <div class="card-sub num">claude-opus-4.6 · 角色覆写</div>
+              <div class="card-row" style="margin-top:5px"><span style="flex:none;color:var(--muted)">兴趣词</span><span class="mini-chip">契约</span><span class="mini-chip">回归</span><span class="mini-chip">风险</span></div>
+            </div>
+            <span class="chip gate"><span class="shape gate"></span>等人裁决</span>
+          </div>
+          <div class="inst-row">
+            <span class="iname">reviewer</span>
+            <span class="mini-chip gate">t4 门禁超时 2 次</span>
+            <span class="right">交付 1/2 · 241k</span>
+          </div>
+          <div class="card-row" style="margin-top:8px"><span class="mini-chip gate">同时在「插件 v0.2 接口评审」在跑</span></div>
+          <div class="card-foot">
+            <span style="color:var(--gate-ink)">等你定夺：重派 / 跳过 / 改期望</span>
+            <div style="margin-left:auto;display:flex;gap:4px">
+              <a class="btn sm" href="detail.html" style="text-decoration:none">看门禁</a>
+              <a class="icon-btn" href="member-menu.html" style="width:28px;height:28px" aria-label="评审者管理菜单"><svg class="icon icon-14"><use href="icons.svg#i-more"></use></svg></a>
+            </div>
+          </div>
+        </article>
+
+        <!-- 需求验证员：空闲 -->
+        <article class="card">
+          <div class="card-top">
+            <span class="mavatar a3">需</span>
+            <div style="flex:1;min-width:0">
+              <div class="card-title">需求验证员</div>
+              <div class="card-sub num">qwen3-coder · 角色覆写</div>
+              <div class="card-row" style="margin-top:5px"><span style="flex:none;color:var(--muted)">兴趣词</span><span class="mini-chip">可交付</span><span class="mini-chip">验收口径</span></div>
+            </div>
+            <span class="chip idle"><span class="shape idle"></span>空闲</span>
+          </div>
+          <div class="inst-row">
+            <span class="iname">req-validator</span>
+            <span class="mini-chip">等 t6 交付后接管</span>
+            <span class="right">交付 1/3 · 96k</span>
+          </div>
+          <div class="card-foot">
+            <span>已排空，可接新任务</span>
+            <div style="margin-left:auto;display:flex;gap:4px">
+              <a class="icon-btn" href="member-menu.html" style="width:28px;height:28px" aria-label="需求验证员管理菜单"><svg class="icon icon-14"><use href="icons.svg#i-more"></use></svg></a>
+            </div>
+          </div>
+        </article>
+
+        <!-- 验收员：空闲 -->
+        <article class="card">
+          <div class="card-top">
+            <span class="mavatar a4">验</span>
+            <div style="flex:1;min-width:0">
+              <div class="card-title">验收员</div>
+              <div class="card-sub num">claude-opus-4.6 · 角色覆写</div>
+              <div class="card-row" style="margin-top:5px"><span style="flex:none;color:var(--muted)">兴趣词</span><span class="mini-chip">验收</span><span class="mini-chip">证据复核</span></div>
+            </div>
+            <span class="chip idle"><span class="shape idle"></span>空闲</span>
+          </div>
+          <div class="inst-row">
+            <span class="iname">acceptor</span>
+            <span class="mini-chip">无进行中任务</span>
+            <span class="right">交付 2/2 · 341k</span>
+          </div>
+          <div class="card-foot">
+            <span>已排空，可接新任务</span>
+            <div style="margin-left:auto;display:flex;gap:4px">
+              <a class="icon-btn" href="member-menu.html" style="width:28px;height:28px" aria-label="验收员管理菜单"><svg class="icon icon-14"><use href="icons.svg#i-more"></use></svg></a>
+            </div>
+          </div>
+        </article>
+
+        <!-- 召唤角色卡 -->
+        <a class="card" href="roles.html" style="border-style:dashed;align-items:center;justify-content:center;min-height:170px;color:var(--muted);gap:6px">
+          <svg class="icon icon-20" style="color:var(--line-strong)"><use href="icons.svg#i-plus"></use></svg>
+          <span style="font-size:13px;font-weight:500;color:var(--text-2)">召唤角色</span>
+          <span style="font-size:12px;color:var(--muted);text-align:center;line-height:1.5;padding:0 12px">从角色库挑一个，拉进来就能领任务；<br>同名角色召唤多次自动编号</span>
+        </a>
+
+      </div>
+
+      <div class="note" style="margin-top:var(--s4)">
+        <span>团队规模上限 <span class="num">6</span>（不含队长）。同一角色召唤第二次时自动得到 <span class="num">-2</span> 后缀的实例名；实例的快照在召唤那一刻固化，之后改角色不影响在跑实例。归档只排空、不删私有空间；移除会连私有空间一起删掉。</span>
+      </div>
+    </div>
+
+    <footer class="costbar">
+      <div class="cost">
+        <div><div class="cost-label">累计 token</div><div class="cost-val">1.24M</div></div>
+        <div class="cost-spark" aria-hidden="true">
+          <i style="height:6px"></i><i style="height:9px"></i><i style="height:7px"></i><i style="height:13px"></i>
+          <i style="height:11px"></i><i style="height:16px"></i><i style="height:14px"></i><i class="hot" style="height:20px"></i>
+        </div>
+      </div>
+      <div class="cost"><div><div class="cost-label">缓存命中率</div><div class="cost-val">72.4<small>%</small></div></div></div>
+      <div class="cost"><div><div class="cost-label">今日未命中 / 输出</div><div class="cost-val">184k <small>/</small> 41k</div></div></div>
+      <div class="cost"><div><div class="cost-label">门禁重跑</div><div class="cost-val">3 <small>次</small></div></div></div>
+      <div class="cost-right">
+        <div style="display:flex;align-items:center;gap:8px">
+          <div class="ring" aria-hidden="true"><b>62%</b></div>
+          <div><div class="cost-label">上下文占用</div><div class="cost-val" style="font-size:12px">158k <small>/ 256k</small></div></div>
+        </div>
+        <span class="mini-chip" title="任务级归因为估算值">归因为估算</span>
+      </div>
+    </footer>
+  </main>
+</div>
+</body>
+</html>

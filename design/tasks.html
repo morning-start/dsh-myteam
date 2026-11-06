@@ -1,0 +1,238 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="dsh-design" content="web">
+<title>任务 · 列表</title>
+<link rel="stylesheet" href="tokens.css">
+<link rel="stylesheet" href="app.css">
+<style>
+.trow { display: flex; align-items: center; gap: 10px; padding: 9px 2px; border-top: 1px solid var(--line-soft); text-decoration: none; color: inherit; }
+.trow:first-of-type { border-top: 0; }
+.trow:hover { background: var(--surface-2); }
+.trow .tid { flex: none; width: 30px; }
+.trow .tt { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: var(--fs-13); color: var(--text); }
+.trow .who { display: flex; gap: 4px; flex: none; }
+.trow .chev { color: var(--muted-2); flex: none; }
+</style>
+</head>
+<body>
+<div class="win">
+
+  <!-- ══ DSH 宿主侧栏 ══ -->
+  <aside class="dsh-rail" aria-label="DSH 侧栏">
+    <div class="dsh-brand">
+      <svg class="icon whale" style="width:24px;height:24px" aria-hidden="true"><use href="icons.svg#i-whale"></use></svg>
+      <span class="wordmark">deepseek</span>
+      <span class="btag">HARNNESS</span>
+      <button class="icon-btn" aria-label="收起侧栏"><svg class="icon icon-16"><use href="icons.svg#i-panel"></use></svg></button>
+    </div>
+    <a class="dsh-newchat" href="conversation.html"><svg class="icon icon-16"><use href="icons.svg#i-plus"></use></svg>新会话</a>
+    <nav class="dsh-nav" aria-label="选项栏">
+      <a href="#"><svg class="icon icon-18"><use href="icons.svg#i-puzzle"></use></svg><span class="lbl">插件</span></a>
+      <a href="#"><svg class="icon icon-18"><use href="icons.svg#i-clock"></use></svg><span class="lbl">自动化任务</span></a>
+      <a href="shell.html" aria-current="page"><svg class="icon icon-18"><use href="icons.svg#i-people"></use></svg><span class="lbl">myteam</span></a>
+      <a href="#"><svg class="icon icon-18"><use href="icons.svg#i-grid"></use></svg><span class="lbl">更多</span></a>
+    </nav>
+    <div class="dsh-sec">
+      <span class="cap">工作区</span>
+      <span class="tools">
+        <button aria-label="搜索工作区"><svg class="icon icon-14"><use href="icons.svg#i-search"></use></svg></button>
+        <button aria-label="工作区视图"><svg class="icon icon-14"><use href="icons.svg#i-sliders"></use></svg></button>
+        <button aria-label="新建工作区"><svg class="icon icon-14"><use href="icons.svg#i-box"></use></svg></button>
+      </span>
+    </div>
+    <div class="dsh-ws">
+      <a class="dsh-ws-row"><svg class="icon icon-16"><use href="icons.svg#i-folder"></use></svg>storefront</a>
+      <a class="dsh-ws-row"><svg class="icon icon-16"><use href="icons.svg#i-folder"></use></svg>atlas-docs</a>
+      <a class="dsh-ws-row open"><svg class="icon icon-16"><use href="icons.svg#i-folder"></use></svg>harbor-web</a>
+      <a class="dsh-sess" href="conversation.html"><span class="t">结算页模块化</span><span class="tm">25 分钟</span></a>
+      <a class="dsh-sess" href="roster.html"><span class="t">插件 v0.2 接口评审</span><span class="tm">2 小时</span></a>
+      <a class="dsh-sess"><span class="t">周报汇总</span><span class="tm">4 小时</span></a>
+      <a class="dsh-ws-row"><svg class="icon icon-16"><use href="icons.svg#i-folder"></use></svg>mocha-lab</a>
+      <a class="dsh-sess"><span class="t">构建脚本提速</span><span class="tm">22 分钟</span></a>
+      <a class="dsh-ws-row"><svg class="icon icon-16"><use href="icons.svg#i-folder"></use></svg>notes-vault</a>
+      <a class="dsh-ws-row"><svg class="icon icon-16"><use href="icons.svg#i-folder"></use></svg>infra-sandbox</a>
+      <a class="dsh-ws-row"><svg class="icon icon-16"><use href="icons.svg#i-folder"></use></svg>docs-migration</a>
+      <a class="dsh-ws-row"><svg class="icon icon-16"><use href="icons.svg#i-folder"></use></svg>archive-2025</a>
+    </div>
+    <div class="dsh-user"><span class="av">林</span><span class="nm">林岸</span></div>
+  </aside>
+
+  <main class="main">
+    <!-- ══ 面板顶栏（作用域切换）══ -->
+    <header class="panel-bar">
+      <b class="panel-name">myteam</b>
+      <div class="seg" role="group" aria-label="作用域">
+        <a href="global.html" aria-pressed="false">全局</a>
+        <a href="shell.html" aria-pressed="true">项目</a>
+      </div>
+      <button class="icon-btn" aria-label="刷新面板"><svg class="icon icon-16"><use href="icons.svg#i-refresh"></use></svg></button>
+    </header>
+
+    <!-- ══ 项目层主导航：角色 / 团队 / 任务 ══ -->
+    <nav class="tabbar" role="tablist">
+      <a class="tab" role="tab" href="roles.html" aria-selected="false">角色<span class="tc">(13)</span></a>
+      <a class="tab" role="tab" href="shell.html" aria-selected="false">团队<span class="tc">(3)</span></a>
+      <a class="tab" role="tab" href="board.html" aria-selected="true">任务<span class="tc">(17)</span></a>
+    </nav>
+
+    <!-- ══ 任务头 ══ -->
+    <header class="teambar">
+      <span class="tb-title"><b>任务</b><span class="tid num">17 个 · 3 个团队参与</span></span>
+      <span class="tb-goal">任务是项目级实体：团队通过「参与」接手，一张任务可多团队参与（主责 / 协作），一个团队也负责多个任务</span>
+      <span class="tb-stats num">进行中 3 · 门禁待审 3 · 已完成 5</span>
+      <span class="tb-actions">
+        <button class="icon-btn" aria-label="刷新"><svg class="icon icon-14"><use href="icons.svg#i-refresh"></use></svg></button>
+        <button class="icon-btn" aria-label="任务操作"><svg class="icon icon-14"><use href="icons.svg#i-more"></use></svg></button>
+      </span>
+    </header>
+
+    <div class="work">
+      <div class="viewbar">
+        <span class="view-label">视图</span>
+        <nav class="vlinks" aria-label="视图切换">
+          <a href="tasks.html" aria-current="true">列表</a>
+          <a href="board.html" aria-current="false">看板</a>
+          <a href="lanes.html" aria-current="false">流程</a>
+          <a href="dag.html" aria-current="false">依赖图</a>
+        </nav>
+        <div class="viewbar-right">
+          <label class="field search">
+            <svg class="icon icon-14"><use href="icons.svg#i-search"></use></svg>
+            <input type="search" placeholder="搜索任务号、标题、团队" aria-label="搜索任务">
+          </label>
+          <button class="btn sm"><svg class="icon icon-14"><use href="icons.svg#i-filter"></use></svg>筛选</button>
+        </div>
+      </div>
+
+      <div class="page">
+        <div class="page-head">
+          <div>
+            <h2>任务清单</h2>
+            <p>任务是项目级实体，团队通过「参与」接手：一张任务可以有多个团队参与（主责一个、协作若干），一个团队也同时参与多个任务。队员分配仍在团队内管理。</p>
+          </div>
+          <div class="page-head-actions">
+            <a class="btn" href="board.html"><svg class="icon icon-14"><use href="icons.svg#i-board"></use></svg>看板视图</a>
+          </div>
+        </div>
+
+        <!-- 汇总（含关系条数）-->
+        <div class="sec" style="flex-direction:row;gap:var(--s5);padding:12px 16px;margin-bottom:var(--s4)">
+          <div class="tstat" style="align-items:flex-start"><b>17</b><span>任务</span></div>
+          <div class="tstat" style="align-items:flex-start"><b>20</b><span>参与关系（主责 17 · 协作 3）</span></div>
+          <div class="tstat" style="align-items:flex-start"><b>3</b><span>进行中</span></div>
+          <div class="tstat" style="align-items:flex-start"><b>3</b><span>门禁待审</span></div>
+          <div class="tstat" style="align-items:flex-start"><b>5</b><span>已完成</span></div>
+          <span style="margin-left:auto;font-size:12px;color:var(--muted)">阶段口径按各团队状态机</span>
+        </div>
+
+        <div class="filterbar" style="margin-bottom:var(--s4)">
+          <div class="seg" role="group" aria-label="按团队筛选">
+            <button aria-pressed="true">全部 17</button>
+            <button aria-pressed="false">结算页模块化 11</button>
+            <button aria-pressed="false">插件 v0.2 接口评审 6</button>
+          </div>
+        </div>
+
+        <!-- 结算页模块化（主责） -->
+        <div class="dsec-head" style="margin-bottom:var(--s2)">
+          <h4>结算页模块化</h4><span class="line"></span>
+          <span class="num n">t-8f3a2c · 运行中 · 主责 11 · 协作 1</span>
+          <a class="mini-link" href="board.html" style="margin-left:auto">看板 →</a>
+        </div>
+        <div class="sec" style="padding:4px 12px;margin-bottom:var(--s4)">
+          <a class="trow" href="detail.html">
+            <span class="tid num">t7</span><span class="tt">抽结算服务边界与接口草案</span>
+            <span class="mini-chip team">结算页模块化 · 主责</span>
+            <span class="mini-chip team coop">协作 · 插件 v0.2</span>
+            <span class="chip run"><span class="shape run"></span>进行中</span>
+            <span class="who"><span class="mini-chip num">implementer</span></span>
+            <svg class="icon icon-14 chev"><use href="icons.svg#i-chevron-right"></use></svg>
+          </a>
+          <a class="trow" href="detail.html">
+            <span class="tid num">t6</span><span class="tt">结算页 UI 迁移到模块包</span>
+            <span class="mini-chip team">结算页模块化 · 主责</span>
+            <span class="chip run"><span class="shape run"></span>进行中</span>
+            <span class="who"><span class="mini-chip num">implementer-2</span></span>
+            <svg class="icon icon-14 chev"><use href="icons.svg#i-chevron-right"></use></svg>
+          </a>
+          <a class="trow" href="detail.html">
+            <span class="tid num">t4</span><span class="tt">替换调用点并跑通 4 条冒烟</span>
+            <span class="mini-chip team">结算页模块化 · 主责</span>
+            <span class="mini-chip team coop">协作 · 插件 v0.2</span>
+            <span class="chip gate"><span class="shape gate"></span>门禁</span>
+            <span class="who"><span class="mini-chip num">implementer</span><span class="mini-chip num">acceptor</span></span>
+            <svg class="icon icon-14 chev"><use href="icons.svg#i-chevron-right"></use></svg>
+          </a>
+          <a class="trow" href="detail.html">
+            <span class="tid num">t3</span><span class="tt">移除旧结算组件目录</span>
+            <span class="mini-chip team">结算页模块化 · 主责</span>
+            <span class="chip gate"><span class="shape gate"></span>门禁</span>
+            <span class="who"><span class="mini-chip num">req-validator</span></span>
+            <svg class="icon icon-14 chev"><use href="icons.svg#i-chevron-right"></use></svg>
+          </a>
+          <a class="trow" href="detail.html">
+            <span class="tid num">t5</span><span class="tt">旧调用点替换与灰度开关</span>
+            <span class="mini-chip team">结算页模块化 · 主责</span>
+            <span class="chip idle"><span class="shape idle"></span>就绪</span>
+            <span class="who"><span class="mini-chip num">reviewer</span></span>
+            <svg class="icon icon-14 chev"><use href="icons.svg#i-chevron-right"></use></svg>
+          </a>
+          <a class="trow" href="board.html">
+            <span class="tid num">…</span><span class="tt" style="color:var(--muted)">待规划 2 · 已完成 3，其余在看板</span>
+            <span class="who" style="margin-left:auto"><span class="mini-link">看板 →</span></span>
+          </a>
+        </div>
+
+        <!-- 插件 v0.2 接口评审（主责） -->
+        <div class="dsec-head" style="margin-bottom:var(--s2)">
+          <h4>插件 v0.2 接口评审</h4><span class="line"></span>
+          <span class="num n">t-21b47e · 运行中 · 主责 6 · 协作 2</span>
+          <a class="mini-link" href="board.html" style="margin-left:auto">看板 →</a>
+        </div>
+        <div class="sec" style="padding:4px 12px;margin-bottom:var(--s4)">
+          <a class="trow" href="detail.html">
+            <span class="tid num">v2</span><span class="tt">锁定 v0.2 对外契约基线</span>
+            <span class="mini-chip team">插件 v0.2 · 主责</span>
+            <span class="mini-chip team coop">协作 · 结算页模块化</span>
+            <span class="chip run"><span class="shape run"></span>进行中</span>
+            <span class="who"><span class="mini-chip num">api-reviewer</span></span>
+            <svg class="icon icon-14 chev"><use href="icons.svg#i-chevron-right"></use></svg>
+          </a>
+          <a class="trow" href="detail.html">
+            <span class="tid num">v3</span><span class="tt">兼容性矩阵比对</span>
+            <span class="mini-chip team">插件 v0.2 · 主责</span>
+            <span class="chip idle"><span class="shape idle"></span>就绪</span>
+            <span class="who"><span class="mini-chip num">api-reviewer</span><span class="mini-chip num">reviewer</span></span>
+            <svg class="icon icon-14 chev"><use href="icons.svg#i-chevron-right"></use></svg>
+          </a>
+          <a class="trow" href="detail.html">
+            <span class="tid num">v1</span><span class="tt">评审口径对齐</span>
+            <span class="mini-chip team">插件 v0.2 · 主责</span>
+            <span class="chip done"><span class="shape done"></span>已完成</span>
+            <span class="who"><span class="mini-chip num">reviewer</span></span>
+            <svg class="icon icon-14 chev"><use href="icons.svg#i-chevron-right"></use></svg>
+          </a>
+          <a class="trow" href="board.html">
+            <span class="tid num">…</span><span class="tt" style="color:var(--muted)">其余 3 个任务在看板</span>
+            <span class="who" style="margin-left:auto"><span class="mini-link">看板 →</span></span>
+          </a>
+        </div>
+
+        <!-- 草稿团队 -->
+        <div class="dsec-head" style="margin-bottom:var(--s2)">
+          <h4>控制台国际化</h4><span class="line"></span>
+          <span class="n">草稿 · 还没有任务，也没有参与关系</span>
+        </div>
+        <p class="note info" style="margin-bottom:var(--s3)">
+          <svg class="icon icon-14"><use href="icons.svg#i-clock"></use></svg>
+          <span>草稿团队还没有参与任何任务。团队组建完成后，由队长在项目里派单（主责）或接到协作邀请，任务与团队的关系在这里显性化。</span>
+        </p>
+      </div>
+    </div>
+  </main>
+</div>
+</body>
+</html>

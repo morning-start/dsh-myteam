@@ -1,0 +1,311 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="dsh-design" content="web">
+<title>任务 · 拖拽态</title>
+<link rel="stylesheet" href="tokens.css">
+<link rel="stylesheet" href="app.css">
+</head>
+<body>
+<div class="win">
+
+  <!-- ══ DSH 宿主侧栏（真实结构：品牌 · 新会话 · 选项栏 · 工作区 · 用户）══ -->
+  <aside class="dsh-rail" aria-label="DSH 侧栏">
+    <div class="dsh-brand">
+      <svg class="icon whale" style="width:24px;height:24px" aria-hidden="true"><use href="icons.svg#i-whale"></use></svg>
+      <span class="wordmark">deepseek</span>
+      <span class="btag">HARNNESS</span>
+      <button class="icon-btn" aria-label="收起侧栏"><svg class="icon icon-16"><use href="icons.svg#i-panel"></use></svg></button>
+    </div>
+    <a class="dsh-newchat" href="conversation.html"><svg class="icon icon-16"><use href="icons.svg#i-plus"></use></svg>新会话</a>
+    <nav class="dsh-nav" aria-label="选项栏">
+      <a href="#"><svg class="icon icon-18"><use href="icons.svg#i-puzzle"></use></svg><span class="lbl">插件</span></a>
+      <a href="#"><svg class="icon icon-18"><use href="icons.svg#i-clock"></use></svg><span class="lbl">自动化任务</span></a>
+      <a href="shell.html" aria-current="page"><svg class="icon icon-18"><use href="icons.svg#i-people"></use></svg><span class="lbl">myteam</span></a>
+      <a href="#"><svg class="icon icon-18"><use href="icons.svg#i-grid"></use></svg><span class="lbl">更多</span></a>
+    </nav>
+    <div class="dsh-sec">
+      <span class="cap">工作区</span>
+      <span class="tools">
+        <button aria-label="搜索工作区"><svg class="icon icon-14"><use href="icons.svg#i-search"></use></svg></button>
+        <button aria-label="工作区视图"><svg class="icon icon-14"><use href="icons.svg#i-sliders"></use></svg></button>
+        <button aria-label="新建工作区"><svg class="icon icon-14"><use href="icons.svg#i-box"></use></svg></button>
+      </span>
+    </div>
+    <div class="dsh-ws">
+      <a class="dsh-ws-row"><svg class="icon icon-16"><use href="icons.svg#i-folder"></use></svg>storefront</a>
+      <a class="dsh-ws-row"><svg class="icon icon-16"><use href="icons.svg#i-folder"></use></svg>atlas-docs</a>
+      <a class="dsh-ws-row open"><svg class="icon icon-16"><use href="icons.svg#i-folder"></use></svg>harbor-web</a>
+      <a class="dsh-sess" href="conversation.html"><span class="t">结算页模块化</span><span class="tm">25 分钟</span></a>
+      <a class="dsh-sess" href="board.html"><span class="t">插件 v0.2 接口评审</span><span class="tm">2 小时</span></a>
+      <a class="dsh-sess"><span class="t">周报汇总</span><span class="tm">4 小时</span></a>
+      <a class="dsh-ws-row"><svg class="icon icon-16"><use href="icons.svg#i-folder"></use></svg>mocha-lab</a>
+      <a class="dsh-sess"><span class="t">构建脚本提速</span><span class="tm">22 分钟</span></a>
+      <a class="dsh-ws-row"><svg class="icon icon-16"><use href="icons.svg#i-folder"></use></svg>notes-vault</a>
+      <a class="dsh-ws-row"><svg class="icon icon-16"><use href="icons.svg#i-folder"></use></svg>infra-sandbox</a>
+      <a class="dsh-ws-row"><svg class="icon icon-16"><use href="icons.svg#i-folder"></use></svg>docs-migration</a>
+      <a class="dsh-ws-row"><svg class="icon icon-16"><use href="icons.svg#i-folder"></use></svg>archive-2025</a>
+    </div>
+    <div class="dsh-user"><span class="av">林</span><span class="nm">林岸</span></div>
+  </aside>
+
+  <main class="main">
+    <!-- ══ 面板顶栏（宿主面板级常驻）══ -->
+    <header class="panel-bar">
+      <b class="panel-name">myteam</b>
+      <div class="seg" role="group" aria-label="作用域">
+        <a href="global.html" aria-pressed="false">全局</a>
+        <a href="shell.html" aria-pressed="true">项目</a>
+      </div>
+      <button class="icon-btn" aria-label="刷新面板"><svg class="icon icon-16"><use href="icons.svg#i-refresh"></use></svg></button>
+    </header>
+
+    <!-- 团队信息卡（FR-14.4） -->
+        <!-- ══ 团队头（真实结构：← 全局 · 名称/ID · 状态 · 描述 · 行内统计 · 右侧动作）══ -->
+        <!-- ══ 任务头（项目级实体，与团队是参与关系）══ -->
+    <header class="teambar">
+      <span class="tb-title"><b>任务</b><span class="tid num">17 个 · 3 个团队参与</span></span>
+      <span class="tb-goal">任务是项目级实体：团队通过「参与」接手，一张任务可多团队参与（主责 / 协作），一个团队也负责多个任务</span>
+      <span class="tb-stats num">进行中 3 · 门禁待审 3 · 已完成 5</span>
+      <span class="tb-actions">
+        <button class="icon-btn" aria-label="刷新"><svg class="icon icon-14"><use href="icons.svg#i-refresh"></use></svg></button>
+        <button class="icon-btn" aria-label="任务操作"><svg class="icon icon-14"><use href="icons.svg#i-more"></use></svg></button>
+      </span>
+    </header>
+
+    <!-- 暂存横幅：运行中团队的重排草稿（FR-1.1 人审三动作） -->
+    <div class="staged">
+      <span class="staged-ico"><svg class="icon icon-18"><use href="icons.svg#i-alert"></use></svg></span>
+      <div class="staged-text">
+        <b>队长重排了计划，等待你裁决</b>
+        <span class="sub">· 改动 3 项：t2 拆成两半、t5 换人、新增 t11 · 批准后才生效，当前在跑的任务不受影响</span>
+      </div>
+      <div class="staged-actions">
+        <button class="btn primary sm">Approve &amp; Run</button>
+        <button class="btn ghost sm">Revise</button>
+        <a class="btn ghost sm" href="discard.html">Discard</a>
+      </div>
+    </div>
+
+    <!-- 功能域 tab -->
+                                <nav class="tabbar" role="tablist">
+      <a class="tab" role="tab" href="roles.html" aria-selected="false">角色<span class="tc">(13)</span></a>
+      <a class="tab" role="tab" href="shell.html" aria-selected="false">团队<span class="tc">(3)</span></a>
+      <a class="tab" role="tab" href="board.html" aria-selected="true">任务<span class="tc">(17)</span></a>
+    </nav>
+
+    <div class="work">
+      <!-- 视图工具条 -->
+      <div class="viewbar">
+                <span class="view-label">视图</span>
+                <nav class="vlinks" aria-label="视图切换">
+          <a href="tasks.html" aria-current="false">列表</a>
+          <a href="board.html" aria-current="true">看板</a>
+          <a href="lanes.html" aria-current="false">流程</a>
+          <a href="dag.html" aria-current="false">依赖图</a>
+        </nav>
+
+        <span class="mini-chip" title="拖拽流转仍受状态机约束">dragRules: state-machine</span>
+
+        <div class="viewbar-right">
+          <label class="field search">
+            <svg class="icon icon-14"><use href="icons.svg#i-search"></use></svg>
+            <input type="search" placeholder="搜索任务号、标题、角色" aria-label="搜索任务">
+          </label>
+          <button class="btn sm"><svg class="icon icon-14"><use href="icons.svg#i-filter"></use></svg>筛选</button>
+        </div>
+      </div>
+
+      <!-- 画布：名册轨 + 看板（拖拽进行中） -->
+      <div class="canvas" style="grid-template-columns:156px minmax(0,1fr)">
+
+        <!-- ── 名册（头像轨）── -->
+                <aside class="trail" aria-label="参与团队">
+          <span class="trail-cap">参与团队</span>
+          <button class="titem" aria-pressed="true" title="全部任务">
+            <span class="tav" style="background:var(--surface-3);color:var(--text-2)">全</span>
+            <span class="tinfo"><b>全部团队</b><span>17 个任务</span></span>
+          </button>
+          <button class="titem" aria-pressed="false" title="结算页模块化 · 主责 11 · 协作 1">
+            <span class="tav">结</span>
+            <span class="tinfo"><b>结算页模块化</b><span>主责 11 · 协作 1</span></span>
+          </button>
+          <button class="titem" aria-pressed="false" title="插件 v0.2 接口评审 · 主责 6 · 协作 2">
+            <span class="tav" style="background:var(--gate-soft);color:var(--gate-ink)">插</span>
+            <span class="tinfo"><b>插件 v0.2 接口评审</b><span>主责 6 · 协作 2</span></span>
+          </button>
+        </aside>
+
+        <!-- ── 看板（列 = 阶段，t6 正从「进行中」拖向「门禁」）── -->
+        <section class="board" aria-label="阶段看板 · 拖拽进行中" style="cursor:grabbing">
+
+          <!-- 被拖起的卡片：悬在「进行中 → 门禁」交界的空中 -->
+          <a class="tcard lift" href="detail.html" aria-grabbed="true">
+            <span class="lift-tag">松手放入</span>
+            <div class="tcard-top"><span class="tid">t6</span><span class="tpri p1">P1</span></div>
+            <div class="tcard-title">结算页 UI 迁移到模块包</div>
+            <div class="tcard-meta"><span class="chip run"><span class="shape run"></span>实现者 2 · 6m</span></div>
+            <div class="tcard-meta"><span class="tcard-model">gpt-5.1</span></div>
+          </a>
+
+          <!-- 待规划 -->
+          <div class="col">
+            <div class="col-head">
+              <span class="shape" style="border-radius:50%;border:1.5px solid var(--muted-2)"></span>
+              <h4>待规划</h4><span class="n">2</span>
+              <button class="add" aria-label="在待规划中新建任务"><svg class="icon icon-14"><use href="icons.svg#i-plus"></use></svg></button>
+            </div>
+            <a class="tcard" href="detail.html">
+              <div class="tcard-top"><span class="tid">t1</span><span class="tpri p2">P2</span></div>
+              <div class="tcard-title">梳理结算页现有调用点清单</div>
+              <div class="tcard-meta"><span class="chip idle"><span class="shape idle"></span>需求验证</span></div>
+            </a>
+            <a class="tcard" href="detail.html">
+              <div class="tcard-top"><span class="tid">t2</span><span class="tpri p1">P1</span></div>
+              <div class="tcard-title">确定模块包对外 API 契约</div>
+              <div class="tcard-meta"><span class="chip idle"><span class="shape idle"></span>实现者</span></div>
+              <div class="tcard-dep blocked"><svg class="icon icon-14"><use href="icons.svg#i-link"></use></svg>被 t1 阻塞</div>
+            </a>
+            <div class="col-empty">拖动卡片改阶段<br>门禁未过会弹回</div>
+          </div>
+
+          <!-- 就绪 -->
+          <div class="col">
+            <div class="col-head">
+              <span class="shape" style="border-radius:50%;border:1.5px solid var(--primary)"></span>
+              <h4>就绪</h4><span class="n">2</span>
+              <button class="add" aria-label="在就绪中新建任务"><svg class="icon icon-14"><use href="icons.svg#i-plus"></use></svg></button>
+            </div>
+            <a class="tcard" href="detail.html">
+              <div class="tcard-top"><span class="tid">t5</span><span class="tpri p1">P1</span></div>
+              <div class="tcard-title">旧调用点替换与灰度开关</div>
+              <div class="tcard-meta"><span class="chip idle"><span class="shape idle"></span>评审者</span></div>
+              <div class="tcard-dep"><svg class="icon icon-14"><use href="icons.svg#i-link"></use></svg>解锁后置 t8、t9</div>
+            </a>
+            <a class="tcard" href="detail.html">
+              <div class="tcard-top"><span class="tid">t8</span><span class="tpri p2">P2</span></div>
+              <div class="tcard-title">补 12 条结算回归用例</div>
+              <div class="tcard-meta"><span class="chip idle"><span class="shape idle"></span>需求验证</span></div>
+            </a>
+          </div>
+
+          <!-- 进行中：t6 被拖走，留下幽灵占位 -->
+          <div class="col">
+            <div class="col-head">
+              <span class="shape run"></span>
+              <h4>进行中</h4><span class="n">1</span>
+              <button class="add" aria-label="在进行中新建任务"><svg class="icon icon-14"><use href="icons.svg#i-plus"></use></svg></button>
+            </div>
+            <a class="tcard" href="detail.html" aria-current="true">
+              <div class="tcard-top"><span class="tid">t7</span><span class="tpri p0">P0</span></div>
+              <div class="tcard-title">抽结算服务边界与接口草案</div>
+              <div class="tcard-meta"><span class="chip run"><span class="shape run"></span>实现者 · 12m</span></div>
+              <div class="tcard-meta"><span class="tcard-model">claude-sonnet</span></div>
+              <div class="tcard-dep"><svg class="icon icon-14"><use href="icons.svg#i-link"></use></svg>解锁后置 t6</div>
+            </a>
+            <div class="tcard ghost">t6 正被拖动</div>
+          </div>
+
+          <!-- 门禁：合法落点，高亮 + 落区提示；被拖起的 t6 悬在列上方 -->
+          <div class="col drop">
+            <div class="col-head">
+              <span class="shape gate"></span>
+              <h4>门禁</h4><span class="n">2</span>
+              <button class="add" aria-label="在门禁中新建任务"><svg class="icon icon-14"><use href="icons.svg#i-plus"></use></svg></button>
+            </div>
+            <div class="dropzone"><svg class="icon icon-14"><use href="icons.svg#i-check"></use></svg>释放移入 · 进入后走 审查 → 命令验证 → 存档</div>
+            <a class="tcard" href="detail.html">
+              <div class="tcard-top"><span class="tid">t4</span><span class="tpri p1">P1</span></div>
+              <div class="tcard-title">替换调用点并跑通 4 条冒烟</div>
+              <div class="tcard-meta"><span class="chip gate"><span class="shape gate"></span>审查中 · 验收员</span></div>
+              <div class="tcard-dep blocked"><svg class="icon icon-14"><use href="icons.svg#i-clock"></use></svg>超时 2 次，已重派</div>
+            </a>
+            <a class="tcard" href="detail.html">
+              <div class="tcard-top"><span class="tid">t3</span><span class="tpri p2">P2</span></div>
+              <div class="tcard-title">移除旧结算组件目录</div>
+              <div class="tcard-meta"><span class="chip gate"><span class="shape gate"></span>验证中 · 需求验证</span></div>
+            </a>
+          </div>
+
+          <!-- 已完成（折叠态）-->
+          <div class="col done-col">
+            <div class="col-head">
+              <span class="shape done"></span>
+              <h4>已完成</h4><span class="n">3</span>
+            </div>
+            <a class="tcard" href="detail.html">
+              <div class="tcard-top"><span class="tid">t0</span></div>
+              <div class="tcard-title">摸清结算页现状与依赖</div>
+              <div class="tcard-meta"><span class="chip done"><span class="shape done"></span>4 条证据</span></div>
+            </a>
+            <a class="tcard" href="detail.html">
+              <div class="tcard-top"><span class="tid">t9</span></div>
+              <div class="tcard-title">CI 增加构建产物校验</div>
+            </a>
+            <a class="tcard" href="detail.html">
+              <div class="tcard-top"><span class="tid">t11</span></div>
+              <div class="tcard-title">补 README 与迁移说明</div>
+            </a>
+          </div>
+        </section>
+
+      </div>
+
+      <!-- 拖拽被拒的回执：刚才 t4 → 已完成 被状态机拦下 -->
+      <div class="dragtoast" role="status">
+        <svg class="icon icon-16"><use href="icons.svg#i-alert"></use></svg>
+        <div>
+          <b>t4 → 已完成 被拒</b>
+          <p>它的命令门禁还没过（超时 2 次）。gate 未过的卡进不了已完成 —— 先让它走完门禁链，或在任务菜单里「重跑这条门禁」。<a href="detail.html">看 t4 卡在哪 →</a></p>
+        </div>
+      </div>
+
+      <!-- ── 成本条（FR-8.2/8.4）── -->
+      <footer class="costbar">
+        <div class="cost">
+          <div>
+            <div class="cost-label">项目累计 token</div>
+            <div class="cost-val">1.86M</div>
+          </div>
+          <div class="cost-spark" aria-hidden="true">
+            <i style="height:6px"></i><i style="height:9px"></i><i style="height:7px"></i><i style="height:13px"></i>
+            <i style="height:11px"></i><i style="height:16px"></i><i style="height:14px"></i><i class="hot" style="height:20px"></i>
+          </div>
+        </div>
+        <div class="cost">
+          <div>
+            <div class="cost-label">缓存命中率</div>
+            <div class="cost-val">71.8<small>%</small></div>
+          </div>
+        </div>
+        <div class="cost">
+          <div>
+            <div class="cost-label">今日未命中 / 输出</div>
+            <div class="cost-val">264k <small>/</small> 58k</div>
+          </div>
+        </div>
+        <div class="cost">
+          <div>
+            <div class="cost-label">门禁重跑</div>
+            <div class="cost-val">4 <small>次</small></div>
+          </div>
+        </div>
+
+        <div class="cost-right">
+          <div style="display:flex;align-items:center;gap:8px">
+            <div class="ring" aria-hidden="true"><b>68%</b></div>
+            <div>
+              <div class="cost-label">上下文占用</div>
+              <div class="cost-val" style="font-size:12px">174k <small>/ 256k</small></div>
+            </div>
+          </div>
+          <span class="mini-chip" title="任务级归因为估算值">归因为估算</span>
+        </div>
+      </footer>
+    </div>
+  </main>
+</div>
+</body>
+</html>

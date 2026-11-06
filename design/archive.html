@@ -1,0 +1,316 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="dsh-design" content="web">
+<title>归档回放 · CI 超时排查</title>
+<link rel="stylesheet" href="tokens.css">
+<link rel="stylesheet" href="app.css">
+</head>
+<body>
+<div class="win">
+
+  <!-- ══ DSH 宿主侧栏（真实结构：品牌 · 新会话 · 选项栏 · 工作区 · 用户）══ -->
+  <aside class="dsh-rail" aria-label="DSH 侧栏">
+    <div class="dsh-brand">
+      <svg class="icon whale" style="width:24px;height:24px" aria-hidden="true"><use href="icons.svg#i-whale"></use></svg>
+      <span class="wordmark">deepseek</span>
+      <span class="btag">HARNNESS</span>
+      <button class="icon-btn" aria-label="收起侧栏"><svg class="icon icon-16"><use href="icons.svg#i-panel"></use></svg></button>
+    </div>
+    <a class="dsh-newchat" href="conversation.html"><svg class="icon icon-16"><use href="icons.svg#i-plus"></use></svg>新会话</a>
+    <nav class="dsh-nav" aria-label="选项栏">
+      <a href="#"><svg class="icon icon-18"><use href="icons.svg#i-puzzle"></use></svg><span class="lbl">插件</span></a>
+      <a href="#"><svg class="icon icon-18"><use href="icons.svg#i-clock"></use></svg><span class="lbl">自动化任务</span></a>
+      <a href="shell.html" aria-current="page"><svg class="icon icon-18"><use href="icons.svg#i-people"></use></svg><span class="lbl">myteam</span></a>
+      <a href="#"><svg class="icon icon-18"><use href="icons.svg#i-grid"></use></svg><span class="lbl">更多</span></a>
+    </nav>
+    <div class="dsh-sec">
+      <span class="cap">工作区</span>
+      <span class="tools">
+        <button aria-label="搜索工作区"><svg class="icon icon-14"><use href="icons.svg#i-search"></use></svg></button>
+        <button aria-label="工作区视图"><svg class="icon icon-14"><use href="icons.svg#i-sliders"></use></svg></button>
+        <button aria-label="新建工作区"><svg class="icon icon-14"><use href="icons.svg#i-box"></use></svg></button>
+      </span>
+    </div>
+    <div class="dsh-ws">
+      <a class="dsh-ws-row"><svg class="icon icon-16"><use href="icons.svg#i-folder"></use></svg>storefront</a>
+      <a class="dsh-ws-row"><svg class="icon icon-16"><use href="icons.svg#i-folder"></use></svg>atlas-docs</a>
+      <a class="dsh-ws-row open"><svg class="icon icon-16"><use href="icons.svg#i-folder"></use></svg>harbor-web</a>
+      <a class="dsh-sess" href="conversation.html"><span class="t">结算页模块化</span><span class="tm">25 分钟</span></a>
+      <a class="dsh-sess" href="board.html"><span class="t">插件 v0.2 接口评审</span><span class="tm">2 小时</span></a>
+      <a class="dsh-sess"><span class="t">周报汇总</span><span class="tm">4 小时</span></a>
+      <a class="dsh-ws-row"><svg class="icon icon-16"><use href="icons.svg#i-folder"></use></svg>mocha-lab</a>
+      <a class="dsh-sess"><span class="t">构建脚本提速</span><span class="tm">22 分钟</span></a>
+      <a class="dsh-ws-row"><svg class="icon icon-16"><use href="icons.svg#i-folder"></use></svg>notes-vault</a>
+      <a class="dsh-ws-row"><svg class="icon icon-16"><use href="icons.svg#i-folder"></use></svg>infra-sandbox</a>
+      <a class="dsh-ws-row"><svg class="icon icon-16"><use href="icons.svg#i-folder"></use></svg>docs-migration</a>
+      <a class="dsh-ws-row"><svg class="icon icon-16"><use href="icons.svg#i-folder"></use></svg>archive-2025</a>
+    </div>
+    <div class="dsh-user"><span class="av">林</span><span class="nm">林岸</span></div>
+  </aside>
+
+  <main class="main">
+    <!-- ══ 面板顶栏（宿主面板级常驻）══ -->
+    <header class="panel-bar">
+      <b class="panel-name">myteam</b>
+      <div class="seg" role="group" aria-label="作用域">
+        <a href="global.html" aria-pressed="false">全局</a>
+        <a href="shell.html" aria-pressed="true">项目</a>
+      </div>
+      <button class="icon-btn" aria-label="刷新面板"><svg class="icon icon-16"><use href="icons.svg#i-refresh"></use></svg></button>
+    </header>
+
+    <header class="archbar">
+      <span class="team-mark"><svg class="icon icon-14"><use href="icons.svg#i-archive"></use></svg></span>
+      <span class="team-id"><b>CI 超时排查</b><span>t-3a80f5</span></span>
+      <span class="chip idle"><span class="shape idle"></span>已归档</span>
+      <span class="arch-date">归档于 10 月 24 日 18:40 · 只读</span>
+      <div class="archbar-actions">
+        <a class="btn sm" href="audit.html"><svg class="icon icon-14"><use href="icons.svg#i-clock"></use></svg>在审计视图打开</a>
+        <a class="btn sm" href="overview.html"><svg class="icon icon-14"><use href="icons.svg#i-chevron-right"></use></svg>全部团队</a>
+      </div>
+    </header>
+
+    <div class="work">
+      <div class="viewbar">
+        <nav class="seg" aria-label="回放分区">
+          <a href="#end" aria-pressed="true">结局</a>
+          <a href="#roster">名册 · 2</a>
+          <a href="#tasks">任务历史 · 3</a>
+          <a href="#ledger">账本与产物</a>
+        </nav>
+        <span class="mini-chip num">14 条事件</span>
+        <span class="mini-chip">归档快照 · 可导出</span>
+      </div>
+
+      <div class="page" style="max-width:1080px;padding-top:var(--s3)">
+
+        <div class="dsec-head" id="end" style="margin-bottom:var(--s2)"><h4>为什么结束</h4><span class="line"></span><span class="n">team.disbanded · seq 14</span></div>
+        <div class="endcard">
+          <h5>不是所有团队都跑到了终点 —— 这个卡在门禁上，你选择了解散</h5>
+          <p>队长在 10 月 24 日 17:52 报 escalate：<code>pnpm -F ci test</code> 连续 3 次在 120 秒上限处超时，判定为 CI 环境侧问题而非代码问题，重跑没有意义。你在 18:12 批了「跳过并记录风险」，队长随即提出「改完缓存策略后再跑一次」的替换计划；18:38 你判断这个排查的投入产出不划算，选择解散。实例在 18:40 前全部排空，账本与 token 一起归档。</p>
+          <div class="endmeta">
+            <span>解散人 · 你</span>
+            <span>运行 1 天 4 小时</span>
+            <span>2 个角色已排空释放</span>
+            <span>1 个未完成任务转 blocked</span>
+            <span>归档至 <code>archive/t-3a80f5/</code></span>
+          </div>
+        </div>
+
+        <div class="dsec-head" style="margin-top:var(--s5);margin-bottom:var(--s2)"><h4>进度</h4><span class="line"></span><span class="n">3 个任务，1 个完成</span></div>
+        <div class="sec">
+          <div class="teambar-stats" style="gap:var(--s5)">
+            <div class="tstat"><b>1/3</b><span>已完成</span></div>
+            <div class="tstat"><b>1</b><span>blocked</span></div>
+            <div class="tstat"><b>1</b><span>未开始</span></div>
+            <div class="tstat"><b>188k</b><span>累计 token</span></div>
+            <div class="tstat"><b>64</b><span>次调用</span></div>
+          </div>
+          <div class="segbar" aria-hidden="true">
+            <i class="done"></i>
+            <i class="blocked"></i>
+            <i></i>
+          </div>
+        </div>
+
+        <div class="dsec-head" id="roster" style="margin-top:var(--s5);margin-bottom:var(--s2)"><h4>名册 · 2</h4><span class="line"></span><span class="n">归档时全部排空</span></div>
+        <div class="grid grid-2">
+          <article class="card">
+            <div class="card-top">
+              <span class="mavatar a1">实</span>
+              <div>
+                <div class="card-title"><span class="iname">implementer</span> <span class="src project"><svg class="icon icon-14"><use href="icons.svg#i-folder"></use></svg>实现者</span></div>
+                <div class="card-sub">claude-sonnet · 继承队长路由</div>
+              </div>
+            </div>
+            <div class="card-row">
+              <span class="mini-chip num">完成 1 个任务</span>
+              <span class="mini-chip">交付 1 份产物</span>
+              <span class="mini-chip num">96k token</span>
+            </div>
+            <div class="card-foot">
+              <span class="role-name">归档时已排空，私有空间保留在快照里</span>
+            </div>
+          </article>
+
+          <article class="card">
+            <div class="card-top">
+              <span class="mavatar a2">评</span>
+              <div>
+                <div class="card-title"><span class="iname">reviewer</span> <span class="src project"><svg class="icon icon-14"><use href="icons.svg#i-folder"></use></svg>评审者</span></div>
+                <div class="card-sub">claude-opus-4.6 · 角色覆写</div>
+              </div>
+            </div>
+            <div class="card-row">
+              <span class="mini-chip num">1 个任务 blocked</span>
+              <span class="mini-chip gate">门禁超时 3 次</span>
+              <span class="mini-chip num">92k token</span>
+            </div>
+            <div class="card-foot">
+              <span class="role-name">归档时已排空，私有空间保留在快照里</span>
+            </div>
+          </article>
+        </div>
+
+        <div class="dsec-head" style="margin-top:var(--s5);margin-bottom:var(--s2)"><h4>花费 · 按天桶</h4><span class="line"></span><span class="n">从 tokens.json 侧车读，可重建</span></div>
+        <div class="sec" style="padding:0;overflow:hidden">
+          <table class="toktable">
+            <thead>
+              <tr>
+                <th>日期</th>
+                <th class="n">未命中</th>
+                <th class="n">命中</th>
+                <th class="n">写缓存</th>
+                <th class="n">输出</th>
+                <th class="n">调用</th>
+                <th class="n">命中率</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td>10 月 23 日</td>
+                <td class="n">42.0k</td>
+                <td class="n">51.0k</td>
+                <td class="n">8.2k</td>
+                <td class="n">11.0k</td>
+                <td class="n">38</td>
+                <td class="n">50.5%</td>
+              </tr>
+              <tr>
+                <td>10 月 24 日</td>
+                <td class="n">33.0k</td>
+                <td class="n">34.0k</td>
+                <td class="n">4.1k</td>
+                <td class="n">4.7k</td>
+                <td class="n">26</td>
+                <td class="n">47.7%</td>
+              </tr>
+            </tbody>
+            <tfoot>
+              <tr>
+                <td>合计</td>
+                <td class="n">75.0k</td>
+                <td class="n">85.0k</td>
+                <td class="n">12.3k</td>
+                <td class="n">15.7k</td>
+                <td class="n">64</td>
+                <td class="n">49.3%</td>
+              </tr>
+            </tfoot>
+          </table>
+        </div>
+
+        <div class="dsec-head" id="tasks" style="margin-top:var(--s5);margin-bottom:var(--s2)"><h4>任务历史 · 3</h4><span class="line"></span><span class="n">终态如实保留，失败不隐藏</span></div>
+        <div class="rows">
+          <article class="row">
+            <span class="mavatar a1" style="width:28px;height:28px;flex:none">实</span>
+            <div class="row-main">
+              <div class="row-title">定位 CI 超时发生在哪一段 <span class="mini-chip num">t1</span> <span class="chip done" style="height:20px;padding:0 6px 0 5px"><span class="shape done" style="width:6px;height:6px"></span>已完成</span></div>
+              <div class="row-sub">实现者 · 18 分钟 · 2 条证据（日志片段 + 分段耗时对比）· 产出 <code>ci-timeout-report.md</code></div>
+            </div>
+            <div class="row-act"><a class="btn sm" href="detail.html">看证据</a></div>
+          </article>
+          <article class="row">
+            <span class="mavatar a2" style="width:28px;height:28px;flex:none">评</span>
+            <div class="row-main">
+              <div class="row-title">修 pipeline 缓存与并发 <span class="mini-chip num">t2</span> <span class="chip fail" style="height:20px;padding:0 6px 0 5px"><span class="shape fail" style="width:6px;height:6px"></span>blocked</span></div>
+              <div class="row-sub">评审者 · 命令门禁连续 3 次在 120 秒上限超时，判为环境问题；解散时转 blocked，未产生新提交</div>
+            </div>
+            <div class="row-act"><a class="btn sm" href="audit.html">看门禁</a></div>
+          </article>
+          <article class="row">
+            <span class="mavatar" style="width:28px;height:28px;flex:none;background:var(--surface-3);color:var(--muted)"><svg class="icon icon-14"><use href="icons.svg#i-clock"></use></svg></span>
+            <div class="row-main">
+              <div class="row-title">回归验证与收口 <span class="mini-chip num">t3</span> <span class="chip idle" style="height:20px;padding:0 6px 0 5px"><span class="shape idle" style="width:6px;height:6px"></span>未开始</span></div>
+              <div class="row-sub">依赖 t2，未满足 —— 从头到尾没有实例认领过它</div>
+            </div>
+            <div class="row-act"></div>
+          </article>
+        </div>
+
+        <div class="dsec-head" id="ledger" style="margin-top:var(--s5);margin-bottom:var(--s2)"><h4>账本与产物</h4><span class="line"></span><span class="n">archive/t-3a80f5/</span></div>
+        <div class="rows">
+          <article class="row">
+            <span class="mavatar" style="width:28px;height:28px;flex:none;background:var(--surface-3);color:var(--muted)"><svg class="icon icon-14"><use href="icons.svg#i-file"></use></svg></span>
+            <div class="row-main">
+              <div class="row-title"><span class="iname">ledger.jsonl</span></div>
+              <div class="row-sub">14 条事件，append-only 原件 —— 回放是逐事件重放，不是快照</div>
+            </div>
+            <div class="row-act"><a class="btn sm" href="audit.html">逐条看</a></div>
+          </article>
+          <article class="row">
+            <span class="mavatar" style="width:28px;height:28px;flex:none;background:var(--surface-3);color:var(--muted)"><svg class="icon icon-14"><use href="icons.svg#i-file"></use></svg></span>
+            <div class="row-main">
+              <div class="row-title"><span class="iname">team.json</span> <span class="iname">tokens.json</span></div>
+              <div class="row-sub">名册与终态 · 按天桶花费侧车（派生，可从 tokenMeter 重建）</div>
+            </div>
+            <div class="row-act"></div>
+          </article>
+          <article class="row">
+            <span class="mavatar" style="width:28px;height:28px;flex:none;background:var(--surface-3);color:var(--muted)"><svg class="icon icon-14"><use href="icons.svg#i-folder"></use></svg></span>
+            <div class="row-main">
+              <div class="row-title"><span class="iname">members/</span></div>
+              <div class="row-sub">2 份 identity.json（不可变配置快照）+ 各自的 memory.md 与私有笔记</div>
+            </div>
+            <div class="row-act"></div>
+          </article>
+          <article class="row">
+            <span class="mavatar" style="width:28px;height:28px;flex:none;background:var(--surface-3);color:var(--muted)"><svg class="icon icon-14"><use href="icons.svg#i-arrow-up-right"></use></svg></span>
+            <div class="row-main">
+              <div class="row-title"><span class="iname">artifacts/</span> <span class="mini-chip num">1 项</span></div>
+              <div class="row-sub"><code>ci-timeout-report.md</code> · 产物索引，正文仍在原仓库路径</div>
+            </div>
+            <div class="row-act"><button class="btn sm">打开目录</button></div>
+          </article>
+        </div>
+
+        <p class="note" style="margin-top:var(--s4)">
+          <svg class="icon icon-14"><use href="icons.svg#i-archive"></use></svg>
+          <span><b>归档是终点，不是暂停。</b>实例会话已释放，任务不能再推进，账本只读。想接着做同类的事，用同一个预设新建一个团队 —— 旧团队不会被自动重建，也不会被新团队引用。归档区按结束日期、标题、花费可排序，也可以导出成人可读快照。</span>
+        </p>
+
+      </div>
+    </div>
+
+    <footer class="costbar">
+      <div class="cost">
+        <div>
+          <div class="cost-label">累计 token</div>
+          <div class="cost-val">188k<small> 归档快照</small></div>
+        </div>
+        <div class="cost-spark" aria-hidden="true">
+          <i style="height:38%"></i><i style="height:52%"></i><i style="height:46%"></i><i style="height:61%"></i>
+          <i style="height:57%"></i><i style="height:44%"></i><i style="height:33%"></i><i style="height:21%"></i>
+        </div>
+      </div>
+      <div class="cost">
+        <div>
+          <div class="cost-label">缓存命中率</div>
+          <div class="cost-val">49.3<small>%</small></div>
+        </div>
+      </div>
+      <div class="cost">
+        <div>
+          <div class="cost-label">今日未命中 / 输出</div>
+          <div class="cost-val">33.0k<small> / 4.7k</small></div>
+        </div>
+      </div>
+      <div class="cost">
+        <div>
+          <div class="cost-label">门禁重跑</div>
+          <div class="cost-val">3<small> 次</small></div>
+        </div>
+      </div>
+      <div class="cost-right">
+        <span class="chip idle"><span class="shape idle"></span>只读回放</span>
+        <span class="mini-chip">归因为估算</span>
+      </div>
+    </footer>
+
+  </main>
+</div>
+</body>
+</html>

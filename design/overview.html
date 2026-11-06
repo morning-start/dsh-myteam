@@ -1,0 +1,215 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="dsh-design" content="web">
+<title>全部团队</title>
+<link rel="stylesheet" href="tokens.css">
+<link rel="stylesheet" href="app.css">
+</head>
+<body>
+<div class="win">
+
+  <!-- ══ DSH 宿主侧栏（真实结构：品牌 · 新会话 · 选项栏 · 工作区 · 用户）══ -->
+  <aside class="dsh-rail" aria-label="DSH 侧栏">
+    <div class="dsh-brand">
+      <svg class="icon whale" style="width:24px;height:24px" aria-hidden="true"><use href="icons.svg#i-whale"></use></svg>
+      <span class="wordmark">deepseek</span>
+      <span class="btag">HARNNESS</span>
+      <button class="icon-btn" aria-label="收起侧栏"><svg class="icon icon-16"><use href="icons.svg#i-panel"></use></svg></button>
+    </div>
+    <a class="dsh-newchat" href="conversation.html"><svg class="icon icon-16"><use href="icons.svg#i-plus"></use></svg>新会话</a>
+    <nav class="dsh-nav" aria-label="选项栏">
+      <a href="#"><svg class="icon icon-18"><use href="icons.svg#i-puzzle"></use></svg><span class="lbl">插件</span></a>
+      <a href="#"><svg class="icon icon-18"><use href="icons.svg#i-clock"></use></svg><span class="lbl">自动化任务</span></a>
+      <a href="shell.html" aria-current="page"><svg class="icon icon-18"><use href="icons.svg#i-people"></use></svg><span class="lbl">myteam</span></a>
+      <a href="#"><svg class="icon icon-18"><use href="icons.svg#i-grid"></use></svg><span class="lbl">更多</span></a>
+    </nav>
+    <div class="dsh-sec">
+      <span class="cap">工作区</span>
+      <span class="tools">
+        <button aria-label="搜索工作区"><svg class="icon icon-14"><use href="icons.svg#i-search"></use></svg></button>
+        <button aria-label="工作区视图"><svg class="icon icon-14"><use href="icons.svg#i-sliders"></use></svg></button>
+        <button aria-label="新建工作区"><svg class="icon icon-14"><use href="icons.svg#i-box"></use></svg></button>
+      </span>
+    </div>
+    <div class="dsh-ws">
+      <a class="dsh-ws-row"><svg class="icon icon-16"><use href="icons.svg#i-folder"></use></svg>storefront</a>
+      <a class="dsh-ws-row"><svg class="icon icon-16"><use href="icons.svg#i-folder"></use></svg>atlas-docs</a>
+      <a class="dsh-ws-row open"><svg class="icon icon-16"><use href="icons.svg#i-folder"></use></svg>harbor-web</a>
+      <a class="dsh-sess" href="conversation.html"><span class="t">结算页模块化</span><span class="tm">25 分钟</span></a>
+      <a class="dsh-sess" href="board.html"><span class="t">插件 v0.2 接口评审</span><span class="tm">2 小时</span></a>
+      <a class="dsh-sess"><span class="t">周报汇总</span><span class="tm">4 小时</span></a>
+      <a class="dsh-ws-row"><svg class="icon icon-16"><use href="icons.svg#i-folder"></use></svg>mocha-lab</a>
+      <a class="dsh-sess"><span class="t">构建脚本提速</span><span class="tm">22 分钟</span></a>
+      <a class="dsh-ws-row"><svg class="icon icon-16"><use href="icons.svg#i-folder"></use></svg>notes-vault</a>
+      <a class="dsh-ws-row"><svg class="icon icon-16"><use href="icons.svg#i-folder"></use></svg>infra-sandbox</a>
+      <a class="dsh-ws-row"><svg class="icon icon-16"><use href="icons.svg#i-folder"></use></svg>docs-migration</a>
+      <a class="dsh-ws-row"><svg class="icon icon-16"><use href="icons.svg#i-folder"></use></svg>archive-2025</a>
+    </div>
+    <div class="dsh-user"><span class="av">林</span><span class="nm">林岸</span></div>
+  </aside>
+
+  <main class="main">
+    <!-- ══ 面板顶栏（宿主面板级常驻）══ -->
+    <header class="panel-bar">
+      <b class="panel-name">myteam</b>
+      <div class="seg" role="group" aria-label="作用域">
+        <a href="global.html" aria-pressed="false">全局</a>
+        <a href="shell.html" aria-pressed="true">项目</a>
+      </div>
+      <button class="icon-btn" aria-label="刷新面板"><svg class="icon icon-16"><use href="icons.svg#i-refresh"></use></svg></button>
+    </header>
+    <div class="page" style="max-width:1080px;padding-top:var(--s4)">
+
+      <div class="page-head" style="align-items:flex-start">
+        <div>
+          <h2>全部团队</h2>
+          <p>myteam 的总入口，跨团队看全局。每个团队是一组各有角色的 agent 会话，围绕一个目标协作；切到别的团队不会打断正在跑的实例。库（角色、预设、技能、知识）按作用域分层，团队只是引用。</p>
+        </div>
+        <div class="page-head-actions">
+          <a class="btn" href="#archived"><svg class="icon icon-14"><use href="icons.svg#i-archive"></use></svg>归档区</a>
+          <a class="btn primary" href="new-team-1.html"><svg class="icon icon-14"><use href="icons.svg#i-plus"></use></svg>新团队</a>
+        </div>
+      </div>
+
+      <!-- 作用域分层：内置 / 全局 / 项目 -->
+      <div class="dsec-head" style="margin-bottom:var(--s2)">
+        <h4>库的作用域</h4><span class="line"></span>
+        <span class="n">内置只读 · 全局跨项目 · 项目是运行时真相</span>
+      </div>
+      <div class="layers" style="margin-bottom:var(--s5)">
+        <div class="layer">
+          <span class="layer-ico builtin"><svg class="icon icon-14"><use href="icons.svg#i-lock"></use></svg></span>
+          <div class="layer-main">
+            <div class="layer-title">内置<span class="src builtin">随插件分发 · 只读</span></div>
+            <div class="layer-path">plugin/config/roles · 所有项目看到同一份，想改就复制出来</div>
+          </div>
+          <div class="layer-n">6<span>角色</span></div>
+          <div class="layer-n">1<span>预设</span></div>
+          <a class="mini-link" href="roles.html">看库</a>
+        </div>
+        <div class="layer">
+          <span class="layer-ico global"><svg class="icon icon-14"><use href="icons.svg#i-globe"></use></svg></span>
+          <div class="layer-main">
+            <div class="layer-title">全局<span class="src global">你的个人资产 · 跨项目</span></div>
+            <div class="layer-path">../.dsh/myteam/roles · 换项目还在，可从这里复制进项目</div>
+          </div>
+          <div class="layer-n">3<span>角色</span></div>
+          <div class="layer-n">2<span>预设</span></div>
+          <a class="mini-link" href="roles.html">看库</a>
+        </div>
+        <div class="layer">
+          <span class="layer-ico project"><svg class="icon icon-14"><use href="icons.svg#i-folder"></use></svg></span>
+          <div class="layer-main">
+            <div class="layer-title">项目<span class="src project">当前项目 · 可编辑</span></div>
+            <div class="layer-path">.team-workplace/config/ · 运行时只认这一层，团队实际用到的都在这儿</div>
+          </div>
+          <div class="layer-n">4<span>角色</span></div>
+          <div class="layer-n">23<span>知识</span></div>
+          <a class="mini-link" href="presets.html">看库</a>
+        </div>
+      </div>
+
+      <!-- 活跃团队 -->
+      <div class="dsec-head" style="margin-bottom:var(--s2)">
+        <h4>活跃 · 2</h4><span class="line"></span>
+        <span class="n">同一时间可以跑多个团队</span>
+      </div>
+      <div class="grid grid-2" style="margin-bottom:var(--s5)">
+
+        <article class="card hoverable" style="gap:var(--s3)">
+          <div class="card-top">
+            <span class="team-mark" style="width:30px;height:30px"><svg class="icon icon-14"><use href="icons.svg#i-hex"></use></svg></span>
+            <div style="flex:1;min-width:0">
+              <div class="card-title">结算页模块化</div>
+              <div class="card-sub num">t-8f3a2c · 创建于今天 19:20</div>
+            </div>
+            <span class="chip run"><span class="shape run"></span>运行中</span>
+          </div>
+          <p style="font-size:var(--fs-13);line-height:1.65;color:var(--text-2)">把结算页拆成独立模块，补齐回归测试并替换旧调用点</p>
+          <div class="card-row" style="font-size:12px;color:var(--muted);gap:var(--s3)">
+            <span>5 个角色</span>
+            <span>11 个任务 · 4 已完成</span>
+            <span>1.24M token</span>
+            <span class="chip gate" style="height:20px;padding:0 6px 0 5px;margin-left:auto"><span class="shape gate" style="width:6px;height:6px"></span>2 门禁待审</span>
+          </div>
+          <div class="card-foot" style="border-top:1px solid var(--line-soft);padding-top:var(--s2)">
+            <a class="btn sm" href="board.html" style="text-decoration:none">进入看板</a>
+            <a class="btn ghost sm" href="board.html" style="text-decoration:none">看门禁</a>
+            <button class="icon-btn" style="margin-left:auto;width:28px;height:28px" aria-label="团队操作"><svg class="icon icon-14"><use href="icons.svg#i-more"></use></svg></button>
+          </div>
+        </article>
+
+        <article class="card hoverable" style="gap:var(--s3)">
+          <div class="card-top">
+            <span class="team-mark" style="width:30px;height:30px;background:var(--gate)"><svg class="icon icon-14"><use href="icons.svg#i-hex"></use></svg></span>
+            <div style="flex:1;min-width:0">
+              <div class="card-title">插件 v0.2 接口评审</div>
+              <div class="card-sub num">t-21b47e · 创建于昨天 14:05</div>
+            </div>
+            <span class="chip idle"><span class="shape idle"></span>等待你裁决</span>
+          </div>
+          <p style="font-size:var(--fs-13);line-height:1.65;color:var(--text-2)">评审 v0.2 的 panel 契约变更，产出兼容性结论与迁移清单</p>
+          <div class="card-row" style="font-size:12px;color:var(--muted);gap:var(--s3)">
+            <span>3 个角色</span>
+            <span>6 个任务 · 5 已完成</span>
+            <span>418k token</span>
+            <span class="chip gate" style="height:20px;padding:0 6px 0 5px;margin-left:auto"><span class="shape gate" style="width:6px;height:6px"></span>计划待批</span>
+          </div>
+          <div class="card-foot" style="border-top:1px solid var(--line-soft);padding-top:var(--s2)">
+            <a class="btn sm" href="board.html" style="text-decoration:none">审阅计划</a>
+            <button class="btn ghost sm">查看账本</button>
+            <button class="icon-btn" style="margin-left:auto;width:28px;height:28px" aria-label="团队操作"><svg class="icon icon-14"><use href="icons.svg#i-more"></use></svg></button>
+          </div>
+        </article>
+      </div>
+
+      <!-- 归档区 -->
+      <div class="dsec-head" id="archived" style="margin-bottom:var(--s2)"><h4>已归档 · 3</h4><span class="line"></span><span class="n">只读，可回放</span></div>
+      <div class="rows">
+        <article class="row">
+          <span class="mavatar" style="width:28px;height:28px;flex:none;background:var(--surface-3);color:var(--muted)"><svg class="icon icon-14"><use href="icons.svg#i-archive"></use></svg></span>
+          <div class="row-main">
+            <div class="row-title">埋点口径对齐 <span class="mini-chip num">t-6c19a0</span></div>
+            <div class="row-sub">4 个角色 · 7 个任务全部完成 · 632k token · 归档于 10 月 26 日</div>
+          </div>
+          <div class="row-act">
+            <a class="btn sm" href="archive.html">回放</a>
+            <button class="icon-btn" style="width:28px;height:28px" aria-label="更多"><svg class="icon icon-14"><use href="icons.svg#i-more"></use></svg></button>
+          </div>
+        </article>
+        <article class="row">
+          <span class="mavatar" style="width:28px;height:28px;flex:none;background:var(--surface-3);color:var(--muted)"><svg class="icon icon-14"><use href="icons.svg#i-archive"></use></svg></span>
+          <div class="row-main">
+            <div class="row-title">CI 超时排查 <span class="mini-chip num">t-3a80f5</span> <span class="chip fail" style="height:20px;padding:0 6px 0 5px"><span class="shape fail" style="width:6px;height:6px"></span>未收口</span></div>
+            <div class="row-sub">2 个角色 · 3 个任务，1 个 blocked 后解散 · 188k token · 归档于 10 月 24 日</div>
+          </div>
+          <div class="row-act">
+            <a class="btn sm" href="archive.html">回放</a>
+            <button class="icon-btn" style="width:28px;height:28px" aria-label="更多"><svg class="icon icon-14"><use href="icons.svg#i-more"></use></svg></button>
+          </div>
+        </article>
+        <article class="row">
+          <span class="mavatar" style="width:28px;height:28px;flex:none;background:var(--surface-3);color:var(--muted)"><svg class="icon icon-14"><use href="icons.svg#i-archive"></use></svg></span>
+          <div class="row-main">
+            <div class="row-title">依赖升级预研 <span class="mini-chip num">t-90d2b1</span></div>
+            <div class="row-sub">3 个角色 · 5 个任务全部完成 · 402k token · 归档于 10 月 21 日</div>
+          </div>
+          <div class="row-act">
+            <a class="btn sm" href="archive.html">回放</a>
+            <button class="icon-btn" style="width:28px;height:28px" aria-label="更多"><svg class="icon icon-14"><use href="icons.svg#i-more"></use></svg></button>
+          </div>
+        </article>
+      </div>
+
+      <p class="note" style="margin-top:var(--s4)">
+        <svg class="icon icon-14"><use href="icons.svg#i-layers"></use></svg>
+        <span><b>团队之间互不干扰。</b>每个团队有自己的账本、名册和 token 账；角色与知识按作用域共享 —— 项目库里的东西所有团队都能用，但知识条目默认只属于创建它的团队。归档的团队不会被自动重建，要复用就新建一个。</span>
+      </p>
+    </div>
+  </main>
+</div>
+</body>
+</html>

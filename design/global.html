@@ -1,0 +1,239 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="dsh-design" content="web">
+<title>全局 · 角色库</title>
+<link rel="stylesheet" href="tokens.css">
+<link rel="stylesheet" href="app.css">
+</head>
+<body>
+<div class="win">
+
+  <!-- ══ DSH 宿主侧栏 ══ -->
+  <aside class="dsh-rail" aria-label="DSH 侧栏">
+    <div class="dsh-brand">
+      <svg class="icon whale" style="width:24px;height:24px" aria-hidden="true"><use href="icons.svg#i-whale"></use></svg>
+      <span class="wordmark">deepseek</span>
+      <span class="btag">HARNNESS</span>
+      <button class="icon-btn" aria-label="收起侧栏"><svg class="icon icon-16"><use href="icons.svg#i-panel"></use></svg></button>
+    </div>
+    <a class="dsh-newchat" href="conversation.html"><svg class="icon icon-16"><use href="icons.svg#i-plus"></use></svg>新会话</a>
+    <nav class="dsh-nav" aria-label="选项栏">
+      <a href="#"><svg class="icon icon-18"><use href="icons.svg#i-puzzle"></use></svg><span class="lbl">插件</span></a>
+      <a href="#"><svg class="icon icon-18"><use href="icons.svg#i-clock"></use></svg><span class="lbl">自动化任务</span></a>
+      <a href="shell.html" aria-current="page"><svg class="icon icon-18"><use href="icons.svg#i-people"></use></svg><span class="lbl">myteam</span></a>
+      <a href="#"><svg class="icon icon-18"><use href="icons.svg#i-grid"></use></svg><span class="lbl">更多</span></a>
+    </nav>
+    <div class="dsh-sec">
+      <span class="cap">工作区</span>
+      <span class="tools">
+        <button aria-label="搜索工作区"><svg class="icon icon-14"><use href="icons.svg#i-search"></use></svg></button>
+        <button aria-label="工作区视图"><svg class="icon icon-14"><use href="icons.svg#i-sliders"></use></svg></button>
+        <button aria-label="新建工作区"><svg class="icon icon-14"><use href="icons.svg#i-box"></use></svg></button>
+      </span>
+    </div>
+    <div class="dsh-ws">
+      <a class="dsh-ws-row"><svg class="icon icon-16"><use href="icons.svg#i-folder"></use></svg>storefront</a>
+      <a class="dsh-ws-row"><svg class="icon icon-16"><use href="icons.svg#i-folder"></use></svg>atlas-docs</a>
+      <a class="dsh-ws-row open"><svg class="icon icon-16"><use href="icons.svg#i-folder"></use></svg>harbor-web</a>
+      <a class="dsh-sess" href="conversation.html"><span class="t">结算页模块化</span><span class="tm">25 分钟</span></a>
+      <a class="dsh-sess" href="board.html"><span class="t">插件 v0.2 接口评审</span><span class="tm">2 小时</span></a>
+      <a class="dsh-sess"><span class="t">周报汇总</span><span class="tm">4 小时</span></a>
+      <a class="dsh-ws-row"><svg class="icon icon-16"><use href="icons.svg#i-folder"></use></svg>mocha-lab</a>
+      <a class="dsh-sess"><span class="t">构建脚本提速</span><span class="tm">22 分钟</span></a>
+      <a class="dsh-ws-row"><svg class="icon icon-16"><use href="icons.svg#i-folder"></use></svg>notes-vault</a>
+      <a class="dsh-ws-row"><svg class="icon icon-16"><use href="icons.svg#i-folder"></use></svg>infra-sandbox</a>
+      <a class="dsh-ws-row"><svg class="icon icon-16"><use href="icons.svg#i-folder"></use></svg>docs-migration</a>
+      <a class="dsh-ws-row"><svg class="icon icon-16"><use href="icons.svg#i-folder"></use></svg>archive-2025</a>
+    </div>
+    <div class="dsh-user"><span class="av">林</span><span class="nm">林岸</span></div>
+  </aside>
+
+  <main class="main">
+    <!-- ══ 面板顶栏（作用域切换）══ -->
+    <header class="panel-bar">
+      <b class="panel-name">myteam</b>
+      <div class="seg" role="group" aria-label="作用域">
+        <a href="global.html" aria-pressed="true">全局</a>
+        <a href="shell.html" aria-pressed="false">项目</a>
+      </div>
+      <button class="icon-btn" aria-label="刷新面板"><svg class="icon icon-16"><use href="icons.svg#i-refresh"></use></svg></button>
+    </header>
+
+    <!-- ══ 全局层头 ══ -->
+    <header class="teambar">
+      <span class="tb-title"><b>全局</b><span class="tid">跨项目共享</span></span>
+      <span class="tb-goal">全局作用域只有角色：内置角色随插件分发，全局角色是你的个人资产，换项目还在。团队是项目层的实体，全局不设团队。</span>
+      <span class="tb-actions">
+        <a class="btn primary sm" href="role-detail.html"><svg class="icon icon-14"><use href="icons.svg#i-plus"></use></svg>新建角色</a>
+      </span>
+    </header>
+
+    <div class="page">
+      <!-- 内置角色 -->
+      <div class="dsec-head" style="margin-bottom:var(--s2)">
+        <h4>内置 · 6</h4><span class="line"></span>
+        <span class="n">随插件分发 · 只读，复制到项目后可改</span>
+      </div>
+      <div class="grid grid-3" style="margin-bottom:var(--s5)">
+
+        <a class="card hoverable" href="role-detail.html">
+          <div class="card-top">
+            <span class="mavatar lead">队</span>
+            <div style="flex:1;min-width:0">
+              <div class="card-title"><span class="iname">captain</span> <span class="src builtin">内置</span></div>
+              <div class="card-sub">拆解目标、派发任务、裁决门禁</div>
+            </div>
+          </div>
+          <div class="card-row" style="font-size:12px;color:var(--muted);flex-wrap:wrap"><span style="flex:none">兴趣词</span><span class="mini-chip">规划</span><span class="mini-chip">裁决</span><span class="mini-chip">澄清</span></div>
+          <div class="card-row"><span class="mini-chip">claude-opus-4-6</span><span class="mini-chip">3 Skill</span><span class="mini-chip">2 MCP</span></div>
+          <div class="card-foot"><span style="font-size:12px;color:var(--muted)">每个团队一名，不开设实例</span><svg class="icon icon-14" style="color:var(--muted)"><use href="icons.svg#i-chevron-right"></use></svg></div>
+        </a>
+
+        <a class="card hoverable" href="role-detail.html">
+          <div class="card-top">
+            <span class="mavatar a1">实</span>
+            <div style="flex:1;min-width:0">
+              <div class="card-title"><span class="iname">implementer</span> <span class="src builtin">内置</span></div>
+              <div class="card-sub">按任务写实现、附验证证据</div>
+            </div>
+          </div>
+          <div class="card-row" style="font-size:12px;color:var(--muted);flex-wrap:wrap"><span style="flex:none">兴趣词</span><span class="mini-chip">结算</span><span class="mini-chip">模块边界</span><span class="mini-chip">灰度</span></div>
+          <div class="card-row"><span class="mini-chip">claude-sonnet-4-5</span><span class="mini-chip">2 Skill</span><span class="mini-chip">1 MCP</span></div>
+          <div class="card-foot"><span style="font-size:12px;color:var(--muted)">被 2 个团队聘任 · 3 个实例</span><svg class="icon icon-14" style="color:var(--muted)"><use href="icons.svg#i-chevron-right"></use></svg></div>
+        </a>
+
+        <a class="card hoverable" href="role-detail.html">
+          <div class="card-top">
+            <span class="mavatar a2">评</span>
+            <div style="flex:1;min-width:0">
+              <div class="card-title"><span class="iname">reviewer</span> <span class="src builtin">内置</span></div>
+              <div class="card-sub">独立评审交付，给出通过或驳回理由</div>
+            </div>
+          </div>
+          <div class="card-row" style="font-size:12px;color:var(--muted);flex-wrap:wrap"><span style="flex:none">兴趣词</span><span class="mini-chip">契约</span><span class="mini-chip">回归</span><span class="mini-chip">风险</span></div>
+          <div class="card-row"><span class="mini-chip">claude-opus-4-6</span><span class="mini-chip">2 Skill</span><span class="mini-chip">1 MCP</span></div>
+          <div class="card-foot"><span style="font-size:12px;color:var(--muted)">被 2 个团队聘任</span><svg class="icon icon-14" style="color:var(--muted)"><use href="icons.svg#i-chevron-right"></use></svg></div>
+        </a>
+
+        <a class="card hoverable" href="role-detail.html">
+          <div class="card-top">
+            <span class="mavatar a4">需</span>
+            <div style="flex:1;min-width:0">
+              <div class="card-title"><span class="iname">req-validator</span> <span class="src builtin">内置</span></div>
+              <div class="card-sub">把目标核对成可验证的验收口径</div>
+            </div>
+          </div>
+          <div class="card-row" style="font-size:12px;color:var(--muted);flex-wrap:wrap"><span style="flex:none">兴趣词</span><span class="mini-chip">可交付</span><span class="mini-chip">验收口径</span></div>
+          <div class="card-row"><span class="mini-chip">qwen3-coder</span><span class="mini-chip">1 Skill</span><span class="mini-chip">0 MCP</span></div>
+          <div class="card-foot"><span style="font-size:12px;color:var(--muted)">被 1 个团队聘任</span><svg class="icon icon-14" style="color:var(--muted)"><use href="icons.svg#i-chevron-right"></use></svg></div>
+        </a>
+
+        <a class="card hoverable" href="role-detail.html">
+          <div class="card-top">
+            <span class="mavatar">验</span>
+            <div style="flex:1;min-width:0">
+              <div class="card-title"><span class="iname">acceptor</span> <span class="src builtin">内置</span></div>
+              <div class="card-sub">按验收口径复核证据，放行或打回</div>
+            </div>
+          </div>
+          <div class="card-row" style="font-size:12px;color:var(--muted);flex-wrap:wrap"><span style="flex:none">兴趣词</span><span class="mini-chip">验收</span><span class="mini-chip">证据复核</span></div>
+          <div class="card-row"><span class="mini-chip">claude-opus-4-6</span><span class="mini-chip">1 Skill</span><span class="mini-chip">1 MCP</span></div>
+          <div class="card-foot"><span style="font-size:12px;color:var(--muted)">被 1 个团队聘任</span><svg class="icon icon-14" style="color:var(--muted)"><use href="icons.svg#i-chevron-right"></use></svg></div>
+        </a>
+
+        <a class="card hoverable" href="role-detail.html">
+          <div class="card-top">
+            <span class="mavatar a3">写</span>
+            <div style="flex:1;min-width:0">
+              <div class="card-title"><span class="iname">tech-writer</span> <span class="src builtin">内置</span></div>
+              <div class="card-sub">把改动沉淀成迁移说明与对外文档</div>
+            </div>
+          </div>
+          <div class="card-row" style="font-size:12px;color:var(--muted);flex-wrap:wrap"><span style="flex:none">兴趣词</span><span class="mini-chip">迁移说明</span><span class="mini-chip">对外文档</span></div>
+          <div class="card-row"><span class="mini-chip">claude-sonnet-4-5</span><span class="mini-chip">2 Skill</span><span class="mini-chip">0 MCP</span></div>
+          <div class="card-foot"><span style="font-size:12px;color:var(--muted)">未被聘任</span><svg class="icon icon-14" style="color:var(--muted)"><use href="icons.svg#i-chevron-right"></use></svg></div>
+        </a>
+      </div>
+
+      <!-- 全局自定义 -->
+      <div class="dsec-head" style="margin-bottom:var(--s2)">
+        <h4>全局 · 3</h4><span class="line"></span>
+        <span class="n">你的个人资产 · 换项目还在</span>
+      </div>
+      <div class="grid grid-3" style="margin-bottom:var(--s5)">
+
+        <a class="card hoverable" href="role-detail.html">
+          <div class="card-top">
+            <span class="mavatar a2">析</span>
+            <div style="flex:1;min-width:0">
+              <div class="card-title"><span class="iname">data-analyst</span> <span class="src global">全局</span></div>
+              <div class="card-sub">取数、对口径、解释异常波动</div>
+            </div>
+          </div>
+          <div class="card-row" style="font-size:12px;color:var(--muted);flex-wrap:wrap"><span style="flex:none">兴趣词</span><span class="mini-chip">取数</span><span class="mini-chip">口径核对</span></div>
+          <div class="card-row"><span class="mini-chip">deepseek-v3.2</span><span class="mini-chip">2 Skill</span><span class="mini-chip">2 MCP</span></div>
+          <div class="card-foot"><span style="font-size:12px;color:var(--muted)">被 1 个项目使用</span><svg class="icon icon-14" style="color:var(--muted)"><use href="icons.svg#i-chevron-right"></use></svg></div>
+        </a>
+
+        <a class="card hoverable" href="role-detail.html">
+          <div class="card-top">
+            <span class="mavatar a4">审</span>
+            <div style="flex:1;min-width:0">
+              <div class="card-title"><span class="iname">api-reviewer</span> <span class="src global">全局</span></div>
+              <div class="card-sub">审对外接口的兼容性与契约一致性</div>
+            </div>
+          </div>
+          <div class="card-row" style="font-size:12px;color:var(--muted);flex-wrap:wrap"><span style="flex:none">兴趣词</span><span class="mini-chip">兼容性</span><span class="mini-chip">契约比对</span></div>
+          <div class="card-row"><span class="mini-chip">claude-opus-4-6</span><span class="mini-chip">1 Skill</span><span class="mini-chip">1 MCP</span></div>
+          <div class="card-foot"><span style="font-size:12px;color:var(--muted)">被 1 个团队聘任</span><svg class="icon icon-14" style="color:var(--muted)"><use href="icons.svg#i-chevron-right"></use></svg></div>
+        </a>
+
+        <a class="card hoverable" href="role-detail.html">
+          <div class="card-top">
+            <span class="mavatar a1">开</span>
+            <div style="flex:1;min-width:0">
+              <div class="card-title"><span class="iname">developer</span> <span class="src global">全局</span></div>
+              <div class="card-sub">写脚本、搭脚手架、处理一次性工程活</div>
+            </div>
+          </div>
+          <div class="card-row" style="font-size:12px;color:var(--muted);flex-wrap:wrap"><span style="flex:none">兴趣词</span><span class="mini-chip">脚本</span><span class="mini-chip">脚手架</span></div>
+          <div class="card-row"><span class="mini-chip">qwen3-coder</span><span class="mini-chip">1 Skill</span><span class="mini-chip">0 MCP</span></div>
+          <div class="card-foot"><span style="font-size:12px;color:var(--muted)">未被聘任</span><svg class="icon icon-14" style="color:var(--muted)"><use href="icons.svg#i-chevron-right"></use></svg></div>
+        </a>
+      </div>
+
+      <!-- 全局另外两类资产 -->
+      <div class="dsec-head" style="margin-bottom:var(--s2)">
+        <h4>随行资产</h4><span class="line"></span>
+        <span class="n">建团模板与系统能力，同样跨项目</span>
+      </div>
+      <div class="grid grid-2">
+        <a class="card hoverable" href="presets.html">
+          <div class="card-top">
+            <span class="mavatar lead" style="background:var(--surface-3);color:var(--text)"><svg class="icon icon-16"><use href="icons.svg#i-layers"></use></svg></span>
+            <div style="flex:1;min-width:0">
+              <div class="card-title">预设 <span class="src global">4 条</span></div>
+              <div class="card-sub">建团模板：一组角色的编排，一条预设开一个团队</div>
+            </div>
+          </div>
+          <div class="card-row" style="font-size:12px;color:var(--muted)">结账改造突击队 · 接口评审组 · 灰度迁移 · 周报整理</div>
+        </a>
+        <a class="card hoverable" href="skills.html">
+          <div class="card-top">
+            <span class="mavatar a3" style="background:var(--surface-3);color:var(--text)"><svg class="icon icon-16"><use href="icons.svg#i-box"></use></svg></span>
+            <div style="flex:1;min-width:0">
+              <div class="card-title">技能 &amp; MCP <span class="src global">9 技能 · 5 连接</span></div>
+              <div class="card-sub">全局能力库：角色详情里按需引用，不在角色里重复定义</div>
+            </div>
+          </div>
+          <div class="card-row" style="font-size:12px;color:var(--muted)">github · tools 已连接 · postgres 只读 · 3 个内置服务器</div>
+        </a>
+      </div>
+    </div>
+  </main>
+</div>
+</body>
+</html>

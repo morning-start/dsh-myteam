@@ -1,0 +1,235 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="dsh-design" content="web">
+<title>任务 · 流程视图</title>
+<link rel="stylesheet" href="tokens.css">
+<link rel="stylesheet" href="app.css">
+</head>
+<body>
+<div class="win">
+
+  <!-- ══ DSH 宿主侧栏（真实结构：品牌 · 新会话 · 选项栏 · 工作区 · 用户）══ -->
+  <aside class="dsh-rail" aria-label="DSH 侧栏">
+    <div class="dsh-brand">
+      <svg class="icon whale" style="width:24px;height:24px" aria-hidden="true"><use href="icons.svg#i-whale"></use></svg>
+      <span class="wordmark">deepseek</span>
+      <span class="btag">HARNNESS</span>
+      <button class="icon-btn" aria-label="收起侧栏"><svg class="icon icon-16"><use href="icons.svg#i-panel"></use></svg></button>
+    </div>
+    <a class="dsh-newchat" href="conversation.html"><svg class="icon icon-16"><use href="icons.svg#i-plus"></use></svg>新会话</a>
+    <nav class="dsh-nav" aria-label="选项栏">
+      <a href="#"><svg class="icon icon-18"><use href="icons.svg#i-puzzle"></use></svg><span class="lbl">插件</span></a>
+      <a href="#"><svg class="icon icon-18"><use href="icons.svg#i-clock"></use></svg><span class="lbl">自动化任务</span></a>
+      <a href="shell.html" aria-current="page"><svg class="icon icon-18"><use href="icons.svg#i-people"></use></svg><span class="lbl">myteam</span></a>
+      <a href="#"><svg class="icon icon-18"><use href="icons.svg#i-grid"></use></svg><span class="lbl">更多</span></a>
+    </nav>
+    <div class="dsh-sec">
+      <span class="cap">工作区</span>
+      <span class="tools">
+        <button aria-label="搜索工作区"><svg class="icon icon-14"><use href="icons.svg#i-search"></use></svg></button>
+        <button aria-label="工作区视图"><svg class="icon icon-14"><use href="icons.svg#i-sliders"></use></svg></button>
+        <button aria-label="新建工作区"><svg class="icon icon-14"><use href="icons.svg#i-box"></use></svg></button>
+      </span>
+    </div>
+    <div class="dsh-ws">
+      <a class="dsh-ws-row"><svg class="icon icon-16"><use href="icons.svg#i-folder"></use></svg>storefront</a>
+      <a class="dsh-ws-row"><svg class="icon icon-16"><use href="icons.svg#i-folder"></use></svg>atlas-docs</a>
+      <a class="dsh-ws-row open"><svg class="icon icon-16"><use href="icons.svg#i-folder"></use></svg>harbor-web</a>
+      <a class="dsh-sess" href="conversation.html"><span class="t">结算页模块化</span><span class="tm">25 分钟</span></a>
+      <a class="dsh-sess" href="board.html"><span class="t">插件 v0.2 接口评审</span><span class="tm">2 小时</span></a>
+      <a class="dsh-sess"><span class="t">周报汇总</span><span class="tm">4 小时</span></a>
+      <a class="dsh-ws-row"><svg class="icon icon-16"><use href="icons.svg#i-folder"></use></svg>mocha-lab</a>
+      <a class="dsh-sess"><span class="t">构建脚本提速</span><span class="tm">22 分钟</span></a>
+      <a class="dsh-ws-row"><svg class="icon icon-16"><use href="icons.svg#i-folder"></use></svg>notes-vault</a>
+      <a class="dsh-ws-row"><svg class="icon icon-16"><use href="icons.svg#i-folder"></use></svg>infra-sandbox</a>
+      <a class="dsh-ws-row"><svg class="icon icon-16"><use href="icons.svg#i-folder"></use></svg>docs-migration</a>
+      <a class="dsh-ws-row"><svg class="icon icon-16"><use href="icons.svg#i-folder"></use></svg>archive-2025</a>
+    </div>
+    <div class="dsh-user"><span class="av">林</span><span class="nm">林岸</span></div>
+  </aside>
+
+  <main class="main">
+    <!-- ══ 面板顶栏（宿主面板级常驻）══ -->
+    <header class="panel-bar">
+      <b class="panel-name">myteam</b>
+      <div class="seg" role="group" aria-label="作用域">
+        <a href="global.html" aria-pressed="false">全局</a>
+        <a href="shell.html" aria-pressed="true">项目</a>
+      </div>
+      <button class="icon-btn" aria-label="刷新面板"><svg class="icon icon-16"><use href="icons.svg#i-refresh"></use></svg></button>
+    </header>
+        <!-- ══ 团队头（真实结构：← 全局 · 名称/ID · 状态 · 描述 · 行内统计 · 右侧动作）══ -->
+        <!-- ══ 任务头（项目级实体，与团队是参与关系）══ -->
+    <header class="teambar">
+      <span class="tb-title"><b>任务</b><span class="tid num">17 个 · 3 个团队参与</span></span>
+      <span class="tb-goal">任务是项目级实体：团队通过「参与」接手，一张任务可多团队参与（主责 / 协作），一个团队也负责多个任务</span>
+      <span class="tb-stats num">进行中 3 · 门禁待审 3 · 已完成 5</span>
+      <span class="tb-actions">
+        <button class="icon-btn" aria-label="刷新"><svg class="icon icon-14"><use href="icons.svg#i-refresh"></use></svg></button>
+        <button class="icon-btn" aria-label="任务操作"><svg class="icon icon-14"><use href="icons.svg#i-more"></use></svg></button>
+      </span>
+    </header>
+
+                                <nav class="tabbar" role="tablist">
+      <a class="tab" role="tab" href="roles.html" aria-selected="false">角色<span class="tc">(13)</span></a>
+      <a class="tab" role="tab" href="shell.html" aria-selected="false">团队<span class="tc">(3)</span></a>
+      <a class="tab" role="tab" href="board.html" aria-selected="true">任务<span class="tc">(17)</span></a>
+    </nav>
+
+    <div class="work">
+      <div class="viewbar">
+                <span class="view-label">视图</span>
+                <nav class="vlinks" aria-label="视图切换">
+          <a href="tasks.html" aria-current="false">列表</a>
+          <a href="board.html" aria-current="false">看板</a>
+          <a href="lanes.html" aria-current="true">流程</a>
+          <a href="dag.html" aria-current="false">依赖图</a>
+        </nav>
+        <div class="viewbar-right">
+          <span class="mini-chip">行 = 角色</span>
+          <button class="btn sm"><svg class="icon icon-14"><use href="icons.svg#i-filter"></use></svg>按阶段</button>
+          <button class="btn sm"><svg class="icon icon-14"><use href="icons.svg#i-filter"></use></svg>按优先级</button>
+        </div>
+      </div>
+
+      <div class="lanes">
+        <!-- 表头 -->
+        <div class="lane" style="margin-bottom:6px">
+          <div class="lane-head">角色</div>
+          <div class="lane-head">待规划 · 2</div>
+          <div class="lane-head">就绪 · 2</div>
+          <div class="lane-head">进行中 · 2</div>
+          <div class="lane-head">门禁 · 2</div>
+        </div>
+
+        <!-- 实现者 -->
+        <div class="lane">
+          <div class="lane-label">
+            <div style="display:flex;align-items:center;gap:6px">
+              <span class="mavatar a1" style="width:24px;height:24px;font-size:12px">实</span>
+              <b>实现者</b>
+            </div>
+            <span class="num">implementer · claude-sonnet</span>
+            <span class="num" style="color:var(--muted)">386k token</span>
+          </div>
+          <div class="lane-cell empty"></div>
+          <div class="lane-cell">
+            <a class="lane-node" href="detail.html"><b>t2</b><span>API 契约</span><span class="tk">阻塞</span></a>
+          </div>
+          <div class="lane-cell">
+            <a class="lane-node run" href="detail.html"><b>t7</b><span>服务边界</span><span class="tk">12m</span></a>
+          </div>
+          <div class="lane-cell empty"></div>
+        </div>
+
+        <!-- 评审者 -->
+        <div class="lane">
+          <div class="lane-label">
+            <div style="display:flex;align-items:center;gap:6px">
+              <span class="mavatar a2" style="width:24px;height:24px;font-size:12px">评</span>
+              <b>评审者</b>
+            </div>
+            <span class="num">reviewer · claude-opus-4.6</span>
+            <span class="num" style="color:var(--muted)">241k token</span>
+          </div>
+          <div class="lane-cell empty"></div>
+          <div class="lane-cell">
+            <a class="lane-node" href="detail.html"><b>t5</b><span>调用点替换</span><span class="tk">就绪</span></a>
+          </div>
+          <div class="lane-cell empty"></div>
+          <div class="lane-cell">
+            <a class="lane-node gate" href="detail.html"><b>t4</b><span>冒烟 4 条</span><span class="tk">重派</span></a>
+          </div>
+        </div>
+
+        <!-- 实现者 2 -->
+        <div class="lane">
+          <div class="lane-label">
+            <div style="display:flex;align-items:center;gap:6px">
+              <span class="mavatar a3" style="width:24px;height:24px;font-size:12px">实</span>
+              <b>实现者<span class="idx">2</span></b>
+            </div>
+            <span class="num">implementer-2 · claude-sonnet</span>
+            <span class="num" style="color:var(--muted)">178k token</span>
+          </div>
+          <div class="lane-cell empty"></div>
+          <div class="lane-cell empty"></div>
+          <div class="lane-cell">
+            <a class="lane-node run" href="detail.html"><b>t6</b><span>UI 迁移</span><span class="tk">6m</span></a>
+          </div>
+          <div class="lane-cell empty"></div>
+        </div>
+
+        <!-- 需求验证员 -->
+        <div class="lane">
+          <div class="lane-label">
+            <div style="display:flex;align-items:center;gap:6px">
+              <span class="mavatar a4" style="width:24px;height:24px;font-size:12px">需</span>
+              <b>需求验证员</b>
+            </div>
+            <span class="num">req-validator · qwen3-coder</span>
+            <span class="num" style="color:var(--muted)">96k token</span>
+          </div>
+          <div class="lane-cell">
+            <a class="lane-node" href="detail.html"><b>t1</b><span>调用点清单</span><span class="tk">待认领</span></a>
+          </div>
+          <div class="lane-cell">
+            <a class="lane-node" href="detail.html"><b>t8</b><span>回归 12 条</span><span class="tk">就绪</span></a>
+          </div>
+          <div class="lane-cell empty"></div>
+          <div class="lane-cell">
+            <a class="lane-node gate" href="detail.html"><b>t3</b><span>移除旧目录</span><span class="tk">验证中</span></a>
+          </div>
+        </div>
+
+        <!-- 验收员 -->
+        <div class="lane">
+          <div class="lane-label">
+            <div style="display:flex;align-items:center;gap:6px">
+              <span class="mavatar" style="width:24px;height:24px;font-size:12px">验</span>
+              <b>验收员</b>
+            </div>
+            <span class="num">acceptor · claude-opus-4.6</span>
+            <span class="num" style="color:var(--muted)">341k token</span>
+          </div>
+          <div class="lane-cell empty"></div>
+          <div class="lane-cell empty"></div>
+          <div class="lane-cell empty"></div>
+          <div class="lane-cell empty" style="justify-content:center;align-items:center">
+            <span style="font-size:12px;color:var(--muted)">无进行中任务</span>
+          </div>
+        </div>
+
+        <p class="note info" style="margin-top:var(--s3)">
+          <svg class="icon icon-14"><use href="icons.svg#i-alert"></use></svg>
+          <span><b>泳道按角色分行</b>，每个格子是该实例在某个阶段的任务节点。在设置页可切换为按阶段或按优先级分行（<span class="num">pipeline.swimlaneBy</span>），蛇形布局让阶段流转方向始终向右。</span>
+        </p>
+      </div>
+
+      <footer class="costbar">
+        <div class="cost">
+          <div><div class="cost-label">项目累计 token</div><div class="cost-val">1.86M</div></div>
+          <div class="cost-spark" aria-hidden="true">
+            <i style="height:6px"></i><i style="height:9px"></i><i style="height:7px"></i><i style="height:13px"></i>
+            <i style="height:11px"></i><i style="height:16px"></i><i style="height:14px"></i><i class="hot" style="height:20px"></i>
+          </div>
+        </div>
+        <div class="cost"><div><div class="cost-label">缓存命中率</div><div class="cost-val">71.8<small>%</small></div></div></div>
+        <div class="cost"><div><div class="cost-label">今日未命中 / 输出</div><div class="cost-val">264k <small>/</small> 58k</div></div></div>
+        <div class="cost"><div><div class="cost-label">门禁重跑</div><div class="cost-val">4 <small>次</small></div></div></div>
+        <div class="cost-right">
+          <div style="display:flex;align-items:center;gap:8px">
+            <div class="ring" aria-hidden="true"><b>68%</b></div>
+            <div><div class="cost-label">上下文占用</div><div class="cost-val" style="font-size:12px">174k <small>/ 256k</small></div></div>
+          </div>
+          <span class="mini-chip">归因为估算</span>
+        </div>
+      </footer>
+    </div>
+  </main>
+</div>
+</body>
+</html>

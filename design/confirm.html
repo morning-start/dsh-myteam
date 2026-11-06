@@ -1,0 +1,141 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="dsh-design" content="web">
+<title>解散团队 · 两段确认</title>
+<link rel="stylesheet" href="tokens.css">
+<link rel="stylesheet" href="app.css">
+</head>
+<body>
+<div class="win">
+
+  <!-- ══ DSH 宿主侧栏（真实结构：品牌 · 新会话 · 选项栏 · 工作区 · 用户）══ -->
+  <aside class="dsh-rail" aria-label="DSH 侧栏">
+    <div class="dsh-brand">
+      <svg class="icon whale" style="width:24px;height:24px" aria-hidden="true"><use href="icons.svg#i-whale"></use></svg>
+      <span class="wordmark">deepseek</span>
+      <span class="btag">HARNNESS</span>
+      <button class="icon-btn" aria-label="收起侧栏"><svg class="icon icon-16"><use href="icons.svg#i-panel"></use></svg></button>
+    </div>
+    <a class="dsh-newchat" href="conversation.html"><svg class="icon icon-16"><use href="icons.svg#i-plus"></use></svg>新会话</a>
+    <nav class="dsh-nav" aria-label="选项栏">
+      <a href="#"><svg class="icon icon-18"><use href="icons.svg#i-puzzle"></use></svg><span class="lbl">插件</span></a>
+      <a href="#"><svg class="icon icon-18"><use href="icons.svg#i-clock"></use></svg><span class="lbl">自动化任务</span></a>
+      <a href="shell.html" aria-current="page"><svg class="icon icon-18"><use href="icons.svg#i-people"></use></svg><span class="lbl">myteam</span></a>
+      <a href="#"><svg class="icon icon-18"><use href="icons.svg#i-grid"></use></svg><span class="lbl">更多</span></a>
+    </nav>
+    <div class="dsh-sec">
+      <span class="cap">工作区</span>
+      <span class="tools">
+        <button aria-label="搜索工作区"><svg class="icon icon-14"><use href="icons.svg#i-search"></use></svg></button>
+        <button aria-label="工作区视图"><svg class="icon icon-14"><use href="icons.svg#i-sliders"></use></svg></button>
+        <button aria-label="新建工作区"><svg class="icon icon-14"><use href="icons.svg#i-box"></use></svg></button>
+      </span>
+    </div>
+    <div class="dsh-ws">
+      <a class="dsh-ws-row"><svg class="icon icon-16"><use href="icons.svg#i-folder"></use></svg>storefront</a>
+      <a class="dsh-ws-row"><svg class="icon icon-16"><use href="icons.svg#i-folder"></use></svg>atlas-docs</a>
+      <a class="dsh-ws-row open"><svg class="icon icon-16"><use href="icons.svg#i-folder"></use></svg>harbor-web</a>
+      <a class="dsh-sess" href="conversation.html"><span class="t">结算页模块化</span><span class="tm">25 分钟</span></a>
+      <a class="dsh-sess" href="board.html"><span class="t">插件 v0.2 接口评审</span><span class="tm">2 小时</span></a>
+      <a class="dsh-sess"><span class="t">周报汇总</span><span class="tm">4 小时</span></a>
+      <a class="dsh-ws-row"><svg class="icon icon-16"><use href="icons.svg#i-folder"></use></svg>mocha-lab</a>
+      <a class="dsh-sess"><span class="t">构建脚本提速</span><span class="tm">22 分钟</span></a>
+      <a class="dsh-ws-row"><svg class="icon icon-16"><use href="icons.svg#i-folder"></use></svg>notes-vault</a>
+      <a class="dsh-ws-row"><svg class="icon icon-16"><use href="icons.svg#i-folder"></use></svg>infra-sandbox</a>
+      <a class="dsh-ws-row"><svg class="icon icon-16"><use href="icons.svg#i-folder"></use></svg>docs-migration</a>
+      <a class="dsh-ws-row"><svg class="icon icon-16"><use href="icons.svg#i-folder"></use></svg>archive-2025</a>
+    </div>
+    <div class="dsh-user"><span class="av">林</span><span class="nm">林岸</span></div>
+  </aside>
+
+  <main class="main">
+    <!-- ══ 面板顶栏（宿主面板级常驻）══ -->
+    <header class="panel-bar">
+      <b class="panel-name">myteam</b>
+      <div class="seg" role="group" aria-label="作用域">
+        <a href="global.html" aria-pressed="false">全局</a>
+        <a href="shell.html" aria-pressed="true">项目</a>
+      </div>
+      <button class="icon-btn" aria-label="刷新面板"><svg class="icon icon-16"><use href="icons.svg#i-refresh"></use></svg></button>
+    </header>
+        <!-- ══ 团队头（真实结构：← 全局 · 名称/ID · 状态 · 描述 · 行内统计 · 右侧动作）══ -->
+    <header class="teambar">
+      <a class="back-all" href="shell.html"><svg class="icon icon-14"><use href="icons.svg#i-arrow-left"></use></svg>项目</a>
+      <span class="tb-title"><b>结算页模块化</b><span class="tid num">t-8f3a2c</span></span>
+      <span class="chip run"><span class="shape run"></span>运行中</span>
+      <span class="tb-goal">把结算页拆成独立模块，补齐回归测试并替换旧调用点</span>
+      <span class="tb-stats num">完成 3/11 · 进行中 2 · 门禁待审 2 · 角色 5</span>
+      <span class="tb-actions">
+        <button class="icon-btn" aria-label="刷新"><svg class="icon icon-14"><use href="icons.svg#i-refresh"></use></svg></button>
+        <button class="icon-btn" aria-label="团队操作"><svg class="icon icon-14"><use href="icons.svg#i-more"></use></svg></button>
+      </span>
+    </header>
+
+                                <nav class="tabbar" role="tablist">
+      <a class="tab" role="tab" href="roster.html" aria-selected="true">队员<span class="tc">(5)</span></a>
+      <a class="tab" role="tab" href="team-tasks.html" aria-selected="false">参与任务<span class="tc">(12)</span></a>
+      <a class="tab" role="tab" href="knowledge.html" aria-selected="false">知识<span class="tc">(23)</span></a>
+      <a class="tab" role="tab" href="audit.html" aria-selected="false">审计</a>
+      <a class="tab" role="tab" href="settings.html" aria-selected="false">设置</a>
+    </nav>
+
+    <!-- 背景：设置页 -->
+    <div class="page" aria-hidden="true" style="max-width:1000px">
+      <div class="page-head">
+        <div><h2>团队设置</h2><p>这里的改动写入 .team-workplace/config/team.config.json。</p></div>
+      </div>
+      <div class="rows">
+        <div class="row"><div class="row-main"><div class="row-title">团队规模</div></div><span class="readonly-val">硬上限 6</span></div>
+        <div class="row"><div class="row-main"><div class="row-title">门禁</div></div><button class="switch" role="switch" aria-checked="true" tabindex="-1"></button></div>
+        <div class="row"><div class="row-main"><div class="row-title" style="color:var(--fail-ink)">解散此团队</div></div><button class="btn danger sm">解散</button></div>
+      </div>
+    </div>
+
+    <!-- 弹层：解散两段确认 -->
+    <div class="scrim">
+      <div class="dialog" role="alertdialog" aria-modal="true" aria-labelledby="disbandTitle" aria-describedby="disbandImpact">
+        <div class="dialog-head">
+          <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px">
+            <span class="chip fail" style="height:22px"><span class="shape fail"></span>不可撤销</span>
+            <span style="font-size:12px;color:var(--muted)">第 2 步，共 2 步</span>
+          </div>
+          <h2 id="disbandTitle">解散「结算页模块化」？</h2>
+          <p>这个团队的所有会话会被终止，在册角色被释放。以下影响会发生，且没有撤销按钮。</p>
+        </div>
+
+        <div class="dialog-body">
+          <div class="impact" id="disbandImpact">
+            <b>解散后的影响面</b>
+            <ul>
+              <li><b>5 个角色</b>将被排空后释放，包括正在跑 t7、t6 的两名</li>
+              <li><b>8 个未完成任务</b>转为 blocked，不会自动续跑</li>
+              <li>账本与 token 记录归档至 <span class="num">archive/</span>，只读可查，但不能再启动</li>
+              <li>各实例的私有空间（工作笔记、临时文件）<b>会被删除</b></li>
+            </ul>
+          </div>
+
+          <div class="form-row">
+            <label for="confirmInput">输入团队 ID 确认</label>
+            <input class="input num" id="confirmInput" value="t-8f3a2c" style="flex:1">
+          </div>
+          <p style="font-size:12px;color:var(--muted);line-height:1.7;margin-top:-6px">
+            如果你只是想让团队停下来，用「归档」就好——归档保留全部数据，之后还能重新打开。
+          </p>
+        </div>
+
+        <div class="dialog-foot">
+          <button class="btn ghost" style="margin-right:auto">改用归档</button>
+          <div class="right">
+            <button class="btn">取消</button>
+            <button class="btn danger">确认解散</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </main>
+</div>
+</body>
+</html>

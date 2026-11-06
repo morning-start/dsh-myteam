@@ -1,0 +1,195 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="dsh-design" content="web">
+<title>单角色调用 · /myteam+roleId</title>
+<link rel="stylesheet" href="tokens.css">
+<link rel="stylesheet" href="app.css">
+</head>
+<body>
+<div class="win">
+
+  <!-- ══ DSH 宿主侧栏（真实结构：品牌 · 新会话 · 选项栏 · 工作区 · 用户）══ -->
+  <aside class="dsh-rail" aria-label="DSH 侧栏">
+    <div class="dsh-brand">
+      <svg class="icon whale" style="width:24px;height:24px" aria-hidden="true"><use href="icons.svg#i-whale"></use></svg>
+      <span class="wordmark">deepseek</span>
+      <span class="btag">HARNNESS</span>
+      <button class="icon-btn" aria-label="收起侧栏"><svg class="icon icon-16"><use href="icons.svg#i-panel"></use></svg></button>
+    </div>
+    <a class="dsh-newchat" href="conversation.html"><svg class="icon icon-16"><use href="icons.svg#i-plus"></use></svg>新会话</a>
+    <nav class="dsh-nav" aria-label="选项栏">
+      <a href="#"><svg class="icon icon-18"><use href="icons.svg#i-puzzle"></use></svg><span class="lbl">插件</span></a>
+      <a href="#"><svg class="icon icon-18"><use href="icons.svg#i-clock"></use></svg><span class="lbl">自动化任务</span></a>
+      <a href="shell.html"><svg class="icon icon-18"><use href="icons.svg#i-people"></use></svg><span class="lbl">myteam</span></a>
+      <a href="#"><svg class="icon icon-18"><use href="icons.svg#i-grid"></use></svg><span class="lbl">更多</span></a>
+    </nav>
+    <div class="dsh-sec">
+      <span class="cap">工作区</span>
+      <span class="tools">
+        <button aria-label="搜索工作区"><svg class="icon icon-14"><use href="icons.svg#i-search"></use></svg></button>
+        <button aria-label="工作区视图"><svg class="icon icon-14"><use href="icons.svg#i-sliders"></use></svg></button>
+        <button aria-label="新建工作区"><svg class="icon icon-14"><use href="icons.svg#i-box"></use></svg></button>
+      </span>
+    </div>
+    <div class="dsh-ws">
+      <a class="dsh-ws-row"><svg class="icon icon-16"><use href="icons.svg#i-folder"></use></svg>storefront</a>
+      <a class="dsh-ws-row"><svg class="icon icon-16"><use href="icons.svg#i-folder"></use></svg>atlas-docs</a>
+      <a class="dsh-ws-row open"><svg class="icon icon-16"><use href="icons.svg#i-folder"></use></svg>harbor-web</a>
+      <a class="dsh-sess" aria-current="page" href="conversation.html"><span class="t">结算页模块化</span><span class="tm">25 分钟</span></a>
+      <a class="dsh-sess" href="board.html"><span class="t">插件 v0.2 接口评审</span><span class="tm">2 小时</span></a>
+      <a class="dsh-sess"><span class="t">周报汇总</span><span class="tm">4 小时</span></a>
+      <a class="dsh-ws-row"><svg class="icon icon-16"><use href="icons.svg#i-folder"></use></svg>mocha-lab</a>
+      <a class="dsh-sess"><span class="t">构建脚本提速</span><span class="tm">22 分钟</span></a>
+      <a class="dsh-ws-row"><svg class="icon icon-16"><use href="icons.svg#i-folder"></use></svg>notes-vault</a>
+      <a class="dsh-ws-row"><svg class="icon icon-16"><use href="icons.svg#i-folder"></use></svg>infra-sandbox</a>
+      <a class="dsh-ws-row"><svg class="icon icon-16"><use href="icons.svg#i-folder"></use></svg>docs-migration</a>
+      <a class="dsh-ws-row"><svg class="icon icon-16"><use href="icons.svg#i-folder"></use></svg>archive-2025</a>
+    </div>
+    <div class="dsh-user"><span class="av">林</span><span class="nm">林岸</span></div>
+  </aside>
+
+  <main class="main">
+    <div class="conv">
+
+      <header class="conv-head">
+        <div class="conv-title">
+          <span class="team-mark" style="background:var(--surface-3);color:var(--text-2)"><svg class="icon icon-14"><use href="icons.svg#i-message"></use></svg></span>
+          <div>
+            <b>结算页重构方案</b>
+            <span>普通会话 · 不是团队</span>
+          </div>
+        </div>
+
+        <div class="guestchips">
+          <span class="mini-chip lead-chip" style="padding:2px 7px 2px 3px"><span class="mavatar a2" style="width:18px;height:18px;font-size:12px">评</span>reviewer</span>
+          <span class="mini-chip" style="padding:2px 7px 2px 3px"><span class="mavatar a4" style="width:18px;height:18px;font-size:12px">文</span>tech-writer</span>
+          <button class="icon-btn" style="width:26px;height:26px" aria-label="卸载角色"><svg class="icon icon-14"><use href="icons.svg#i-x"></use></svg></button>
+        </div>
+
+        <button class="icon-btn" aria-label="更多"><svg class="icon icon-14"><use href="icons.svg#i-more"></use></svg></button>
+      </header>
+
+      <!-- 单角色调用横幅：说清它不属于任何团队 -->
+      <div class="guestbar">
+        <svg class="icon icon-14"><use href="icons.svg#i-role"></use></svg>
+        <span><b>2 个角色的配置已注入这个会话</b> —— 提示词、工具策略、技能与 MCP 都按角色声明加载。这次调用<b>不属于任何团队</b>，不进团队账本，也不会产生实例会话。</span>
+        <button class="btn ghost sm" style="margin-left:auto;flex:none">看注入了什么</button>
+      </div>
+
+      <div class="stream">
+        <div class="stream-inner">
+
+          <!-- 人：输入命令 -->
+          <div class="turn">
+            <span class="turn-av human">你</span>
+            <div class="turn-body">
+              <div class="turn-meta"><b>你</b><span>10:02</span></div>
+              <p class="bubble"><span class="cmd">/myteam+reviewer+tech-writer</span> 帮我看这份拆分方案，把风险点和要补的文档列出来。</p>
+            </div>
+          </div>
+
+          <!-- 插件：配置注入卡（tool.call.toolview） -->
+          <div class="turn">
+            <span class="turn-av lead" style="background:var(--surface-3);color:var(--text-2)">插</span>
+            <div class="turn-body">
+              <div class="turn-meta"><b>myteam</b><span>10:02</span></div>
+
+              <div class="toolcard">
+                <div class="toolcard-head">
+                  <svg class="icon icon-14"><use href="icons.svg#i-link"></use></svg>
+                  <span class="tname">myteam_apply_roles</span>
+                  <span class="tstat">· 2 个角色 · 只收窄，不扩权</span>
+                  <svg class="icon icon-14 chev"><use href="icons.svg#i-chevron-down"></use></svg>
+                </div>
+                <div class="toolcard-body">
+                  <div class="injrow">
+                    <span class="inj-k">系统提示</span>
+                    <span class="inj-v">追加 2 段角色提示（<code>reviewer</code> 审查准则、<code>tech-writer</code> 文档骨架）<span class="mini-chip">一次性注入</span></span>
+                  </div>
+                  <div class="injrow">
+                    <span class="inj-k">工具策略</span>
+                    <span class="inj-v">取交集后收窄 2 项：<code>bash</code> 移除 · <code>write</code> 限文档目录<span class="mini-chip gate">只能收窄</span></span>
+                  </div>
+                  <div class="injrow">
+                    <span class="inj-k">技能</span>
+                    <span class="inj-v"><span class="mini-chip">review-playbook</span><span class="mini-chip">doc-outline</span></span>
+                  </div>
+                  <div class="injrow">
+                    <span class="inj-k">MCP</span>
+                    <span class="inj-v">连接层 ∩ allowlist = <span class="mini-chip">dsh-fs</span><span class="mini-chip">git</span><span class="mini-chip off"><svg class="icon icon-14"><use href="icons.svg#i-alert"></use></svg>figma 未连接</span></span>
+                  </div>
+                  <div class="injrow">
+                    <span class="inj-k">模型路由</span>
+                    <span class="inj-v"><code>claude-opus-4.6</code>（来自 reviewer，冲突时取后加载的那个）</span>
+                  </div>
+                </div>
+                <div class="toolcard-foot">
+                  <a class="btn ghost sm" href="roles.html">看角色定义</a>
+                  <a class="btn ghost sm" href="skills.html">看技能与 MCP</a>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- 助手：用注入的角色身份回答 -->
+          <div class="turn">
+            <span class="turn-av lead">评</span>
+            <div class="turn-body">
+              <div class="turn-meta"><b>评审者 + 技术文档</b><span>10:03</span></div>
+              <p class="bubble">按审查准则过了一遍，三个风险点，文档缺两块：</p>
+              <p class="bubble" style="margin-top:6px">
+                <b>风险 1 · 灰度开关没有默认值。</b>t5 的开关如果默认开启，回滚时得逐个调用点关，实际等于没灰度。<br>
+                <b>风险 2 · 契约里没写金额精度。</b>结算金额是整数分还是浮点，现在两份实现不一致，迁移后会对不上账。<br>
+                <b>风险 3 · t3 删旧目录没有前置检查。</b>还有 4 个调用点在别处引用，删完直接编译不过。<br>
+                要补的文档：迁移说明（含回滚步骤）、对外 API 变更清单。
+              </p>
+              <div class="toolcard" style="margin-top:8px">
+                <div class="toolcard-head">
+                  <svg class="icon icon-14"><use href="icons.svg#i-file"></use></svg>
+                  <span class="tname">write</span>
+                  <span class="tstat">· docs/settlement-migration.md · 已收窄到 docs/</span>
+                  <svg class="icon icon-14 chev"><use href="icons.svg#i-chevron-right"></use></svg>
+                </div>
+              </div>
+            </div>
+          </div>
+
+        </div>
+      </div>
+
+      <div class="composer">
+        <div class="composer-box" style="border-color:var(--primary);box-shadow:0 0 0 3px var(--primary-soft)">
+          <span class="cmd-prefix">/myteam+</span>
+          <input class="cmd-input" value="tech-w" aria-label="命令输入" autocomplete="off">
+          <button class="send-btn" aria-label="发送"><svg class="icon icon-14"><use href="icons.svg#i-send"></use></svg></button>
+        </div>
+
+        <!-- 前缀匹配有多个候选：回显让人选，绝不猜（FR-15.1） -->
+        <div class="candpop" role="listbox" aria-label="匹配到的角色">
+          <div class="cand-cap">匹配到 2 个角色 · 选一个</div>
+          <div class="cand" role="option" aria-selected="true">
+            <span class="mavatar a4" style="width:20px;height:20px;font-size:12px">文</span>
+            <span class="cand-name">tech-writer</span>
+            <span class="src project">项目</span>
+            <span class="cand-sub">gpt-5.1 · 迁移说明与对外文档</span>
+          </div>
+          <div class="cand" role="option" aria-selected="false">
+            <span class="mavatar a4" style="width:20px;height:20px;font-size:12px">文</span>
+            <span class="cand-name">tech-writer-cn</span>
+            <span class="src global">全局</span>
+            <span class="cand-sub">继承队长路由 · 只写中文文档</span>
+          </div>
+          <div class="cand-foot">已加载的再输一次是刷新；要卸掉就写 <code>-reviewer</code></div>
+        </div>
+
+        <p class="composer-hint">这个会话不是团队，所以 <code>/myteam new</code> 在这里不可用 —— 团队只能从 team 预设新建。单角色调用随时可用，两者互不干扰。</p>
+      </div>
+
+    </div>
+  </main>
+</div>
+</body>
+</html>

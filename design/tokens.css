@@ -1,0 +1,157 @@
+/* ============================================================
+   dsh-myteam 面板 · 设计变量
+   对齐 DSH 宿主官方主题（dsh-client-ui-theme 的 neutral-bluish 灰阶 +
+   blue 主色 + green/amber/red 语义色），接入时一层映射 --dsw-alias-*。
+   颜色按「角色」定义；字号最小 12px（12 / 13 / 15 / 20 / 24）。
+   ============================================================ */
+
+:root {
+  /* ── 表面与线（DSH neutral-bluish 冷灰：纯白层叠 + 透明黑描边分层）── */
+  --bg:            #ffffff;            /* bluish-00：bg-base 与 layer-1/2/3 同值 */
+  --surface:       #ffffff;
+  --surface-2:     #f5f6f7;            /* bluish-60  表头 / hover / 嵌套卡 */
+  --surface-3:     #f1f3f5;            /* bluish-75  更深一档 */
+  --surface-active:#e9ecf2;            /* bluish-150 选中态 */
+  --line:          #0000001a;          /* border-l2  rgba(0,0,0,.10) */
+  --line-soft:     #0000000a;          /* border-l1 */
+  --line-strong:   #00000029;          /* border-l4 */
+
+  /* ── 文字（label-primary / secondary / tertiary / caption）── */
+  --text:          #0f1115;            /* bluish-1000 */
+  --text-2:        #43454a;            /* bluish-750 */
+  --muted:         #61666b;            /* bluish-700  label-secondary */
+  --muted-2:       #81858c;            /* bluish-600  label-tertiary */
+  --muted-3:       #adb2b8;            /* bluish-400  caption，仅图标与大字 */
+
+  /* ── 主色：DSH 蓝（button-primary 观感）── */
+  --primary:       #4d93f8;            /* blue-450 */
+  --primary-deep:  #2563eb;            /* blue-600：hover / 激活 / 强调文字 */
+  --primary-hover: #3b82f6;            /* blue-500 */
+  --primary-soft:  #e5f0ff;            /* blue-75 */
+  --primary-line:  #dbeafe;            /* blue-100 */
+  --primary-solid: #2563eb;          /* blue-600：实底（按钮/头像/步骤点），白字 5.2:1 */
+  --on-primary:    #ffffff;
+  --on-solid:      #ffffff;
+  --knob:          #ffffff;
+
+  /* ── 成员四色（头像底：blue / green / amber / red 的浅底深字）── */
+  --m1-bg: #dbeafe; --m1-line: #bfdbfe; --m1-ink: #1e40af;
+  --m2-bg: #e6faed; --m2-line: #bbf7d0; --m2-ink: #166534;
+  --m3-bg: #fef5e7; --m3-line: #fde68a; --m3-ink: #92400e;
+  --m4-bg: #fee2e2; --m4-line: #fecaca; --m4-ink: #991b1b;
+
+  /* ── 半透明（ghost hover / 遮罩）── */
+  --wash:  #2631480f;                  /* interactive-bg-hover */
+  --scrim: #0000003d;                  /* bg-mask-1 */
+
+  /* ── 状态四色（state-success / warn / error / idle）── */
+  --run:           #22c55e;            /* green-500 */
+  --run-soft:      #e6faed;
+  --gate:          #f59e0b;            /* amber-500 */
+  --gate-soft:     #fef5e7;
+  --gate-line:     #fde68a;
+  --gate-ink:      #92400e;
+  --ok-ink:        #166534;            /* green-800：浅底上的成功文字，白底 6.3:1 */
+  --done:          #22c55e;
+  --done-soft:     #e6faed;
+  --done-line:     #bbf7d0;
+  --fail:          #ef4444;            /* red-500 */
+  --fail-soft:     #fef2f2;
+  --fail-line:     #fecaca;
+  --fail-ink:      #991b1b;
+  --idle:          #d4d4d4;            /* neutral-300 */
+  --idle-soft:     #f5f5f5;
+
+  /* ── 排版：DSH 字体栈（标题 Montserrat，正文系统栈）── */
+  --font: "Montserrat", "PingFang SC", "HarmonyOS Sans SC", "MiSans", "Microsoft YaHei", system-ui, sans-serif;
+  --mono: "SF Mono", "JetBrains Mono", "Fira Code", Consolas, "Liberation Mono", Menlo, Courier, monospace;
+
+  --fs-12: 12px;
+  --fs-13: 13px;
+  --fs-15: 15px;
+  --fs-20: 20px;
+  --fs-24: 24px;
+
+  /* ── 间距（4 / 8 倍数）── */
+  --s1: 4px;  --s2: 8px;  --s3: 12px; --s4: 16px;
+  --s5: 20px; --s6: 24px; --s7: 32px; --s8: 40px;
+
+  /* ── 圆角（DSH：按钮 6、卡 8、大容器 10+）── */
+  --r-sm: 6px;
+  --r-md: 8px;
+  --r-lg: 12px;
+  --r-pill: 999px;
+
+  /* ── 阴影：DSH 不用阴影堆层级，只留浮层两档 ── */
+  --sh-1: none;
+  --sh-2: 0 4px 16px rgba(15, 17, 21, .08);
+  --sh-3: 0 12px 40px rgba(15, 17, 21, .16), 0 2px 8px rgba(15, 17, 21, .06);
+
+  --ease: cubic-bezier(.2, .8, .2, 1);
+}
+
+/* ============================================================
+   深色：宿主 dark 模式的 neutral-bluish 反转
+   （bg-base 950 / layer-1 875 / layer-2 850 / layer-3 800，
+    白色改透明白描边，主色提亮到 blue-400）
+   ============================================================ */
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg:            #151517;            /* bluish-950 */
+    --surface:       #232324;            /* bluish-875 */
+    --surface-2:     #2c2c2e;            /* bluish-850 */
+    --surface-3:     #353638;            /* bluish-800 */
+    --surface-active:#1b1b1c;            /* bluish-900 选中态 */
+    --line:          #ffffff1f;          /* border-l2 */
+    --line-soft:     #ffffff0f;          /* border-l1 */
+    --line-strong:   #ffffff29;          /* border-l3 */
+
+    --text:          #f9fafb;            /* bluish-50 */
+    --text-2:        #cfd3d6;            /* bluish-300 */
+    --muted:         #979da6;            /* bluish-500 */
+    --muted-2:       #81858c;            /* bluish-600 */
+    --muted-3:       #61666b;            /* bluish-700，深色下只给图标 */
+
+    --primary:       #60a5fa;            /* blue-400 */
+    --primary-deep:  #93c5fd;            /* blue-300：深色下强调文字提亮 */
+    --primary-hover: #4d93f8;
+    --primary-soft:  #172554;            /* blue-950 */
+    --primary-line:  #1e40af;            /* blue-800 */
+    --primary-solid: #60a5fa;            /* blue-400：深色实底，深字 7:1 */
+    --on-primary:    #0b1220;
+    --on-solid:      #0b1220;
+    --knob:          #f9fafb;
+
+    --m1-bg: #172554; --m1-line: #1e40af; --m1-ink: #93c5fd;
+    --m2-bg: #14532d; --m2-line: #166534; --m2-ink: #86efac;
+    --m3-bg: #451a03; --m3-line: #92400e; --m3-ink: #fcd34d;
+    --m4-bg: #450a0a; --m4-line: #991b1b; --m4-ink: #fca5a5;
+
+    --wash:  #ffffff0f;
+    --scrim: #0000007a;
+
+    --ok-ink:        #86efac;            /* green-300：深底上的成功文字 */
+    --run:           #4ed17e;            /* green-400 */
+    --run-soft:      #143322;
+    --gate:          #f7ad31;            /* amber-400 */
+    --gate-soft:     #2e2210;
+    --gate-line:     #57431c;
+    --gate-ink:      #fbd38d;
+    --done:          #4ed17e;
+    --done-soft:     #143322;
+    --done-line:     #1f5133;
+    --fail:          #f25a5a;            /* red-400 */
+    --fail-soft:     #331a1a;
+    --fail-line:     #5c2a2a;
+    --fail-ink:      #fecaca;
+    --idle:          #545557;            /* neutral-600 */
+    --idle-soft:     #2c2c2e;
+
+    --sh-1: none;
+    --sh-2: 0 4px 16px rgba(0, 0, 0, .45);
+    --sh-3: 0 12px 40px rgba(0, 0, 0, .6), 0 2px 8px rgba(0, 0, 0, .4);
+
+    color-scheme: dark;
+  }
+}

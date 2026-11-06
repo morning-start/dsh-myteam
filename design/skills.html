@@ -1,0 +1,321 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="dsh-design" content="web">
+<title>技能 & MCP · 全局</title>
+<link rel="stylesheet" href="tokens.css">
+<link rel="stylesheet" href="app.css">
+</head>
+<body>
+<div class="win">
+
+  <!-- ══ DSH 宿主侧栏（真实结构：品牌 · 新会话 · 选项栏 · 工作区 · 用户）══ -->
+  <aside class="dsh-rail" aria-label="DSH 侧栏">
+    <div class="dsh-brand">
+      <svg class="icon whale" style="width:24px;height:24px" aria-hidden="true"><use href="icons.svg#i-whale"></use></svg>
+      <span class="wordmark">deepseek</span>
+      <span class="btag">HARNNESS</span>
+      <button class="icon-btn" aria-label="收起侧栏"><svg class="icon icon-16"><use href="icons.svg#i-panel"></use></svg></button>
+    </div>
+    <a class="dsh-newchat" href="conversation.html"><svg class="icon icon-16"><use href="icons.svg#i-plus"></use></svg>新会话</a>
+    <nav class="dsh-nav" aria-label="选项栏">
+      <a href="#"><svg class="icon icon-18"><use href="icons.svg#i-puzzle"></use></svg><span class="lbl">插件</span></a>
+      <a href="#"><svg class="icon icon-18"><use href="icons.svg#i-clock"></use></svg><span class="lbl">自动化任务</span></a>
+      <a href="shell.html" aria-current="page"><svg class="icon icon-18"><use href="icons.svg#i-people"></use></svg><span class="lbl">myteam</span></a>
+      <a href="#"><svg class="icon icon-18"><use href="icons.svg#i-grid"></use></svg><span class="lbl">更多</span></a>
+    </nav>
+    <div class="dsh-sec">
+      <span class="cap">工作区</span>
+      <span class="tools">
+        <button aria-label="搜索工作区"><svg class="icon icon-14"><use href="icons.svg#i-search"></use></svg></button>
+        <button aria-label="工作区视图"><svg class="icon icon-14"><use href="icons.svg#i-sliders"></use></svg></button>
+        <button aria-label="新建工作区"><svg class="icon icon-14"><use href="icons.svg#i-box"></use></svg></button>
+      </span>
+    </div>
+    <div class="dsh-ws">
+      <a class="dsh-ws-row"><svg class="icon icon-16"><use href="icons.svg#i-folder"></use></svg>storefront</a>
+      <a class="dsh-ws-row"><svg class="icon icon-16"><use href="icons.svg#i-folder"></use></svg>atlas-docs</a>
+      <a class="dsh-ws-row open"><svg class="icon icon-16"><use href="icons.svg#i-folder"></use></svg>harbor-web</a>
+      <a class="dsh-sess" href="conversation.html"><span class="t">结算页模块化</span><span class="tm">25 分钟</span></a>
+      <a class="dsh-sess" href="board.html"><span class="t">插件 v0.2 接口评审</span><span class="tm">2 小时</span></a>
+      <a class="dsh-sess"><span class="t">周报汇总</span><span class="tm">4 小时</span></a>
+      <a class="dsh-ws-row"><svg class="icon icon-16"><use href="icons.svg#i-folder"></use></svg>mocha-lab</a>
+      <a class="dsh-sess"><span class="t">构建脚本提速</span><span class="tm">22 分钟</span></a>
+      <a class="dsh-ws-row"><svg class="icon icon-16"><use href="icons.svg#i-folder"></use></svg>notes-vault</a>
+      <a class="dsh-ws-row"><svg class="icon icon-16"><use href="icons.svg#i-folder"></use></svg>infra-sandbox</a>
+      <a class="dsh-ws-row"><svg class="icon icon-16"><use href="icons.svg#i-folder"></use></svg>docs-migration</a>
+      <a class="dsh-ws-row"><svg class="icon icon-16"><use href="icons.svg#i-folder"></use></svg>archive-2025</a>
+    </div>
+    <div class="dsh-user"><span class="av">林</span><span class="nm">林岸</span></div>
+  </aside>
+
+  <main class="main">
+    <!-- ══ 面板顶栏（宿主面板级常驻）══ -->
+    <header class="panel-bar">
+      <b class="panel-name">myteam</b>
+      <div class="seg" role="group" aria-label="作用域">
+        <a href="global.html" aria-pressed="true">全局</a>
+        <a href="shell.html" aria-pressed="false">项目</a>
+      </div>
+      <button class="icon-btn" aria-label="刷新面板"><svg class="icon icon-16"><use href="icons.svg#i-refresh"></use></svg></button>
+    </header>
+        <!-- ══ 团队头（真实结构：← 全局 · 名称/ID · 状态 · 描述 · 行内统计 · 右侧动作）══ -->
+        <!-- ══ 全局层头（技能 & MCP）══ -->
+        <!-- ══ 全局层头（技能 & MCP）══ -->
+    <header class="teambar">
+      <a class="back-all" href="global.html"><svg class="icon icon-14"><use href="icons.svg#i-arrow-left"></use></svg>全局</a>
+      <span class="tb-title"><b>技能 &amp; MCP</b><span class="tid">全局 · 能力库</span></span>
+      <span class="tb-goal">系统级能力清单；角色详情里按需引用，不在角色里重复定义</span>
+      <span class="tb-actions">
+        <button class="icon-btn" aria-label="刷新"><svg class="icon icon-14"><use href="icons.svg#i-refresh"></use></svg></button>
+      </span>
+    </header>
+
+        
+
+    <div class="page">
+      <div class="page-head">
+        <div>
+          <h2>技能与 MCP</h2>
+          <p>角色的能力由两样东西组成：<b>技能</b>按四层来源取，<b>MCP</b>分两段看。实例化时按角色绑定注入，注入后只对那个实例可见，不会漏到别的实例身上。</p>
+        </div>
+        <div class="page-head-actions">
+        </div>
+      </div>
+
+      <!-- ── 技能四层 ── -->
+      <div class="dsec-head" style="margin-bottom:var(--s2)">
+        <h4>技能 · 四层来源</h4><span class="line"></span>
+        <span class="n">实例拿到的是「内置 + 项目 + 该角色绑定」</span>
+      </div>
+      <div class="layers" style="margin-bottom:var(--s3)">
+        <div class="layer">
+          <span class="layer-ico builtin"><svg class="icon icon-14"><use href="icons.svg#i-lock"></use></svg></span>
+          <div class="layer-main">
+            <div class="layer-title">内置<span class="src builtin">只读</span></div>
+            <div class="layer-path">plugin/skills · 含 create-role、create-team 两个随行技能</div>
+          </div>
+          <div class="layer-n">4<span>技能</span></div>
+          <button class="btn sm" style="flex:none">看全部</button>
+        </div>
+        <div class="layer">
+          <span class="layer-ico global"><svg class="icon icon-14"><use href="icons.svg#i-globe"></use></svg></span>
+          <div class="layer-main">
+            <div class="layer-title">全局<span class="src global">跨项目</span></div>
+            <div class="layer-path">../.dsh/myteam/skills · 你自己的技能，换项目也带着</div>
+          </div>
+          <div class="layer-n">2<span>技能</span></div>
+          <button class="btn sm" style="flex:none">看全部</button>
+        </div>
+        <div class="layer">
+          <span class="layer-ico project"><svg class="icon icon-14"><use href="icons.svg#i-folder"></use></svg></span>
+          <div class="layer-main">
+            <div class="layer-title">项目<span class="src project">可编辑 · 运行时真相</span></div>
+            <div class="layer-path">.team-workplace/config/skills · 这个项目里所有角色都能用</div>
+          </div>
+          <div class="layer-n">3<span>技能</span></div>
+          <button class="btn sm" style="flex:none">看全部</button>
+        </div>
+        <div class="layer">
+          <span class="layer-ico" style="background:var(--surface-3);color:var(--text-2)"><svg class="icon icon-14"><use href="icons.svg#i-link"></use></svg></span>
+          <div class="layer-main">
+            <div class="layer-title">角色绑定<span class="src">按角色声明</span></div>
+            <div class="layer-path">角色配置里的 skill 引用列表 · 只对声明了它的角色实例生效</div>
+          </div>
+          <div class="layer-n">7<span>条绑定</span></div>
+          <button class="btn sm" style="flex:none">看绑定</button>
+        </div>
+      </div>
+
+      <p class="note info" style="margin-bottom:var(--s4)">
+        <svg class="icon icon-14"><use href="icons.svg#i-layers"></use></svg>
+        <span><b>隔离发生在实例身上。</b>实例化时，插件在它自己的 scope 里注册一份技能清单 —— 只有「内置 + 项目 + 该角色绑定」这三样，全局技能要显式绑进角色才生效。所以 A 实例装了技能，B 实例看不到。</span>
+      </p>
+
+      <div class="filterbar">
+        <label class="field search" style="width:220px">
+          <svg class="icon icon-14" style="color:var(--muted)"><use href="icons.svg#i-search"></use></svg>
+          <input type="search" placeholder="搜技能名或用途" aria-label="搜索技能">
+        </label>
+        <div class="seg" role="group" aria-label="按来源筛选">
+          <button aria-pressed="true">全部 9</button>
+          <button aria-pressed="false">内置 4</button>
+          <button aria-pressed="false">全局 2</button>
+          <button aria-pressed="false">项目 3</button>
+        </div>
+        <span style="font-size:12px;color:var(--muted)">被角色绑定 7 次</span>
+      </div>
+
+      <div class="rows" style="margin-bottom:var(--s5)">
+
+        <article class="row">
+          <span class="mavatar a1" style="width:30px;height:30px;flex:none">建</span>
+          <div class="row-main">
+            <div class="row-title">
+              <span class="iname">create-role</span>
+              <span class="src builtin"><svg class="icon icon-14"><use href="icons.svg#i-lock"></use></svg>内置</span>
+              <span class="mini-chip">被 4 个角色绑定</span>
+            </div>
+            <div class="row-sub">对话式建角色：逐项追问职责边界、需要的能力、工具收窄、模型路由，生成预览卡等你确认后才落库。默认写进项目库。</div>
+          </div>
+          <div class="row-act">
+            <span style="font-size:12px;color:var(--muted);white-space:nowrap">追问有上限</span>
+            <button class="icon-btn" style="width:30px;height:30px" aria-label="更多"><svg class="icon icon-14"><use href="icons.svg#i-more"></use></svg></button>
+          </div>
+        </article>
+
+        <article class="row">
+          <span class="mavatar a1" style="width:30px;height:30px;flex:none">章</span>
+          <div class="row-main">
+            <div class="row-title">
+              <span class="iname">create-team</span>
+              <span class="src builtin"><svg class="icon icon-14"><use href="icons.svg#i-lock"></use></svg>内置</span>
+              <span class="mini-chip">队长专用</span>
+              <span class="mini-chip gate">规划中</span>
+            </div>
+            <div class="row-sub">给团队定章程：能干什么、做到什么程度、用哪些文件管项目。产出是写给队长看的能力补充说明，落在项目里 —— 它是预设的补充，不是另一个独立的东西。</div>
+          </div>
+          <div class="row-act">
+            <span style="font-size:12px;color:var(--muted);white-space:nowrap">M2 后段</span>
+            <button class="icon-btn" style="width:30px;height:30px" aria-label="更多"><svg class="icon icon-14"><use href="icons.svg#i-more"></use></svg></button>
+          </div>
+        </article>
+
+        <article class="row">
+          <span class="mavatar a3" style="width:30px;height:30px;flex:none">迁</span>
+          <div class="row-main">
+            <div class="row-title">
+              <span class="iname">migration-checklist</span>
+              <span class="src project">项目</span>
+              <span class="mini-chip">被 2 个角色绑定</span>
+            </div>
+            <div class="row-sub">模块迁移的自检清单：先摘调用点、再留灰度开关、最后删旧目录。每次跑完把新的坑补进去。</div>
+          </div>
+          <div class="row-act">
+            <span style="font-size:12px;color:var(--muted);white-space:nowrap">昨天更新</span>
+            <button class="icon-btn" style="width:30px;height:30px" aria-label="更多"><svg class="icon icon-14"><use href="icons.svg#i-more"></use></svg></button>
+          </div>
+        </article>
+
+        <article class="row">
+          <span class="mavatar a2" style="width:30px;height:30px;flex:none">审</span>
+          <div class="row-main">
+            <div class="row-title">
+              <span class="iname">review-playbook</span>
+              <span class="src project">项目</span>
+              <span class="mini-chip">被 1 个角色绑定</span>
+            </div>
+            <div class="row-sub">审查的固定动作：先看结论行有没有写，再看证据能不能复现，最后才看代码风格。没有结论行一律判 needs-human。</div>
+          </div>
+          <div class="row-act">
+            <span style="font-size:12px;color:var(--muted);white-space:nowrap">3 天前</span>
+            <button class="icon-btn" style="width:30px;height:30px" aria-label="更多"><svg class="icon icon-14"><use href="icons.svg#i-more"></use></svg></button>
+          </div>
+        </article>
+
+        <article class="row">
+          <span class="mavatar a4" style="width:30px;height:30px;flex:none">写</span>
+          <div class="row-main">
+            <div class="row-title">
+              <span class="iname">doc-outline</span>
+              <span class="src global">全局</span>
+              <span class="mini-chip">本项目 0 个角色绑定</span>
+            </div>
+            <div class="row-sub">长文档先出骨架再填内容，骨架要能被一句话说清。你个人的写作习惯，跟着你走但不自动生效。</div>
+          </div>
+          <div class="row-act">
+            <button class="btn sm">绑进角色</button>
+            <button class="icon-btn" style="width:30px;height:30px" aria-label="更多"><svg class="icon icon-14"><use href="icons.svg#i-more"></use></svg></button>
+          </div>
+        </article>
+
+      </div>
+
+      <!-- ── MCP 两段式 ── -->
+      <div class="dsec-head" style="margin-bottom:var(--s2)">
+        <h4>MCP · 两段式</h4><span class="line"></span>
+        <span class="n">可见范围 = 连接层 ∩ 角色 allowlist</span>
+      </div>
+
+      <div class="mcp-split">
+
+        <div class="mcp-pane">
+          <div class="mcp-head">
+            <span class="mcp-badge">连接层</span>
+            <span class="mcp-note">宿主 / 用户全局配置 · 插件只读，绝不代连</span>
+          </div>
+          <ul class="mcp-list">
+            <li class="mcp-item">
+              <svg class="icon icon-14" style="color:var(--done)"><use href="icons.svg#i-check"></use></svg>
+              <span class="mcp-name">dsh-fs</span>
+              <span class="mcp-desc">文件读写</span>
+              <span class="mini-chip" style="margin-left:auto">已连接</span>
+            </li>
+            <li class="mcp-item">
+              <svg class="icon icon-14" style="color:var(--done)"><use href="icons.svg#i-check"></use></svg>
+              <span class="mcp-name">git</span>
+              <span class="mcp-desc">分支与差异</span>
+              <span class="mini-chip" style="margin-left:auto">已连接</span>
+            </li>
+            <li class="mcp-item">
+              <svg class="icon icon-14" style="color:var(--done)"><use href="icons.svg#i-check"></use></svg>
+              <span class="mcp-name">postgres</span>
+              <span class="mcp-desc">只读查询</span>
+              <span class="mini-chip" style="margin-left:auto">已连接</span>
+            </li>
+            <li class="mcp-item off">
+              <svg class="icon icon-14" style="color:var(--muted)"><use href="icons.svg#i-x"></use></svg>
+              <span class="mcp-name">figma</span>
+              <span class="mcp-desc">设计稿取色与标注</span>
+              <span class="mini-chip off" style="margin-left:auto">未连接</span>
+            </li>
+          </ul>
+        </div>
+
+        <div class="mcp-join" aria-hidden="true"><svg class="icon icon-18"><use href="icons.svg#i-link"></use></svg></div>
+
+        <div class="mcp-pane">
+          <div class="mcp-head">
+            <span class="mcp-badge">可见层</span>
+            <span class="mcp-note">角色声明 allowlist · 实例只能看到这里面的</span>
+          </div>
+          <ul class="mcp-list">
+            <li class="mcp-item">
+              <span class="mavatar a1" style="width:22px;height:22px;font-size:12px">实</span>
+              <span class="mcp-name">implementer</span>
+              <span class="mcp-tags">
+                <span class="mini-chip">dsh-fs</span><span class="mini-chip">git</span>
+              </span>
+            </li>
+            <li class="mcp-item">
+              <span class="mavatar a2" style="width:22px;height:22px;font-size:12px">评</span>
+              <span class="mcp-name">reviewer</span>
+              <span class="mcp-tags">
+                <span class="mini-chip">dsh-fs</span><span class="mini-chip">git</span><span class="mini-chip">postgres</span>
+              </span>
+            </li>
+            <li class="mcp-item">
+              <span class="mavatar a3" style="width:22px;height:22px;font-size:12px">需</span>
+              <span class="mcp-name">req-validator</span>
+              <span class="mcp-tags">
+                <span class="mini-chip">dsh-fs</span>
+                <span class="mini-chip off"><svg class="icon icon-14"><use href="icons.svg#i-alert"></use></svg>figma 未连接</span>
+              </span>
+            </li>
+          </ul>
+        </div>
+
+      </div>
+
+      <p class="note" style="margin-top:var(--s4)">
+        <svg class="icon icon-14"><use href="icons.svg#i-alert"></use></svg>
+        <span>allowlist 里写了但宿主没连的 server 只标灰，不拦着你建角色 —— 连上之后自动生效。反过来，宿主连了但角色没声明的，实例一律看不到。</span>
+      </p>
+    </div>
+
+  </main>
+</div>
+</body>
+</html>

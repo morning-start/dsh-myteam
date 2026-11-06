@@ -1,0 +1,232 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="dsh-design" content="web">
+<title>角色 · 实现者 implementer</title>
+<link rel="stylesheet" href="tokens.css">
+<link rel="stylesheet" href="app.css">
+<style>
+.prompt { margin: 0; padding: 10px 12px; background: var(--surface-2); border: 1px solid var(--line); border-radius: var(--r-sm); font-family: var(--mono); font-size: 12px; line-height: 1.6; color: var(--text-2); white-space: pre-wrap; word-break: break-word; }
+.abl-row { display: flex; align-items: center; gap: 10px; padding: 9px 0; border-top: 1px solid var(--line-soft); }
+.abl-row:first-of-type { border-top: 0; }
+.abl-ico { width: 28px; height: 28px; flex: none; display: grid; place-items: center; border-radius: var(--r-sm); background: var(--surface-2); color: var(--muted); }
+.abl-main { flex: 1; min-width: 0; }
+.abl-name { font-size: 13px; font-weight: 600; color: var(--text); }
+.abl-name .num { font-weight: 400; font-size: 12px; color: var(--muted); margin-left: 6px; }
+.abl-sub { font-size: 12px; color: var(--muted); margin-top: 1px; }
+.abl-state { flex: none; font-size: 12px; }
+.tgl { flex: none; width: 30px; height: 17px; border-radius: 999px; background: var(--primary-solid); position: relative; }
+.tgl::after { content: ""; position: absolute; top: 2px; right: 2px; width: 13px; height: 13px; border-radius: 50%; background: var(--on-solid); }
+.tgl.off { background: var(--line-strong); }
+.tgl.off::after { right: auto; left: 2px; background: var(--surface); }
+</style>
+</head>
+<body>
+<div class="win">
+
+  <!-- ══ DSH 宿主侧栏 ══ -->
+  <aside class="dsh-rail" aria-label="DSH 侧栏">
+    <div class="dsh-brand">
+      <svg class="icon whale" style="width:24px;height:24px" aria-hidden="true"><use href="icons.svg#i-whale"></use></svg>
+      <span class="wordmark">deepseek</span>
+      <span class="btag">HARNNESS</span>
+      <button class="icon-btn" aria-label="收起侧栏"><svg class="icon icon-16"><use href="icons.svg#i-panel"></use></svg></button>
+    </div>
+    <a class="dsh-newchat" href="conversation.html"><svg class="icon icon-16"><use href="icons.svg#i-plus"></use></svg>新会话</a>
+    <nav class="dsh-nav" aria-label="选项栏">
+      <a href="#"><svg class="icon icon-18"><use href="icons.svg#i-puzzle"></use></svg><span class="lbl">插件</span></a>
+      <a href="#"><svg class="icon icon-18"><use href="icons.svg#i-clock"></use></svg><span class="lbl">自动化任务</span></a>
+      <a href="shell.html" aria-current="page"><svg class="icon icon-18"><use href="icons.svg#i-people"></use></svg><span class="lbl">myteam</span></a>
+      <a href="#"><svg class="icon icon-18"><use href="icons.svg#i-grid"></use></svg><span class="lbl">更多</span></a>
+    </nav>
+    <div class="dsh-sec">
+      <span class="cap">工作区</span>
+      <span class="tools">
+        <button aria-label="搜索工作区"><svg class="icon icon-14"><use href="icons.svg#i-search"></use></svg></button>
+        <button aria-label="工作区视图"><svg class="icon icon-14"><use href="icons.svg#i-sliders"></use></svg></button>
+        <button aria-label="新建工作区"><svg class="icon icon-14"><use href="icons.svg#i-box"></use></svg></button>
+      </span>
+    </div>
+    <div class="dsh-ws">
+      <a class="dsh-ws-row"><svg class="icon icon-16"><use href="icons.svg#i-folder"></use></svg>storefront</a>
+      <a class="dsh-ws-row"><svg class="icon icon-16"><use href="icons.svg#i-folder"></use></svg>atlas-docs</a>
+      <a class="dsh-ws-row open"><svg class="icon icon-16"><use href="icons.svg#i-folder"></use></svg>harbor-web</a>
+      <a class="dsh-sess" href="conversation.html"><span class="t">结算页模块化</span><span class="tm">25 分钟</span></a>
+      <a class="dsh-sess" href="board.html"><span class="t">插件 v0.2 接口评审</span><span class="tm">2 小时</span></a>
+      <a class="dsh-sess"><span class="t">周报汇总</span><span class="tm">4 小时</span></a>
+      <a class="dsh-ws-row"><svg class="icon icon-16"><use href="icons.svg#i-folder"></use></svg>mocha-lab</a>
+      <a class="dsh-sess"><span class="t">构建脚本提速</span><span class="tm">22 分钟</span></a>
+      <a class="dsh-ws-row"><svg class="icon icon-16"><use href="icons.svg#i-folder"></use></svg>notes-vault</a>
+      <a class="dsh-ws-row"><svg class="icon icon-16"><use href="icons.svg#i-folder"></use></svg>infra-sandbox</a>
+      <a class="dsh-ws-row"><svg class="icon icon-16"><use href="icons.svg#i-folder"></use></svg>docs-migration</a>
+      <a class="dsh-ws-row"><svg class="icon icon-16"><use href="icons.svg#i-folder"></use></svg>archive-2025</a>
+    </div>
+    <div class="dsh-user"><span class="av">林</span><span class="nm">林岸</span></div>
+  </aside>
+
+  <main class="main">
+    <!-- ══ 面板顶栏（作用域切换）══ -->
+    <header class="panel-bar">
+      <b class="panel-name">myteam</b>
+      <div class="seg" role="group" aria-label="作用域">
+        <a href="global.html" aria-pressed="true">全局</a>
+        <a href="shell.html" aria-pressed="false">项目</a>
+      </div>
+      <button class="icon-btn" aria-label="刷新面板"><svg class="icon icon-16"><use href="icons.svg#i-refresh"></use></svg></button>
+    </header>
+
+    <!-- ══ 角色头 ══ -->
+    <header class="teambar">
+      <a class="back-all" href="global.html"><svg class="icon icon-14"><use href="icons.svg#i-arrow-left"></use></svg>全局</a>
+      <span class="tb-title"><b>实现者</b><span class="tid num">implementer</span></span>
+      <span class="chip idle"><span class="shape idle"></span>内置 · 只读</span>
+      <span class="tb-goal">按任务写实现、附验证证据；fork 到项目后可改</span>
+      <span class="tb-actions">
+        <a class="btn primary sm" href="roles.html">复制到项目</a>
+        <button class="icon-btn" aria-label="角色操作"><svg class="icon icon-14"><use href="icons.svg#i-more"></use></svg></button>
+      </span>
+    </header>
+
+    <div class="detail-grid" style="grid-template-columns:minmax(0,1fr) 320px">
+
+      <!-- ── 主列：定义 · 技能 · 工具 ── -->
+      <div style="display:flex;flex-direction:column;gap:var(--s4);min-width:0">
+
+        <!-- 定义与设定 -->
+        <section class="sec" style="gap:10px">
+          <div class="dsec-head"><h4>定义与设定</h4><span class="line"></span><span class="n">角色的全部本体，改这里就是改角色</span></div>
+          <div style="display:flex;flex-direction:column;gap:8px;font-size:13px">
+            <div style="display:flex;gap:8px"><span class="mini-chip" style="flex:none">职责</span><span style="color:var(--text-2)">领任务、写实现、自验后交付；不通过门禁不甩给下一位。</span></div>
+            <div style="display:flex;gap:8px"><span class="mini-chip" style="flex:none">边界</span><span style="color:var(--text-2)">不改验收口径；需求有歧义回到队长澄清，不自行猜测。</span></div>
+            <div style="display:flex;gap:8px"><span class="mini-chip" style="flex:none">兴趣词</span><span style="display:flex;gap:4px;flex-wrap:wrap"><span class="mini-chip">结算</span><span class="mini-chip">模块边界</span><span class="mini-chip">灰度</span><span style="font-size:12px;color:var(--muted)">派单的软信号，不是权限</span></span></div>
+          </div>
+          <div style="display:flex;align-items:center;gap:8px;margin-top:2px">
+            <span style="font-size:12px;color:var(--muted);flex:none">系统提示词</span>
+            <span class="mini-chip num" style="height:18px">1.2k tokens</span>
+            <button class="btn ghost sm" style="margin-left:auto">展开编辑</button>
+          </div>
+          <pre class="prompt">你是 implementer，负责把一条任务做成可验证的交付。
+规则：
+1. 开工前确认验收标准，缺口径先回 thread 提问；
+2. 交付必须附证据：命令、输出、diff 摘要；
+3. 遇到 interest词（结算/模块边界/灰度）相关的取舍，写清理由再动手；
+4. 完成即报，不等待，不重复派活。</pre>
+          <div style="display:flex;align-items:center;gap:8px">
+            <span style="font-size:12px;color:var(--muted);flex:none">模型路由</span>
+            <span class="mini-chip">主 claude-sonnet-4-5</span>
+            <span class="mini-chip">回退 gpt-5.1</span>
+            <span class="mini-chip">继承队长路由</span>
+          </div>
+        </section>
+
+        <!-- 技能 -->
+        <section class="sec" style="gap:10px">
+          <div class="dsec-head"><h4>技能</h4><span class="line"></span><span class="n">启用 2 / 全局库 9 · 引用而非内联</span></div>
+          <div>
+            <div class="abl-row">
+              <span class="abl-ico"><svg class="icon icon-14"><use href="icons.svg#i-layers"></use></svg></span>
+              <div class="abl-main">
+                <div class="abl-name">结算模块化手册<span class="num">settlement-refactor</span></div>
+                <div class="abl-sub">拆分步骤、接口清单模板、回归口径，44 步</div>
+              </div>
+              <span class="tgl" role="switch" aria-checked="true" aria-label="启用 结算模块化手册"></span>
+            </div>
+            <div class="abl-row">
+              <span class="abl-ico"><svg class="icon icon-14"><use href="icons.svg#i-check"></use></svg></span>
+              <div class="abl-main">
+                <div class="abl-name">回归自验清单<span class="num">regression-checklist</span></div>
+                <div class="abl-sub">交付前 12 项自验：构建、冒烟、diff 审读</div>
+              </div>
+              <span class="tgl" role="switch" aria-checked="true" aria-label="启用 回归自验清单"></span>
+            </div>
+            <div class="abl-row" style="color:var(--muted)">
+              <span class="abl-ico"><svg class="icon icon-14"><use href="icons.svg#i-plus"></use></svg></span>
+              <div class="abl-main">
+                <div class="abl-name" style="font-weight:500;color:var(--text-2)">从技能库添加</div>
+                <div class="abl-sub">还有 7 个可用：契约比对、灰度开关、迁移说明、取数口径…</div>
+              </div>
+              <a class="btn sm" href="skills.html">浏览</a>
+            </div>
+          </div>
+        </section>
+
+        <!-- MCP 与工具 -->
+        <section class="sec" style="gap:10px">
+          <div class="dsec-head"><h4>MCP 与工具</h4><span class="line"></span><span class="n">工具策略跟随角色，实例不越权</span></div>
+          <div>
+            <div class="abl-row">
+              <span class="abl-ico"><svg class="icon icon-14"><use href="icons.svg#i-branch"></use></svg></span>
+              <div class="abl-main">
+                <div class="abl-name">github · tools<span class="num">MCP</span></div>
+                <div class="abl-sub">已连接 · 12 个工具 · 读写仓库与 PR</div>
+              </div>
+              <span class="chip run" style="flex:none"><span class="shape run"></span>已连接</span>
+            </div>
+            <div class="abl-row">
+              <span class="abl-ico"><svg class="icon icon-14"><use href="icons.svg#i-archive"></use></svg></span>
+              <div class="abl-main">
+                <div class="abl-name">postgres · readonly<span class="num">MCP</span></div>
+                <div class="abl-sub">已连接 · 4 个工具 · 只读，结算库白名单表</div>
+              </div>
+              <span class="chip run" style="flex:none"><span class="shape run"></span>已连接</span>
+            </div>
+            <div class="abl-row">
+              <span class="abl-ico"><svg class="icon icon-14"><use href="icons.svg#i-terminal"></use></svg></span>
+              <div class="abl-main">
+                <div class="abl-name">内置工具</div>
+                <div class="abl-sub" style="display:flex;gap:4px;flex-wrap:wrap;margin-top:4px"><span class="mini-chip">read</span><span class="mini-chip">edit</span><span class="mini-chip">bash</span><span class="mini-chip">glob</span><span class="mini-chip">grep</span><span class="mini-chip" style="color:var(--muted)">无 write_root</span></div>
+              </div>
+            </div>
+          </div>
+        </section>
+      </div>
+
+      <!-- ── 侧列 ── -->
+      <aside style="display:flex;flex-direction:column;gap:var(--s4);min-width:0">
+
+        <!-- 在册情况 -->
+        <section class="sec" style="gap:10px">
+          <div class="dsec-head"><h4>在册情况</h4><span class="line"></span></div>
+          <div style="font-size:13px">被 <b>2 个团队</b>聘任 · <b>3 个实例</b></div>
+          <div style="display:flex;flex-direction:column;gap:8px">
+            <div style="display:flex;align-items:center;gap:8px;font-size:12px">
+              <span class="mavatar a1" style="width:22px;height:22px;font-size:12px">实</span>
+              <span style="min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">结算页模块化 · <span class="num">implementer</span></span>
+              <span class="chip run" style="margin-left:auto"><span class="shape run"></span>在跑</span>
+            </div>
+            <div style="display:flex;align-items:center;gap:8px;font-size:12px">
+              <span class="mavatar a3" style="width:22px;height:22px;font-size:12px">实</span>
+              <span style="min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">结算页模块化 · <span class="num">implementer-2</span></span>
+              <span class="chip run" style="margin-left:auto"><span class="shape run"></span>在跑</span>
+            </div>
+            <div style="display:flex;align-items:center;gap:8px;font-size:12px">
+              <span class="mavatar a1" style="width:22px;height:22px;font-size:12px">实</span>
+              <span style="min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">插件 v0.2 接口评审 · <span class="num">implementer</span></span>
+              <span class="chip idle" style="margin-left:auto"><span class="shape idle"></span>空闲</span>
+            </div>
+          </div>
+        </section>
+
+        <!-- 快照规则 -->
+        <section class="sec">
+          <p class="note info" style="margin:0">
+            <svg class="icon icon-14"><use href="icons.svg#i-lock"></use></svg>
+            <span><b>快照在召唤那一刻固化：</b>队员带着角色当时的快照上路，之后改这个角色不影响在跑实例 —— 想让新设定生效，重新召唤。</span>
+          </p>
+        </section>
+
+        <!-- 操作 -->
+        <section class="sec" style="gap:8px">
+          <div class="dsec-head"><h4>操作</h4><span class="line"></span></div>
+          <a class="btn primary" href="roles.html" style="width:100%">复制到项目</a>
+          <a class="btn" href="conversation.html" style="width:100%">在队长会话试召唤</a>
+          <button class="btn ghost" disabled style="width:100%">删除（内置只读）</button>
+        </section>
+      </aside>
+    </div>
+  </main>
+</div>
+</body>
+</html>

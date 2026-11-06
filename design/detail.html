@@ -1,0 +1,331 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="dsh-design" content="web">
+<title>任务详情 · t7 抽结算服务边界与接口草案</title>
+<link rel="stylesheet" href="tokens.css">
+<link rel="stylesheet" href="app.css">
+</head>
+<body>
+<div class="win">
+
+  <!-- ══ DSH 宿主侧栏（真实结构：品牌 · 新会话 · 选项栏 · 工作区 · 用户）══ -->
+  <aside class="dsh-rail" aria-label="DSH 侧栏">
+    <div class="dsh-brand">
+      <svg class="icon whale" style="width:24px;height:24px" aria-hidden="true"><use href="icons.svg#i-whale"></use></svg>
+      <span class="wordmark">deepseek</span>
+      <span class="btag">HARNNESS</span>
+      <button class="icon-btn" aria-label="收起侧栏"><svg class="icon icon-16"><use href="icons.svg#i-panel"></use></svg></button>
+    </div>
+    <a class="dsh-newchat" href="conversation.html"><svg class="icon icon-16"><use href="icons.svg#i-plus"></use></svg>新会话</a>
+    <nav class="dsh-nav" aria-label="选项栏">
+      <a href="#"><svg class="icon icon-18"><use href="icons.svg#i-puzzle"></use></svg><span class="lbl">插件</span></a>
+      <a href="#"><svg class="icon icon-18"><use href="icons.svg#i-clock"></use></svg><span class="lbl">自动化任务</span></a>
+      <a href="shell.html" aria-current="page"><svg class="icon icon-18"><use href="icons.svg#i-people"></use></svg><span class="lbl">myteam</span></a>
+      <a href="#"><svg class="icon icon-18"><use href="icons.svg#i-grid"></use></svg><span class="lbl">更多</span></a>
+    </nav>
+    <div class="dsh-sec">
+      <span class="cap">工作区</span>
+      <span class="tools">
+        <button aria-label="搜索工作区"><svg class="icon icon-14"><use href="icons.svg#i-search"></use></svg></button>
+        <button aria-label="工作区视图"><svg class="icon icon-14"><use href="icons.svg#i-sliders"></use></svg></button>
+        <button aria-label="新建工作区"><svg class="icon icon-14"><use href="icons.svg#i-box"></use></svg></button>
+      </span>
+    </div>
+    <div class="dsh-ws">
+      <a class="dsh-ws-row"><svg class="icon icon-16"><use href="icons.svg#i-folder"></use></svg>storefront</a>
+      <a class="dsh-ws-row"><svg class="icon icon-16"><use href="icons.svg#i-folder"></use></svg>atlas-docs</a>
+      <a class="dsh-ws-row open"><svg class="icon icon-16"><use href="icons.svg#i-folder"></use></svg>harbor-web</a>
+      <a class="dsh-sess" href="conversation.html"><span class="t">结算页模块化</span><span class="tm">25 分钟</span></a>
+      <a class="dsh-sess" href="board.html"><span class="t">插件 v0.2 接口评审</span><span class="tm">2 小时</span></a>
+      <a class="dsh-sess"><span class="t">周报汇总</span><span class="tm">4 小时</span></a>
+      <a class="dsh-ws-row"><svg class="icon icon-16"><use href="icons.svg#i-folder"></use></svg>mocha-lab</a>
+      <a class="dsh-sess"><span class="t">构建脚本提速</span><span class="tm">22 分钟</span></a>
+      <a class="dsh-ws-row"><svg class="icon icon-16"><use href="icons.svg#i-folder"></use></svg>notes-vault</a>
+      <a class="dsh-ws-row"><svg class="icon icon-16"><use href="icons.svg#i-folder"></use></svg>infra-sandbox</a>
+      <a class="dsh-ws-row"><svg class="icon icon-16"><use href="icons.svg#i-folder"></use></svg>docs-migration</a>
+      <a class="dsh-ws-row"><svg class="icon icon-16"><use href="icons.svg#i-folder"></use></svg>archive-2025</a>
+    </div>
+    <div class="dsh-user"><span class="av">林</span><span class="nm">林岸</span></div>
+  </aside>
+
+  <main class="main">
+    <!-- ══ 面板顶栏（宿主面板级常驻）══ -->
+    <header class="panel-bar">
+      <b class="panel-name">myteam</b>
+      <div class="seg" role="group" aria-label="作用域">
+        <a href="global.html" aria-pressed="false">全局</a>
+        <a href="shell.html" aria-pressed="true">项目</a>
+      </div>
+      <button class="icon-btn" aria-label="刷新面板"><svg class="icon icon-16"><use href="icons.svg#i-refresh"></use></svg></button>
+    </header>
+
+        <!-- ══ 团队头（真实结构：← 全局 · 名称/ID · 状态 · 描述 · 行内统计 · 右侧动作）══ -->
+        <!-- ══ 任务详情头 ══ -->
+    <header class="teambar">
+      <a class="back-all" href="board.html"><svg class="icon icon-14"><use href="icons.svg#i-arrow-left"></use></svg>任务</a>
+      <span class="tb-title"><b>抽结算服务边界与接口草案</b><span class="tid num">t7 · P0</span></span>
+      <span class="chip run"><span class="shape run"></span>进行中</span>
+      <span class="tb-goal">结算页模块化 · 主责 &nbsp;|&nbsp; 插件 v0.2 接口评审 · 协作</span>
+      <span class="tb-stats num">第 2 次尝试 · 12m · 12 次工具调用</span>
+      <span class="tb-actions">
+        <button class="icon-btn" aria-label="刷新"><svg class="icon icon-14"><use href="icons.svg#i-refresh"></use></svg></button>
+        <button class="icon-btn" aria-label="任务操作"><svg class="icon icon-14"><use href="icons.svg#i-more"></use></svg></button>
+      </span>
+    </header>
+
+                                <nav class="tabbar" role="tablist">
+      <a class="tab" role="tab" href="roles.html" aria-selected="false">角色<span class="tc">(13)</span></a>
+      <a class="tab" role="tab" href="shell.html" aria-selected="false">团队<span class="tc">(3)</span></a>
+      <a class="tab" role="tab" href="board.html" aria-selected="true">任务<span class="tc">(17)</span></a>
+    </nav>
+
+    <!-- 面包屑：从看板点进来 -->
+    <div class="crumbbar">
+      <a href="board.html"><svg class="icon icon-14"><use href="icons.svg#i-chevron-right" style="transform:rotate(180deg)"></use></svg>看板</a>
+      <span class="sep">/</span>
+      <span>进行中</span>
+      <span class="sep">/</span>
+      <span class="cur num">t7</span>
+    </div>
+
+    <div class="detail-grid">
+
+      <!-- ══ 左：任务正文 ══ -->
+      <div class="detail-main">
+
+        <!-- 标题区 -->
+        <div class="sec" style="gap:10px">
+          <div>
+            <div class="detail-eyebrow">t7 · 第 2 次尝试 · 由实现者认领</div>
+            <h1 class="detail-title">抽结算服务边界与接口草案</h1>
+            <div class="drawer-tags" style="margin-top:10px">
+              <span class="chip run"><span class="shape run"></span>进行中</span>
+              <span class="tpri p0">P0</span>
+              <span class="mini-chip"><svg class="icon icon-14"><use href="icons.svg#i-clock"></use></svg>已跑 12m</span>
+              <span class="mini-chip">M · 约 3h</span>
+              <span class="mini-chip">12 次工具调用</span>
+            </div>
+          </div>
+          <p style="font-size:13px;line-height:1.75;color:var(--text-2);padding-top:10px;border-top:1px solid var(--line-soft);max-width:60ch">
+            把结算逻辑从页面组件里剥出来，定义服务边界与对外接口，产出可被前端和测试共同依赖的契约文档。不迁移的部分要写明理由与风险等级。
+          </p>
+        </div>
+
+        <!-- 验收标准 -->
+        <section class="sec">
+          <div class="dsec-head"><h4>验收标准</h4><span class="line"></span><span class="n">1 / 3 已验</span></div>
+          <ul class="ac-list">
+            <li class="ac pass">
+              <span class="mark">✓</span>
+              <span>输出 <span class="num">docs/settlement/api.md</span>，含 6 个端点签名
+                <span class="note">· 20:47 由证据 1 验证</span>
+              </span>
+            </li>
+            <li class="ac pending">
+              <span class="mark">2</span>
+              <span>旧调用点全部映射到新端点，附对照表</span>
+            </li>
+            <li class="ac pending">
+              <span class="mark">3</span>
+              <span>边界说明含 3 条不迁移理由 <span class="note">· 你在 thread 里追加过此要求</span></span>
+            </li>
+          </ul>
+        </section>
+
+        <!-- 验证证据（按 attempt 分组）-->
+        <section class="sec">
+          <div class="dsec-head"><h4>验证证据</h4><span class="line"></span><span class="n">第 2 次尝试 · 2 条</span></div>
+          <div class="evidence">
+            <div class="ev">
+              <div class="ev-head">
+                <span class="exit ok">0</span>
+                <span class="cmd">pnpm -F settlement typecheck</span>
+                <span class="mini-chip">20:47</span>
+              </div>
+              <pre class="ev-code"><span class="dim">$ tsc --noEmit</span>
+<span class="ok">✓ 0 errors, 0 warnings</span>
+<span class="dim">  142 files in 8.4s</span></pre>
+            </div>
+            <div class="ev">
+              <div class="ev-head">
+                <span class="exit ok">0</span>
+                <span class="cmd">pnpm -F settlement test --run</span>
+                <span class="mini-chip">20:47</span>
+              </div>
+              <pre class="ev-code"><span class="ok">✓ 38 passed</span> <span class="dim">| 2 skipped (legacy)</span>
+<span class="dim">  Duration  11.2s</span></pre>
+            </div>
+          </div>
+          <p class="note" style="margin-top:10px">
+            <svg class="icon icon-14"><use href="icons.svg#i-alert"></use></svg>
+            <span>第 1 次尝试的 3 条证据已归档，因上下文超限中断未计入本次验收。</span>
+          </p>
+        </section>
+
+        <!-- 沟通 thread -->
+        <section class="sec">
+          <div class="dsec-head"><h4>沟通 thread</h4><span class="line"></span><span class="n">3 条 · 账本派生</span></div>
+          <div class="thread">
+            <div class="msg">
+              <span class="msg-av human">我</span>
+              <div class="msg-body">
+                <div class="msg-meta"><b>你</b><span>21:01</span></div>
+                <p class="msg-text">不迁移的部分请写清理由，别只留 TODO。</p>
+              </div>
+            </div>
+            <div class="msg">
+              <span class="msg-av a1">实</span>
+              <div class="msg-body">
+                <div class="msg-meta"><b>implementer</b><span>21:03</span></div>
+                <p class="msg-text">收到。理由会带上涉及的 3 处历史债务与风险等级。</p>
+              </div>
+            </div>
+            <div class="msg">
+              <span class="msg-av a1">实</span>
+              <div class="msg-body">
+                <div class="msg-meta"><b>implementer</b><span>20:47</span></div>
+                <p class="msg-text">AC1 已过，证据已挂到本任务。</p>
+              </div>
+            </div>
+          </div>
+          <div class="composer-mini">
+            <input type="text" placeholder="留言进任务 thread（以 human 身份）…" aria-label="留言">
+            <button class="send-btn" aria-label="发送"><svg class="icon icon-14"><use href="icons.svg#i-send"></use></svg></button>
+          </div>
+        </section>
+      </div>
+
+      <!-- ══ 右：属性与操作 ══ -->
+      <aside class="detail-side">
+
+        <!-- 参与团队（任务 × 团队，多对多）-->
+        <div class="sec" style="gap:10px">
+          <div class="dsec-head"><h4>参与团队 · 2</h4><span class="line"></span><span class="n">主责 1 · 协作 1</span></div>
+          <a class="team-card" href="roster.html" style="padding:10px 12px;margin-bottom:0">
+            <div class="tc-head">
+              <span class="name">结算页模块化</span>
+              <span class="chip run"><span class="shape run"></span>主责</span>
+              <span class="tc-zone num">t-8f3a2c</span>
+            </div>
+            <p class="tc-desc">队员 · implementer（主）· implementer-2</p>
+          </a>
+          <a class="team-card" href="roster.html" style="padding:10px 12px;margin-bottom:0">
+            <div class="tc-head">
+              <span class="name">插件 v0.2 接口评审</span>
+              <span class="chip idle"><span class="shape idle"></span>协作</span>
+              <span class="tc-zone num">t-21b47e</span>
+            </div>
+            <p class="tc-desc">队员 · reviewer（接口契约评审）</p>
+          </a>
+          <div style="display:flex;gap:6px;margin-top:2px">
+            <button class="btn sm" style="flex:1"><svg class="icon icon-14"><use href="icons.svg#i-message"></use></svg>私讯</button>
+            <a class="btn sm" href="roster.html" style="flex:1"><svg class="icon icon-14"><use href="icons.svg#i-arrow-up-right"></use></svg>进入团队</a>
+          </div>
+        </div>
+
+        <!-- 依赖 -->
+        <div class="sec" style="gap:8px">
+          <div class="dsec-head"><h4>依赖关系</h4><span class="line"></span></div>
+          <div style="display:flex;flex-direction:column;gap:4px">
+            <div style="display:flex;align-items:center;gap:6px;font-size:12px">
+              <span class="mini-chip">上游</span>
+              <a href="detail.html" class="num" style="color:var(--primary-deep);font-size:12px;min-height:28px;display:inline-flex;align-items:center">t0 摸清结算页现状</a>
+              <span class="chip done" style="margin-left:auto"><span class="shape done"></span>已完成</span>
+            </div>
+            <div style="display:flex;align-items:center;gap:6px;font-size:12px">
+              <span class="mini-chip">解锁</span>
+              <a href="detail.html" class="num" style="color:var(--primary-deep);font-size:12px;min-height:28px;display:inline-flex;align-items:center">t6 结算页 UI 迁移</a>
+              <span class="chip run" style="margin-left:auto"><span class="shape run"></span>在跑</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- 门禁 -->
+        <div class="sec" style="gap:8px">
+          <div class="dsec-head"><h4>门禁链</h4><span class="line"></span><span class="n">3 项</span></div>
+          <div class="rows" style="border:0">
+            <div class="row" style="padding:7px 0;min-height:0">
+              <svg class="icon icon-14" style="color:var(--done)"><use href="icons.svg#i-check"></use></svg>
+              <div class="row-main"><div class="row-title" style="font-size:12px">typecheck</div></div>
+              <span class="exit ok">0</span>
+            </div>
+            <div class="row" style="padding:7px 0;min-height:0">
+              <svg class="icon icon-14" style="color:var(--done)"><use href="icons.svg#i-check"></use></svg>
+              <div class="row-main"><div class="row-title" style="font-size:12px">unit test</div></div>
+              <span class="exit ok">0</span>
+            </div>
+            <div class="row" style="padding:7px 0;min-height:0">
+              <svg class="icon icon-14" style="color:var(--muted)"><use href="icons.svg#i-dot"></use></svg>
+              <div class="row-main"><div class="row-title" style="font-size:12px">接口契约评审</div><div class="row-sub">等待队长验收</div></div>
+              <span class="mini-chip">待跑</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- 成本归因 -->
+        <div class="sec" style="gap:8px">
+          <div class="dsec-head"><h4>成本归因</h4><span class="line"></span><span class="mini-chip">估算</span></div>
+          <div style="display:flex;align-items:baseline;justify-content:space-between">
+            <span class="cost-label">本任务累计</span>
+            <span class="cost-val">386k</span>
+          </div>
+          <div style="display:flex;align-items:baseline;justify-content:space-between">
+            <span class="cost-label">缓存命中</span>
+            <span class="cost-val" style="font-size:12px">68.2<small>%</small></span>
+          </div>
+          <div style="display:flex;align-items:baseline;justify-content:space-between">
+            <span class="cost-label">占团队总消耗</span>
+            <span class="cost-val" style="font-size:12px">31.1<small>%</small></span>
+          </div>
+          <p class="row-sub" style="margin-top:2px">按 tokenMeter 用量比例分摊，非精确计量。</p>
+        </div>
+
+        <!-- 危险操作 -->
+        <div class="sec" style="gap:8px">
+          <div class="dsec-head"><h4>任务操作</h4><span class="line"></span></div>
+          <div style="display:flex;flex-direction:column;gap:6px">
+            <button class="btn sm" style="justify-content:flex-start"><svg class="icon icon-14"><use href="icons.svg#i-pause"></use></svg>暂停此任务</button>
+            <button class="btn sm" style="justify-content:flex-start"><svg class="icon icon-14"><use href="icons.svg#i-branch"></use></svg>拆分为子任务</button>
+            <button class="btn danger sm" style="justify-content:flex-start"><svg class="icon icon-14"><use href="icons.svg#i-x"></use></svg>取消此任务</button>
+          </div>
+          <p class="row-sub">取消后已产出证据保留，任务转 blocked 并回到队长重规划。</p>
+        </div>
+      </aside>
+    </div>
+
+    <!-- 成本条 -->
+    <footer class="costbar">
+      <div class="cost">
+        <div>
+          <div class="cost-label">本任务 token</div>
+          <div class="cost-val">386k</div>
+        </div>
+        <div class="cost-spark" aria-hidden="true">
+          <i style="height:6px"></i><i style="height:9px"></i><i style="height:7px"></i><i style="height:13px"></i>
+          <i style="height:11px"></i><i style="height:16px"></i><i style="height:14px"></i><i class="hot" style="height:20px"></i>
+        </div>
+      </div>
+      <div class="cost">
+        <div><div class="cost-label">缓存命中率</div><div class="cost-val">68.2<small>%</small></div></div>
+      </div>
+      <div class="cost">
+        <div><div class="cost-label">今日未命中 / 输出</div><div class="cost-val">62k <small>/</small> 8k</div></div>
+      </div>
+      <div class="cost-right">
+        <div style="display:flex;align-items:center;gap:8px">
+          <div class="ring" aria-hidden="true"><b>31%</b></div>
+          <div>
+            <div class="cost-label">占团队消耗</div>
+            <div class="cost-val" style="font-size:12px">386k <small>/ 1.24M</small></div>
+          </div>
+        </div>
+        <span class="mini-chip">归因为估算</span>
+      </div>
+    </footer>
+  </main>
+</div>
+</body>
+</html>
