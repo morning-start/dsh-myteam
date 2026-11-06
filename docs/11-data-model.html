@@ -1,0 +1,181 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>myteam · 功能关系与数据存储结构</title>
+<style>
+  :root{
+    --bg:#0f1115; --panel:#161a21; --panel2:#1b2029; --line:#2a303b;
+    --fg:#e6e9ef; --muted:#9aa4b2; --muted2:#6f7a89;
+    --acc:#7aa2f7; --ok:#7bd88f; --warn:#e0af68; --err:#f7768e; --kv:#bb9af7;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--fg);font:14px/1.65 -apple-system,"Segoe UI","PingFang SC","Microsoft YaHei",sans-serif}
+  .wrap{max-width:1180px;margin:0 auto;padding:32px 24px 64px}
+  h1{font-size:22px;margin:0 0 6px;letter-spacing:.2px}
+  .sub{color:var(--muted);font-size:13px;margin-bottom:26px}
+  h2{font-size:15px;margin:34px 0 12px;padding-left:10px;border-left:3px solid var(--acc);letter-spacing:.3px}
+  .card{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:16px 18px}
+  .grid{display:grid;gap:12px}
+  .g2{grid-template-columns:1fr 1fr}
+  .g4{grid-template-columns:repeat(4,1fr)}
+  @media (max-width:860px){.g2,.g4{grid-template-columns:1fr}}
+  .tag{display:inline-block;font-size:12px;padding:1px 8px;border-radius:999px;border:1px solid var(--line);color:var(--muted);margin-left:6px;vertical-align:2px}
+  .mono{font-family:ui-monospace,Consolas,"Courier New",monospace;font-size:12px;line-height:1.7;white-space:pre;overflow:auto}
+  table{width:100%;border-collapse:collapse;font-size:13px}
+  th,td{text-align:left;padding:7px 10px;border-bottom:1px solid var(--line);vertical-align:top}
+  th{color:var(--muted);font-weight:600;font-size:12px;letter-spacing:.3px}
+  tr:last-child td{border-bottom:none}
+  code{font-family:ui-monospace,Consolas,monospace;font-size:12px;background:var(--panel2);padding:1px 5px;border-radius:4px;color:var(--kv)}
+  .flow{display:flex;align-items:center;gap:8px;flex-wrap:wrap;font-size:12.5px}
+  .node{background:var(--panel2);border:1px solid var(--line);border-radius:8px;padding:6px 10px}
+  .arrow{color:var(--muted)}
+  .layer{border:1px solid var(--line);border-radius:10px;padding:12px 14px;background:var(--panel)}
+  .layer h3{margin:0 0 6px;font-size:13px}
+  .l0{border-color:#3b4a63}.l1{border-color:#3d5a45}.l2{border-color:#5a4a35}.l3{border-color:#4a3f5e}
+  .badge{font-size:12px;border-radius:5px;padding:1px 6px;margin-right:6px}
+  .b-ok{background:#1e3326;color:var(--ok)} .b-warn{background:#33291a;color:var(--warn)}
+  .b-err{background:#331e24;color:var(--err)} .b-acc{background:#1b2740;color:var(--acc)}
+  .small{font-size:12px;color:var(--muted)}
+  .kv{color:var(--kv)}
+  .note{border-left:2px solid var(--line);padding-left:12px;color:var(--muted);font-size:12.5px;margin-top:10px;max-width:68ch}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>myteam · 功能关系与数据存储结构</h1>
+  <div class="sub">对应 docs/11-数据模型与存储设计（CHG-44）· 一句话模型：一个工作区 = 一个 .team-workplace；权威只有账本，其余皆派生 / 配置 / 归档</div>
+
+  <h2>一、关系总览</h2>
+  <div class="card">
+    <div class="mono">Workspace ──1:N── Team
+   Team ──1:N── Member / Task / Message / KnowledgeProposal
+   Team ──1:N── TokenBucket（按天 × 成员）
+   Task ──N:N── Task          （deps 依赖）
+   Task ──1:N── Attempt       （claim 生命周期）
+   Task ──1:N── GateResult    （review/verify/archive）
+
+Role（内置/全局/项目）──1:N── Member
+   └ spawn 时快照进 identity.json
+Preset（团队模式）──1── Captain Session ──1── Team
+KnowledgeEntry ──N:N── Task（evidence 指针）</div>
+    <div class="note">不变量：①面板永远不是事实源（数字全从账本投影派生）；②角色=引用+快照，改角色不影响已召唤成员；③任务=attempt 级绑定，释放/撤销即失效；④知识=多对多证据关系；⑤token 是派生计量，不进账本、不进模型上下文。</div>
+  </div>
+
+  <h2>二、功能 ↔ 数据</h2>
+  <div class="card">
+    <table>
+      <thead><tr><th>功能</th><th>写</th><th>读</th><th>落点</th></tr></thead>
+      <tbody>
+        <tr><td>团队创建（队长会话）</td><td>team.created</td><td>角色库</td><td>state/teams/&lt;id&gt;/ledger.jsonl</td></tr>
+        <tr><td>团队模板 → 建团配置</td><td>team.config.json</td><td>模板 + 角色库</td><td>state/teams/&lt;id&gt;/team.config.json</td></tr>
+        <tr><td>角色创建 / 复制</td><td>角色 JSON</td><td>内置·全局·项目角色</td><td>config/roles/&lt;id&gt;.json</td></tr>
+        <tr><td>计划（澄清/暂存/批准）</td><td>plan.*</td><td>投影</td><td>ledger</td></tr>
+        <tr><td>任务执行</td><td>task.*</td><td>投影、门禁配置</td><td>ledger</td></tr>
+        <tr><td>门禁</td><td>task.gate.result</td><td>产物落位、证据块</td><td>ledger + 交付物</td></tr>
+        <tr><td>面板（看板/流程/详情）</td><td>只读（写仅 planAction/postComment/disband）</td><td>投影、tokens</td><td>内存 + tokens.json</td></tr>
+        <tr><td>角色↔团队关系视图</td><td>只读</td><td>describe().members</td><td>内存投影</td></tr>
+        <tr><td>知识库</td><td>knowledge.* + 条目 md</td><td>条目 + 索引</td><td>config/knowledge/</td></tr>
+        <tr><td>成员记忆</td><td>memory.md / notes/</td><td>仅该成员</td><td>members/&lt;id&gt;/memory/</td></tr>
+        <tr><td>成员能力隔离</td><td>运行时收窄</td><td>identity.json</td><td>不落盘（视图）</td></tr>
+        <tr><td>token 计量</td><td>tokens.json（派生）</td><td>tokenUsage 投影</td><td>tokens.json</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <h2>三、存储分层</h2>
+  <div class="grid g4">
+    <div class="layer l0"><h3>L0 权威 <span class="tag">append-only</span></h3>
+      <div class="small">ledger.jsonl（每团队一份）<br>单写者 commit + fsync<br>首事件 rules.version.adopted</div>
+      <div class="small" style="margin-top:8px">丢失 = 团队历史丢失</div>
+    </div>
+    <div class="layer l1"><h3>L1 派生 <span class="tag">内存</span></h3>
+      <div class="small">TeamProjection：成员/任务/提案/inbox<br>commit 后增量折叠<br>丢失零后果</div>
+      <div class="small" style="margin-top:8px">重建：冷启动全量重放</div>
+    </div>
+    <div class="layer l2"><h3>L2 侧车/配置 <span class="tag">可重建或人工</span></h3>
+      <div class="small">tokens.json · identity.json<br>config/roles · config/knowledge<br>成员 memory/notes</div>
+      <div class="small" style="margin-top:8px">tokens 由账本重算；identity 为快照</div>
+    </div>
+    <div class="layer l3"><h3>L3 归档/导出 <span class="tag">快照</span></h3>
+      <div class="small">archive/&lt;teamId&gt;/<br>export/</div>
+      <div class="small" style="margin-top:8px">解散时归档；可重新导出</div>
+    </div>
+  </div>
+
+  <h2>四、目录结构（实测）</h2>
+  <div class="grid g2">
+    <div class="card">
+      <div class="mono">.team-workplace/
+├── structure.md            <span class="small">队长结构约定</span>
+├── config/                 <span class="small">✅ 入库</span>
+│   ├── team.config.json    <span class="small">看板/limits/gates</span>
+│   ├── roles/&lt;id&gt;.json     <span class="small">项目角色（运行时真相）</span>
+│   ├── presets/            <span class="small">团队模板（项目层，建团时应用）</span>
+│   └── knowledge/
+│       ├── &lt;topic&gt;.md      <span class="small">frontmatter+正文</span>
+│       └── index.json      <span class="small">派生索引</span>
+├── state/                  <span class="small">❌ gitignore</span>
+│   ├── teams/&lt;teamId&gt;/
+│   │   ├── ledger.jsonl    <span class="small">L0 唯一权威</span>
+│   │   ├── tokens.json     <span class="small">L2 按天×成员</span>
+│   │   ├── team.config.json <span class="small">团队级生效配置（模板落盘）</span>
+│   │   └── members/&lt;id&gt;/
+│   │       ├── identity.json
+│   │       └── memory/
+│   │           ├── memory.md
+│   │           └── notes/
+│   ├── logs/
+│   └── scratch/            <span class="small">不入库</span>
+├── archive/&lt;teamId&gt;/       <span class="small">L3 归档快照</span>
+└── export/                 <span class="small">L3 人读导出</span></div>
+    </div>
+    <div class="card">
+      <div class="mono">$DSH_HOME/myteam/
+├── roles/&lt;id&gt;.json         <span class="small">用户全局角色（存档层）</span>
+└── workspaces.json         <span class="small">跨工作区团队索引（CHG-45 已实现）</span>
+
+<span class="small">已实现（解决"会话关闭后团队从全局列表消失"）：</span>
+.team-workplace/state/teams.json
+  → teamId / goal / state / members / counts / updatedAt
+  → 派生自各 ledger，可全量重建（commit 后单条 upsert）</div>
+      <div class="note">全局视图 = 存活会话（在线，可交互） ∪ teams.json（离线，可打开只读快照）；团队卡标注在线/离线。</div>
+    </div>
+  </div>
+
+  <h2>五、写入与数据流</h2>
+  <div class="card">
+    <div class="flow">
+      <span class="node">工具调用 / 面板动作</span><span class="arrow">→</span>
+      <span class="node">TeamService.commit()</span><span class="arrow">→</span>
+      <span class="node">① 领域校验</span><span class="arrow">→</span>
+      <span class="node">② schema + seq</span><span class="arrow">→</span>
+      <span class="node">③ 副本 applyEvent（O(1)）</span><span class="arrow">→</span>
+      <span class="node">④ append + fsync</span><span class="arrow">→</span>
+      <span class="node">⑤ 切换投影 + 侧车</span>
+    </div>
+    <div class="note" style="margin-top:14px">写路径固定「<b>先算后写</b>」：副本 apply 成功才 append，折返失败不落账本、不动投影（CHG-59）；投影只存内存，<b>不落 team.json</b>（ADR-002 R2 决策 B），冷启动从账本全量重放一次。</div>
+    <div class="mono" style="margin-top:14px">task.created → backlog → ready → in_progress
+  → evidence → completed → gate → done
+异常：escalate → re-scoping → rescope | split | abort
+知识：knowledge.proposed → 队长采纳 → knowledge.adopted</div>
+  </div>
+
+  <h2>六、缺口与进展</h2>
+  <div class="card">
+    <table>
+      <thead><tr><th>项</th><th>影响</th><th>状态 / 建议</th></tr></thead>
+      <tbody>
+        <tr><td><span class="badge b-ok">已实现</span>全局视图离线数据源</td><td>会话关闭后团队不可见</td><td>CHG-45：state/teams.json + workspaces.json + 在线/离线合并</td></tr>
+        <tr><td><span class="badge b-ok">已实现</span>离线团队只读看板</td><td>只能看摘要，不能看看板</td><td>CHG-46：getOfflineBoard/getOfflineTaskDetail 直接从账本容错折叠（坏行标 degraded）</td></tr>
+        <tr><td><span class="badge b-ok">已实现</span>面板成员管理</td><td>不能暂停/移除成员</td><td>CHG-48：memberOp（suspend/archive/remove/restore；remove 两段确认；actor=human）</td></tr>
+        <tr><td><span class="badge b-acc">部分</span>开箱团队模板</td><td>自定义团队模板无来源</td><td>CHG-50~54：内置+项目模板；全局只放角色；模板可组队、队员技能/MCP 入快照</td></tr>
+        <tr><td><span class="badge b-acc">P2</span>export / archive 结构未定稿</td><td>导出物不一致</td><td>export/&lt;teamId&gt;-&lt;ts&gt;/{board.md,tokens.csv,roster.json}；archive 加 meta.json</td></tr>
+        <tr><td><span class="badge b-acc">部分</span>token 双口径</td><td>账本用量 vs 实时读对不上</td><td>CHG-47：成本 tab + 来源标注（tokenMeter/启发式/非账单）+ 离线 tokens；差额对照待做</td></tr>
+      </tbody>
+    </table>
+  </div>
+</div>
+</body>
+</html>
