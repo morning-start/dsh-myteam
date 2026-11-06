@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="64" height="64">
+  <!-- myteam：六边形（插件名⬢）内三枚成员节点与中心队长节点，领域中性原创图形 -->
+  <path d="M32 4 56 18v28L32 60 8 46V18Z" fill="none" stroke="currentColor" stroke-width="4" stroke-linejoin="round"/>
+  <circle cx="32" cy="24" r="6" fill="currentColor"/>
+  <circle cx="22" cy="40" r="5" fill="currentColor" opacity="0.72"/>
+  <circle cx="42" cy="40" r="5" fill="currentColor" opacity="0.72"/>
+  <path d="M32 30v6M28 34l-4 3M36 34l4 3" stroke="currentColor" stroke-width="3" stroke-linecap="round" fill="none"/>
+</svg>

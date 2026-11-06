@@ -1,0 +1,88 @@
+# dsh-plugin-myteam bundle patch（ADR-005：preset 组合形态）
+#
+# Loader 语义（cordis-plugin-loader/lib/index.js Entry._init()）：
+# 1. 每个装载行必须带 `name`（插件包说明符）——Entry._init 按 options.name import，
+#    缺 name 的行 import 失败被跳过（logger.error）。
+# 2. preset 行（@deepseek-ai/dsh-agent-preset）是 EntryGroup：config.plugins 是嵌套
+#    子行列表，子行同样按 name 解析、在 preset scope 内激活 → 工具/提示词仅队长会话可见。
+# 3. @deepseek-ai/dsh-persona 只能挂在 agent scope（preset 组合内）——顶层全局挂载
+#    与 deployment persona 冲突 fail loud（dsh-persona README「No global mount」）。
+#
+# 三行职责（ADR-003/T0-⑤）：
+#   myteam-preset-captain 团队预设（队长会话唯一入口）；
+#                         组合内 = myteam-host（服务+Lead 工具）+ myteam-persona-captain（身份）。
+#   myteam-host           注册于 preset 组合内 = 服务与工具仅在队长会话 scope 激活（NFR-7.4）。
+#                         面板读盘走 workspace 文件（ctx.remote 面板通道 M2 接 gateway 后启用），
+#                         不依赖服务可见性。
+#
+# 成员工具（9 个）不在 preset 层注册——成员由插件经 agents.create 的 setup(agentCtx)
+# 在成员作用域内注册（ADR-003），preset 只负责队长。
+
+- insert:
+    # 客户端载体行（裸包名，dsh-client-modules 组图约定）：dsh-client-modules/lib/index.js
+    # resolveMeta → exactPackageSpecifier（:83-89）只认「不含 / 的裸包名」行——
+    # 含子路径的行（如 dsh-plugin-myteam/panel）不进 window.__DSH_BOOT__ 客户端图，
+    # 面板/侧栏 UI 整体不可见。preset 内的 myteam-host 行在 PresetTree（root loader
+    # 树之外），扫描也看不到。故顶层必须挂一行裸包名；config.carrier=true 让
+    # apply 直接返回（宿主职责全部留在 preset 作用域，NFR-7.4；也避免 root 侧
+    # 再 provide 'myteam' 与门面造成网关端点歧义）。
+    - id: myteam-carrier
+      name: 'dsh-plugin-myteam'
+      config:
+        carrier: true
+    # M2 门面行（官方 SessionController 模式，dsh-api-session-controller/lib/index.js:2952）：
+    # 根级 typert remote 服务，namespace 仍 'myteam' → 客户端端点 myteam/<method> 不变。
+    # 为什么必需：preset 挂载审计要求队长内的 MyTeamRemote isolate（entry-local realm），
+    # 而网关 claimsEndpoint/resolveSrcDescriptor 只扫 root 可见服务 → 隔离服务进不了
+    # srcClaims，ctx.remote.myteam.* 在 claims 层被拒。门面（root 可见）经官方口子
+    # agentPresets.serviceFor(agent,'myteam') 读隔离服务；方法首参 `agent` 命中
+    # dsh-agent 的 typert lookup（wire=agentId），网关把客户端传的 sessionId 解析成
+    # Agent 实例。inject：门面读 agents（listTeams 会话发现）与 agentPresets（serviceFor）。
+    - id: myteam-panel
+      name: 'dsh-plugin-myteam/panel'
+      inject: ['agents', 'agentPresets']
+    - id: myteam-preset-captain
+      name: '@deepseek-ai/dsh-agent-preset'
+      config:
+        id: myteam-captain
+        name: 团队模式
+        description: '团队模式（myteam）：队长会话统一规划名册与任务 DAG、分发成员、裁决 escalate，面板可查看看板与角色。从诞生起只做协调不做领域工作。'
+        order: 100
+        plugins:
+          - id: myteam-host
+            name: 'dsh-plugin-myteam'
+            # 行级 inject（EntryOptions.inject，loader internal/plugin 钩子并入 fiber.inject）：
+            # 等价于插件 apply 函数上的 .inject 属性，双保险且在清单里显式可见。
+            inject: ['tools', 'agents']
+            # 行级 isolate（EntryOptions.isolate，Dict<true|string>）：把本行提供的服务名
+            # 映射到 entry-local realm（LocalRealm，键后缀 '#<entry.id>'）。
+            # 必需：preset 挂载审计 mountPreset → leakedServices 检查「preset 子树是否
+            # 把服务发布到 root realm」——无 isolate 时 cordis reflect.provide 会写
+            # root[isolate][name] = Symbol(name)（cordis lib/index.js L805），MyTeamRemote
+            # 的 'myteam' 键就等于 root 键 → 判定泄漏 → 抛
+            # `Preset services require isolate realms: myteam`（preset 卡片「加载失败」）。
+            # 有 isolate 时实现存于 realm 私有符号，root 键不同 → 不泄漏。
+            # 官方对照：dsh-experimental-agent-team 的 TeamService(super(ctx,'agentTeams'))
+            # 挂在 profile 顶层行（不在 preset 内）→ 不受 preset 泄漏审计。
+            isolate:
+              myteam: true
+          - id: myteam-persona-captain
+            name: '@deepseek-ai/dsh-persona'
+            config:
+              prefix: |
+                你是 myteam 团队的队长（Captain），myteam 是本工作区启用的多智能体团队插件。
+                你的职责边界（FR-10.1）：
+                1. 任务安排：把用户目标拆解为满足 AC 的任务集（requiredRole 必须在名册内、每任务 AC≥1 可检验），
+                   用 myteam_submit_plan 提交草稿——草稿阶段绝不产生成员会话，等人工 Approve & Run。
+                2. 结构整理：维护 docs/ 与 .team-workplace/ 的落位约定（structure.md）；叶子任务必须带 deliverableSpec。
+                3. 过程检查与调度：分派走原子 claim/attempt 机制；escalate 提醒出现时按 rescope > split > abort 次序裁决；
+                   每任务 escalate 计数 >2 时建议用户人工介入。
+                4. 你不做具体领域工作（写代码/写文档是成员的事）；你拥有全部 myteam_ Lead 工具。
+                5. 澄清硬终止（FR-1.6）：信息不足时先澄清再出名册——问题分 taste/fact 两型，taste 才必须停，
+                   fact 用默认值+假设标注兜底；追问 ≤3 轮；同问题不重复问；用户可随时喊停；
+                   每轮澄清都必须出现在 myteam_submit_plan 的 clarify 参数里（落账本 plan.clarify 事件）。
+                   澄清话术（FR-16.4④/R33）：需要项目背景或历史决策信息时，提示用户可直接 @ 相关历史会话
+                   （一次引用胜过多轮口述）；引用内容由用户侧给出，你不主动猜测未提供的会话内容。
+                6. 交付纪律（FR-5.0）：成员的 done 申报必须带 [Verification evidence] 证据块；
+                   审查任务产出时先审证据块，再看正文结论；禁止凭"没有出现拒绝词"就认为通过。
+                7. 通用性（FR-10.3）：团队领域由角色与配置决定，不预设"开发"语境；工具描述与裁决话术保持领域中性。

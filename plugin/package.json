@@ -1,0 +1,52 @@
+{
+  "name": "dsh-plugin-myteam",
+  "version": "0.1.0",
+  "description": "myteam — DSH 内的独立多智能体团队运行时：任务账本、状态机、质量门禁、角色库与可视化面板；零依赖内置 agentTeams（通用 Agent 团队平台）",
+  "type": "module",
+  "main": "./lib/host.mjs",
+  "exports": {
+    ".": "./lib/host.mjs",
+    "./host": "./lib/host.mjs",
+    "./panel": "./lib/panel.mjs",
+    "./client": "./client/client.js",
+    "./locale/*.json": "./locale/*.json",
+    "./icon": "./icon.svg",
+    "./icon.svg": "./icon.svg",
+    "./package.json": "./package.json"
+  },
+  "icon": "./icon.svg",
+  "engines": {
+    "node": ">=22.18",
+    "dsh": ">=0.2.1-rc.0 <0.3.0"
+  },
+  "dsh": {
+    "bundle": {
+      "patch": "./cordis.patch.yml"
+    },
+    "client": {
+      "platform": "web",
+      "inject": [
+        "@deepseek-ai/dsh-api-remotes",
+        "@deepseek-ai/dsh-client-locale",
+        "@deepseek-ai/dsh-client-ui-conversation",
+        "@deepseek-ai/dsh-client-ui-layout",
+        "@deepseek-ai/dsh-client-ui-sidebar",
+        "@deepseek-ai/dsh-client-ui-workspace"
+      ]
+    }
+  },
+  "files": [
+    "lib",
+    "src",
+    "client",
+    "scripts",
+    "cordis.patch.yml",
+    "locale/*.json",
+    "icon.svg"
+  ],
+  "scripts": {
+    "bundle": "node scripts/build-lib.mjs",
+    "test": "node --test test/*.test.ts test/*.test.js"
+  },
+  "license": "MIT"
+}

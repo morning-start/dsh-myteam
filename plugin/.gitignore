@@ -1,0 +1,8 @@
+# >>> dsh-plugin-myteam managed block >>>
+.team-workplace/state/
+.team-workplace/archive/
+# <<< dsh-plugin-myteam managed block <<<
+
+# 依赖（本地开发用软链/安装，不随包分发）
+node_modules/
+*.log

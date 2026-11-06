@@ -1,0 +1,20 @@
+{
+  // 类型门禁配置（P2 技术债）：构建用的是 node:module stripTypeScriptTypes —— 只擦类型、从不校验，
+  // 于是「访问不存在的属性」这类错误永远逃过编译器。本文件给编译器一个可复现的入口：
+  //   npx --no-install tsc -p plugin/tsconfig.json --noEmit
+  // 刻意 noEmit：产物由 scripts/build-lib.mjs 生成（lib/*.mjs），tsc 只做检查。
+  // 刻意不加 devDependency：Node >= 22.18 自带类型擦除，仓库保持零依赖。
+  "compilerOptions": {
+    "target": "ES2022",
+    "lib": ["ES2022"],
+    "module": "NodeNext",
+    "moduleResolution": "NodeNext",
+    // 源码里的相对导入以 .ts 结尾（Node 类型擦除要求），构建脚本再改写为 .mjs
+    "allowImportingTsExtensions": true,
+    "noEmit": true,
+    "strict": true,
+    "skipLibCheck": true,
+    "forceConsistentCasingInFileNames": true
+  },
+  "include": ["src/**/*.ts"]
+}
