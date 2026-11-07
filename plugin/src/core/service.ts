@@ -34,6 +34,7 @@ import {
   type RoleStorePaths,
 } from './roles/role-store.ts'
 import { loadEffectiveConfig, readProjectConfigRaw, readTeamConfigRaw, type TeamConfig } from './config/team-config.ts'
+import { storeLayout } from './workspace/layout.ts'
 // CHG-87（FR-5.3/FR-5.4/FR-16.4③）：command 门禁 / scope 审计 / 证据指针
 import { validateVerifyCommand } from './gates/command-gate.ts'
 import { validateEvidencePointer } from './knowledge/evidence-pointer.ts'
@@ -77,7 +78,7 @@ export class TeamService {
   constructor(opts: TeamServiceOptions) {
     this.opts = opts
     this.teamId = opts.teamId
-    const teamsDir = join(opts.workspaceRoot, '.team-workplace', 'state', 'teams')
+    const teamsDir = storeLayout(opts.workspaceRoot).tasks
     this.ledgerPath = join(teamsDir, opts.teamId, 'ledger.jsonl')
     // 三层合并（CHG-56）：项目级 config/team.config.json（或注入覆盖）← 团队级 team.config.json
     const projectConfig = readProjectConfigRaw(opts.workspaceRoot) ?? opts.configOverride

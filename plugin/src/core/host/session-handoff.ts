@@ -464,7 +464,7 @@ export interface HandoffRunOptions {
   summary: string
   /** 新会话的首条消息（= buildHandoffPrompt(summary)） */
   prompt: string
-  /** 新会话的工作目录（同一工作区 → 同一份 `.team-workplace`） */
+  /** 新会话的工作目录（同一工作区 → 同一份 `.dsh-myteam`） */
   cwd: string
   /** 新会话运行的 Agent 预设（默认团队预设 `myteam-captain`） */
   agentPreset: string

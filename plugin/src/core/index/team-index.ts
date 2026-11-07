@@ -4,8 +4,9 @@
  * 背景：面板全局视图此前只聚合「存活的队长会话」——会话关闭/宿主重启后，未归档团队
  * 会从全局列表消失（docs/11 §七 P1）。本模块把账本折叠成可重建的摘要索引：
  *
- *   .team-workplace/state/teams.json        # 工作区级：本工作区所有团队摘要
- *   $DSH_HOME/myteam/workspaces.json         # 跨工作区级：workspaceRoot → teams[]
+ *   .dsh-myteam/state/teams.json          # 工作区级：本工作区所有团队摘要
+ *   $DSH_HOME/myteam/workspaces.json      # 跨工作区级：workspaceRoot → teams[]（**只用于「全部项目」入口，
+ *                                         #   绝不并入项目视图**——CHG-102 修「所有项目看起来都一样」）
  *
  * 纪律（docs/11 §二）：
  *  - 索引是**派生数据**，不是事实源：任何时刻可 scanWorkspaceIndex() 全量重建；
@@ -18,6 +19,7 @@ import { homedir } from 'node:os'
 import { dirname, join } from 'node:path'
 import { foldEvents } from '../scheduler/fold.ts'
 import type { TeamProjection } from '../scheduler/state.ts'
+import { storeLayout } from '../workspace/layout.ts'
 
 export interface TeamIndexMember {
   roleId: string
@@ -61,7 +63,7 @@ const INDEX_FILE = 'teams.json'
 /* ── 路径 ── */
 
 export function workspaceIndexPath(workspaceRoot: string): string {
-  return join(workspaceRoot, '.team-workplace', 'state', INDEX_FILE)
+  return storeLayout(workspaceRoot).stateIndex
 }
 
 /** 插件级 home（跨工作区共享）：$DSH_HOME/myteam，缺省 ~/.dsh/myteam */
@@ -125,7 +127,7 @@ export function readEventsTolerant(ledgerPath: string): { events: Array<{ seq: n
 
 /** 全量扫描工作区账本，重建索引（索引缺失/损坏时的重建入口） */
 export function scanWorkspaceIndex(workspaceRoot: string): WorkspaceIndex {
-  const teamsDir = join(workspaceRoot, '.team-workplace', 'state', 'teams')
+  const teamsDir = storeLayout(workspaceRoot).tasks
   const teams: TeamIndexEntry[] = []
   let names: string[] = []
   try {

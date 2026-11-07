@@ -1,10 +1,9 @@
-# >>> dsh-plugin-myteam managed block >>>
-.team-workplace/state/
-.team-workplace/archive/
-# <<< dsh-plugin-myteam managed block <<<
+# CHG-102：项目级存储根 `.dsh-myteam/` 的提交纪律由**目录内**的
+# `.dsh-myteam/.gitignore` 自己维护（插件幂等写），这里不再追加托管块。
+# 旧实现曾把下面这个托管块写进项目根，污染用户仓库 —— 已由 migrate 清理。
 #
-# 上方托管块由插件幂等维护（plugin/src/host-workspace.ts:30-69），**请勿手改**；
-# 其余规则是人工维护层，插件不读不写。
+# 历史兼容：只忽略旧目录名，避免升级后残留目录被提交。
+.team-workplace/
 
 # ────────────────────────────────────────────────────────────────
 # 依赖与构建产物

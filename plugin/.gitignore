@@ -1,8 +1,6 @@
-# >>> dsh-plugin-myteam managed block >>>
-.team-workplace/state/
-.team-workplace/archive/
-# <<< dsh-plugin-myteam managed block <<<
-
+# CHG-102：项目级存储的提交纪律住在 `<project>/.dsh-myteam/.gitignore` 里
+# （由 plugin/src/core/workspace/layout.ts 幂等维护），这里不再写托管块。
+#
 # 依赖（本地开发用软链/安装，不随包分发）
 node_modules/
 *.log

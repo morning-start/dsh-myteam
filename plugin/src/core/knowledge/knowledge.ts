@@ -1,7 +1,7 @@
 /**
  * T18（FR-17，v2.5）+ M2-0c（FR-17.2/17.4 v2.7 Hindsight 语义增强，CHG-21/28）。
  *
- * 三层记忆中的 ② 团队知识库：`.team-workplace/config/knowledge/<topic>.md` + index.json。
+ * 三层记忆中的 ② 团队知识库：`.dsh-myteam/config/knowledge/<topic>.md` + index.json。
  * 硬规则（PRD §5.17）：
  *   - 每条必带 evidence（E8）与 contributor（E9）；无 evidence → `unverified` 标记；
  *   - 注入分层：索引常驻（≤40 行预算，config knowledge.indexBudget）+ 条目按需读（绝不全文倾倒）；
@@ -18,6 +18,7 @@
  */
 import { readFileSync, writeFileSync, existsSync, readdirSync, mkdirSync } from 'node:fs'
 import { join } from 'node:path'
+import { storeLayout } from '../workspace/layout.ts'
 
 export const INDEX_BUDGET_LINES = 40
 
@@ -352,7 +353,7 @@ export function candidatesForDraft(
 /* ── 文件 IO（host 进程内，R26）──────────────────────────────── */
 
 export function knowledgeDirOf(workspaceRoot: string): string {
-  return join(workspaceRoot, '.team-workplace', 'config', 'knowledge')
+  return storeLayout(workspaceRoot).knowledge
 }
 
 export function listKnowledge(dir: string): KnowledgeEntry[] {

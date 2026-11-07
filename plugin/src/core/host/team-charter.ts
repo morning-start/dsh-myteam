@@ -30,9 +30,10 @@
  */
 import { existsSync, readFileSync, statSync } from 'node:fs'
 import { join } from 'node:path'
+import { STORE_DIR } from '../workspace/layout.ts'
 
-/** 章程文件相对工作区根的位置（与 `host-workspace.ts` 的 `ensureWorkplaceDirs` 同源） */
-export const TEAM_CHARTER_FILE = join('.team-workplace', 'structure.md')
+/** 章程文件相对项目根的位置（与 `core/workspace/layout.ts` 的 `storeLayout().charter` 同源） */
+export const TEAM_CHARTER_FILE = join(STORE_DIR, 'structure.md')
 
 /**
  * 注入上限（64 KiB）。

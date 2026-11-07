@@ -8,7 +8,8 @@
  *   - CHG-91：新增 `plugin` 来源——**插件贡献的团队模板跨项目可见**（插件资产，不是用户资产）。
  *     用户自建模板仍只在项目层（原意不变：不该全局污染）；
  *   - builtin：随插件分发、只读的开箱团队（标准队长 + 3 名队员）；
- *   - project：`<workspaceRoot>/.team-workplace/config/presets/*.json`。
+ *   - project：`<project>/.dsh-myteam/config/teams/*.json`（CHG-102：目录名从 `presets/`
+ *     改为 `teams/`，与「团队」这个用户可见概念对齐）。
  *
  * 纪律：
  *   - 面板/门面**只读**；模板的创建/复制/fork/删除走队长工具（CHG-57），面板不写盘；
@@ -18,6 +19,7 @@
 import { existsSync, mkdirSync, readdirSync, readFileSync, renameSync, unlinkSync, writeFileSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 import { DEFAULT_CONFIG } from '../config/team-config.ts'
+import { storeLayout } from '../workspace/layout.ts'
 
 /** 团队模板来源（CHG-91 增 `plugin`：插件贡献，跨项目可见） */
 export type PresetOrigin = 'builtin' | 'plugin' | 'project'
@@ -94,7 +96,7 @@ const SAFE_ID = /^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$/
 export function presetDirs(workspaceRoot: string): PresetCatalog['dirs'] {
   return {
     builtin: '（插件内置）',
-    project: join(workspaceRoot, '.team-workplace', 'config', 'presets'),
+    project: storeLayout(workspaceRoot).teams,
   }
 }
 

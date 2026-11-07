@@ -12,6 +12,7 @@
  * 本文件保持宿主无关：组装逻辑纯函数化，宿主接线（真 agents.create）在 host.ts。
  */
 import type { RoleDefinition } from '../roles/builtin-roles.ts'
+import { scratchDir } from '../workspace/layout.ts'
 
 /** 9 个团队协调工具（FR-3.5 v2.5：永不可被策略关闭；v2.4 +claim_task，v2.5 +read_knowledge） */
 export const TEAM_MEMBER_TOOLS = [
@@ -111,7 +112,7 @@ export function memberPromptSection(role: RoleDefinition, member: MemberInstance
 
 /** scratch 区路径（FR-10.5；R26：成员自己 mkdir，不预创建） */
 export function scratchPathFor(workspaceRoot: string, teamId: string, memberId: string): string {
-  return [workspaceRoot, '.team-workplace', 'state', 'scratch', teamId, memberId].join('/')
+  return scratchDir(workspaceRoot, teamId, memberId)
 }
 
 /**
