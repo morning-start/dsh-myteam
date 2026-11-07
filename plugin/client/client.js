@@ -2767,6 +2767,12 @@ window.__ModuleLoader__.load({
       const call = (method, query) => rpcCall(connection, `myteam/${method}`, { agentId: sessionId, query })
       return {
         listTeams: () => rpcCall(connection, 'myteam/listTeams', {}),
+        /* CHG-102：项目级存储状态 / 初始化（根级端点，只收 query）。
+         * CHG-104 教训：面板门面加了方法、客户端的 api 表没加 → `discoveryApi.getStoreState` 是
+         * undefined → 调用即 TypeError → catch 里 setStoreState(null) → 面板永远停在「加载中」。
+         * 现在由 t85 交叉校验「服务端 marker ⊆ 客户端 api 表」，漏一个就红。 */
+        getStoreState: (query) => rpcCall(connection, 'myteam/getStoreState', { query }),
+        initStore: (query) => rpcCall(connection, 'myteam/initStore', { query }),
         // T25：离线只读视图——网关门面方法无 agent 首参，args 只允许 { query }（assertExactArguments）
         getOfflineBoard: (query) => rpcCall(connection, 'myteam/getOfflineBoard', { query }),
         getOfflineTaskDetail: (query) => rpcCall(connection, 'myteam/getOfflineTaskDetail', { query }),
@@ -3353,6 +3359,10 @@ window.__ModuleLoader__.load({
       /* CHG-75：依赖改挂横幅（中性提示色——不是错误，是依赖关系变了） */
       '.mt-banner-rewired{background:var(--dsw-alias-bg-layer-2);border-left:3px solid var(--dsw-alias-border-l3)}',
       '.mt-banner-cancel{background:var(--dsw-alias-bg-layer-2);border-left:3px solid var(--dsw-alias-state-error-primary)}',
+      /* CHG-104：未初始化引导横幅（非阻塞——面板永远照常渲染） */
+      '.mt-banner-info{background:var(--dsw-alias-bg-layer-2);border-left:3px solid var(--dsw-alias-brand-primary);flex-wrap:wrap;justify-content:flex-start;font-size:12px;line-height:1.5}',
+      '.mt-banner-text{flex:1 1 320px;min-width:0;color:var(--dsw-alias-label-secondary);overflow-wrap:anywhere}',
+      '.mt-banner-path{font-size:11px;color:var(--dsw-alias-label-tertiary);overflow-wrap:anywhere}',
       '.mt-banner-stack{display:flex;flex-direction:column;gap:6px}',
       '.mt-foldhead{display:flex;align-items:center;gap:8px;width:100%;text-align:left;background:none;border:none;color:inherit;font:inherit;padding:0;cursor:pointer}',
       '.mt-foldhead .mt-count{margin-left:auto}',
@@ -9837,13 +9847,17 @@ window.__ModuleLoader__.load({
         if (!projectRoot || !rootCandidates.includes(projectRoot)) setProjectRoot(rootCandidates[0])
       }, [rootCandidates, projectRoot])
       react.useEffect(() => { loadProject(projectRoot) }, [projectRoot, loadProject])
-      /* CHG-102：项目存储状态（换项目即重读；未初始化 → 空态，不渲染任何项目内容） */
+      /* CHG-102 / CHG-104：项目存储状态。
+       * 纪律：**读取失败绝不阻塞面板**——失败/方法缺失/加载中一律视为「未知」(undefined)，
+       * 照常渲染面板；只有明确拿到 `initialized:false` 才显示引导横幅（不替换整屏）。 */
       react.useEffect(() => {
         if (!projectRoot) { setStoreState(undefined); return undefined }
+        // 宿主 lib 可能是旧版本（门面方法未注册）→ 不能调用，否则 TypeError 会让面板卡死
+        if (typeof discoveryApi.getStoreState !== 'function') { setStoreState(undefined); return undefined }
         let alive = true
-        discoveryApi.getStoreState({ workspaceRoot: projectRoot }).then((r) => {
-          if (alive) setStoreState(r?.status === 'ok' ? r : null)
-        }).catch(() => { if (alive) setStoreState(null) })
+        discoveryApi.getStoreState({ workspaceRoot: projectRoot })
+          .then((r) => { if (alive) setStoreState(r?.status === 'ok' ? r : undefined) })
+          .catch(() => { if (alive) setStoreState(undefined) })
         return () => { alive = false }
       }, [projectRoot, discoveryApi])
       /** 空态里的「初始化」：只建目录与元文件（幂等，不建团队不写账本） */
@@ -10214,31 +10228,23 @@ window.__ModuleLoader__.load({
         return js('div', { className: 'mt-panel', ...themeAttr, children: [topbar, j('div', { className: 'mt-empty', children: [t('global.empty'), j('br'), t('global.emptyHint')] })] })
       }
       /**
-       * CHG-102 空态门：项目还没进团队模式（`.dsh-myteam/` 未初始化）时，
-       * **一个角色/团队/任务都不渲染**——否则内置角色 + 全局库会被误读成「这个项目已经有团队」。
-       * 已初始化的项目才继续往下走（storeState 为 undefined/null 时按加载中处理，避免闪空态）。
+       * CHG-104：**面板永不因为存储状态白屏**（用户反馈「UI 加载不出来」）。
+       *
+       * 修复前的两个 early return 把整屏换成了「加载中」/「一句话空态」：
+       *  - `storeState === null`（读取失败或方法不存在）→ 永远停在「加载中」，没有出口；
+       *  - `initialized === false` → 连 tab 和目录都不给看。
+       *
+       * 现在改成**非阻塞横幅**：未初始化时顶部提示 + 初始化按钮，**tab 与内容照常渲染**；
+       * 未知（undefined）时什么都不显示，直接渲染正常面板。
        */
-      if (scope === 'project' && storeState === null) {
-        return js('div', { className: 'mt-panel', ...themeAttr, children: [topbar, j('div', { className: 'mt-empty', children: error ?? t('state.loading') })] })
-      }
-      if (scope === 'project' && storeState && storeState.initialized === false) {
-        return js('div', { className: 'mt-panel', ...themeAttr, children: [
-          topbar,
-          js('div', { className: 'mt-page', children: [
-            js('div', { className: 'mt-empty', children: [
-              j('b', { children: t('store.emptyTitle') }),
-              j('br'),
-              j('span', { children: t('store.emptyBody') }),
-              j('br'),
-              j('code', { children: String(storeState.layout?.root ?? '') }),
-            ] }),
-            js('div', { className: 'mt-page-head-actions', children: [
-              j('button', { className: 'mt-btn mt-btn-primary', onClick: initStore, children: t('store.init') }),
-            ] }),
-            j('p', { className: 'mt-hint', children: t('store.uploadHint') }),
-          ] }),
-        ] })
-      }
+      const storeBanner = scope === 'project' && storeState && storeState.initialized === false
+        ? js('div', { className: 'mt-banner mt-banner-info', role: 'status', children: [
+            j('b', { children: t('store.emptyTitle') }),
+            j('span', { className: 'mt-banner-text', children: t('store.emptyBody') }),
+            j('code', { className: 'mt-banner-path', children: String(storeState.layout?.root ?? '') }),
+            j('button', { className: 'mt-btn mt-btn-primary mt-btn-sm', onClick: initStore, children: t('store.init') }),
+          ] })
+        : null
       if (!pv) {
         return js('div', { className: 'mt-panel', ...themeAttr, children: [topbar, j('div', { className: 'mt-empty', children: error ?? t('state.loading') })] })
       }
@@ -11406,6 +11412,8 @@ window.__ModuleLoader__.load({
       return js('div', { className: 'mt-panel', ...themeAttr, children: [
         topbar,
         projectTabs,
+        /* CHG-104：未初始化引导是横幅，不替换整屏（面板永远可加载、可浏览） */
+        storeBanner,
         error ? j('div', { className: 'mt-banner mt-error-banner', role: 'alert', children: error }) : null,
         notice ? js('div', { className: 'mt-banner', children: [
           j('span', { className: 'mt-notice', children: notice }),
