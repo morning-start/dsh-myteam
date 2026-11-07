@@ -542,11 +542,21 @@ test('t75-13 (CHG-93): contributionsBody 三分支 —— 加载中外壳不闪 
   })
   const text = textOf(tree)
   assert.ok(text.includes('Acme 工作流插件'), '插件显示名')
-  assert.ok(text.includes('acme-workflow · v1.0.0'), 'id + 版本')
+  assert.ok(text.includes('v1.0.0'), '版本（id 收进包图标 title，不再占一行）')
+  assert.ok(
+    collect(tree).some((node) => String(node.props?.title ?? '') === 'acme-workflow'),
+    '插件 id 仍可查（包图标 title）',
+  )
   assert.ok(text.includes('acme-reviewer'), '角色 id（用户要能直接写进 roster）')
-  assert.ok(text.includes('contrib.providedBy'), '「由插件 X 提供」溯源')
+  // CHG-106：溯源收进胶囊 title（可见文案只用「名字 + id」，不占一整行）
+  assert.ok(
+    collect(tree).some((node) => String(node.props?.title ?? '').includes('contrib.providedBy')),
+    '「由插件 X 提供」溯源',
+  )
   assert.ok(text.includes('🔒'), '只读徽标')
-  assert.ok(text.includes('acme-reviewer · acme-implementer'), '模板名册预览（建队向导要看「这个团队有谁」）')
+  // CHG-106：名册预览改到团队胶囊的 title（可见文案只放「N 人」，避免占一整行）
+  const teamChip = collect(tree).find((node) => String(node.props?.title ?? '').includes('acme-reviewer · acme-implementer'))
+  assert.ok(teamChip, '模板名册预览（建队向导要看「这个团队有谁」）')
   assert.ok(text.includes('contrib.root'), '贡献目录路径')
   // 只读徽标用 chip（不是普通文字）
   assert.ok(collect(tree).some((node) => classOf(node).includes('mt-chip-origin')), '只读徽标要有样式类')
@@ -569,7 +579,7 @@ test('t75-14 (CHG-93): contributionsBody 有 error 时红条 —— 列出每条
   assert.ok(collect(tree).some((node) => classOf(node).includes('mt-error-banner')), '红条要有告警样式')
 })
 
-test('t75-15 (CHG-105): 贡献区块改为「每插件一张卡 + 卡内扁平行列表」——不再三层套嵌卡片', () => {
+test('t75-15 (CHG-105/106): 能力包 = 一张卡 + 卡内**内联胶囊**（不再一个角色占一整行）', () => {
   const { contributionsBody } = G89()
   const tree = contributionsBody(t, {
     status: 'ok', root: '/h/myteam/plugins', ok: true,
@@ -578,25 +588,37 @@ test('t75-15 (CHG-105): 贡献区块改为「每插件一张卡 + 卡内扁平�
     teams: [{ id: 'acme-review-squad', name: 'Acme 评审小队', namespace: 'acme', members: [{ roleId: 'acme-security-auditor' }, { roleId: 'reviewer' }] }],
     warnings: [],
   })
-  const classes = collect(tree).flatMap((node) => classOf(node).split(/\s+/).filter(Boolean))
+  const nodes = collect(tree)
+  const classes = nodes.flatMap((node) => classOf(node).split(/\s+/).filter(Boolean))
   const unique = new Set(classes)
 
   // ① 只有一层卡片：mt-sec 只出现在最外层 section 上（原实现内部还有两个 mt-sec 卡片）
   const secCount = classes.filter((cls) => cls === 'mt-sec').length
   assert.equal(secCount, 1, `mt-sec 只能出现一次（外层区块），实际 ${secCount} 次 —— 内部再套卡片就是三层边框`)
-  // ② 行列表容器是扁平的 group，旧的带框列表容器必须消失
-  assert.ok(unique.has('mt-contrib-group'), '角色/模板分组用 mt-contrib-group')
-  assert.ok(!unique.has('mt-contrib-rolelist'), '不再使用带框的 rolelist 容器')
-  assert.ok(!unique.has('mt-contrib-teamlist'), '不再使用带框的 teamlist 容器')
-  // ③ 插件头一行放「名字 + id·版本 + 计数」，计数靠右
-  assert.ok(unique.has('mt-contrib-plugin-head'), '插件头单独一行')
+  // ② 能力平铺：caps 容器 + 每类一行 + 胶囊列表；旧的整行 row / 带框 list 必须消失
+  assert.ok(unique.has('mt-contrib-caps'), '能力区用 mt-contrib-caps')
+  assert.ok(unique.has('mt-contrib-cap-row'), '每类能力一行（角色 / 模板）')
+  assert.ok(unique.has('mt-contrib-chips'), '能力用 flex-wrap 胶囊平铺')
+  assert.ok(unique.has('mt-contrib-chip'), '单个能力是一个胶囊')
+  for (const gone of ['mt-contrib-group', 'mt-contrib-group-label', 'mt-contrib-rolelist', 'mt-contrib-teamlist', 'mt-contrib-role', 'mt-contrib-team']) {
+    assert.ok(!unique.has(gone), `旧结构 ${gone} 必须消失（它会把一个条目撑成一整行）`)
+  }
+  // ③ 胶囊里同时给出「人话名字」和「可直接写进 roster 的 id」
+  const chipText = nodes.filter((node) => classOf(node).includes('mt-contrib-chip')).map((node) => textOf(node)).join(' | ')
+  assert.ok(chipText.includes('安全审计'), '胶囊显示角色名')
+  assert.ok(chipText.includes('acme-security-auditor'), '胶囊同时带 id（用户要能直接复制进 roster）')
+  assert.ok(chipText.includes('contrib.members'), '模板胶囊显示人数（不铺开名册）')
+  // ④ 包头部：图标 + 名字 + 版本 + 计数（一行读完「这是什么、带了多少能力」）
+  assert.ok(unique.has('mt-contrib-plugin-head'), '能力包头部单独一行')
+  assert.ok(unique.has('mt-contrib-pack-glyph'), '包图标（形状通道，不只靠颜色）')
   assert.ok(unique.has('mt-contrib-counts'), '计数靠右（mt-contrib-counts）')
-  // ④ 只读徽标是短标签 + title 承载完整说明（原实现长句直接铺满整行）
-  const lock = collect(tree).find((node) => classOf(node).includes('mt-contrib-lock'))
-  assert.ok(lock, '只读徽标要有 mt-contrib-lock（靠右不拉伸）')
+  // ⑤ 只读 + 目录压到脚注一行，不占正文高度
+  assert.ok(unique.has('mt-contrib-foot'), '脚注行（只读 + 目录）')
+  const lock = nodes.find((node) => classOf(node).includes('mt-contrib-lock'))
+  assert.ok(lock, '只读徽标要有 mt-contrib-lock')
   assert.ok(String(lock.props?.title ?? '').length > 10, '完整说明放 title（悬停可读，不占版面）')
   assert.equal(String(lock.children?.[0] ?? lock.children ?? ''), `🔒 ${t('contrib.readonly')}`, '徽标正文必须是短标签')
-  // ⑤ 行内 id 用设计系统的 chip（不新增字体族覆盖）
-  assert.ok(unique.has('mt-rolechip'), 'id 用既有 mt-rolechip')
-  assert.ok(unique.has('mt-rolechip-mono'), 'id 用等宽数字 chip')
+  // ⑥ 版本 chip 复用设计系统（不新增字体族覆盖）
+  assert.ok(unique.has('mt-rolechip'), '版本用既有 mt-rolechip')
+  assert.ok(unique.has('mt-rolechip-mono'), '版本用等宽数字 chip')
 })

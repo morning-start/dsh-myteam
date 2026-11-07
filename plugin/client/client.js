@@ -403,21 +403,24 @@ window.__ModuleLoader__.load({
       'role.origin.global': '全局',
       'role.origin.project': '项目',
       /* CHG-91（插件团队贡献契约 v1）：插件贡献的角色只读 + 插件贡献区 */
-      'contrib.title': '插件贡献',
-      'contrib.desc': '第三方插件装好后贡献进全局角色库与团队模板的角色。只读——想改请「复制到项目」再编辑。',
-      'contrib.empty': '当前没有插件贡献（把插件装进 $DSH_HOME/myteam/plugins/ 即可）',
+      'contrib.title': '能力包',
+      'contrib.desc': '第三方插件把「一个能打的角色 / 一支配好的队」打包成能力包；装好后直接进角色库与建队向导，组队时按名字聘任即可。',
+      'contrib.empty': '还没有装能力包（把插件放进 $DSH_HOME/myteam/plugins/ 即可）',
       'contrib.reload': '重新扫描插件',
       'contrib.reloading': '扫描中…',
-      'contrib.reloaded': '已重新扫描：{plugins} 个插件 · {roles} 个角色 · {teams} 个团队模板',
-      'contrib.pluginCount': '{n} 个插件',
+      'contrib.reloaded': '已重新扫描：{plugins} 个能力包 · {roles} 个角色 · {teams} 个团队模板',
+      'contrib.pluginCount': '{n} 个能力包',
       'contrib.roles': '角色',
       'contrib.teams': '团队模板',
+      'contrib.capRoles': '角色',
+      'contrib.capTeams': '模板',
+      'contrib.members': '{n} 人',
       'contrib.providedBy': '由插件「{plugin}」提供',
       'contrib.readonly': '只读',
-      'contrib.readonlyHint': '插件贡献的角色只读；想改请先「复制到项目」再编辑项目库那份',
-      'contrib.warnTitle': '插件贡献有问题（{n} 条 error）',
+      'contrib.readonlyHint': '能力包里的角色只读；想改请先「复制到项目」再编辑项目库那份',
+      'contrib.warnTitle': '能力包装载有问题（{n} 条 error）',
       'contrib.warnHint': '这些条目已被跳过。按每条提示改插件目录后点「重新扫描插件」。',
-      'contrib.ok': '插件贡献装载正常（{plugins} 个插件 / {roles} 个角色 / {teams} 个团队模板）',
+      'contrib.ok': '能力包装载正常（{plugins} 个包 / {roles} 个角色 / {teams} 个团队模板）',
       'contrib.root': '贡献目录：{root}',
       /* CHG-74：同名副本（内置/全局/项目库可能有同一 id）——被压过的那份标注「谁让位」 */
       'role.shadowedBy': '同名{origin}副本（以此为准）',
@@ -1542,22 +1545,25 @@ window.__ModuleLoader__.load({
       'role.origin.plugin': 'Plugin',
       'role.origin.global': 'Global',
       'role.origin.project': 'Project',
-      /* CHG-91: plugin-contributed roles are read-only */
-      'contrib.title': 'Plugin contributions',
-      'contrib.desc': 'Roles that third-party plugins contribute into the global role library and team templates. Read-only - copy to project to edit.',
-      'contrib.empty': 'No plugin contributions (drop a plugin into $DSH_HOME/myteam/plugins/)',
+      /* CHG-91 / CHG-106: capability packs (roles + team templates bundled by plugins) */
+      'contrib.title': 'Capability packs',
+      'contrib.desc': 'Third-party plugins bundle a capable role or a ready-made team into a capability pack. Once installed it shows up in the role library and team wizard - pick it by name when forming a team.',
+      'contrib.empty': 'No capability packs installed (drop a plugin into $DSH_HOME/myteam/plugins/)',
       'contrib.reload': 'Rescan plugins',
       'contrib.reloading': 'Scanning…',
-      'contrib.reloaded': 'Rescanned: {plugins} plugin(s) · {roles} role(s) · {teams} team template(s)',
-      'contrib.pluginCount': '{n} plugin(s)',
+      'contrib.reloaded': 'Rescanned: {plugins} pack(s) · {roles} role(s) · {teams} team template(s)',
+      'contrib.pluginCount': '{n} pack(s)',
       'contrib.roles': 'Roles',
       'contrib.teams': 'Team templates',
+      'contrib.capRoles': 'Roles',
+      'contrib.capTeams': 'Templates',
+      'contrib.members': '{n} members',
       'contrib.providedBy': 'Provided by plugin "{plugin}"',
       'contrib.readonly': 'Read-only',
-      'contrib.readonlyHint': 'Plugin-contributed roles are read-only; copy to project to edit that copy',
-      'contrib.warnTitle': 'Plugin contributions have {n} error(s)',
+      'contrib.readonlyHint': 'Roles inside a capability pack are read-only; copy to project to edit that copy',
+      'contrib.warnTitle': 'Capability packs have {n} error(s)',
       'contrib.warnHint': 'Those entries were skipped. Fix the plugin directory per each message, then click "Rescan plugins".',
-      'contrib.ok': 'Plugin contributions loaded ({plugins} plugin(s) / {roles} role(s) / {teams} team template(s))',
+      'contrib.ok': 'Capability packs loaded ({plugins} pack(s) / {roles} role(s) / {teams} team template(s))',
       'contrib.root': 'Contribution root: {root}',
       /* CHG-74: same-id copies (built-in / global / project) — the shadowed one says who won */
       'role.shadowedBy': 'Same id in {origin} (that one wins)',
@@ -3596,23 +3602,27 @@ window.__ModuleLoader__.load({
       '.mt-avatar-a4{background:color-mix(in srgb, var(--dsw-alias-state-error-primary) 12%, transparent);border-color:color-mix(in srgb, var(--dsw-alias-state-error-primary) 30%, transparent);color:var(--dsw-alias-state-error-primary)}',
       '.mt-chip-origin{flex:none;color:var(--dsw-alias-label-tertiary)}',
       /* CHG-91（插件团队贡献契约 v1）：插件贡献区块 —— 与角色库同层级但不抢视觉
-       * CHG-105：从「三层套嵌卡片」改成**每插件一张卡 + 卡内扁平行列表**
-       * （原先 插件贡献 > 角色/团队模板 各一层带框卡片，单条数据也撑出大块留白，
-       *   右侧只读徽标又被拉成长条 → 整块又高又空）。 */
+       * CHG-105：三层套嵌卡片 → 每插件一张卡 + 扁平行列表
+       * CHG-106：**能力包**心智——包 = 一张卡；包里的能力用**内联胶囊**平铺，
+       * 一行能放几个放几个，不再「一个角色占一整行、中间拉一条空档」。 */
       '.mt-contrib{margin-bottom:16px}',
       '.mt-contrib-body{display:flex;flex-direction:column;gap:8px;margin-top:8px}',
-      '.mt-contrib-plugin{border:1px solid var(--dsw-alias-line-soft);border-radius:8px;overflow:hidden;background:var(--dsw-alias-surface-raised)}',
-      '.mt-contrib-plugin-head{display:flex;align-items:baseline;gap:8px;padding:8px 12px;background:var(--dsw-alias-bg-layer-2);border-bottom:1px solid var(--dsw-alias-line-soft)}',
+      '.mt-contrib-plugin{border:1px solid var(--dsw-alias-line-soft);border-radius:10px;overflow:hidden;background:var(--dsw-alias-surface-raised)}',
+      '.mt-contrib-plugin-head{display:flex;align-items:center;gap:8px;padding:8px 12px;background:var(--dsw-alias-bg-layer-2);border-bottom:1px solid var(--dsw-alias-line-soft)}',
+      '.mt-contrib-pack-glyph{flex:none;display:grid;place-items:center;width:20px;height:20px;border-radius:6px;font-size:11px;background:color-mix(in srgb, var(--dsw-alias-brand-primary) 14%, transparent);color:var(--dsw-alias-brand-primary)}',
       '.mt-contrib-counts{margin-left:auto;flex:none;font-size:11px;color:var(--dsw-alias-label-tertiary);font-variant-numeric:tabular-nums}',
-      '.mt-contrib-group{display:flex;flex-direction:column;gap:2px;padding:8px 12px}',
-      '.mt-contrib-group+.mt-contrib-group{border-top:1px solid var(--dsw-alias-line-soft)}',
-      '.mt-contrib-group-label{font-size:11px;font-weight:600;letter-spacing:.02em;color:var(--dsw-alias-label-tertiary);margin-bottom:2px}',
-      '.mt-contrib-role,.mt-contrib-team{display:flex;align-items:center;gap:8px;min-height:24px;padding:1px 6px;border-radius:4px;font-size:12px}',
-      '.mt-contrib-role:hover,.mt-contrib-team:hover{background:var(--dsw-alias-bg-layer-2)}',
-      '.mt-contrib-name{flex:none;color:var(--dsw-alias-label-primary)}',
-      '.mt-contrib-meta{min-width:0;color:var(--dsw-alias-label-tertiary);font-size:11px;overflow-wrap:anywhere}',
-      /* 只读徽标只占自己那一格：短标签 + title 承载完整说明，不再拉满整行 */
-      '.mt-contrib-lock{margin-left:auto;flex:none}',
+      '.mt-contrib-caps{display:flex;flex-direction:column;gap:6px;padding:8px 12px}',
+      '.mt-contrib-cap-row{display:flex;align-items:flex-start;gap:8px}',
+      '.mt-contrib-cap-label{flex:none;width:32px;padding-top:3px;font-size:11px;font-weight:600;letter-spacing:.02em;color:var(--dsw-alias-label-tertiary)}',
+      '.mt-contrib-chips{display:flex;flex-wrap:wrap;gap:6px;min-width:0}',
+      '.mt-contrib-chip{display:inline-flex;align-items:center;gap:6px;max-width:100%;padding:2px 8px;border:1px solid var(--dsw-alias-line-soft);border-radius:999px;font-size:12px;line-height:1.6;background:var(--dsw-alias-bg-layer-2);color:var(--dsw-alias-label-primary)}',
+      '.mt-contrib-chip:hover{border-color:color-mix(in srgb, var(--dsw-alias-brand-primary) 42%, var(--dsw-alias-line-soft))}',
+      '.mt-contrib-chip-icon{flex:none;font-size:11px;opacity:.85}',
+      '.mt-contrib-chip-name{flex:none;max-width:220px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}',
+      '.mt-contrib-chip-id{flex:none;font-size:10px;font-variant-numeric:tabular-nums;letter-spacing:.01em;color:var(--dsw-alias-label-tertiary)}',
+      '.mt-contrib-foot{display:flex;align-items:center;gap:8px;padding:5px 12px;border-top:1px solid var(--dsw-alias-line-soft);background:var(--dsw-alias-bg-layer-2);font-size:11px}',
+      '.mt-contrib-lock{flex:none}',
+      '.mt-contrib-root{min-width:0;margin-left:auto;color:var(--dsw-alias-label-tertiary);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}',
       '.mt-contrib-warns{margin:6px 0 0;padding-left:18px;display:flex;flex-direction:column;gap:4px;font-size:12px}',
       '.mt-contrib-warn-err{color:var(--dsw-alias-state-error-primary)}',
       '.mt-contrib-warn-info{color:var(--dsw-alias-label-secondary)}',
@@ -7444,34 +7454,54 @@ window.__ModuleLoader__.load({
           : plugins.length === 0
             ? j('div', { className: 'mt-empty', children: t('contrib.empty') })
             : js('div', { className: 'mt-contrib-body', children: plugins.map((plugin) => js('div', { key: plugin.pluginId, className: 'mt-contrib-plugin', children: [
-              /* 插件头：名字 + id·版本 + 计数（计数靠右，和列表左对齐形成一条干净的中轴） */
+              /* CHG-106：能力包头部——包名 + 版本 + 计数（一行读完「这是什么、带了多少能力」） */
               js('div', { className: 'mt-contrib-plugin-head', children: [
+                j('span', { className: 'mt-contrib-pack-glyph', 'aria-hidden': true, title: plugin.pluginId, children: '▣' }),
                 j('strong', { children: plugin.displayName }),
-                j('span', { className: 'mt-rolechip mt-rolechip-mono', children: `${plugin.pluginId} · v${plugin.version}` }),
-                j('span', { className: 'mt-contrib-counts', children: `${t('contrib.roles')} ${plugin.roles.length} · ${t('contrib.teams')} ${plugin.teams.length}` }),
+                j('span', { className: 'mt-rolechip mt-rolechip-mono', children: `v${plugin.version}` }),
+                j('span', { className: 'mt-contrib-counts', children: `${t('contrib.capRoles')} ${plugin.roles.length} · ${t('contrib.capTeams')} ${plugin.teams.length}` }),
               ] }),
-              roles.length > 0 ? js('div', { className: 'mt-contrib-group', children: [
-                j('span', { className: 'mt-contrib-group-label', children: t('contrib.roles') }),
-                ...roles.map((role) => js('div', { key: role.id, className: 'mt-contrib-role', children: [
-                  j('span', { className: 'mt-rolechip mt-rolechip-mono', children: role.id }),
-                  j('span', { className: 'mt-contrib-name', children: role.name }),
-                  j('span', { className: 'mt-contrib-meta', children: t('contrib.providedBy').replace('{plugin}', displayNameOf(String(role.origin ?? '').replace(/^plugin:/, ''))) }),
-                  /* 只读徽标只占自己那一格（短标签 + title 说明），不再拉一条长条撑满整行 */
-                  j('span', {
-                    className: 'mt-chip mt-chip-origin mt-contrib-lock',
-                    title: t('contrib.readonlyHint'),
-                    children: `🔒 ${t('contrib.readonly')}`,
-                  }),
-                ] })),
-              ] }) : null,
-              teams.length > 0 ? js('div', { className: 'mt-contrib-group', children: [
-                j('span', { className: 'mt-contrib-group-label', children: t('contrib.teams') }),
-                ...teams.map((team) => js('div', { key: team.id, className: 'mt-contrib-team', children: [
-                  j('span', { className: 'mt-rolechip mt-rolechip-mono', children: team.id }),
-                  j('span', { className: 'mt-contrib-name', children: team.name }),
-                  j('span', { className: 'mt-contrib-meta', children: (team.members ?? []).map((member) => member.roleId).join(' · ') }),
-                ] })),
-              ] }) : null,
+              /* CHG-106：能力用**内联胶囊**平铺——一个包一条能力行，横向排满就换行，
+               * 不再「一个角色占一整行、名字和 id 之间拉一条空档」。 */
+              js('div', { className: 'mt-contrib-caps', children: [
+                roles.length > 0 ? js('div', { className: 'mt-contrib-cap-row', children: [
+                  j('span', { className: 'mt-contrib-cap-label', children: t('contrib.roles') }),
+                  js('div', { className: 'mt-contrib-chips', children: roles.map((role) => {
+                    const provider = displayNameOf(String(role.origin ?? '').replace(/^plugin:/, ''))
+                    return j('span', {
+                      key: role.id,
+                      className: 'mt-contrib-chip',
+                      title: `${role.id} · ${role.name} · ${t('contrib.providedBy').replace('{plugin}', provider)}`,
+                      children: [
+                        j('span', { className: 'mt-contrib-chip-icon', 'aria-hidden': true, children: '🛡' }),
+                        j('span', { className: 'mt-contrib-chip-name', children: role.name }),
+                        j('code', { className: 'mt-contrib-chip-id', children: role.id }),
+                      ],
+                    })
+                  }) }),
+                ] }) : null,
+                teams.length > 0 ? js('div', { className: 'mt-contrib-cap-row', children: [
+                  j('span', { className: 'mt-contrib-cap-label', children: t('contrib.teams') }),
+                  js('div', { className: 'mt-contrib-chips', children: teams.map((team) => {
+                    const roster = (team.members ?? []).map((member) => member.roleId).join(' · ')
+                    return j('span', {
+                      key: team.id,
+                      className: 'mt-contrib-chip',
+                      title: `${team.id} · ${team.name} · ${roster}`,
+                      children: [
+                        j('span', { className: 'mt-contrib-chip-icon', 'aria-hidden': true, children: '👥' }),
+                        j('span', { className: 'mt-contrib-chip-name', children: team.name }),
+                        j('span', { className: 'mt-contrib-chip-id', children: t('contrib.members').replace('{n}', String((team.members ?? []).length)) }),
+                      ],
+                    })
+                  }) }),
+                ] }) : null,
+              ] }),
+              /* 只读 + 目录：压到卡片脚注一行，不占正文高度 */
+              js('div', { className: 'mt-contrib-foot', children: [
+                j('span', { className: 'mt-chip mt-chip-origin mt-contrib-lock', title: t('contrib.readonlyHint'), children: `🔒 ${t('contrib.readonly')}` }),
+                j('span', { className: 'mt-contrib-root', title: String(data?.root ?? ''), children: t('contrib.root').replace('{root}', String(data?.root ?? '')) }),
+              ] }),
             ] })) }),
         j('div', { className: 'mt-hint', children: t('contrib.root').replace('{root}', String(data?.root ?? '')) }),
         err ? j('div', { className: 'mt-form-note mt-error-banner', role: 'alert', children: err }) : null,
