@@ -39,6 +39,7 @@ import { readPresetCatalog, BUILTIN_PRESET_IDS } from './core/presets/preset-sto
 import { loadContributions } from './core/contributions/parse.mjs'
 import { contributionsRoot } from './core/contributions/discover.mjs'
 import { CONTRIBUTION_CODES,                          } from './core/contributions/contract.mjs'
+import { isStoreInitialized, readManifest, storeLayout, ensureStore, rejectProjectRoot, STORE_DIR } from './core/workspace/layout.mjs'
 
 /** 门面可见的最小 Agent 面（真实实例由网关 lookup 注入；测试用 mock） */
                                             
@@ -252,7 +253,75 @@ export class MyTeamPanelFacade extends TypertRemoteService {
       if (liveNoRoot.has(offline.teamId)) continue
       teams.push(offline)
     }
+    /**
+     * CHG-102（P0「所有项目看起来都一样」）：这里**只做跨工作区发现**（项目下拉的候选），
+     * 项目作用域的数据面是 `getProject({workspaceRoot})`——它按工作区过滤，不再把全局
+     * 索引串进项目视图。两侧职责分开，避免「切了项目看到同一批团队」。
+     */
     return { status: 'ok', teams }
+  }
+
+  /**
+   * CHG-102：初始化项目级存储（面板空态里的「进入团队模式」入口）。
+   *
+   * 只建目录与元文件（`.dsh-myteam/` + `.gitignore` + `manifest.json`），**不建团队、不写账本、
+   * 不召唤成员**——所以它是安全的项目级写操作，不需要两段确认；重复调用幂等。
+   */
+  async initStore(query                         ) {
+    const workspaceRoot = String(query?.workspaceRoot ?? '')
+    if (!isAbsolute(workspaceRoot)) return OFFLINE_INVALID
+    if (!isAbsolute(workspaceRoot) || rejectProjectRoot(workspaceRoot)) {
+      return {
+        status: 'error',
+        code: 'MT_VALIDATION',
+        message: `workspaceRoot 不能是 DSH profile / 家目录：${workspaceRoot}`,
+      }
+    }
+    const result = ensureStore(workspaceRoot, { warn: () => {} })
+    return {
+      status: 'ok',
+      workspaceRoot,
+      root: result.layout.root,
+      created: result.created,
+      migrated: result.migrated,
+      warnings: result.warnings,
+      initialized: isStoreInitialized(workspaceRoot),
+    }
+  }
+
+  /**
+   * CHG-102：项目级存储状态（面板空态/引导的唯一数据面）。
+   *
+   * 为什么必须有个端点：用户「还没开始团队模式的对话」时，面板不该凭空显示角色/团队/任务
+   * ——那会把内置角色与全局库误读成「这个项目已经有团队了」。`initialized=false` 时
+   * 客户端只画一句「这个项目还没进入团队模式」+ 初始化入口。
+   */
+  async getStoreState(query                         ) {
+    const workspaceRoot = String(query?.workspaceRoot ?? '')
+    if (!isAbsolute(workspaceRoot)) return OFFLINE_INVALID
+    const layout = storeLayout(workspaceRoot)
+    const initialized = isStoreInitialized(workspaceRoot)
+    const manifest = initialized ? readManifest(workspaceRoot) : undefined
+    return {
+      status: 'ok',
+      workspaceRoot,
+      initialized,
+      manifest: manifest ?? null,
+      /** 目录契约（面板「设置 → 存储」展示 / 排障用；路径不是秘密） */
+      layout: {
+        root: layout.root,
+        gitignore: layout.gitignore,
+        config: layout.config,
+        tasks: layout.tasks,
+        history: layout.history,
+        state: layout.state,
+      },
+      /** 上传纪律：与 `.dsh-myteam/.gitignore` 同语义（面板只读展示） */
+      upload: {
+        include: ['manifest.json', 'README.md', 'structure.md', 'config/', 'tasks/'],
+        exclude: ['state/', 'history/', 'export/', '*.tmp'],
+      },
+    }
   }
 
   /** 跨工作区索引 → 离线团队摘要（索引缺失/损坏时返回空，不抛错） */
@@ -393,7 +462,7 @@ export class MyTeamPanelFacade extends TypertRemoteService {
 
   /**
    * 面板保存项目角色（CHG-72，FR-27，ADR-006 R1）：角色是**配置资产**，不进账本。
-   * 写 `.team-workplace/config/roles/<id>.json`，校验与工具链同源（assertValidRole）；
+   * 写 `.dsh-myteam/config/roles/<id>.json`，校验与工具链同源（assertValidRole）；
    * 同名已存在必须显式 confirm（两段确认）；每次写入留一行 `.audit.jsonl` 旁路审计。
    */
   async saveRole(query                         ) {
@@ -403,31 +472,22 @@ export class MyTeamPanelFacade extends TypertRemoteService {
     if (!role || typeof role !== 'object' || Array.isArray(role)) {
       return { status: 'error', code: 'MT_VALIDATION', message: 'role is required (object)' }
     }
-    const paths = projectRolePaths(workspaceRoot)
-    try {
-      // 先校验再谈覆盖：非法角色不该因为「同名已存在」而走到确认流程
-      assertValidRole(role         )
-      const existing = readProjectRole(paths.projectRolesDir, String(role.id))
-      if (existing && query?.confirm !== true) {
-        return {
-          status: 'confirm-required',
-          existing: { id: existing.id, name: existing.name, version: existing.version ?? 1 },
-          message: `角色 "${role.id}" 已存在于项目库，保存会覆盖该文件（在跑实例仍用召唤时快照）；确认请带 confirm=true`,
-        }
-      }
-      const out = saveProjectRole(paths, role         , { overwrite: query?.confirm === true, actor: 'human' })
-      return { status: 'saved', workspaceRoot, roleId: String(role.id), ...out }
-    } catch (e) {
-      const err = e                                       
-      return { status: 'error', code: err.code ?? 'MT_ROLE_INVALID', message: err.message ?? String(e) }
-    }
+    // CHG-103：作用域守卫与工具链**同一份实现**（缺省 project；global 需 confirmGlobal）
+    const out = roleOpImpl(
+      { paths: projectRolePaths(workspaceRoot), actor: 'human' },
+      'save',
+      { role, scope: query?.scope, confirmGlobal: query?.confirmGlobal, confirm: query?.confirm },
+    )
+    return out.status === 'saved' ? { ...out, workspaceRoot } : out
   }
 
   /* ── CHG-73：角色删除 + 能力目录（配置资产写操作 / 角色表单候选）── */
 
   /**
-   * 删除项目角色（FR-27，ADR-006 R1）：配置资产，不进账本。
+   * 删除角色（FR-27，ADR-006 R1）：配置资产，不进账本。
    * 两段确认 + 占用面（模板引用 / 团队在册 / 项目自身角色）+ `.audit.jsonl` 审计行。
+   *
+   * CHG-103：删除也走作用域——缺省只删项目库；`scope:'global'` 需 `confirmGlobal:true`。
    */
   async deleteRole(query                         ) {
     const workspaceRoot = String(query?.workspaceRoot ?? '')
@@ -435,24 +495,27 @@ export class MyTeamPanelFacade extends TypertRemoteService {
     const roleId = String(query?.roleId ?? '').trim()
     if (!roleId) return { status: 'error', code: 'MT_VALIDATION', message: 'roleId is required' }
     const usage = roleUsage(workspaceRoot, roleId)
-    if (query?.confirm !== true) {
+    const isGlobal = query?.scope === 'global'
+    if (query?.confirm !== true || (isGlobal && query?.confirmGlobal !== true)) {
       return {
         status: 'confirm-required',
+        scope: isGlobal ? 'global' : 'project',
         roleId,
         usage: { teams: usage.teams.length, instances: usage.instances, presets: usage.presets },
         bindings: usage.bindings,
-        message: `删除项目角色「${roleId}」会移除 .team-workplace/config/roles/${roleId}.json（在跑成员仍用召唤时快照）；${
-          usage.bindings.length > 0 ? `当前仍被占用：${usage.bindings.join(', ')}` : '当前未被任何团队/模板引用'
-        }；确认请带 confirm=true`,
+        message: isGlobal
+          ? `删除**全局**角色「${roleId}」会影响所有项目看到的这一份定义（各项目副本不受影响）；确认请同时带 confirmGlobal=true 与 confirm=true`
+          : `删除项目角色「${roleId}」会移除 ${STORE_DIR}/config/roles/${roleId}.json（在跑成员仍用召唤时快照）；${
+              usage.bindings.length > 0 ? `当前仍被占用：${usage.bindings.join(', ')}` : '当前未被任何团队/模板引用'
+            }；确认请带 confirm=true`,
       }
     }
-    try {
-      const out = deleteProjectRoleSafe(projectRolePaths(workspaceRoot), roleId, { bindings: usage.bindings, actor: 'human' })
-      return { status: 'deleted', roleId, ...out }
-    } catch (e) {
-      const err = e                                       
-      return { status: 'error', code: err.code ?? 'MT_ROLE_INVALID', message: err.message ?? String(e) }
-    }
+    const out = roleOpImpl(
+      { paths: projectRolePaths(workspaceRoot), actor: 'human', bindings: usage.bindings },
+      'delete',
+      { roleId, scope: query?.scope, confirmGlobal: query?.confirmGlobal, confirm: query?.confirm },
+    )
+    return out.status === 'deleted' ? { ...out, workspaceRoot } : out
   }
 
   /**
@@ -694,7 +757,7 @@ export class MyTeamPanelFacade extends TypertRemoteService {
     // 只是发现账本；空账本被 buildOfflineBoard 过滤掉）
     try {
       const seen = new Set(inputs.map((input) => input.teamId))
-      const teamsDir = join(workspaceRoot, '.team-workplace', 'state', 'teams')
+      const teamsDir = storeLayout(workspaceRoot).tasks
       for (const name of readdirSync(teamsDir)) {
         if (seen.has(name) || !isSafeTeamId(name)) continue
         const offline = buildOfflineBoard(workspaceRoot, name)
@@ -935,7 +998,7 @@ export class MyTeamPanelFacade extends TypertRemoteService {
 }
 
 // 手动 Remote 标记：gateway 按 method 名发现端点（namespace=myteam，direct invocation）
-markRemoteMethods(MyTeamPanelFacade.prototype, ['listTeams', 'getProject', 'getRoleDetail', 'saveRole', 'deleteRole', 'getCapabilityCatalog', 'getOfflineBoard', 'getOfflineTaskDetail', 'getOfflineTokens', 'getOfflineAudit', 'getOfflinePresets', 'getBoard', 'getTaskDetail', 'getTokens', 'getInbox', 'getAudit', 'getConfig', 'getPresets', 'getRoles', 'getKnowledge', 'planAction', 'postComment', 'memberOp', 'disband', 'createTask', 'createTasks', 'updateTask', 'assignTask', 'participateTask', 'rescopeTask', 'cancelTask', 'batchTaskOp',
+markRemoteMethods(MyTeamPanelFacade.prototype, ['listTeams', 'getStoreState', 'initStore', 'getProject', 'getRoleDetail', 'saveRole', 'deleteRole', 'getCapabilityCatalog', 'getOfflineBoard', 'getOfflineTaskDetail', 'getOfflineTokens', 'getOfflineAudit', 'getOfflinePresets', 'getBoard', 'getTaskDetail', 'getTokens', 'getInbox', 'getAudit', 'getConfig', 'getPresets', 'getRoles', 'getKnowledge', 'planAction', 'postComment', 'memberOp', 'disband', 'createTask', 'createTasks', 'updateTask', 'assignTask', 'participateTask', 'rescopeTask', 'cancelTask', 'batchTaskOp',
   // CHG-86：门禁裁决 / 归档快照 / 知识提案策展
   'reviewTask', 'getArchive', 'getArchives', 'adoptKnowledge',
   // CHG-87（FR-13.1/FR-16.1）：角色库统一写入口 + 单角色调用

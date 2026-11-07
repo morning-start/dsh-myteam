@@ -6,11 +6,14 @@
  *   - patch 硬上限（host 层）与 config 冲突取更严格者；
  *   - 非法配置（如列映射不覆盖终态）→ 回退默认 + 告警（返回 warnings）。
  * 层级：内置默认 < 项目 team.config.json < 团队模板（CHG-55：建团时按模板落
- * `.team-workplace/state/teams/<teamId>/team.config.json`，团队级更具体、优先级最高）。
+ * `tasks/<teamId>/team.config.json`，团队级更具体、优先级最高）。
+ *
+ * CHG-102：落盘根改为项目级 `.dsh-myteam/`，路径统一从 `core/workspace/layout.ts` 取。
  */
 
 import { existsSync, mkdirSync, readFileSync, writeFileSync, renameSync } from 'node:fs'
-import { dirname, join } from 'node:path'
+import { dirname } from 'node:path'
+import { storeLayout, teamConfigPath as teamConfigPathOf } from '../workspace/layout.mjs'
 
                              
           
@@ -193,9 +196,9 @@ export function loadEffectiveConfig(projectConfigRaw         , teamConfigRaw    
   return { config: clamped, warnings, fellBack, applied }
 }
 
-/** 项目级配置落点（CHG-56）：随仓库共享，团队级配置在它之上叠加 */
+/** 项目级配置落点（CHG-56 / CHG-102）：`<project>/.dsh-myteam/config/team.config.json` */
 export function projectConfigPath(workspaceRoot        )         {
-  return join(workspaceRoot, '.team-workplace', 'config', 'team.config.json')
+  return storeLayout(workspaceRoot).teamConfig
 }
 
 /** 读项目级配置（缺失/坏 JSON 返回 undefined） */
@@ -212,9 +215,9 @@ function readJsonIfExists(path        )          {
   }
 }
 
-/** 团队级配置落点（CHG-55）：与账本同目录，随团队生命周期走 */
+/** 团队级配置落点（CHG-55 / CHG-102）：与账本同目录，随团队生命周期走 */
 export function teamConfigPath(workspaceRoot        , teamId        )         {
-  return join(workspaceRoot, '.team-workplace', 'state', 'teams', teamId, 'team.config.json')
+  return teamConfigPathOf(workspaceRoot, teamId)
 }
 
 /** 读团队级配置（缺失/坏 JSON 返回 undefined；坏 JSON 不抛错，由上层回退默认） */

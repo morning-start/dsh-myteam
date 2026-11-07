@@ -8,7 +8,7 @@
  * 为什么落 `config/roles/session-defaults.json` 而不是账本：
  *  - 角色是**配置资产**（docs/04 §3.4），角色库写操作一律不进账本（create_role /
  *    update_role / saveRole 都不进）；单角色调用与它们同类；
- *  - 目录语义上属于 `.team-workplace/config/`（项目级配置），不属任何团队 state。
+ *  - 目录语义上属于 `.dsh-myteam/config/`（项目级配置），不属任何团队 state。
  *
  * 跨重启恢复的口径：本文件是**默认值**，不是运行期状态——启动时读它重建提示词 section；
  * 会话内改动用同一个文件覆盖写（单写者：host 进程）。
@@ -16,6 +16,7 @@
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs'
 import { dirname, join } from 'node:path'
                                                         
+import { storeLayout } from '../workspace/layout.mjs'
 
 export const SESSION_DEFAULTS_VERSION = 1
 
@@ -32,14 +33,14 @@ export const SESSION_DEFAULTS_VERSION = 1
  
 
 /**
- * `.team-workplace/config/session-defaults.json` 绝对路径。
+ * `.dsh-myteam/config/session-defaults.json` 绝对路径。
  *
  * **为什么不放 `config/roles/`**（踩过的坑）：`listProjectRoles()` 会把 `config/roles/` 下
  * 所有 `*.json` 当角色定义读，读到本文件直接判定 `MT_ROLE_CORRUPT` → **整个角色目录变不可用**
  * （面板角色 tab / 建团选角色全挂）。会话默认值是配置，不是角色条目，必须与角色库分开目录。
  */
 export function sessionDefaultsPath(workspaceRoot        )         {
-  return join(workspaceRoot, '.team-workplace', 'config', 'session-defaults.json')
+  return storeLayout(workspaceRoot).sessionDefaults
 }
 
 /** 读默认值（文件缺失/损坏 → 空列表；损坏不抛，面板降级为「未启用」） */

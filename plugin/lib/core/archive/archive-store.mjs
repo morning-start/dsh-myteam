@@ -2,14 +2,15 @@
  * CHG-86（P0-2 / FR-14.1）：团队归档落盘。
  *
  * 修复的缺陷：`myteam_disband` 此前只往账本写一条 `team.disbanded` 事件，payload 里
- * 带个 `archivedPaths: ['.team-workplace/archive']` 字符串就算完事——**没有任何文件 IO**。
+ * 带个 `archivedPaths: ['.dsh-myteam/history/archive']` 字符串就算完事——**没有任何文件 IO**。
  * 而面板归档视图（`plugin/client/client.js` 归档回放屏）渲染的是
  * `archive/<teamId>/team.json`、`tokens.json`、`members/`、`artifacts/`，
  * 这些文件**永远不存在**，整套归档视图因此是空壳。
  *
- * 布局（FR-9.3 四分区之一，`.team-workplace/archive/` 已在 .gitignore 托管块内）：
+ * 布局（CHG-102：整体流程历史分区，`.dsh-myteam/history/archive/` 在存储目录
+ * 自己的 `.gitignore` 里被忽略）：
  * ```
- * .team-workplace/archive/<teamId>/
+ * .dsh-myteam/history/archive/<teamId>/
  *   MANIFEST.json             归档清单（生成时间 / 来源账本 / 事件数 / 文件列表）
  *   team.json                 团队快照（名册 + 任务终态 + 目标 + 归档时刻）
  *   tokens.json               token 侧车最终快照（按天桶）
@@ -27,6 +28,7 @@ import { existsSync, mkdirSync, readdirSync, readFileSync, writeFileSync } from 
 import { join } from 'node:path'
                                                            
                                                             
+import { teamArchiveDir, archiveRoot, STORE_DIR } from '../workspace/layout.mjs'
 
 /** 归档快照版本（结构演进时 +1，读侧按版本兼容） */
 export const ARCHIVE_VERSION = 1
@@ -79,14 +81,14 @@ export const ARCHIVE_VERSION = 1
                     
  
 
-/** 归档目录（团队级）：`.team-workplace/archive/<teamId>` */
+/** 归档目录（团队级）：`history/archive/<teamId>` */
 export function archiveDirOf(workspaceRoot        , teamId        )         {
-  return join(workspaceRoot, '.team-workplace', 'archive', teamId)
+  return teamArchiveDir(workspaceRoot, teamId)
 }
 
-/** 归档根目录：`.team-workplace/archive` */
+/** 归档根目录：`history/archive` */
 export function archiveRootOf(workspaceRoot        )         {
-  return join(workspaceRoot, '.team-workplace', 'archive')
+  return archiveRoot(workspaceRoot)
 }
 
 /**
@@ -190,7 +192,7 @@ export function writeArchive(workspaceRoot        , snapshot                    
     files: [...files],
   })
   files.push('MANIFEST.json')
-  return { dir, relativeDir: `${'.team-workplace/archive'}/${snapshot.teamId}`, files }
+  return { dir, relativeDir: `${STORE_DIR}/history/archive/${snapshot.teamId}`, files }
 }
 
 /**

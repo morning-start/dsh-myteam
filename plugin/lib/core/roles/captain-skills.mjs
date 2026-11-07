@@ -1,12 +1,20 @@
 /**
- * T32（CHG-53）：队长内置技能 —— create-role / modify-role。
+ * T32（CHG-53）：队长内置技能 —— create-role / modify-role / create-team / write-team-charter。
  *
- * 角色只能由标准队长（myteam-captain 预设）创建与修改（用户定案）；两个技能挂进
- * 队长 scope（host.initialize → ctx.skills.register），模型按需加载全文后调用
- * myteam_create_role / myteam_update_role 两个 Lead 工具落库。
+ * 角色只能由标准队长（myteam-captain 预设）创建与修改（用户定案）；技能挂进队长 scope
+ * （host.initialize → ctx.skills.register），模型按需加载全文后调用对应 Lead 工具落库。
  *
- * M2-7（FR-18）：新增 create-team 团队章程技能——只产出**项目层**章程文件
- * （`.team-workplace/structure.md`），不建名册、不派任务；沿用同一注册面。
+ * ── CHG-102 修订（用户定案 2026-11-07）───────────────────────────
+ * 「你创建角色、创建团队的这个技能做得不对」——旧版三个问题：
+ *   ① 路径写的是 `.team-workplace/`（旧落盘根），而宿主实际把它解析到了 DSH profile，
+ *      于是**项目级角色写进了用户全局目录**；
+ *   ② `create-team` 名不副实：名字叫「创建团队」，正文却在写**章程**（不建名册、不派任务）
+ *      —— 用户说「创建一个项目级别的团队」时拿到的是写文档的指导；
+ *   ③ 没写「项目级存储」这条主心骨（哪些落 `config/`、哪些落 `tasks/`、哪些不入库）。
+ *
+ * 现在：`create-team` = 建团队（名册 + 任务 DAG，落 `.dsh-myteam/`）；
+ * 写章程拆成独立技能 `write-team-charter`。所有路径以
+ * `core/workspace/layout.ts` 的目录契约为准。
  *
  * 纪律：
  *  - 技能正文只写"怎么做 + 边界"，不复制角色 schema 的实现细节（schema 以工具定义为准）；
@@ -23,7 +31,21 @@
 
 const CREATE_ROLE_CONTENT = `# 创建角色（create-role）
 
-你是团队队长。用户要求"新建一个角色/岗位/成员类型"时，用 \`myteam_create_role\` 写进**项目角色库**（\`.team-workplace/config/roles/<roleId>.json\`）。
+你是团队队长。用户要求"新建一个角色/岗位/成员类型"时，用 \`myteam_create_role\` 写进**本项目**的角色库
+（\`<项目>/.dsh-myteam/config/roles/<roleId>.json\`）。
+
+## 作用域：默认项目级，全局必须明示（CHG-103，硬规则）
+
+**不传 \`scope\` = 写项目库**（\`.dsh-myteam/config/roles/\`，只对本项目可见）——这是绝大多数情况。
+
+只有在**用户明确说「全局」/「所有项目共用」/「放到全局角色库」**时，才允许 \`scope: "global"\`：
+
+1. 先调 \`myteam_create_role({..., scope: "global"})\`（**不带** \`confirmGlobal\`）→ 返回 \`confirm-required\`；
+2. 把这个回执原样讲给用户（会写进跨项目全局库、影响所有项目），**等用户明确确认**；
+3. 用户确认后再调一次，带 \`confirmGlobal: true\` 落盘。
+
+**禁止猜测**：指令含糊（「建个架构师」）时一律建项目级，不要自作主张写全局；
+用户说「全局」但没确认影响面时，也不要直接带 \`confirmGlobal: true\`。
 
 ## 先问清三件事（合并成一轮，不要反复追问）
 
@@ -39,6 +61,20 @@ const CREATE_ROLE_CONTENT = `# 创建角色（create-role）
   **只有 id === \`captain\` 能带 \`isCaptain: true\`** —— 第二个队长类会被 \`MT_ROLE_CAPTAIN_RESERVED\` 硬拒（CHG-101）。
   想改队长的提示词或工具集？覆写项目库的 \`config/roles/captain.json\` —— 换的是**同一份设定的实现**，
   不是新增第二个队长类。\`isCaptain\` 保持 \`false\` 即可（默认值，不用显式写）。
+
+## 落盘位置（项目级，不是全局）
+
+| 内容 | 路径 | 入库 |
+|---|---|---|
+| 角色 | \`.dsh-myteam/config/roles/<roleId>.json\` | ✅ 随仓库共享 |
+| 项目自身角色 | \`.dsh-myteam/config/project-role.json\` | ✅ |
+| 团队（名册） | \`.dsh-myteam/config/teams/<teamId>.json\` | ✅ |
+| 技能 | \`.dsh-myteam/config/skills/<skillId>.json\` | ✅ |
+| 工具策略 | \`.dsh-myteam/config/tools/<toolId>.json\` | ✅ |
+| 任务与依赖 | \`.dsh-myteam/tasks/<teamId>/ledger.jsonl\` | ✅ |
+| 运行时状态 | \`.dsh-myteam/state/\`、\`history/\`、\`export/\` | ❌ 不入库 |
+
+**默认就是项目级**：不要写"全局角色库"、不要用绝对路径、不要写进 \`.dsh/\` 或用户家目录。
 
 ## 字段怎么写
 
@@ -72,7 +108,7 @@ myteam_create_role({
 
 ### 记忆区（\`memory.md\` + \`notes/\`，FR-6.1）
 
-- 每个成员有独立记忆区：\`.team-workplace/state/teams/<teamId>/members/<memberId>/\` 下的
+- 每个成员有独立记忆区：\`.dsh-myteam/history/members/<teamId>/<memberId>/\` 下的
   \`memory.md\`（长期结论）与 \`notes/\`（过程记录，自建）。
 - **证据强制**（默认开）：记忆条目的 \`[Verification evidence]\` 必须指向真实存在的
   任务 id / 文件路径 / 会话指针（\`task:\` / \`file:\` / \`session:\` 三类前缀）。
@@ -105,7 +141,7 @@ const MODIFY_ROLE_CONTENT = `# 修改角色（modify-role）
 
 ## 先确认改的是哪一层
 
-- 项目角色（origin=project）：直接改项目库。
+- 项目角色（origin=project）：直接改项目库（\`.dsh-myteam/config/roles/\`）。
 - 内置角色（origin=builtin）/ 全局角色（origin=global）：只读。\`myteam_update_role\` 会**先复制一份进项目库**（fork，保留 \`origin: builtin:<id>\`）再应用修改；这意味着：
   - 只影响本项目，全局/内置原文件不变；
   - 同名副本之后以项目库为准（运行时只认项目库）。
@@ -164,14 +200,14 @@ const CHOOSE_TEMPLATE_CONTENT = `# 选择团队模板（choose-team-template）
 const MANAGE_TEMPLATE_CONTENT = `# 管理团队模板（manage-team-template）
 
 模板 = 标准队长（隐式）+ 队员（各自技能/MCP）+ 看板列 + 泳道 + 门禁 + 任务类型。
-写路径全部在项目层：\`.team-workplace/config/presets/<id>.json\`。
+写路径全部在项目层：\`.dsh-myteam/config/teams/<id>.json\`。
 
 ## 四个工具
 
 - \`myteam_save_preset({ preset, overwrite? })\`：建/改项目模板。已存在时必须 \`overwrite: true\`（两段确认，version + 1）；内置 id 拒写（MT_PRESET_BUILTIN）。
 - \`myteam_copy_preset({ fromPresetId, toPresetId, name? })\`：内置/项目 → 新项目模板（fork）。目标已存在或为内置 id 会被拒。
 - \`myteam_delete_preset({ presetId, confirm: true })\`：仅项目模板；内置拒删；confirm 两段确认。
-- \`myteam_reset_team_config({ teamId, confirm: true })\`：删除团队级 team.config.json，退回「项目层 < 插件默认」。只重置配置，不动账本/成员。
+- \`myteam_reset_team_config({ teamId, confirm: true })\`：删除团队级 \`tasks/<teamId>/team.config.json\`，退回「项目层 < 插件默认」。只重置配置，不动账本/成员。
 
 ## 判断该用哪个
 
@@ -190,12 +226,72 @@ const MANAGE_TEMPLATE_CONTENT = `# 管理团队模板（manage-team-template）
 - 隔离在成员上岗（spawn/approve）时生效；改角色/模板后需要重新上岗的成员才会重新收窄。
 `;
 
-const CREATE_TEAM_CONTENT = `# 组建团队章程（create-team）
+const CREATE_TEAM_CONTENT = `# 创建项目级团队（create-team）
 
-用户要"定团队边界/写团队章程/约定文件治理"时，用本技能产出**一份项目层章程文件**：
-团队能力与边界 + 约束与文件治理章程，写入 \`.team-workplace/structure.md\`。
+用户说"建一个团队 / 创建一个项目级别的团队 / 把这几个人组成一个团队"时用本技能。
 
-这是**写章程**的技能：只产出并落盘这一个文件，**不建名册、不派任务**。
+**产出 = 一个可运行的团队**（名册 + 任务 DAG + 落盘配置），不是一份文档。
+想写"团队章程/文件治理约定" → 用 \`write-team-charter\` 技能，别在本技能里写。
+
+## 团队是什么
+
+- **Team** = 一次协作的容器（唯一 teamId），状态 \`draft → active → archived → discarded\`；
+- **名册** = 标准队长（隐式，\`myteam-captain\` 预设）+ N 名队员（每名队员引用一个角色）；
+  名册里**不能有 captain**（队长隐式，写了会被忽略）；
+- **任务 DAG** = 任务 + 依赖 + 每任务的验收标准（AC ≥1 且可检验）；
+- **落盘**：团队配置进 \`.dsh-myteam/config/teams/<teamId>.json\`，任务与依赖进
+  \`.dsh-myteam/tasks/<teamId>/ledger.jsonl\`（append-only，唯一权威）。
+
+## 流程（四步，不要跳）
+
+### 第 1 步：先看模板
+
+\`myteam_list_presets\` 拿内置 + 项目模板。有贴的就用 \`presetId\` 起步；
+没有就手工列名册（每个 roleId 必须**已在项目角色库**，见 \`myteam_get_roles\`）。
+
+### 第 2 步：定名册
+
+- 每名队员写清：\`roleId\`、\`instanceName\`（同角色多人时区分）、可选的 \`skills\` / \`mcpAllowlist\`；
+- 名册 1~6 名队员（队长不算）；
+- 角色不够用？先走 \`create-role\` 技能建角色，**不要**临时编一个不存在的 roleId。
+
+### 第 3 步：拆任务
+
+- 每个任务：\`title\` + \`requiredRole\`（必须在名册内）+ \`acceptanceCriteria\`（≥1 条，可判真假）
+  + 叶子任务的 \`deliverableSpec\`（\`path/producer/reviewer/archiver\`）；
+- 依赖用 \`deps\`（任务 id 数组）：**只写直接上游**，不要写传递依赖（DAG 会自己算）；
+- 并行度：能并行的别串起来；一条链上的任务数量控制在 5 个以内。
+
+### 第 4 步：提交草稿并等人工批准
+
+\`\`\`
+myteam_submit_plan({
+  teamName: "结算页重做",
+  goal: "把结算页从 v1 重做到 v2，性能与可访问性达标",
+  presetId: "starter-team",      // 有模板就填，没有就改用 roster
+  tasks: [
+    { id: "t1", title: "接口契约", requiredRole: "req-validator", acceptanceCriteria: ["列出 12 个字段的类型与来源"], deps: [] },
+    { id: "t2", title: "页面实现", requiredRole: "developer", acceptanceCriteria: ["三态齐全", "构建通过"], deps: ["t1"], deliverableSpec: { path: "src/pages/checkout", producer: "developer", reviewer: "acceptor", archiver: "acceptor" } }
+  ]
+})
+\`\`\`
+
+**草稿阶段不产生任何成员会话**：等用户在面板上 Approve & Run 才实例化。
+
+## 边界
+
+- 不写章程（\`write-team-charter\`）；不建角色（\`create-role\`）；不保存模板（\`manage-team-template\`）；
+- 不把团队落盘到全局目录：一律在 \`<项目>/.dsh-myteam/\` 下；
+- 名册里出现 \`captain\`、任务 \`requiredRole\` 不在名册、AC 为空、依赖成环——都会被硬拒，别试；
+- 团队解散（disband）会归档到 \`.dsh-myteam/history/archive/<teamId>/\`，不可逆，需要两段确认。
+`;
+
+const WRITE_CHARTER_CONTENT = `# 编写团队章程（write-team-charter）
+
+用户要"定团队边界 / 写团队章程 / 约定文件治理 / 规定谁归档"时用本技能，产出**一份项目层章程文件**：
+团队能力与边界 + 约束与文件治理章程，写入 \`.dsh-myteam/structure.md\`。
+
+这是**写章程**的技能：只产出并落盘这一个文件，**不建名册、不派任务**（要建团队用 \`create-team\`）。
 
 定位：章程是**项目层**的一份约定（每个项目一份，不是每个团队一份），是队长做规划与派单时的
 能力补充说明——规划前先读它，产出物落位以它为准。
@@ -209,7 +305,7 @@ const CREATE_TEAM_CONTENT = `# 组建团队章程（create-team）
 
 ## 章程正文怎么写
 
-文件路径固定为 \`.team-workplace/structure.md\`（项目层，随仓库共享；宿主已预置标题骨架，你**覆盖正文**，不要另建文件）。
+文件路径固定为 \`.dsh-myteam/structure.md\`（项目级，随仓库共享；宿主已预置标题骨架，你**覆盖正文**，不要另建文件）。
 
 正文分两段，段标题固定，便于后续检索与引用：
 
@@ -222,21 +318,23 @@ const CREATE_TEAM_CONTENT = `# 组建团队章程（create-team）
 
 ### 二、约束与文件治理章程
 
-- **文件放哪里**：\`.team-workplace/config/\`（项目配置：\`team.config.json\`、\`roles/\`、\`presets/\`、\`knowledge/\`）、\`.team-workplace/state/\`（运行时状态，不入库）、\`docs/\`（人读交付物）。
+- **文件放哪里**：\`.dsh-myteam/config/\`（角色 / 团队 / 技能 / 工具 / 流程 / 知识，**入库共享**）、
+  \`.dsh-myteam/tasks/<teamId>/\`（任务与依赖账本，**入库**）、
+  \`.dsh-myteam/state/\`、\`.dsh-myteam/history/\`（运行时与历史，**不入库**）、\`docs/\`（人读交付物）。
 - **做到什么程度**：什么算"写到一半"（草稿），什么算"可交付"（完整且可复核）。
 - **谁沟通**：队长对外，队员对队长；跨团队协作走既有团队协作路径，不私拉群。
 - **谁存档**：产物落位由任务的 \`deliverableSpec\` 指派（\`path/producer/reviewer/archiver\`）；章程本身由队长维护。
 
 ## 落盘
 
-1. 先读 \`.team-workplace/structure.md\`（宿主预置的标题骨架），再写，避免覆盖已有内容。
+1. 先读 \`.dsh-myteam/structure.md\`（宿主预置的标题骨架），再写，避免覆盖已有内容。
 2. 用工作区文件工具（\`write\` / \`edit\`）把上面两段正文写进该文件。
 3. 写完读回一遍确认落盘，再把章程要点（能力边界 + 文件治理）向用户复述一遍。
 4. 当前会话没有文件写入工具时：把章程全文贴给用户，并明确说明"未落盘"——不要口头声称已写入。
 
 ## 与其他能力的关系
 
-- 名册与任务不归本技能：要组队用 \`myteam_submit_plan\`（名册 + 任务 DAG），要改团队名/目标用 \`myteam_update_team\`。
+- 名册与任务不归本技能：要组队用 \`create-team\` 技能（\`myteam_submit_plan\`）。
 - 角色不归本技能：要新建或改角色用 create-role / modify-role 技能。
 - 团队模板不归本技能：要保存队形为模板用 manage-team-template 技能。
 
@@ -245,14 +343,14 @@ const CREATE_TEAM_CONTENT = `# 组建团队章程（create-team）
 - 不越权：本技能**只写章程文件**，不改角色库、不动预设、不提交任务草稿。
 - 不越权：章程是**约定**不是硬门禁——它约束队长与队员的行为，宿主不会据此拦截任何工具调用。
 - 不越权：不把章程塞进成员提示词、不改队友身份快照——要让某条边界对某个角色生效，走角色提示词。
-- 不越权：不改 \`.team-workplace/config/team.config.json\`（看板列/门禁等行为配置由预设与团队级配置决定；章程只声明"怎么管文件"，不改配置结构）。
+- 不越权：不改 \`.dsh-myteam/config/team.config.json\`（看板列/门禁等行为配置由预设与团队级配置决定；章程只声明"怎么管文件"，不改配置结构）。
 - 章程是**每个项目一份**（项目层），不是每个团队一份；团队间的差异用各自任务的 \`deliverableSpec\` 表达。
 `;
 
 export const CAPTAIN_SKILLS                 = [
   {
     name: 'create-role',
-    description: '由队长创建项目角色：写职责/系统提示词/工具策略/技能/MCP，落项目角色库。',
+    description: '由队长创建项目角色：写职责/系统提示词/工具策略/技能/MCP，落项目角色库 .dsh-myteam/config/roles/。',
     whenToUse: '用户要求新建角色、岗位或成员类型，或现有角色无法覆盖某类工作时。',
     content: CREATE_ROLE_CONTENT,
   },
@@ -261,6 +359,18 @@ export const CAPTAIN_SKILLS                 = [
     description: '由队长修改项目角色：patch 合并写回；内置/全局角色 fork 进项目后再改，运行中成员不受影响。',
     whenToUse: '用户要求调整已有角色的职责、提示词、技能或 MCP 时。',
     content: MODIFY_ROLE_CONTENT,
+  },
+  {
+    name: 'create-team',
+    description: '由队长创建项目级团队：定名册 + 拆任务 DAG + 落 .dsh-myteam/（config/teams + tasks/<teamId>/ledger.jsonl），提交草稿等人工批准。',
+    whenToUse: '用户要建团队、创建项目级别的团队、定名册（把几个角色组成一个团队）并派任务时。',
+    content: CREATE_TEAM_CONTENT,
+  },
+  {
+    name: 'write-team-charter',
+    description: '由队长产出项目层团队章程：团队能力与边界 + 约束与文件治理章程，写入 .dsh-myteam/structure.md；只写章程，不建名册不派任务。',
+    whenToUse: '用户要定团队边界、写团队章程、明确团队能力范围，或要约定文件治理与落位规则时。',
+    content: WRITE_CHARTER_CONTENT,
   },
   {
     name: 'choose-team-template',
@@ -273,12 +383,6 @@ export const CAPTAIN_SKILLS                 = [
     description: '创建/复制/删除项目团队模板，或把团队配置恢复默认；内置模板只读、破坏性操作两段确认。',
     whenToUse: '用户要保存队形为模板、复制模板、删除模板，或让某个团队改回默认配置时。',
     content: MANAGE_TEMPLATE_CONTENT,
-  },
-  {
-    name: 'create-team',
-    description: '由队长产出项目层团队章程：团队能力与边界 + 约束与文件治理章程，写入 .team-workplace/structure.md；只写章程，不建名册不派任务。',
-    whenToUse: '用户要组建团队并定边界、写团队章程、明确团队能力范围，或要约定文件治理与落位规则时。',
-    content: CREATE_TEAM_CONTENT,
   },
 ]
 

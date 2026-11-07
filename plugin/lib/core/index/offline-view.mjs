@@ -4,7 +4,7 @@
  * 背景：CHG-45 让面板能看到离线团队（跨工作区索引），但点击只能提示「会话未运行」，
  * 看不到任何任务（docs/11 §七 P4）。本模块把「读账本 → 折叠 → 视图」搬到门面进程内：
  *
- *   workspaceRoot/.team-workplace/state/teams/<teamId>/ledger.jsonl
+ *   <project>/.dsh-myteam/tasks/<teamId>/ledger.jsonl
  *     └─ readEventsTolerant（坏行跳过）→ foldTolerant（坏事件跳过）→ buildBoardView
  *
  * 纪律：
@@ -24,6 +24,7 @@ import { readPresetCatalog,                    } from '../presets/preset-store.m
 import { buildAuditView, buildBoardView, buildProjectView, buildTaskDetailView, buildTokensView,                                                       } from '../../remote/views.mjs'
 import { readEventsTolerant, resolveMyteamHome } from './team-index.mjs'
 import { listRoleCatalog, readProjectRoleCard,                     } from '../roles/role-store.mjs'
+import { storeLayout, teamLedgerPath as teamLedgerPathOf, teamArchiveDir } from '../workspace/layout.mjs'
 
 /** 团队 id 白名单：字母数字开头，只允许字母数字/点/下划线/连字符（点号单独不放行，避免 ..） */
 const SAFE_TEAM_ID = /^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$/
@@ -59,7 +60,7 @@ export function isSafeTeamId(teamId        )          {
 export function teamLedgerPath(workspaceRoot        , teamId        )                     {
   if (!workspaceRoot || !isAbsolute(workspaceRoot)) return undefined
   if (!isSafeTeamId(teamId)) return undefined
-  return join(workspaceRoot, '.team-workplace', 'state', 'teams', teamId, 'ledger.jsonl')
+  return teamLedgerPathOf(workspaceRoot, teamId)
 }
 
                                
@@ -225,7 +226,7 @@ export function roleUsage(workspaceRoot        , roleId        )            {
   } catch {
     // 项目自身角色文件损坏：忽略
   }
-  const teamsDir = join(workspaceRoot, '.team-workplace', 'state', 'teams')
+  const teamsDir = storeLayout(workspaceRoot).tasks
   let names           = []
   try {
     names = readdirSync(teamsDir)
@@ -257,11 +258,11 @@ function readProjectRoleCardSafe(workspaceRoot        ) {
 
 /** 工作区角色库路径（离线只读：项目库 + 全局库 + 项目自身角色） */
 export function projectRolePaths(workspaceRoot        )                 {
-  const projectRolesDir = join(workspaceRoot, '.team-workplace', 'config', 'roles')
+  const layout = storeLayout(workspaceRoot)
   return {
-    projectRolesDir,
+    projectRolesDir: layout.roles,
     globalRolesDir: join(resolveMyteamHome(), 'roles'),
-    projectRoleFile: join(workspaceRoot, '.team-workplace', 'config', 'project-role.json'),
+    projectRoleFile: layout.projectRole,
   }
 }
 
@@ -278,7 +279,7 @@ function foldTeamLedger(workspaceRoot        , teamId        )                  
  * 任务归属 = 持有账本的团队（主责）；协作关系来自 task.participate 事件（FR-21）。
  */
 export function buildOfflineProject(workspaceRoot        , opts                       = {})              {
-  const teamsDir = join(workspaceRoot, '.team-workplace', 'state', 'teams')
+  const teamsDir = storeLayout(workspaceRoot).tasks
   let names           = []
   try {
     names = readdirSync(teamsDir)

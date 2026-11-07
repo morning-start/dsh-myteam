@@ -81,6 +81,10 @@ export const MT_CODES = [
   'MT_ROLE_OCCUPIED',
   'MT_ROLE_READONLY',
 
+  // ── 作用域（CHG-103：全局 vs 项目级）──────────────────────────
+  'MT_SCOPE_INVALID',
+  'MT_SCOPE_PROJECT_ONLY',
+
   // ── 名册 ────────────────────────────────────────────────────
   'MT_ROSTER_DUAL_CAPTAIN',
   'MT_ROSTER_EMPTY',
@@ -180,6 +184,10 @@ export const MT_CODE_DOCS                         = {
   MT_ROLE_NOT_FOUND: '角色 id 在内置/全局/项目三层里都找不到。',
   MT_ROLE_OCCUPIED: '角色正被在册成员占用，不能删改（先释放成员）。',
   MT_ROLE_READONLY: '内置角色只读，不能改不能删——想改即 fork 进项目库（CHG-6）。',
+
+  // 作用域（CHG-103）
+  MT_SCOPE_INVALID: '作用域只接受 `project` | `global`（缺省 = 项目级）。',
+  MT_SCOPE_PROJECT_ONLY: '该内容只能存在于项目级（任务账本 / 历史 / 状态 / 导出 / 成员实例）；全局只有角色 / 团队 / 技能 / 工具 / 知识。',
 
   // 名册
   MT_ROSTER_DUAL_CAPTAIN: '名册里有多个队长。',

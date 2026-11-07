@@ -8,7 +8,8 @@
  * sessionProjections/typert）通过 svc() 防御性读取，缺失只降级不致命。
  *
  * 职责：
- *   ① 目录初始化（.team-workplace 四分区 + gitignore 托管块）
+ *   ① 目录初始化（`.dsh-myteam/` 项目级存储 + 目录内 .gitignore；CHG-102 收口到
+ *      `core/workspace/layout.ts`，项目根来自**会话工作目录**而不是 DSH profile）
  *   ② TeamService 管理（按 teamId 惰性创建 + 冷启动重放恢复）
  *   ③ Lead 工具 17 个注册（preset scope = 队长会话可见，ADR-003；+adopt_knowledge、+create_role/update_role）
  *   ④ 成员 spawn：agents.create 直连 + setup 作用域（9 成员工具/restrict/persona/skills）
@@ -18,10 +19,13 @@
  * 零依赖边界（PRD §2/§9）：绝不 import/调用 agentTeams 服务与内置团队工具；
  * 宿主服务白名单见 PRD §9（agents/subagents/tools/typert/tokenMeter/sessionProjections）。
  */
-import { join, isAbsolute } from 'node:path'
+import { join, isAbsolute, sep } from 'node:path'
 import { randomUUID, createHash } from 'node:crypto'
 import { existsSync, mkdirSync, writeFileSync, readFileSync, readdirSync, statSync, unlinkSync } from 'node:fs'
 import { ensureWorkplaceDirs, ensureGitignoreManagedBlock } from './host-workspace.mjs'
+import { resolveProjectRoot, storeLayout, teamLedgerPath as teamLedgerPathOf, scratchDir as scratchDirOf, memberIdentityDir as memberIdentityDirOf, STORE_DIR } from './core/workspace/layout.mjs'
+// CHG-103：作用域契约（全局 vs 项目级）——角色两级都可用，任务/历史/状态只能项目级
+import { normalizeScope } from './core/workspace/scope.mjs'
 import { TeamService, bootstrapTeam,                  } from './core/service.mjs'
 import { leadToolDefs, memberToolDefs, toolOutput,              } from './tools/defs.mjs'
 import { wakeDecisionsFor, changeSince,                   } from './core/scheduler/wake.mjs'
@@ -30,7 +34,7 @@ import { diffTaskInput, structuralFieldsOf } from './core/tasks/diff.mjs'
 import { buildToolMask, memberPromptSection, memoryPromptSection, memberSessionId, HOST_TEAM_TOOLS_TO_HIDE,                     } from './core/members/member-setup.mjs'
 import { applyCapabilityGuard, capabilitySummary, resolveCapabilities } from './core/members/capability-guard.mjs'
 import { memoryDirFor, seedMemoryIfMissing, auditMemoryContent,                    } from './core/members/memory.mjs'
-import { copyToProject, listRoleCatalog, readProjectRole, resolveRuntimeRole, writeProjectRole, assertValidRole, readProjectRoleCard, writeProjectRoleCard, clearProjectRoleCard, deleteProjectRoleSafe,                     } from './core/roles/role-store.mjs'
+import { copyToProject, listRoleCatalog, readGlobalRole, readProjectRole, resolveRuntimeRole, saveGlobalRole, writeProjectRole, assertValidRole, readProjectRoleCard, writeProjectRoleCard, clearProjectRoleCard, deleteProjectRoleSafe,                     } from './core/roles/role-store.mjs'
 // CHG-87（docs/04 §2 承诺的 roleOp 端点）：host 与面板共用同一份实现
 import { roleOp as roleOpImpl } from './core/roles/role-ops.mjs'
 import { presetTeamRoster,                     } from './core/roles/builtin-roles.mjs'
@@ -107,12 +111,53 @@ export function compileParameters(tool         )          {
                   
                                                                                                   
                               
+                                                           
+                                                                       
  
+
+/**
+ * 会话工作目录（CHG-102）：项目根的**权威来源**。
+ *
+ * 宿主里 `ctx.workspace.root` 在 desktop profile 下是 profile 目录（不是项目），
+ * 而每个会话的 cwd 才是用户真正打开的项目。`agents.currentInitiator()` 是官方给
+ * 「工具执行链」用的口子（宿主 agents 服务签名），拿不到再用 workingDirectory。
+ */
+function sessionCwdOf(rt         )                     {
+  try {
+    const agents = (rt                                                                                                   )?.agents
+    let agent         
+    try {
+      agent = agents?.currentInitiator?.()
+    } catch {
+      agent = undefined
+    }
+    if (!agent) return undefined
+    const session = (agent                                   ).session
+    const cwd = session?.cwd
+    if (typeof cwd === 'string' && cwd.length > 0) return cwd
+    // 兜底：workingDirectory 服务按会话解析
+    const wd = (rt                                                                                         )?.workingDirectory
+    if (wd?.get && session) {
+      const resolved = wd.get(session)
+      if (typeof resolved === 'string' && resolved.length > 0) return resolved
+    }
+    return undefined
+  } catch {
+    return undefined
+  }
+}
 
 /** 行 config（cordis.patch.yml myteam-host.config；全部可省） */
                                
                                                           
                                 
+     
+                           
+    
+                                                       
+                                         
+     
+                        
                                                                  
                          
                                                                        
@@ -153,7 +198,7 @@ function safeRead(obj         , prop        )      {
 }
 
 export function resolveTeamLedgerPath(workspaceRoot        , teamId        )         {
-  return join(workspaceRoot, '.team-workplace', 'state', 'teams', teamId, 'ledger.jsonl')
+  return teamLedgerPathOf(workspaceRoot, teamId)
 }
 
 /** CHG-71：可能改变「有哪些任务可领」的事件——提交后触发一次派单扫描 */
@@ -244,7 +289,7 @@ export function buildKnowledgeView(workspaceRoot        )
   }))
   const proposals                                                                                                                                                                                                                      = []
   const timeline                                                                                                       = {}
-  const teamsDir = join(workspaceRoot, '.team-workplace', 'state', 'teams')
+  const teamsDir = storeLayout(workspaceRoot).tasks
   try {
     if (existsSync(teamsDir)) {
       for (const teamId of readdirSync(teamsDir)) {
@@ -294,7 +339,7 @@ export function buildKnowledgeView(workspaceRoot        )
 
 /** 默认团队：状态目录下唯一团队；多团队时取最近修改的账本（M1 单活跃团队口径） */
 export function pickDefaultTeamId(workspaceRoot        )         {
-  const teamsDir = join(workspaceRoot, '.team-workplace', 'state', 'teams')
+  const teamsDir = storeLayout(workspaceRoot).tasks
   try {
     const names = readdirSync(teamsDir).filter((n) => existsSync(join(teamsDir, n, 'ledger.jsonl')))
     if (names.length === 0) return 'default'
@@ -326,12 +371,53 @@ export class MyTeamHost {
    * 冷启动从已有 tokens.json 的 `totals` 恢复基线（见 syncTokens）。
    */
           tokenBaselines = new Map                                                   ()
-           workspaceRoot        
-           rolePaths                
+  /**
+   * 项目根（CHG-102 的 P0 修复）。
+   *
+   * 修复前 = `ctx.workspace.root ?? process.cwd()`：desktop profile 下 `workspace.root` 是
+   * `~/.dsh/profiles/desktop`，于是**项目级角色/团队/任务全部写进了用户全局 profile**，
+   * 面板项目视图永远看不到（「所有项目看起来都一样」的根因）。
+   *
+   * 现在按 `resolveProjectRoot()` 的优先级：**会话工作目录**（`agent.session.cwd` /
+   * `workingDirectory.get`）→ 行 config 显式 → 宿主 workspace（过 profile 拒绝规则）→
+   * 进程 cwd。解析结果缓存（一个 host 实例 = 一个队长 preset 作用域 = 一个项目）。
+   */
+          _workspaceRoot         
+          _rolePaths                 
+  get workspaceRoot()         {
+    if (!this._workspaceRoot) {
+      const resolution = resolveProjectRoot({
+        explicit: typeof this.config.workspaceRoot === 'string' ? this.config.workspaceRoot : undefined,
+        sessionCwd: sessionCwdOf(this.rt),
+        workspaceRoot: (safeRead(this.rt, 'workspace')                                 )?.root,
+        cwd: process.cwd(),
+      })
+      this._workspaceRoot = resolution.root
+      this.workspaceFallback = resolution.source === 'cwd'
+      for (const rejected of resolution.rejected) {
+        this.log('warn', `project root candidate rejected (${rejected.source}: ${rejected.path}): ${rejected.reason}`)
+      }
+      this.log('info', `project root = ${resolution.root} (source: ${resolution.source})`)
+    }
+    return this._workspaceRoot
+  }
+  get rolePaths()                 {
+    if (!this._rolePaths) {
+      const layout = storeLayout(this.workspaceRoot)
+      this._rolePaths = {
+        projectRolesDir: layout.roles,
+        // 全局角色库：$DSH_HOME/myteam/roles（CHG-69 与面板/离线聚合统一路径口径）
+        globalRolesDir: this.config.globalRolesDir ?? join(resolveMyteamHome(), 'roles'),
+        // 项目自身角色（FR-19）：不属于任何团队，可被本项目各团队聘任
+        projectRoleFile: layout.projectRole,
+      }
+    }
+    return this._rolePaths
+  }
            config              
   /** TeamService effectiveConfig 覆盖：行 config 显式 > 运行时自有属性（见 constructor 注释） */
           configOverride          
-  /** workspace 服务缺失时为 true（initialize 记 warn，提示 .team-workplace 落点降级） */
+  /** workspace 服务缺失时为 true（initialize 记 warn，提示存储落点降级） */
           workspaceFallback = false
   /**
    * CHG-91（插件团队贡献契约 v1）：第三方插件贡献的角色与团队模板。
@@ -349,16 +435,6 @@ export class MyTeamHost {
     // 真实宿主 rt 是 Cordis Context 代理，且宿主 asar 全文无 configOverride（0 命中）
     // → 真实环境恒 undefined，TeamService 走 loadEffectiveConfig 默认值。
     this.configOverride = config.configOverride ?? safeRead(rt, 'configOverride')
-    const ws = safeRead(rt, 'workspace')                                 
-    this.workspaceRoot = ws?.root ?? process.cwd()
-    this.workspaceFallback = !ws?.root
-    this.rolePaths = {
-      projectRolesDir: join(this.workspaceRoot, '.team-workplace', 'config', 'roles'),
-      // 全局角色库：$DSH_HOME/myteam/roles（CHG-69 与面板/离线聚合统一路径口径）
-      globalRolesDir: this.config.globalRolesDir ?? join(resolveMyteamHome(), 'roles'),
-      // 项目自身角色（FR-19）：不属于任何团队，可被本项目各团队聘任
-      projectRoleFile: join(this.workspaceRoot, '.team-workplace', 'config', 'project-role.json'),
-    }
     // T24（CHG-45）：索引缺失时全量重建（冷启动/首次使用），保证面板全局视图先有离线数据
     this.ensureTeamIndex()
   }
@@ -459,9 +535,9 @@ export class MyTeamHost {
     const dirs = ensureWorkplaceDirs(this.workspaceRoot, (m) => this.log('warn', m))
     ensureGitignoreManagedBlock(this.workspaceRoot, (m) => this.log('warn', m))
     if (this.workspaceFallback) {
-      this.log('warn', `runtime workspace unavailable; .team-workplace rooted at process cwd: ${this.workspaceRoot}`)
+      this.log('warn', `session working directory unavailable; ${STORE_DIR} rooted at process cwd: ${this.workspaceRoot}`)
     }
-    this.log('info', `workplace ready: ${dirs.root} (created ${dirs.created.length} dirs)`)
+    this.log('info', `store ready: ${dirs.root} (created ${dirs.created.length} dirs)`)
     // CHG-91（插件团队贡献契约 v1）：装载第三方插件贡献的角色与团队模板。
     // **必须早于** registerLeadTools / registerRemote——工具与面板都要读这份目录。
     // 纪律：只读（JSON.parse 文件）、失败隔离（坏插件只进 warnings）、大声（warn 日志 + 面板红条）。
@@ -1022,7 +1098,7 @@ export class MyTeamHost {
           // （payload 里带个路径字符串），没有任何文件 IO——面板归档视图渲染的
           // archive/<id>/{team.json,tokens.json,members/,artifacts/} 永远不存在，整套是空壳。
           // 顺序：先落账本（状态变 archived）→ 再按归档态快照写文件 → 最后释放成员。
-          const disbanded = this.commit(teamId, { actor, type: 'team.disbanded', payload: { teamId, archivedPaths: [`.team-workplace/archive/${teamId}`] } })
+          const disbanded = this.commit(teamId, { actor, type: 'team.disbanded', payload: { teamId, archivedPaths: [`${STORE_DIR}/history/archive/${teamId}`] } })
           if (!disbanded.ok) {
             return { status: 'error', code: disbanded.code, message: disbanded.message }
           }
@@ -2343,7 +2419,7 @@ export class MyTeamHost {
         status: 'confirm-required',
         roleId: id,
         usage: { teams: usage.teams.length, instances: usage.instances, presets: usage.presets },
-        message: `删除项目角色「${id}」会移除 .team-workplace/config/roles/${id}.json（在跑成员仍用召唤时快照）；${usage.bindings.length > 0 ? `当前仍被占用：${usage.bindings.join(', ')}` : '当前未被任何团队/模板引用'}；确认请带 confirm=true`,
+        message: `删除项目角色「${id}」会移除 ${STORE_DIR}/config/roles/${id}.json（在跑成员仍用召唤时快照）；${usage.bindings.length > 0 ? `当前仍被占用：${usage.bindings.join(', ')}` : '当前未被任何团队/模板引用'}；确认请带 confirm=true`,
       }
     }
     try {
@@ -2518,7 +2594,7 @@ export class MyTeamHost {
         agentCtx.systemPrompt.section({
           name: `myteam:scratch-${member.memberId}`,
           order: 102,
-          text: `临时脚本一律写入 ${join(this.workspaceRoot, '.team-workplace', 'state', 'scratch', teamId, memberId)}（目录不存在时先创建；不入库、不进收口提交）。`,
+          text: `临时脚本一律写入 ${scratchDirOf(this.workspaceRoot, teamId, memberId)}（目录不存在时先创建；不入库、不进收口提交）。`,
         })
         // ⑥ 记忆纪律 section（T20：FR-6.2 证据指针 + FR-6.4 不宣告交接）
         const memDir = memoryDirFor(this.workspaceRoot, teamId, memberId)
@@ -2547,7 +2623,7 @@ export class MyTeamHost {
       this.log('warn', `member ${memberId} handle/followup failed: ${String(e)}`)
     })
     // identity.json 快照（C3 不可变）
-    const identityDir = join(this.workspaceRoot, '.team-workplace', 'state', 'teams', teamId, 'members', memberId)
+    const identityDir = memberIdentityDirOf(this.workspaceRoot, teamId, memberId)
     if (!existsSync(identityDir)) mkdirSync(identityDir, { recursive: true })
     writeFileSync(join(identityDir, 'identity.json'), `${JSON.stringify({ ...member, roleSnapshot: roleDef, spawnedAt: Date.now() }, null, 2)}\n`, 'utf8')
     // 记忆区播种（T21，FR-6.1：幂等；R26：host 进程 fs；notes/ 留给成员自建）
@@ -2900,7 +2976,7 @@ export class MyTeamHost {
       status: written.created ? 'created' : 'updated',
       presetId: definition.id,
       version: definition.version,
-      presetPath: `.team-workplace/config/presets/${definition.id}.json`,
+      presetPath: `${STORE_DIR}/config/teams/${definition.id}.json`,
       note: written.created ? '模板已创建；用 myteam_submit_plan({presetId}) 应用' : '模板已更新（版本 +1）；已建团队不受影响',
     }
   }
@@ -2926,7 +3002,7 @@ export class MyTeamHost {
       status: 'copied',
       presetId: toId,
       fromPresetId: fromId,
-      presetPath: `.team-workplace/config/presets/${toId}.json`,
+      presetPath: `${STORE_DIR}/config/teams/${toId}.json`,
       note: '已复制成项目模板；改它不影响来源模板，用 myteam_submit_plan({presetId}) 应用',
     }
   }
@@ -2965,13 +3041,17 @@ export class MyTeamHost {
     }
   }
 
-  /** 创建项目角色（CHG-53，队长技能 create-role 的写入口）：同名任一来源存在 → MT_ROLE_EXISTS */
+  /**
+   * 创建角色（CHG-53，队长技能 create-role 的写入口）。
+   *
+   * CHG-103（用户定案）：
+   *  - **默认项目级**：不传 `scope` 一律写 `.dsh-myteam/config/roles/`；
+   *  - **全局必须明示**：`scope: 'global'` + `confirmGlobal: true` 才写全局库；
+   *    只传 scope 不传确认 → 返回 `confirm-required`（模型据此弹窗让用户明确确认）；
+   *  - 同名任一来源存在 → `MT_ROLE_EXISTS`（不静默覆盖）。
+   */
   createRole(args                         )                          {
     const roleId = String(args.roleId ?? '')
-    const existing = this.roleCatalog().find((entry) => entry.definition.id === roleId)
-    if (existing) {
-      return { status: 'error', code: 'MT_ROLE_EXISTS', message: `role "${roleId}" already exists in ${existing.origin} library` }
-    }
     const def                 = {
       id: roleId,
       name: String(args.name ?? ''),
@@ -2988,25 +3068,91 @@ export class MyTeamHost {
       ...(isPlainObject(args.model) ? { model: args.model                            } : {}),
     }
     if (!def.name.trim()) return { status: 'error', code: 'MT_ROLE_INVALID', message: `role "${roleId}" requires name` }
+    // 「创建」语义严格：同名已存在一律 MT_ROLE_EXISTS（不提供覆盖语义——那是 update_role 的事）。
+    // 项目级还要看内置/全局/插件（都不允许被同名项目角色覆盖，R13 引用即复制）。
+    let scope                      
     try {
-      assertValidRole(def)
-      const written = writeProjectRole(this.rolePaths.projectRolesDir, def)
-      return {
-        status: 'created',
-        roleId,
-        filePath: written.filePath,
-        note: '角色已写入项目库；可用 myteam_spawn_member 或组队名册引用（运行中成员不受影响）',
-      }
+      scope = normalizeScope(args.scope)
     } catch (e) {
       return this.roleError(e)
     }
+    if (scope === 'global') {
+      if (readGlobalRole(this.rolePaths, roleId)) {
+        return { status: 'error', code: 'MT_ROLE_EXISTS', message: `role "${roleId}" already exists in global library` }
+      }
+    } else {
+      const existing = this.roleCatalog().find((entry) => entry.definition.id === roleId)
+      if (existing) {
+        return { status: 'error', code: 'MT_ROLE_EXISTS', message: `role "${roleId}" already exists in ${existing.origin} library` }
+      }
+    }
+    // 统一走 roleOp.save：作用域守卫 / 全局两段确认 / 审计与面板同源
+    const out = this.roleOp('save', {
+      role: def,
+      scope,
+      confirmGlobal: args.confirmGlobal,
+      confirm: true,
+    })
+    // 工具语义是「创建」：落盘成功后把 saved 归一成 created（confirm-required / error 原样透传）
+    return out.status === 'saved' ? { ...out, status: 'created' } : out
   }
 
-  /** 修改项目角色（CHG-53，队长技能 modify-role）：内置/全局先复制进项目（fork）再 patch */
+  /**
+   * 修改角色（CHG-53，队长技能 modify-role）。
+   *
+   * CHG-103：`scope` 决定改哪一层——
+   *  - `project`（缺省）：内置/全局先复制进项目（fork）再 patch（原行为）；
+   *  - `global`：**必须** `confirmGlobal: true`，直接改全局库那一份（各项目副本不受影响）。
+   */
   updateRole(args                         )                          {
     const roleId = String(args.roleId ?? '')
     if (!isPlainObject(args.patch)) {
       return { status: 'error', code: 'MT_ROLE_INVALID', message: 'patch object is required' }
+    }
+    let scope                      
+    try {
+      scope = normalizeScope(args.scope)
+    } catch (e) {
+      return this.roleError(e)
+    }
+    const applyPatch = (base                )                 => {
+      const patch = args.patch                           
+      const next                 = { ...base, version: (base.version ?? 1) + 1 }
+      if (typeof patch.name === 'string') next.name = patch.name
+      if (typeof patch.description === 'string') next.description = patch.description
+      if (typeof patch.systemPrompt === 'string') next.systemPrompt = patch.systemPrompt
+      if (typeof patch.isCaptain === 'boolean') next.isCaptain = patch.isCaptain
+      if (Array.isArray(patch.skills)) next.skills = patch.skills.filter((skill)                  => typeof skill === 'string')
+      if (Array.isArray(patch.mcpAllowlist)) next.mcpAllowlist = patch.mcpAllowlist.filter((name)                 => typeof name === 'string')
+      if (Array.isArray(patch.interestWords)) {
+        next.interestWords = patch.interestWords
+          .filter((word)                 => typeof word === 'string' && word.trim().length > 0)
+          .map((word) => word.trim())
+      }
+      if (isPlainObject(patch.toolPolicy)) next.toolPolicy = patch.toolPolicy                                
+      if (isPlainObject(patch.model)) next.model = patch.model                           
+      return next
+    }
+    if (scope === 'global') {
+      if (args.confirmGlobal !== true) {
+        return {
+          status: 'confirm-required',
+          scope: 'global',
+          roleId,
+          message: `要修改的是**全局**角色库里的「${roleId}」——它影响所有项目看到的这一份定义。确认全局作用域请带 confirmGlobal=true 重试；只改本项目请省略 scope（默认项目级，会先复制一份进项目库再改）。`,
+        }
+      }
+      const base = readGlobalRole(this.rolePaths, roleId)
+      if (!base) return { status: 'error', code: 'MT_ROLE_NOT_FOUND', message: `role "${roleId}" not found in global library` }
+      const next = applyPatch(base)
+      if (!next.name.trim()) return { status: 'error', code: 'MT_ROLE_INVALID', message: `role "${roleId}" requires name` }
+      try {
+        assertValidRole(next)
+        saveGlobalRole(this.rolePaths, next, { overwrite: true, actor: 'human' })
+        return { status: 'updated', scope: 'global', roleId, version: next.version, note: '已更新全局角色定义；各项目里的副本不受影响（运行时只认项目库）' }
+      } catch (e) {
+        return this.roleError(e)
+      }
     }
     let def = readProjectRole(this.rolePaths.projectRolesDir, roleId)
     let copiedFrom                    
@@ -3024,27 +3170,14 @@ export class MyTeamHost {
       def = readProjectRole(this.rolePaths.projectRolesDir, roleId)
     }
     if (!def) return { status: 'error', code: 'MT_ROLE_NOT_FOUND', message: `role "${roleId}" not found in project library` }
-    const patch = args.patch
-    const next                 = { ...def, version: (def.version ?? 1) + 1 }
-    if (typeof patch.name === 'string') next.name = patch.name
-    if (typeof patch.description === 'string') next.description = patch.description
-    if (typeof patch.systemPrompt === 'string') next.systemPrompt = patch.systemPrompt
-    if (typeof patch.isCaptain === 'boolean') next.isCaptain = patch.isCaptain
-    if (Array.isArray(patch.skills)) next.skills = patch.skills.filter((skill)                  => typeof skill === 'string')
-    if (Array.isArray(patch.mcpAllowlist)) next.mcpAllowlist = patch.mcpAllowlist.filter((name)                 => typeof name === 'string')
-    if (Array.isArray(patch.interestWords)) {
-      next.interestWords = patch.interestWords
-        .filter((word)                 => typeof word === 'string' && word.trim().length > 0)
-        .map((word) => word.trim())
-    }
-    if (isPlainObject(patch.toolPolicy)) next.toolPolicy = patch.toolPolicy                                
-    if (isPlainObject(patch.model)) next.model = patch.model                           
+    const next = applyPatch(def)
     if (!next.name.trim()) return { status: 'error', code: 'MT_ROLE_INVALID', message: `role "${roleId}" requires name` }
     try {
       assertValidRole(next)
       writeProjectRole(this.rolePaths.projectRolesDir, next)
       return {
         status: 'updated',
+        scope: 'project',
         roleId,
         version: next.version,
         ...(copiedFrom ? { copiedFrom } : {}),
@@ -3233,7 +3366,7 @@ export class MyTeamHost {
   }
 
   /**
-   * CHG-93（FR-18 职责③ F8）：把团队章程（`.team-workplace/structure.md`）注入队长 system prompt。
+   * CHG-93（FR-18 职责③ F8）：把团队章程（`.dsh-myteam/structure.md`）注入队长 system prompt。
    *
    * ## 为什么必须做
    *
@@ -3453,7 +3586,7 @@ export class MyTeamHost {
    */
   syncTokens(teamId        )             {
     const svc = this.service(teamId)
-    const dir = join(this.workspaceRoot, '.team-workplace', 'state', 'teams', teamId)
+    const dir = storeLayout(this.workspaceRoot).tasks + sep + teamId
     const filePath = join(dir, 'tokens.json')
     // ① 已有历史：优先内存，其次读盘（进程重启后 days 不能丢）
     let file = this.tokensFiles.get(teamId)

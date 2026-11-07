@@ -2,7 +2,7 @@
  * 成员记忆数据层（T19，CHG-19，FR-6.1/6.2 + ADR-009）。
  *
  * 设计（ADR-009）：文件即真相 + 事后审计。
- *  - 记忆区 = state/teams/<teamId>/members/<memberId>/memory/（memory.md + notes/）
+ *  - 记忆区 = history/members/<teamId>/<memberId>/memory/（memory.md + notes/）
  *  - 跨会话持久（FR-6.1）：seedMemoryIfMissing 幂等，已存在不覆盖
  *  - 写入纪律（FR-6.2）：提示词层约束（member-setup T20 section）；host 层事后审计
  *    —— auditMemoryFile 解析条目级/frontmatter 级 evidence 指针，违规记 findings
@@ -10,10 +10,11 @@
  *  - FR-6.4（不宣告交接）在提示词层（T20），不在本文件。
  */
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs'
+import { memberMemoryDir } from '../workspace/layout.mjs'
 
 /** 成员记忆目录（FR-6.1：绑定成员身份，随 identity 目录走） */
 export function memoryDirFor(workspaceRoot        , teamId        , memberId        )         {
-  return [workspaceRoot, '.team-workplace', 'state', 'teams', teamId, 'members', memberId, 'memory'].join('/')
+  return memberMemoryDir(workspaceRoot, teamId, memberId)
 }
 
 /** memory.md 种子模板（frontmatter 归因头 + 占位正文；契约 docs/04 §1.2b） */
