@@ -598,6 +598,8 @@ export class MyTeamPanelFacade extends TypertRemoteService {
     return {
       status: 'ok',
       root: catalog.root,
+      /* CHG-108：展示用（用户名 → ~） */
+      rootDisplay: displayPath(catalog.root),
       ok: catalog.ok,
       scannedAt: catalog.scannedAt,
       plugins: catalog.plugins,

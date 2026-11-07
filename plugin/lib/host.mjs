@@ -3469,14 +3469,17 @@ export class MyTeamHost {
    * 读取某个团队的归档快照（只读）。
    * `teamId` 缺省时取默认团队；该团队未归档 → `null`（面板按"未归档"渲染，不猜半个快照）。
    */
-  archiveView(teamId         )                                                                            {
+  archiveView(teamId         )                                                                                                 {
     const id = teamId && teamId.trim().length > 0 ? teamId.trim() : this.defaultTeamId()
-    return { teamId: id, archive: readArchive(this.workspaceRoot, id), root: archiveRootOf(this.workspaceRoot) }
+    const root = archiveRootOf(this.workspaceRoot)
+    // CHG-108：展示用（用户名 → ~）；root 保留绝对路径
+    return { teamId: id, archive: readArchive(this.workspaceRoot, id), root, rootDisplay: displayPath(root) }
   }
 
   /** 已归档团队 id 列表（面板「全部团队」入口；只读目录名） */
-  archiveList()                                    {
-    return { root: archiveRootOf(this.workspaceRoot), teams: listArchives(this.workspaceRoot) }
+  archiveList()                                                         {
+    const root = archiveRootOf(this.workspaceRoot)
+    return { root, rootDisplay: displayPath(root), teams: listArchives(this.workspaceRoot) }
   }
 
   /* ── 会话移交（CHG-88 / M2-E / FR-16.3）───────────────────────── */
