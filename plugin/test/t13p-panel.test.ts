@@ -73,12 +73,12 @@ test('t13p-1: typertRemote 绑定 serviceKey=myteamPanel + namespace=myteam（�
   assert.equal(binding.namespace, 'myteam')
 })
 
-test('t13p-2: marker 44 方法全部 direct invocation（listTeams/getStoreState/initStore + getProject/getRoleDetail/saveRole/deleteRole/getCapabilityCatalog + 5 个离线只读 + 25 个会话门面 + CHG-87 roleOp/applyRoles + CHG-88 handoff + CHG-91 getContributions/reloadContributions + CHG-102 项目存储）', () => {
+test('t13p-2: marker 45 方法全部 direct invocation（listTeams/getStoreState/initStore + getProject/getRoleDetail/saveRole/deleteRole/getCapabilityCatalog + 5 个离线只读 + 25 个会话门面 + CHG-87 roleOp/applyRoles + CHG-88 handoff + CHG-91 getContributions/reloadContributions + CHG-102 项目存储）', () => {
   const d = (MyTeamPanelFacade.prototype as any)[DESCRIPTOR]
   assert.ok(d, 'prototype 上必须有 remote-methods 描述符')
   assert.equal(d.version, 1)
   const names = d.methods.map((m: any) => m.method)
-  assert.deepEqual(names, ['describe', 'listTeams', 'getStoreState', 'initStore', 'getProject', 'getRoleDetail', 'saveRole', 'deleteRole', 'getCapabilityCatalog', 'getOfflineBoard', 'getOfflineTaskDetail', 'getOfflineTokens', 'getOfflineAudit', 'getOfflinePresets', 'getBoard', 'getTaskDetail', 'getTokens', 'getInbox', 'getAudit', 'getConfig', 'getPresets', 'getRoles', 'getKnowledge', 'planAction', 'postComment', 'memberOp', 'disband', 'createTask', 'createTasks', 'updateTask', 'assignTask', 'participateTask', 'rescopeTask', 'cancelTask', 'batchTaskOp', 'reviewTask', 'getArchive', 'getArchives', 'adoptKnowledge', 'roleOp', 'applyRoles', 'handoff', 'getContributions', 'reloadContributions'])
+  assert.deepEqual(names, ['batch', 'describe', 'listTeams', 'getStoreState', 'initStore', 'getProject', 'getRoleDetail', 'saveRole', 'deleteRole', 'getCapabilityCatalog', 'getOfflineBoard', 'getOfflineTaskDetail', 'getOfflineTokens', 'getOfflineAudit', 'getOfflinePresets', 'getBoard', 'getTaskDetail', 'getTokens', 'getInbox', 'getAudit', 'getConfig', 'getPresets', 'getRoles', 'getKnowledge', 'planAction', 'postComment', 'memberOp', 'disband', 'createTask', 'createTasks', 'updateTask', 'assignTask', 'participateTask', 'rescopeTask', 'cancelTask', 'batchTaskOp', 'reviewTask', 'getArchive', 'getArchives', 'adoptKnowledge', 'roleOp', 'applyRoles', 'handoff', 'getContributions', 'reloadContributions'])
   for (const m of d.methods) assert.deepEqual(m.invocation, { kind: 'direct' })
 })
 

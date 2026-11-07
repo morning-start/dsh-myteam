@@ -81,6 +81,10 @@ export const MT_CODES = [
   'MT_ROLE_OCCUPIED',
   'MT_ROLE_READONLY',
 
+  // ── 批量调用（CHG-112）──────────────────────────────────────
+  "MT_BATCH_NOT_ROOT",
+  "MT_UNKNOWN_METHOD",
+
   // ── 作用域（CHG-103：全局 vs 项目级）──────────────────────────
   'MT_SCOPE_INVALID',
   'MT_SCOPE_PROJECT_ONLY',
@@ -184,6 +188,10 @@ export const MT_CODE_DOCS: Record<MtCode, string> = {
   MT_ROLE_NOT_FOUND: '角色 id 在内置/全局/项目三层里都找不到。',
   MT_ROLE_OCCUPIED: '角色正被在册成员占用，不能删改（先释放成员）。',
   MT_ROLE_READONLY: '内置角色只读，不能改不能删——想改即 fork 进项目库（CHG-6）。',
+
+  // 批量调用（CHG-112）
+  MT_BATCH_NOT_ROOT: "批量调用只支持根级方法（形参只有 query）；agent 作用域的方法请单独调用。",
+  MT_UNKNOWN_METHOD: "方法名不在宿主方法表里（客户端与服务端版本不一致，或拼错了）。",
 
   // 作用域（CHG-103）
   MT_SCOPE_INVALID: '作用域只接受 `project` | `global`（缺省 = 项目级）。',
