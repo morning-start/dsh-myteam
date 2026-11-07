@@ -4,7 +4,7 @@
  * 来源三层（CHG-5/6）：
  *   builtin —— 插件包内只读（builtin-roles.ts），运行时不可变；
  *   global  —— $DSH_HOME/myteam/roles/（M1 只读展示为复制源；增删改查/发布交互 M2，CHG-16 第三刀）；
- *   project —— .team-workplace/config/roles/ = 运行时唯一真相。
+ *   project —— .dsh-myteam/config/roles/ = 运行时唯一真相。
  *
  * 硬规则：
  *   - 运行时只解析项目库（场景 13：删全局同名角色不影响运行中团队）；
@@ -437,4 +437,92 @@ export function validateRoster(roster: { roleId: string }[], paths: RoleStorePat
   if (captainEntries.length > 1) {
     throw new RoleError('MT_ROSTER_DUAL_CAPTAIN', `roster must include exactly one captain role (found ${captainEntries.length})`)
   }
+}
+
+/* ── 全局角色库写入口（CHG-103）──────────────────────────────────
+ * 用户定案：「允许添加（全局角色），但必须明确指定为『全局』时才能创建」。
+ *
+ * 纪律：
+ *  - **默认项目级**：调用方不传 scope 一律走项目库（normalizeScope 的缺省）；
+ *  - 全局写必须显式 `scope: 'global'` + 两段确认（`confirmGlobal: true`）；
+ *  - 全局库只存**角色定义**，绝不落 tasks/history/state/export（`assertWritableAtScope` 守卫）；
+ *  - 全局角色同样受 captain 保留 id 与 C5 只收窄约束（复用 assertValidRole）。
+ */
+
+function requireGlobalDir(paths: RoleStorePaths): string {
+  if (!paths.globalRolesDir) throw new RoleError('MT_ROLE_NO_GLOBAL_DIR', 'global roles dir not configured')
+  return paths.globalRolesDir
+}
+
+/** 全局角色文件路径（`$DSH_HOME/myteam/roles/<id>.json`） */
+export function globalRoleFilePath(paths: RoleStorePaths, id: string): string {
+  return join(requireGlobalDir(paths), `${id}.json`)
+}
+
+export function readGlobalRole(paths: RoleStorePaths, id: string): RoleDefinition | undefined {
+  const dir = paths.globalRolesDir
+  if (!dir || !existsSync(dir)) return undefined
+  return readProjectRole(dir, id)
+}
+
+/** 全局角色审计行（与项目库同构，落在全局目录） */
+export function globalRoleAuditPath(paths: RoleStorePaths): string {
+  return join(requireGlobalDir(paths), '.audit.jsonl')
+}
+
+function appendGlobalRoleAudit(paths: RoleStorePaths, entry: RoleAuditEntry, actor?: string): string {
+  const p = globalRoleAuditPath(paths)
+  mkdirSync(dirname(p), { recursive: true })
+  appendFileSync(p, `${JSON.stringify({ ts: Date.now(), actor: actor ?? 'human', scope: 'global', action: entry.action, roleId: entry.roleId, file: entry.file })}\n`, 'utf8')
+  return p
+}
+
+/**
+ * 保存全局角色（新建/覆盖）。
+ * - 同名已存在且 `overwrite !== true` → `MT_ROLE_EXISTS`（不静默覆盖，两段确认在调用方）；
+ * - captain 身份不可占用（名册「有且仅有一个队长」的锚点只在项目库/内置）。
+ */
+export function saveGlobalRole(
+  paths: RoleStorePaths,
+  def: RoleDefinition,
+  opts: { overwrite?: boolean; actor?: string } = {},
+): { filePath: string; action: 'created' | 'updated'; auditPath: string } {
+  if (def?.id === 'captain') {
+    throw new RoleError('MT_ROLE_INVALID', 'captain is a builtin identity; create a global role with a different id')
+  }
+  assertValidRole(def)
+  const existing = readGlobalRole(paths, def.id)
+  if (existing && opts.overwrite !== true) {
+    throw new RoleError('MT_ROLE_EXISTS', `global role "${def.id}" already exists; pass overwrite to replace it`, { id: def.id, version: existing.version ?? 1 })
+  }
+  const dir = requireGlobalDir(paths)
+  mkdirSync(dir, { recursive: true })
+  const filePath = join(dir, `${def.id}.json`)
+  writeFileSync(filePath, `${JSON.stringify(def, null, 2)}\n`, 'utf8')
+  const auditPath = appendGlobalRoleAudit(paths, { action: existing ? 'updated' : 'created', roleId: def.id, file: filePath }, opts.actor)
+  return { filePath, action: existing ? 'updated' : 'created', auditPath }
+}
+
+/**
+ * 删除全局角色。纪律：
+ *  - 只删全局库（项目库那份不受影响——运行时只认项目库，R13）；
+ *  - captain 不可删；
+ *  - 被占用（模板引用 / 在册团队）拒绝并列占用方（C7 守门）；
+ *  - 删不存在的全局角色 → `MT_ROLE_NOT_FOUND`（不假装成功）。
+ */
+export function deleteGlobalRoleSafe(
+  paths: RoleStorePaths,
+  roleId: string,
+  opts: { bindings?: string[]; actor?: string } = {},
+): { filePath: string; auditPath: string } {
+  if (roleId === 'captain') throw new RoleError('MT_ROLE_CAPTAIN', 'captain is a builtin identity; it cannot be deleted')
+  const bindings = (opts.bindings ?? []).filter((binding) => binding.length > 0)
+  if (bindings.length > 0) {
+    throw new RoleError('MT_ROLE_OCCUPIED', `role "${roleId}" is still bound by: ${bindings.join(', ')}`, bindings)
+  }
+  const p = globalRoleFilePath(paths, roleId)
+  if (!existsSync(p)) throw new RoleError('MT_ROLE_NOT_FOUND', `role "${roleId}" not found in global library`)
+  unlinkSync(p)
+  const auditPath = appendGlobalRoleAudit(paths, { action: 'deleted', roleId, file: p }, opts.actor)
+  return { filePath: p, auditPath }
 }

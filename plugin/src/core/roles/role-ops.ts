@@ -17,14 +17,18 @@
 import { join } from 'node:path'
 import {
   assertValidRole,
+  deleteGlobalRoleSafe,
   deleteProjectRoleSafe,
   listRoleCatalog,
+  readGlobalRole,
   readProjectRole,
+  saveGlobalRole,
   saveProjectRole,
   writeProjectRole,
   type RoleDefinition,
   type RoleStorePaths,
 } from './role-store.ts'
+import { assertWritableAtScope, normalizeScope, type Scope } from '../workspace/scope.ts'
 
 export interface RoleOpContext {
   paths: RoleStorePaths
@@ -41,12 +45,16 @@ export const ROLE_OPS: readonly RoleOpName[] = ['save', 'delete', 'publish', 'fo
 /**
  * 角色库统一写入口。
  *
- * | op | 语义 | 两段确认 |
- * |----|------|----------|
- * | `save` | 新建/覆盖项目库角色 | 同名已存在时 `confirm=true` |
- * | `delete` | 删除项目库角色（C7 守门：占用面非空 → `MT_ROLE_OCCUPIED`） | 恒需 `confirm=true` |
- * | `publish` | 项目库角色 → 全局库（对工作区所有项目可见） | 恒需 `confirm=true` |
- * | `fork` | 任意来源角色复制成**新 id** 的项目库角色 | 无（同名已存在 → `MT_ROLE_EXISTS`） |
+ * | op | 语义 | 作用域 | 两段确认 |
+ * |----|------|--------|----------|
+ * | `save` | 新建/覆盖角色（默认项目库） | `project`（缺省）\| `global`（须明示） | 同名已存在 → `confirm=true`；全局 → `confirmGlobal=true` |
+ * | `delete` | 删除角色（C7 守门：占用面非空 → `MT_ROLE_OCCUPIED`） | 同上 | 恒需 `confirm=true`（全局另需 `confirmGlobal=true`） |
+ * | `publish` | 项目库角色 → 全局库（对工作区所有项目可见） | 单向流动 | 恒需 `confirm=true` |
+ * | `fork` | 任意来源角色复制成**新 id** 的项目库角色 | 项目 | 无（同名已存在 → `MT_ROLE_EXISTS`） |
+ *
+ * **作用域纪律（CHG-103，用户定案）**：全局是**必须明示**的——`scope` 缺省 = `project`。
+ * 传 `global` 时还要 `confirmGlobal: true` 才落盘，否则返回 `confirm-required`
+ * （模型必须先把「这会写进跨项目全局库」讲清楚、拿到用户确认，再重试）。
  *
  * 内置身份 `captain` 是名册「有且仅有一个队长」的锚点：publish / fork 的目标 id 都不允许是它。
  */
@@ -63,16 +71,42 @@ export function roleOp(ctx: RoleOpContext, op: string, payload: Record<string, u
         // 先校验再谈覆盖：非法角色不该因为「同名已存在」而走到确认流程
         assertValidRole(role as never)
         const def = role as unknown as RoleDefinition
+        const scope = normalizeScope(payload.scope)
+        // CHG-103：作用域守卫——角色两级都允许，但这条断言保证「全局只能放全局该放的东西」
+        assertWritableAtScope(scope, 'roles')
+        if (scope === 'global') {
+          if (payload.confirmGlobal !== true) {
+            return {
+              status: 'confirm-required',
+              scope: 'global',
+              roleId: def.id,
+              filePath: join(ctx.paths.globalRolesDir ?? '', `${def.id}.json`),
+              message: `「${def.name || def.id}」将被写入**全局角色库**（对所有项目可见，不是只在本项目）。确认全局作用域请带 confirmGlobal=true 重试；只想本项目用请省略 scope（默认项目级）。`,
+            }
+          }
+          const existingGlobal = readGlobalRole(ctx.paths, def.id)
+          if (existingGlobal && payload.confirm !== true) {
+            return {
+              status: 'confirm-required',
+              scope: 'global',
+              existing: { id: existingGlobal.id, name: existingGlobal.name, version: existingGlobal.version ?? 1 },
+              message: `全局角色 "${def.id}" 已存在，保存会覆盖该文件；确认请带 confirm=true`,
+            }
+          }
+          const out = saveGlobalRole(ctx.paths, def, { overwrite: payload.confirm === true, actor })
+          return { status: 'saved', scope: 'global', roleId: def.id, ...out }
+        }
         const existing = readProjectRole(ctx.paths.projectRolesDir, def.id)
         if (existing && payload.confirm !== true) {
           return {
             status: 'confirm-required',
+            scope: 'project',
             existing: { id: existing.id, name: existing.name, version: existing.version ?? 1 },
             message: `角色 "${def.id}" 已存在于项目库，保存会覆盖该文件（在跑实例仍用召唤时快照）；确认请带 confirm=true`,
           }
         }
         const out = saveProjectRole(ctx.paths, def, { overwrite: payload.confirm === true, actor })
-        return { status: 'saved', roleId: def.id, ...out }
+        return { status: 'saved', scope: 'project', roleId: def.id, ...out }
       } catch (e) {
         return roleOpError(e)
       }
@@ -80,17 +114,33 @@ export function roleOp(ctx: RoleOpContext, op: string, payload: Record<string, u
     case 'delete': {
       const roleId = String(payload.roleId ?? '').trim()
       if (!roleId) return { status: 'error', code: 'MT_VALIDATION', message: 'roleId is required' }
-      if (payload.confirm !== true) {
-        return {
-          status: 'confirm-required',
-          roleId,
-          bindings: [...(ctx.bindings ?? [])],
-          message: `删除项目角色「${roleId}」会移除 .team-workplace/config/roles/${roleId}.json（在跑成员仍用召唤时快照）；确认请带 confirm=true`,
-        }
-      }
       try {
+        const scope = normalizeScope(payload.scope)
+        assertWritableAtScope(scope, 'roles')
+        if (scope === 'global') {
+          if (payload.confirmGlobal !== true || payload.confirm !== true) {
+            return {
+              status: 'confirm-required',
+              scope: 'global',
+              roleId,
+              bindings: [...(ctx.bindings ?? [])],
+              message: `删除**全局**角色「${roleId}」会影响所有项目的可见性（各项目里的副本不受影响）；确认请同时带 confirmGlobal=true 与 confirm=true`,
+            }
+          }
+          const out = deleteGlobalRoleSafe(ctx.paths, roleId, { bindings: ctx.bindings ?? [], actor })
+          return { status: 'deleted', scope: 'global', roleId, ...out }
+        }
+        if (payload.confirm !== true) {
+          return {
+            status: 'confirm-required',
+            scope: 'project',
+            roleId,
+            bindings: [...(ctx.bindings ?? [])],
+            message: `删除项目角色「${roleId}」会移除 .dsh-myteam/config/roles/${roleId}.json（在跑成员仍用召唤时快照）；确认请带 confirm=true`,
+          }
+        }
         const out = deleteProjectRoleSafe(ctx.paths, roleId, { bindings: ctx.bindings ?? [], actor })
-        return { status: 'deleted', roleId, ...out }
+        return { status: 'deleted', scope: 'project', roleId, ...out }
       } catch (e) {
         return roleOpError(e)
       }

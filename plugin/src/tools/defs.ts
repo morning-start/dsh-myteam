@@ -384,7 +384,7 @@ export function leadToolDefs(): ToolDef[] {
      * 面板展示的是假数据（UI 声称支持单角色调用，实际没有任何落库路径）。 */
     {
       name: 'myteam_apply_roles',
-      description: '单角色调用（CHG-87 / FR-16.1，M2-0 T12）：把角色配置临时注入当前会话（提示词 section + C5 收窄 + Skill/MCP 绑定），与成员实例化同管线；**不入团队账本**（不是团队，没有任务 DAG）。`roles` 累加启用（`/myteam+researcher+reviewer`），`remove` 卸载（`/myteam-researcher`）。sessionDefaults 落 .team-workplace/config/roles/session-defaults.json，跨重启恢复。已有会话与普通新对话都可用；不可用于启用 Team（FR-16.1 拍板）。',
+      description: '单角色调用（CHG-87 / FR-16.1，M2-0 T12）：把角色配置临时注入当前会话（提示词 section + C5 收窄 + Skill/MCP 绑定），与成员实例化同管线；**不入团队账本**（不是团队，没有任务 DAG）。`roles` 累加启用（`/myteam+researcher+reviewer`），`remove` 卸载（`/myteam-researcher`）。sessionDefaults 落 .dsh-myteam/config/session-defaults.json，跨重启恢复。已有会话与普通新对话都可用；不可用于启用 Team（FR-16.1 拍板）。',
       parameters: {
         type: 'object',
         properties: {
@@ -503,11 +503,13 @@ export function leadToolDefs(): ToolDef[] {
     },
     {
       name: 'myteam_delete_role',
-      description: '删除项目角色（CHG-73 / FR-27）：只删项目库（内置/全局只读），captain 不可删；被模板引用或团队在册时拒绝并列占用方。两段确认（第一次返回 usage），删除留 .audit.jsonl 审计行。',
+      description: '删除角色（CHG-73 / FR-27，CHG-103 作用域）：**缺省只删项目库**（内置只读）；`scope:"global"` 删全局库（须同时 `confirmGlobal:true` + `confirm:true`——全局影响所有项目）。captain 不可删；被模板引用或团队在册时拒绝并列占用方。删除留 .audit.jsonl 审计行。',
       parameters: {
         type: 'object',
         properties: {
-          roleId: str('角色 id（项目库）', true),
+          roleId: str('角色 id', true),
+          scope: { type: 'string', enum: ['project', 'global'], description: '作用域（缺省 project；global 必须明示且需 confirmGlobal）' },
+          confirmGlobal: bool('全局作用域二次确认（scope=global 时必填 true）'),
           confirm: bool('二段确认必须为 true', true),
         },
         required: ['roleId'],
@@ -525,7 +527,7 @@ export function leadToolDefs(): ToolDef[] {
     { name: 'myteam_adopt_knowledge', description: '采纳/驳回知识提案（FR-17.4 策展门）：adopted 落 config/knowledge/（带 evidence+contributor 归因）；rejected 只留痕。draftId 来自 knowledge.proposed 事件。', parameters: { type: 'object', properties: { teamId: teamId(), draftId: str('知识提案 id（knowledge.proposed 事件的 draftId）', true), decision: { type: 'string', enum: ['adopted', 'rejected'], description: '策展决定', required: true }, note: str('处置说明') } } },
     {
       name: 'myteam_create_role',
-      description: '创建项目角色（队长专属，CHG-53）：写 .team-workplace/config/roles/<roleId>.json。角色是配置单元（职责/提示词/工具策略/技能/MCP）；内置与全局角色只读，新建角色可在组队时引用。',
+      description: '创建角色（队长专属，CHG-53 / CHG-103 作用域）：**缺省写项目级** `.dsh-myteam/config/roles/<roleId>.json`（只对本项目可见）。仅当用户**明确说「全局」/「所有项目共用」**时才传 `scope:"global"` + `confirmGlobal:true` 写全局库；指令不清晰时必须先弹窗确认，不要猜。角色是配置单元（职责/提示词/工具策略/技能/MCP）；内置角色只读，新建角色可在组队时引用。',
       parameters: {
         type: 'object',
         properties: {
@@ -539,18 +541,22 @@ export function leadToolDefs(): ToolDef[] {
           toolPolicy: { type: 'object', description: '工具策略（C5 只收窄）：{ allow?: string[], deny?: string[] }' },
           model: { type: 'object', description: '模型路由覆写：{ provider, model }' },
           isCaptain: bool('是否队长角色（默认 false；一个团队只能有一个队长）'),
+          scope: { type: 'string', enum: ['project', 'global'], description: '作用域（缺省 project）。global = 写全局角色库、所有项目可见——必须用户明确要求' },
+          confirmGlobal: bool('全局作用域二次确认：scope=global 时必须 true（否则返回 confirm-required 供弹窗）'),
         },
         required: ['roleId', 'name', 'description', 'systemPrompt'],
       },
     },
     {
       name: 'myteam_update_role',
-      description: '修改项目角色（队长专属，CHG-53）：patch 合并后写回；项目库缺失但内置/全局存在时先复制进项目（fork，origin 保留）。运行中的成员使用身份快照，修改不影响他们。',
+      description: '修改角色（队长专属，CHG-53 / CHG-103 作用域）：**缺省改项目库**（项目库缺失但内置/全局存在时先复制进项目，fork，origin 保留）；`scope:"global"` 直接改全局库那一份（须 `confirmGlobal:true`，各项目副本不受影响）。运行中的成员使用身份快照，修改不影响他们。',
       parameters: {
         type: 'object',
         properties: {
           roleId: str('角色 id', true),
           patch: { type: 'object', description: '要修改的字段：name/description/systemPrompt/skills/mcpAllowlist/interestWords/toolPolicy/model/isCaptain', required: true },
+          scope: { type: 'string', enum: ['project', 'global'], description: '作用域（缺省 project；global 必须明示且需 confirmGlobal）' },
+          confirmGlobal: bool('全局作用域二次确认（scope=global 时必填 true）'),
         },
         required: ['roleId', 'patch'],
       },
@@ -574,7 +580,7 @@ export function leadToolDefs(): ToolDef[] {
     },
     {
       name: 'myteam_save_preset',
-      description: '创建或更新项目团队模板（CHG-57）：写 .team-workplace/config/presets/<id>.json。内置模板只读（请用 myteam_copy_preset 复制成新 id）；已存在的项目模板需 overwrite=true 才覆盖（两段确认）。',
+      description: '创建或更新项目团队模板（CHG-57）：写 .dsh-myteam/config/teams/<id>.json。内置模板只读（请用 myteam_copy_preset 复制成新 id）；已存在的项目模板需 overwrite=true 才覆盖（两段确认）。',
       parameters: {
         type: 'object',
         properties: {
