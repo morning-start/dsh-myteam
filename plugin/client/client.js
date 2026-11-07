@@ -1255,6 +1255,8 @@ window.__ModuleLoader__.load({
       'g6.conv.openPanel': '在面板打开',
       'g6.conv.openDetail': '看 {id} 详情',
       'g6.conv.ledger': '账本已记录 · {time}',
+      /* CHG-109：没有真实时间戳时不写死时间 */
+      'g6.conv.ledgerNoTime': '账本已记录',
       'g6.conv.moreTasks': '另有 {n} 个任务',
       'g6.conv.tasksEmpty': '当前看板还没有任务（面板只读真实账本，不展示演示数据）',
       'g6.conv.approvedStat': '· 计划已批准，{n} 个角色的会话已创建',
@@ -2403,6 +2405,8 @@ window.__ModuleLoader__.load({
       'g6.conv.openPanel': 'Open in panel',
       'g6.conv.openDetail': 'See {id} detail',
       'g6.conv.ledger': 'Recorded in ledger · {time}',
+      /* CHG-109: no fake time when there is no real timestamp */
+      'g6.conv.ledgerNoTime': 'Recorded in ledger',
       'g6.conv.moreTasks': '{n} more tasks',
       'g6.conv.tasksEmpty': 'No tasks on the board yet (the panel reads the real ledger and shows no demo data)',
       'g6.conv.approvedStat': '· plan approved, sessions for {n} roles created',
@@ -11702,6 +11706,8 @@ window.__ModuleLoader__.load({
             title: task.title,
             state: task.state,
             who: (task.assignees ?? []).map((id) => String(id)).join('、'),
+            /* CHG-109：真实时间戳（有就显示，绝不写死） */
+            ...(typeof task.updatedAt === 'string' ? { ts: task.updatedAt } : typeof task.ts === 'string' ? { ts: task.ts } : {}),
           }))
           const team = (teamsData?.teams ?? []).find((entry) => entry.sessionId === sessionId)
           setState({
@@ -11724,10 +11730,16 @@ window.__ModuleLoader__.load({
     function TeamPlanTasksCard({ t, tasks, stat, onOpenPanel, onOpenTask, loaded = true }) {
       const list = (tasks ?? []).slice(0, 4)
       const rest = Math.max(0, (tasks ?? []).length - list.length)
+      /* CHG-109：脚注的时间**不再写死 21:13**——有真实时间戳就显示，没有就只写「账本已记录」 */
+      const lastTs = list.map((task) => task?.ts).filter((ts) => typeof ts === 'string' && ts.length > 0).sort().at(-1)
       const foot = [
         j('button', { key: 'panel', className: 'mt-btn mt-btn-sm', onClick: onOpenPanel, children: t('g6.conv.openPanel') }),
         j('button', { key: 'detail', className: 'mt-btn mt-btn-sm', onClick: onOpenTask, children: t('g6.conv.openDetail').replace('{id}', String(list[0]?.id ?? '—')) }),
-        j('span', { key: 'note', className: 'mt-toolcard-note', children: t('g6.conv.ledger').replace('{time}', '21:13') }),
+        j('span', {
+          key: 'note',
+          className: 'mt-toolcard-note',
+          children: lastTs ? t('g6.conv.ledger').replace('{time}', String(lastTs)) : t('g6.conv.ledgerNoTime'),
+        }),
       ]
       /* 加载中骨架：只给**设计稿结构**（行 + 状态位 + 计数占位），不含任何演示任务 */
       const skeleton = [0, 1].map((index) => js('div', { key: `sk-${index}`, className: 'mt-toolcard-row', children: [

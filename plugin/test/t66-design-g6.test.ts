@@ -299,6 +299,10 @@ test('t66-6: 会话页团队视图（conversation.view）—— 只读真实账�
   }
   assert.ok(!source.includes('CONV_DEMO_TASKS'), '演示任务常量必须删除')
   assert.ok(!source.includes('__MYTEAM_DEMO__'), '演示开关必须删除')
+  /* ⑤ CHG-109：脚注时间不得写死——没有真实时间戳就只写「账本已记录」 */
+  assert.ok(!source.includes("replace('{time}', '21:13')"), '不得再把脚注时间写死为 21:13')
+  assert.ok(source.includes("t('g6.conv.ledgerNoTime')"), '无时间戳时用「账本已记录」兜底')
+  assert.ok(source.includes("typeof task.updatedAt === 'string'"), '任务映射要带真实时间戳')
 
   /* ③ 数据源必须真实：getBoard + listTeams（团队名/状态） */
   assert.ok(source.includes('makeApi(connection, sessionId)'), '看板数据源')
