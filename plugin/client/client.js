@@ -2807,6 +2807,8 @@ window.__ModuleLoader__.load({
       const call = (method, query) => rpcCall(connection, `myteam/${method}`, { agentId: sessionId, query })
       return {
         listTeams: () => rpcCall(connection, 'myteam/listTeams', {}),
+        /* CHG-111：能力协商——拿到宿主**真实**方法表，缺能力就降级而不是运行时崩 */
+        describe: (query) => rpcCall(connection, 'myteam/describe', { query }),
         /* CHG-102：项目级存储状态 / 初始化（根级端点，只收 query）。
          * CHG-104 教训：面板门面加了方法、客户端的 api 表没加 → `discoveryApi.getStoreState` 是
          * undefined → 调用即 TypeError → catch 里 setStoreState(null) → 面板永远停在「加载中」。

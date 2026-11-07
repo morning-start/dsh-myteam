@@ -27,6 +27,10 @@ import { TypertRemoteService } from '@deepseek-ai/dsh-typert-protocol'
 import { isAbsolute, join } from 'node:path'
 import { readdirSync } from 'node:fs'
 import { markRemoteMethods, normalizeCtx } from './remote/service.ts'
+
+/** CHG-111：typert 描述符键 + 面板协议版本（方法表只增不减，新增能力时 +1） */
+const DESCRIPTOR_KEY = '@deepseek-ai/dsh-typert-protocol/remote-methods'
+const PANEL_PROTOCOL_VERSION = 1
 import { readGlobalIndex } from './core/index/team-index.ts'
 import { buildOfflineAudit, buildOfflineBoard, buildOfflinePresets, buildOfflineProject, buildOfflineTaskDetail, buildOfflineTokens, isSafeTeamId, projectRolePaths, roleUsage } from './core/index/offline-view.ts'
 import { buildProjectView, buildRoleDetailView, type ProjectTeamInput } from './remote/views.ts'
@@ -1003,10 +1007,36 @@ export class MyTeamPanelFacade extends TypertRemoteService {
     if (!remote) return UNAVAILABLE
     return remote.getPresets(query ?? {})
   }
+
+  /**
+   * CHG-111：**能力协商**（治「两端方法表漂移」）。
+   *
+   * 为什么需要：43 条路由靠「服务端数组 + 客户端对象字面量」两份**手工**列表对齐，
+   * 任一漏写就是运行时 `undefined`（CHG-104：整屏卡在「加载中」）。客户端启动时拉一次
+   * 本端点拿服务端**真实**方法表：缺方法就降级（按钮置灰 + 提示重启宿主），而不是崩。
+   *
+   * 纪律：方法表**只增不减**；新增方法时 `version` +1，客户端据此决定能不能用新能力。
+   */
+  async describe(query: Record<string, unknown>) {
+    const descriptor = (MyTeamPanelFacade.prototype as unknown as Record<string, { methods: Array<{ method: string }> }>)[
+      DESCRIPTOR_KEY
+    ]
+    const methods = (descriptor?.methods ?? []).map((entry) => entry.method)
+    return {
+      status: 'ok',
+      /** 协议版本（方法表只增不减；新增能力时 +1） */
+      version: PANEL_PROTOCOL_VERSION,
+      methods,
+      count: methods.length,
+      /** 非空时客户端应展示「宿主版本过旧」并降级（当前恒 true） */
+      complete: methods.length > 0,
+      ...(typeof query?.workspaceRoot === 'string' ? { workspaceRoot: query.workspaceRoot } : {}),
+    }
+  }
 }
 
 // 手动 Remote 标记：gateway 按 method 名发现端点（namespace=myteam，direct invocation）
-markRemoteMethods(MyTeamPanelFacade.prototype, ['listTeams', 'getStoreState', 'initStore', 'getProject', 'getRoleDetail', 'saveRole', 'deleteRole', 'getCapabilityCatalog', 'getOfflineBoard', 'getOfflineTaskDetail', 'getOfflineTokens', 'getOfflineAudit', 'getOfflinePresets', 'getBoard', 'getTaskDetail', 'getTokens', 'getInbox', 'getAudit', 'getConfig', 'getPresets', 'getRoles', 'getKnowledge', 'planAction', 'postComment', 'memberOp', 'disband', 'createTask', 'createTasks', 'updateTask', 'assignTask', 'participateTask', 'rescopeTask', 'cancelTask', 'batchTaskOp',
+markRemoteMethods(MyTeamPanelFacade.prototype, ['describe', 'listTeams', 'getStoreState', 'initStore', 'getProject', 'getRoleDetail', 'saveRole', 'deleteRole', 'getCapabilityCatalog', 'getOfflineBoard', 'getOfflineTaskDetail', 'getOfflineTokens', 'getOfflineAudit', 'getOfflinePresets', 'getBoard', 'getTaskDetail', 'getTokens', 'getInbox', 'getAudit', 'getConfig', 'getPresets', 'getRoles', 'getKnowledge', 'planAction', 'postComment', 'memberOp', 'disband', 'createTask', 'createTasks', 'updateTask', 'assignTask', 'participateTask', 'rescopeTask', 'cancelTask', 'batchTaskOp',
   // CHG-86：门禁裁决 / 归档快照 / 知识提案策展
   'reviewTask', 'getArchive', 'getArchives', 'adoptKnowledge',
   // CHG-87（FR-13.1/FR-16.1）：角色库统一写入口 + 单角色调用

@@ -104,3 +104,17 @@ test('t85-6: 横幅样式存在且不与既有选择器重名（t62-10 守门的
     assert.equal(hits, 1, `${cls} 必须恰好定义一次（实际 ${hits}）`)
   }
 })
+
+test('t85-7: describe 能力协商——返回宿主真实方法表，客户端据此降级（CHG-111）', async () => {
+  const facade = new MyTeamPanelFacade({ agents: { list: () => [] }, logger: { info() {}, warn() {} } })
+  const result = await facade.describe({ workspaceRoot: 'C:\\ws' })
+  assert.equal(result.status, 'ok')
+  assert.ok(result.version >= 1, '协议版本')
+  assert.ok(Array.isArray(result.methods) && result.methods.length >= 40, '方法表非空')
+  assert.ok(result.methods.includes('describe'), '自己也在表里（可自描述）')
+  assert.ok(result.methods.includes('reloadContributions'), '旧方法仍在（只增不减）')
+  assert.equal(result.count, result.methods.length, 'count 与方法表一致')
+  // 客户端 api 表必须包含 describe（否则协商本身调不到）
+  const api = clientApiMethods()
+  assert.ok(api.includes('describe'), '客户端 makeApi 必须暴露 describe')
+})
