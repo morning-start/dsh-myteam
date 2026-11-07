@@ -58,6 +58,12 @@ import {
 } from './core/host/session-handoff.ts'
 import { recoveryAction, checkArchiveGate } from './core/scheduler/recovery.ts'
 import { entryFromProjection, scanWorkspaceIndex, readWorkspaceIndex, writeWorkspaceIndex, upsertTeamEntry, upsertGlobalWorkspace, resolveMyteamHome } from './core/index/team-index.ts'
+// CHG-91（插件团队贡献契约 v1）：装载第三方插件贡献的角色与团队模板
+import { loadContributions } from './core/contributions/parse.ts'
+import { contributionsRoot } from './core/contributions/discover.ts'
+import { CONTRIBUTION_CODES, emptyContributionCatalog, type ContributionCatalog } from './core/contributions/contract.ts'
+// CHG-93（FR-18 职责③ F8）：团队章程注入队长 system prompt
+import { readTeamCharter, TEAM_CHARTER_SECTION, TEAM_CHARTER_VARIABLE } from './core/host/team-charter.ts'
 import { roleUsage, projectRolePaths } from './core/index/offline-view.ts'
 
 /* 宿主编译辅助（T0 实证：register 前必须编译成完整 JSON Schema）。
@@ -327,6 +333,14 @@ export class MyTeamHost {
   private configOverride?: unknown
   /** workspace 服务缺失时为 true（initialize 记 warn，提示 .team-workplace 落点降级） */
   private workspaceFallback = false
+  /**
+   * CHG-91（插件团队贡献契约 v1）：第三方插件贡献的角色与团队模板。
+   *
+   * 装载在 `initialize()` 里（**只读**：`JSON.parse` 文件，不 `import()` 插件代码、不写账本）。
+   * 一个插件坏了不影响其它插件（`warnings[]` 收集），但**必须大声**——
+   * 面板角色库页顶部显示红条，不静默跳过（契约 P4）。
+   */
+  private contributionCatalog: ContributionCatalog = emptyContributionCatalog('')
 
   constructor(rt: HostRuntime, config: MyTeamConfig = {}) {
     this.rt = rt
@@ -347,6 +361,59 @@ export class MyTeamHost {
     }
     // T24（CHG-45）：索引缺失时全量重建（冷启动/首次使用），保证面板全局视图先有离线数据
     this.ensureTeamIndex()
+  }
+
+  /**
+   * CHG-91：重新扫描插件贡献（启动时一次 + 面板/工具显式重载）。
+   *
+   * 三条纪律（契约 §8 / §11）：
+   *  1. **只读**——`loadContributions` 只 `JSON.parse` 文件，不 `import()` 插件代码、不写账本；
+   *  2. **失败隔离**——一个插件坏了不影响其它插件（`parseContributions` 里没有 `throw`）；
+   *  3. **大声**——每个失败都写进 `warnings`，并 `log('warn')` 一条汇总（面板顶部红条读它）。
+   */
+  reloadContributions(): ContributionCatalog {
+    const root = contributionsRoot()
+    // 冲突裁决用「内置 id」（撞上 = 硬失败）；模板可解析集合 = 全部非插件来源
+    const baseCatalog = listRoleCatalog(this.rolePaths)
+    const builtinRoleIds = new Set(baseCatalog.filter((entry) => entry.origin === 'builtin').map((entry) => entry.definition.id))
+    const resolvableRoleIds = new Set(baseCatalog.map((entry) => entry.definition.id))
+    const builtinTemplateIds = new Set(BUILTIN_PRESET_IDS)
+    try {
+      this.contributionCatalog = loadContributions(root, { builtinRoleIds, builtinTemplateIds, resolvableRoleIds })
+    } catch (e) {
+      // 装载器自身异常（理论上不该发生）：不让它拖垮启动，但必须留痕
+      this.contributionCatalog = { ...emptyContributionCatalog(root), ok: false, warnings: [{
+        level: 'error', code: 'MT_PLUGIN_MANIFEST_INVALID', pluginId: '(loader)', message: `贡献装载器异常：${String(e)}`,
+      }] }
+      this.log('warn', `contributions loader failed: ${String(e)}`)
+    }
+    const errors = this.contributionCatalog.warnings.filter((warning) => warning.level === 'error')
+    if (errors.length > 0) {
+      this.log('warn', `plugin contributions: ${errors.length} error(s), ${errors.map((warning) => warning.code).join(', ')}`)
+    } else if (this.contributionCatalog.plugins.length > 0) {
+      this.log('info', `plugin contributions: ${this.contributionCatalog.plugins.length} plugin(s), ${this.contributionCatalog.roles.length} role(s), ${this.contributionCatalog.teams.length} team(s)`)
+    }
+    return this.contributionCatalog
+  }
+
+  /** CHG-91：当前装载的贡献目录（只读快照；面板/工具用） */
+  contributionSnapshot(): ContributionCatalog {
+    return this.contributionCatalog
+  }
+
+  /** CHG-91：角色目录（**含插件贡献**）——所有调用点统一走这里，避免漏传 contributions 造成分叉 */
+  roleCatalog() {
+    return listRoleCatalog(this.rolePaths, this.contributionCatalog.roles)
+  }
+
+  /** CHG-91：团队模板目录（**含插件贡献**） */
+  presetCatalog(): PresetCatalog {
+    return readPresetCatalog(this.workspaceRoot, this.contributionCatalog.teams)
+  }
+
+  /** CHG-91：某个角色是否是插件贡献（只读；写操作要报 `MT_ROLE_READONLY`） */
+  contributedRole(roleId: string) {
+    return this.contributionCatalog.roles.find((role) => role.id === roleId)
   }
 
   /** T24：索引缺失时从账本全量重建工作区索引 + 全局索引（失败只 warn） */
@@ -395,10 +462,16 @@ export class MyTeamHost {
       this.log('warn', `runtime workspace unavailable; .team-workplace rooted at process cwd: ${this.workspaceRoot}`)
     }
     this.log('info', `workplace ready: ${dirs.root} (created ${dirs.created.length} dirs)`)
+    // CHG-91（插件团队贡献契约 v1）：装载第三方插件贡献的角色与团队模板。
+    // **必须早于** registerLeadTools / registerRemote——工具与面板都要读这份目录。
+    // 纪律：只读（JSON.parse 文件）、失败隔离（坏插件只进 warnings）、大声（warn 日志 + 面板红条）。
+    this.reloadContributions()
     // Lead 工具注册（preset 层；队长会话可见）。工具面缺失是致命配置错误 → fail loud。
     this.registerLeadTools()
-    // 队长技能（CHG-53）：create-role / modify-role（仅队长 scope；缺 skills 服务时只告警）
-    this.registerCaptainSkills()
+    // 队长技能（CHG-53）+ 团队章程（CHG-93 FR-18③）：都是 **preset 作用域服务**，
+    // 必须延迟注入——真实安装实测（CHG-93）发现 initialize() 同步执行时
+    // skills / systemPrompt 还没就绪，两个注册**静默不生效**（单测里 rt 是同步桩，永远拿得到）。
+    this.deferCaptainServices()
     // 面板 Remote service（ADR-006：client 读盘真相 + 唯一写入口；namespace myteam）
     this.registerRemote()
     // hideBuiltinTeamTools（PRD §2.4）：隐藏宿主内置团队工具。
@@ -676,7 +749,7 @@ export class MyTeamHost {
           // 块级遮蔽：分支内既有 teamId 引用（validatePlan/commit/payload）统一指向新团队 id
           const teamId = newTeamId
           const presetId = typeof args.presetId === 'string' && args.presetId.trim() ? args.presetId.trim() : ''
-          const preset = presetId ? readPresetCatalog(this.workspaceRoot).entries.find((entry) => entry.definition.id === presetId) : undefined
+          const preset = presetId ? this.presetCatalog().entries.find((entry) => entry.definition.id === presetId) : undefined
           if (presetId && !preset) {
             return { status: 'error', code: 'MT_VALIDATION', message: `team preset "${presetId}" not found (project/builtin)` }
           }
@@ -691,14 +764,14 @@ export class MyTeamHost {
           const roleErrors: string[] = []
           for (const entry of roster) {
             if (entry.roleId === 'captain') continue
-            const catalogEntry = listRoleCatalog(this.rolePaths).find((item) => item.definition.id === entry.roleId)
+            const catalogEntry = this.roleCatalog().find((item) => item.definition.id === entry.roleId)
             if (!catalogEntry) {
               roleErrors.push(`unknown role "${entry.roleId}"`)
               continue
             }
             if (!readProjectRole(this.rolePaths.projectRolesDir, entry.roleId)) {
               try {
-                copyToProject(this.rolePaths, entry.roleId, catalogEntry.origin)
+                copyToProject(this.rolePaths, entry.roleId, catalogEntry.origin, this.contributionCatalog.roles)
               } catch (e) {
                 roleErrors.push(`role "${entry.roleId}": ${String((e as { message?: string }).message ?? e)}`)
               }
@@ -1066,7 +1139,7 @@ export class MyTeamHost {
             return { status: 'cleared', note: '项目自身角色已取消（不影响任何团队）' }
           }
           const roleId = String(args.roleId ?? '')
-          const entry = listRoleCatalog(this.rolePaths).find((item) => item.definition.id === roleId)
+          const entry = this.roleCatalog().find((item) => item.definition.id === roleId)
           if (!entry) return { status: 'error', code: 'MT_ROLE_NOT_FOUND', message: `role "${roleId}" not found in any library` }
           if (args.confirm !== true) {
             return {
@@ -1096,6 +1169,11 @@ export class MyTeamHost {
           return this.applyRoles(teamId, args, actor)
         case 'myteam_list_presets':
           return this.listPresetsTool()
+        // CHG-91（插件团队贡献契约 v1）：插件贡献的只读视图 + 显式重载
+        case 'myteam_list_contributions':
+          return this.listContributionsTool()
+        case 'myteam_reload_contributions':
+          return this.listContributionsTool(this.reloadContributions())
         case 'myteam_save_preset':
           return this.savePreset(args)
         case 'myteam_copy_preset':
@@ -2353,9 +2431,9 @@ export class MyTeamHost {
     const svc = this.service(teamId)
     // 运行时只认项目库（FR-10.2）；内置/全局/项目自身角色自动复制进项目库（引用即复制）
     if (!resolveRuntimeRole(this.rolePaths, roleId)) {
-      const source = listRoleCatalog(this.rolePaths).find((entry) => entry.definition.id === roleId)
+      const source = this.roleCatalog().find((entry) => entry.definition.id === roleId)
       if (!source) return { status: 'error', code: 'MT_ROLE_NOT_FOUND', message: `role "${roleId}" not found in any library` }
-      const copy = copyToProject(this.rolePaths, roleId, source.origin)
+      const copy = copyToProject(this.rolePaths, roleId, source.origin, this.contributionCatalog.roles)
       this.log('info', `${source.origin} role "${roleId}" copied to project library: ${copy.filePath}`)
     }
     const n = Object.keys(svc.projectionSnapshot.members).length + 1
@@ -2478,6 +2556,38 @@ export class MyTeamHost {
     return { status: 'spawned', memberId, sessionId }
   }
 
+  /**
+   * CHG-93（清 §7.4 遗留硬编码）：成员待处理消息数（`message.sent` 未消费条数）。
+   *
+   * 为什么需要它：`member.released` / `member.archived` 的 `drained.pending` 此前**硬编码为 0**——
+   * 账本上写「排空完成」，实际成员收件箱里还压着消息。释放是**不可逆**动作（`mode: 'remove'`
+   * 会删私有空间），它宣称的「排空」必须是**真的**，否则审计回看会得到错误结论。
+   *
+   * 口径：`message.sent` 里 `to === memberId` 且对应 `messageId` 尚未 `message.consumed` 的条数。
+   * 读账本（不是投影）——投影的 `inbox` 只为面板人工待办聚合，不带收件人。
+   */
+  private pendingMessagesFor(teamId: string, memberId: string): number {
+    try {
+      const events = readLedgerEvents(this.service(teamId).ledgerPath).events
+      const sent = new Set<string>()
+      const consumed = new Set<string>()
+      for (const event of events) {
+        const payload = (event.payload ?? {}) as Record<string, unknown>
+        const messageId = typeof payload.messageId === 'string' ? payload.messageId : ''
+        if (!messageId) continue
+        if (event.type === 'message.sent' && String(payload.to ?? '') === memberId) sent.add(messageId)
+        else if (event.type === 'message.consumed') consumed.add(messageId)
+      }
+      let pending = 0
+      for (const messageId of sent) if (!consumed.has(messageId)) pending += 1
+      return pending
+    } catch (e) {
+      // 读账本失败不该阻断释放（释放是排空动作），但必须留痕——0 是「读不到」而不是「真的没有」
+      this.log('warn', `drained.pending unavailable for ${teamId}/${memberId}: ${String(e)}`)
+      return 0
+    }
+  }
+
   releaseMember(teamId: string, memberId: string, mode: string, confirm: boolean, actor = 'lead'): Record<string, unknown> {
     const svc = this.service(teamId)
     const proj = svc.projectionSnapshot
@@ -2490,9 +2600,11 @@ export class MyTeamHost {
     if (member.currentTaskId) {
       return { status: 'drain-pending', code: 'MT_DRAIN_PENDING', running: 1, note: `成员仍有在跑任务 ${member.currentTaskId}；先 revoke/reassign 或等完成` }
     }
+    // CHG-93：排空面**如实**记录（原实现硬编码 running:0/pending:0，「排空完成」是假的）
+    const drained = { running: 0, pending: this.pendingMessagesFor(teamId, memberId) }
     // 释放前记忆审计（T21：违规落 memory.audit，不阻断释放——M2 再议 hard 阻断）
     const memAudit = this.auditMemberMemory(teamId, memberId)
-    const r = this.commit(teamId, { actor, type: mode === 'archive' ? 'member.archived' : 'member.released', payload: { teamId, memberId, mode, drained: { running: 0, pending: 0 } } })
+    const r = this.commit(teamId, { actor, type: mode === 'archive' ? 'member.archived' : 'member.released', payload: { teamId, memberId, mode, drained } })
     if (!r.ok) return { status: 'error', code: r.code, message: r.message }
     const handle = this.memberHandles.get(memberId)
     if (handle) {
@@ -2717,8 +2829,11 @@ export class MyTeamHost {
     model?: { provider: string; model: string }
     version: number
   }> {
-    return listRoleCatalog(this.rolePaths).map((entry) => ({
+    return this.roleCatalog().map((entry) => ({
       origin: entry.origin,
+      // CHG-91：插件来源带 pluginId（面板显示「由插件 X 提供」+ 只读徽标）
+      ...(entry.pluginId ? { pluginId: entry.pluginId } : {}),
+      ...(entry.shadowedBy ? { shadowedBy: entry.shadowedBy } : {}),
       id: entry.definition.id,
       name: entry.definition.name,
       description: entry.definition.description,
@@ -2735,7 +2850,7 @@ export class MyTeamHost {
 
   /** 模板目录（队长选模板用；不写盘） */
   listPresetsTool(): Record<string, unknown> {
-    const catalog = readPresetCatalog(this.workspaceRoot)
+    const catalog = this.presetCatalog()
     return {
       status: 'ok',
       dirs: catalog.dirs,
@@ -2766,7 +2881,7 @@ export class MyTeamHost {
     if ('errors' in validated) return { status: 'error', code: 'MT_VALIDATION', message: validated.errors.join('; ') }
     const unknownRoles = validated.members
       .map((member) => member.roleId)
-      .filter((roleId) => !listRoleCatalog(this.rolePaths).some((entry) => entry.definition.id === roleId))
+      .filter((roleId) => !this.roleCatalog().some((entry) => entry.definition.id === roleId))
     if (unknownRoles.length > 0) {
       return { status: 'error', code: 'MT_VALIDATION', message: `unknown role(s) in preset: ${[...new Set(unknownRoles)].join(', ')}` }
     }
@@ -2794,7 +2909,7 @@ export class MyTeamHost {
   copyPreset(args: Record<string, unknown>): Record<string, unknown> {
     const fromId = String(args.fromPresetId ?? '')
     const toId = String(args.toPresetId ?? '')
-    const source = readPresetCatalog(this.workspaceRoot).entries.find((entry) => entry.definition.id === fromId)
+    const source = this.presetCatalog().entries.find((entry) => entry.definition.id === fromId)
     if (!source) return { status: 'error', code: 'MT_PRESET_NOT_FOUND', message: `preset "${fromId}" not found (builtin/project)` }
     if (BUILTIN_PRESET_IDS.has(toId)) {
       return { status: 'error', code: 'MT_PRESET_BUILTIN', message: `target id "${toId}" is a builtin preset (read-only); choose another id` }
@@ -2853,7 +2968,7 @@ export class MyTeamHost {
   /** 创建项目角色（CHG-53，队长技能 create-role 的写入口）：同名任一来源存在 → MT_ROLE_EXISTS */
   createRole(args: Record<string, unknown>): Record<string, unknown> {
     const roleId = String(args.roleId ?? '')
-    const existing = listRoleCatalog(this.rolePaths).find((entry) => entry.definition.id === roleId)
+    const existing = this.roleCatalog().find((entry) => entry.definition.id === roleId)
     if (existing) {
       return { status: 'error', code: 'MT_ROLE_EXISTS', message: `role "${roleId}" already exists in ${existing.origin} library` }
     }
@@ -2896,11 +3011,11 @@ export class MyTeamHost {
     let def = readProjectRole(this.rolePaths.projectRolesDir, roleId)
     let copiedFrom: string | undefined
     if (!def) {
-      const source = listRoleCatalog(this.rolePaths).find((entry) => entry.definition.id === roleId)
+      const source = this.roleCatalog().find((entry) => entry.definition.id === roleId)
       if (!source) return { status: 'error', code: 'MT_ROLE_NOT_FOUND', message: `role "${roleId}" not found in any library` }
       if (source.origin !== 'project') {
         try {
-          copyToProject(this.rolePaths, roleId, source.origin)
+          copyToProject(this.rolePaths, roleId, source.origin, this.contributionCatalog.roles)
           copiedFrom = source.origin
         } catch (e) {
           return this.roleError(e)
@@ -2968,7 +3083,7 @@ export class MyTeamHost {
       return { status: 'error', code: 'MT_VALIDATION', message: 'apply_roles requires roles[] or remove[]（单角色调用要指定启用/卸载哪些角色）' }
     }
     // FR-16.1 拍板：已有会话原地启用 Team 不支持——但单角色调用随时可用，两者不冲突。
-    const catalog = listRoleCatalog(this.rolePaths)
+    const catalog = this.roleCatalog()
     const unknown = [...requested, ...removals].filter((id) => !catalog.some((entry) => entry.definition.id === id))
     if (unknown.length > 0) {
       return {
@@ -2982,7 +3097,7 @@ export class MyTeamHost {
     // 生效角色定义：项目库优先（运行时真相，R13），否则目录里优先级最高的那份
     const resolved: RoleDefinition[] = []
     for (const roleId of nextRoles) {
-      const entry = listRoleCatalog(this.rolePaths).find((candidate) => candidate.definition.id === roleId)
+      const entry = this.roleCatalog().find((candidate) => candidate.definition.id === roleId)
       if (entry) resolved.push(entry.definition)
     }
     const promptSection = buildRolePromptSection(resolved)
@@ -3033,6 +3148,26 @@ export class MyTeamHost {
    * 面板侧（`MyTeamPanelFacade.roleOp`）走同一份——离线团队没有活动会话也能改角色库。
    */
   roleOp(op: string, payload: Record<string, unknown> = {}): Record<string, unknown> {
+    /**
+     * CHG-91（契约 P3 单向流动）：**插件贡献的角色只读**。
+     *
+     * `save` / `delete` / `publish` 打到 `plugin` 来源的角色上一律拒（`MT_ROLE_READONLY`）——
+     * 想改就 `copyToProject` 复制成项目库角色再改（此后项目库优先级更高，自动生效）。
+     * 为什么 `publish` 也拒：插件来源不是「项目库资产」，没有「发布到全局」这一说。
+     */
+    const directId = String((payload as { roleId?: unknown }).roleId ?? '')
+    const saveId = String((payload as { role?: { id?: unknown } }).role?.id ?? '')
+    if (op === 'save' || op === 'delete' || op === 'publish') {
+      const readonlyId = this.contributedRole(directId) ? directId : (saveId && this.contributedRole(saveId) ? saveId : '')
+      if (readonlyId) {
+        return {
+          status: 'error',
+          code: CONTRIBUTION_CODES.ROLE_READONLY,
+          roleId: readonlyId,
+          message: `插件贡献的角色「${readonlyId}」只读；想改请先「复制到项目」再编辑项目库那份`,
+        }
+      }
+    }
     // 实现集中在 core/roles/role-ops.ts：host 与面板共用同一份（避免「工具能改、面板改不了」分叉）
     return roleOpImpl({ paths: this.rolePaths, actor: 'human' }, op, payload)
   }
@@ -3043,8 +3178,40 @@ export class MyTeamHost {
   }
 
   /** 队长技能注册（CHG-53）：create-role / modify-role；skills 服务缺失只告警，不影响主链 */
-  private registerCaptainSkills(): void {
-    const skills = safeRead(this.rt, 'skills') as { register?: (skill: Record<string, unknown>) => unknown } | undefined
+  /**
+   * CHG-93（**真实安装实测发现的 P0**）：preset 作用域的服务是**异步就绪**的。
+   *
+   * `initialize()` 在插件 apply 时同步执行，此时 preset 作用域的 `skills` / `systemPrompt`
+   * 还没注册完——直接读拿到 `undefined`，于是「船长技能」与「团队章程」**静默不注入**：
+   * 日志只有一句 warn，功能面全空。**单测发现不了**（测试里的 rt 是同步桩，永远拿得到）。
+   *
+   * 修法：用 cordis 的**延迟注入** `ctx.inject([...], cb)` —— 服务就绪后再跑，
+   * 不阻塞插件装载。宿主不支持 `inject` 时退回同步路径（老宿主仍能跑，只是可能拿不到）。
+   */
+  private deferCaptainServices(): void {
+    const ctx = this.rt as unknown as { inject?: (deps: string[], cb: (scoped: unknown) => void) => unknown }
+    const run = (scoped?: unknown): void => {
+      try {
+        this.registerCaptainSkills(scoped)
+        this.registerTeamCharter(scoped)
+      } catch (e) {
+        // 两个都是增强项（技能 / 章程），失败只告警不阻断主链
+        this.log('warn', `captain scope registration failed: ${String(e)}`)
+      }
+    }
+    if (typeof ctx?.inject === 'function') {
+      try {
+        ctx.inject(['skills', 'systemPrompt'], (scoped) => run(scoped))
+        return
+      } catch (e) {
+        this.log('warn', `deferred captain services unavailable (falling back to sync): ${String(e)}`)
+      }
+    }
+    run()
+  }
+
+  private registerCaptainSkills(scoped?: unknown): void {
+    const skills = safeRead(scoped ?? this.rt, 'skills') as { register?: (skill: Record<string, unknown>) => unknown } | undefined
     if (!skills || typeof skills.register !== 'function') {
       this.log('warn', 'skills service unavailable; captain role skills not registered')
       return
@@ -3065,6 +3232,62 @@ export class MyTeamHost {
     this.log('info', `captain role skills registered (${registered}/${CAPTAIN_SKILLS.length})`)
   }
 
+  /**
+   * CHG-93（FR-18 职责③ F8）：把团队章程（`.team-workplace/structure.md`）注入队长 system prompt。
+   *
+   * ## 为什么必须做
+   *
+   * CHG-88 实装了 create-team 技能**写**章程，但**没有任何读取方**——章程写进磁盘就没人看，
+   * 队长自己的系统提示里一个字都没有。「UI 显示已生成团队章程、模型侧零感知」是典型的
+   * 文档承诺与实现分叉。
+   *
+   * ## 为什么用 variable + section（而不是静态 section）
+   *
+   * 宿主 `systemPrompt.section({text})` 是**会话建立时**取值（NFR-7.3「系统提示稳定」），
+   * 而章程是队长随时会改的文件。`systemPrompt.variable(name, provider)` 的 provider
+   * **每次组装求值**，配合 `section({text:'{{var}}'})` 就能做到「改了下一次请求生效」。
+   *
+   * 宿主没有 variable API 时**降级为静态注入并如实告知**（改动下次重启生效）——
+   * 不假装即时生效（与 `applyRoles` 的诚实口径一致）。
+   *
+   * ## 边界
+   *
+   * 章程是**给模型看的约定，不是权限**：不改 `toolPolicy`、不绕门禁。
+   * 文件缺失是合法状态（新项目首次启动就是空的）——不注册 section，不阻断会话建立。
+   */
+  private registerTeamCharter(scoped?: unknown): void {
+    const systemPrompt = safeRead(scoped ?? this.rt, 'systemPrompt') as
+      | {
+        variable?: (name: string, provider: () => string) => unknown
+        section?: (section: { name: string; order: number; text: string }) => unknown
+      }
+      | undefined
+    if (!systemPrompt || typeof systemPrompt.section !== 'function') {
+      this.log('warn', 'systemPrompt service unavailable; team charter not injected')
+      return
+    }
+    try {
+      if (typeof systemPrompt.variable === 'function') {
+        // 动态路径：每次组装重新读盘（队长改章程不必重启）
+        systemPrompt.variable(TEAM_CHARTER_VARIABLE, () => readTeamCharter(this.workspaceRoot).text)
+        systemPrompt.section({ ...TEAM_CHARTER_SECTION, text: `{{${TEAM_CHARTER_VARIABLE}}}` })
+        this.log('info', 'team charter injected (dynamic: edits take effect on the next request)')
+        return
+      }
+      // 退化路径：静态注入（改动下次重启生效）
+      const charter = readTeamCharter(this.workspaceRoot)
+      if (charter.text.length === 0) {
+        this.log('info', 'team charter: no structure.md yet (nothing to inject)')
+        return
+      }
+      systemPrompt.section({ ...TEAM_CHARTER_SECTION, text: charter.text })
+      this.log('info', `team charter injected (static ${charter.bytes}B; edits take effect after restart)`)
+    } catch (e) {
+      // 注入失败不该阻断启动（章程是增强，不是主链），但必须留痕
+      this.log('warn', `team charter injection failed: ${String(e)}`)
+    }
+  }
+
   /** 知识库面板视图（FR-17.5 数据面，M2-0b）：条目全量 + 各团队待审提案 + 条目演化时间线（读投影，不进模型上下文） */
   knowledgeView() {
     return buildKnowledgeView(this.workspaceRoot)
@@ -3072,7 +3295,37 @@ export class MyTeamHost {
 
   /** 预设库面板视图（CHG-50）：三层只读目录（builtin/global/project），不写盘 */
   presetCatalogView(): PresetCatalog {
-    return readPresetCatalog(this.workspaceRoot)
+    return this.presetCatalog()
+  }
+
+  /**
+   * CHG-91（契约 §12.1）：插件贡献的**只读**工具视图。
+   *
+   * 为什么队长需要它：插件装完后「有哪些角色可用」是规划的前提——不查就会派给
+   * 一个不存在的角色（`MT_ROLE_NOT_FOUND`）。所以这里给的是**可执行**信息：
+   * 角色 id（能直接写进 `roster[].roleId`）+ 团队模板名册 + 每条 warning 的修法。
+   *
+   * @param catalog 显式传入则用它（重载路径）；缺省走当前快照
+   */
+  private listContributionsTool(catalog: ContributionCatalog = this.contributionCatalog): Record<string, unknown> {
+    return {
+      status: 'ok',
+      root: catalog.root,
+      ok: catalog.ok,
+      scannedAt: catalog.scannedAt,
+      plugins: catalog.plugins.map((plugin) => ({
+        pluginId: plugin.pluginId,
+        displayName: plugin.displayName,
+        version: plugin.version,
+        namespace: plugin.namespace,
+        status: plugin.status,
+        roles: plugin.roles,
+        teams: plugin.teams,
+      })),
+      roles: catalog.roles.map((role) => ({ id: role.id, name: role.name, origin: role.origin })),
+      teams: catalog.teams.map((team) => ({ id: team.id, name: team.name, namespace: team.namespace, members: team.members })),
+      warnings: catalog.warnings,
+    }
   }
 
   /* ── 归档快照（CHG-86 / P0-2：面板归档视图的读面）────────────── */
@@ -3144,6 +3397,8 @@ export class MyTeamHost {
         instanceName: member.instanceName,
         status: member.status,
         currentTaskId: member.currentTaskId,
+        // M2-D ①（FR-16.4①）：会话索引的指针来源——没有它就编不出 \`session:<id>\`
+        ...(member.sessionId ? { sessionId: member.sessionId } : {}),
       })),
       recentEvents,
       ...(typeof args.sourceSessionId === 'string' && args.sourceSessionId.trim().length > 0

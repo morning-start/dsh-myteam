@@ -106,11 +106,11 @@ test('t53-6: C 诊断一键修复 —— assignable / roleSwap / spawnRole 三�
   assert.match(source, /const assignable = fix\.assignable \?\? \[\]/)
   assert.match(source, /const roleSwap = fix\.roleSwap \?\? \[\]/)
   assert.match(source, /const spawnRole = fix\.spawnRole/)
-  // assignable → assignTask（单选一个成员）
-  assert.match(source, /const r = await api\.assignTask\(\{ teamId, taskId, memberIds: \[option\.memberId\] \}\)/)
+  // assignable → assignTask（单选一个成员）；CHG-89：与编辑表单共用同一份版本快照
+  assert.match(source, /const r = await api\.assignTask\(\{[\s\S]{0,260}?memberIds: \[option\.memberId\],[\s\S]{0,260}?expectedRevision/)
   assert.ok(source.includes("t('diag.fixAssign')"), '一键指派按钮文案')
-  // roleSwap → updateTask patch {requiredRole}（选中即改）
-  assert.match(source, /const r = await api\.updateTask\(\{ teamId, taskId, patch: \{ requiredRole: roleId \} \}\)/)
+  // roleSwap → updateTask patch {requiredRole}（选中即改）；CHG-89：同样回传 expectedRevision
+  assert.match(source, /const r = await api\.updateTask\(\{[\s\S]{0,260}?patch: \{ requiredRole: roleId \},[\s\S]{0,260}?expectedRevision/)
   assert.ok(source.includes("t('diag.fixRoleSwapOption')"), '角色下拉（含空闲数）')
   // spawnRole → 纯提示（不自动执行）
   assert.ok(source.includes("t('diag.fixSpawn')") && source.includes("t('diag.fixSpawnHint')"), '去召唤提示')
@@ -122,7 +122,7 @@ test('t53-6: C 诊断一键修复 —— assignable / roleSwap / spawnRole 三�
   assert.ok(source.includes("t('diag.fixReinforce')") && source.includes("t('diag.fixReinforceHint')"), '增援措辞')
   assert.ok(!/api\.(spawn|createMember|memberOp)\(/.test(source.slice(source.indexOf('function DiagFix('), source.indexOf('function DiagFix(') + 4000)), 'spawnRole 不触发写调用')
   // 详情页渲染 + 修复成功后刷新
-  assert.match(source, /j\(DiagFix, \{ t, api, teamId, taskId, diagnosis: detail\.diagnosis, readOnly, onFixed: onDiagnosisFixed \}\)/)
+  assert.match(source, /j\(DiagFix, \{ t, api, teamId, taskId, diagnosis: detail\.diagnosis, readOnly, onFixed: onDiagnosisFixed, expectedRevision: detail\.revision \}\)/)
   assert.match(source, /const onDiagnosisFixed = async \(message\) => \{/)
 })
 

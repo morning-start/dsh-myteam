@@ -1,0 +1,27 @@
+{
+  "id": "acme-trio",
+  "name": "Acme 三人组（需求 → 实现 → 复核）",
+  "description": "Acme 风格的标准交付团队；实现后强制复核门禁",
+  "members": [
+    { "roleId": "acme-requirement", "instanceName": "需求" },
+    { "roleId": "acme-implementer", "instanceName": "实现" },
+    { "roleId": "acme-reviewer", "instanceName": "复核" }
+  ],
+  "board": {
+    "columns": ["待办", "进行中", "门禁", "完成"]
+  },
+  "pipeline": {
+    "swimlaneBy": "role"
+  },
+  "gates": {
+    "enabled": true,
+    "commandTimeoutMs": 120000
+  },
+  "taskTypes": {
+    "impl": { "gateChain": ["review", "verify"] },
+    "doc": { "gateChain": ["review"] }
+  },
+  "version": 1,
+  "namespace": "acme",
+  "charter": "## Acme 团队章程\n\n- 任何实现任务必须过 `review` 门禁；产线代码再加 `verify`（跑命令取退出码）。\n- 复核不通过必须给**可复现步骤**，不接受「我觉得不行」。\n- 范围外重构单独立任务，不在实现任务里顺手做。\n- 需求变更走 `rescope`，不留口头约定。\n"
+}

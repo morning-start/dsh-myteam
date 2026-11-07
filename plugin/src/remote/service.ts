@@ -178,6 +178,21 @@ export class MyTeamRemote extends TypertRemoteService {
   }
 
   /**
+   * CHG-91（契约 §12.1）：第三方插件贡献的只读视图。
+   *
+   * 归属说明：贡献物是**插件资产**（随插件安装写盘），myteam 只读不写——
+   * 所以这里没有 `publish` / `save` 之类写端点（P3 单向流动）。
+   */
+  async getContributions() {
+    return contributionView(this.host.contributionSnapshot())
+  }
+
+  /** CHG-91：显式重载（插件装/卸后不必重启宿主） */
+  async reloadContributions() {
+    return contributionView(this.host.reloadContributions())
+  }
+
+  /**
    * 角色库统一写入口（CHG-87，docs/04 §2 承诺的 `roleOp(op, payload)`）。
    * 修复前 doc 里列了这个端点、实现只有 saveRole/deleteRole —— 契约承诺与实现分叉。
    * op ∈ save / delete / publish（项目 → 全局库）/ fork（复制成新 id）。
@@ -465,7 +480,9 @@ markRemoteMethods(MyTeamRemote.prototype, ['getBoard', 'getTaskDetail', 'getToke
   // CHG-87（FR-13.1/FR-16.1）：角色库统一写入口 + 单角色调用
   'roleOp', 'applyRoles',
   // CHG-88（M2-E / FR-16.3）：会话移交（摘要 → 新团队预设会话）
-  'handoff'])
+  'handoff',
+  // CHG-91（插件团队贡献契约 v1）：插件贡献只读视图 + 显式重载
+  'getContributions', 'reloadContributions'])
 
 // views.ts 纯函数复用（buildDetail/buildBoard/buildTokens 薄转发，避免 client 打包拉入 service 类型）
 import { buildAuditView, buildBoardView, buildConfigView, buildTaskDetailView, buildTokensView } from './views.ts'
@@ -477,6 +494,27 @@ function buildBoard(service: ReturnType<MyTeamHost['service']>, columnMapping: R
 }
 function buildTokens(file: Parameters<typeof buildTokensView>[0]) {
   return buildTokensView(file)
+}
+
+/**
+ * CHG-91：贡献目录的**线上形态**（只读）。
+ *
+ * 为什么在 service 层再包一层而不是直接把 catalog 扔出去：
+ *  - 角色定义里的 `systemPrompt` 可能上千字，面板列表不需要——只给 id/name/origin；
+ *  - 团队模板只给 `members` 名册预览（建队向导要展示「这个团队有谁」）；
+ *  - `warnings` 原样带上（面板顶部红条 + 每条都有「怎么改」，契约 §9）。
+ */
+function contributionView(catalog: import('../core/contributions/contract.ts').ContributionCatalog) {
+  return {
+    status: 'ok' as const,
+    root: catalog.root,
+    ok: catalog.ok,
+    scannedAt: catalog.scannedAt,
+    plugins: catalog.plugins,
+    roles: catalog.roles.map((role) => ({ id: role.id, name: role.name, origin: role.origin })),
+    teams: catalog.teams.map((team) => ({ id: team.id, name: team.name, namespace: team.namespace, members: team.members })),
+    warnings: catalog.warnings,
+  }
 }
 
 export { Remote }

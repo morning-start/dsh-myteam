@@ -395,6 +395,30 @@ export function leadToolDefs()            {
         },
       },
     },
+    /* CHG-91（插件团队贡献契约 v1）：第三方插件贡献的角色/团队模板的只读视图。
+     * 为什么队长需要它：插件装完后「有哪些角色可用」是队长规划的前提——不查就会
+     * 派给一个不存在的角色（`MT_ROLE_NOT_FOUND`）。 */
+    {
+      name: 'myteam_list_contributions',
+      description: '列出插件贡献（CHG-91，契约 §12.1）：第三方插件装好后贡献进 myteam 全局团队库的角色与团队模板。只读——贡献物是**插件资产**，myteam 不写回。返回每个插件的 id/显示名/版本 + 角色 id/名 + 团队模板名册 + warnings（每个 warning 都带「怎么改」）。',
+      parameters: {
+        type: 'object',
+        properties: {
+          teamId: str('团队 id（可省；仅用于工作区解析——贡献目录是插件级，跨工作区共享）'),
+        },
+      },
+    },
+    /* CHG-91：插件装/卸后显式重载——不重启宿主就能看到新贡献。 */
+    {
+      name: 'myteam_reload_contributions',
+      description: '重新扫描插件贡献（CHG-91，契约 §12.1）：插件安装/卸载后调用，不必重启宿主。**只读**（重新扫 $DSH_HOME/myteam/plugins/，不写任何文件、不写账本）；返回与 myteam_list_contributions 同构的目录 + 本次扫描的 warnings。',
+      parameters: {
+        type: 'object',
+        properties: {
+          teamId: str('团队 id（可省；仅用于工作区解析）'),
+        },
+      },
+    },
     {
       name: 'myteam_rescope_task',
       description: '一键重新规划（CHG-73 / FR-31）：撤当前 attempt（若有）→ 任务回 ready（依赖未完成则回 backlog）→ 可用 patch 改完成定义 → 可重派队员。理由必填（为什么要重规划必须留痕）。终态任务（done/failed/cancelled）不可重规划。',

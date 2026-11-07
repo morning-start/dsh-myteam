@@ -9,7 +9,15 @@
  * （队长 + 实现 + 评审）仅是首个示例。
  */
 
-export type RoleOrigin = 'builtin' | 'global' | 'project' | 'project-role'
+/**
+ * 角色来源（CHG-91：五档）。
+ *
+ * `plugin` 是 CHG-91 新增的**插件贡献**来源——第三方插件把角色写进
+ * `$DSH_HOME/myteam/plugins/<pluginId>/roles/`，myteam 装载后盖 `origin: 'plugin:<pluginId>'`。
+ * 它**只读**（写操作 `MT_ROLE_READONLY`），优先级在 builtin 与 global 之间：
+ * 用户的全局库/项目库永远压得过插件（想改插件给的默认，写一份同 id 进全局库即可）。
+ */
+export type RoleOrigin = 'builtin' | 'plugin' | 'global' | 'project' | 'project-role'
 
 export interface RoleDefinition {
   id: string

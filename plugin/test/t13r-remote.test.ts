@@ -137,7 +137,7 @@ test('t13r-7: Remote 方法标记描述符（version 1 + direct invocation，gat
   assert.ok(desc, 'marker descriptor present on own prototype')
   assert.equal(desc.version, 1)
   const names = desc.methods.map((m: any) => m.method)
-  assert.deepEqual(names, ['getBoard', 'getTaskDetail', 'getTokens', 'getInbox', 'getAudit', 'getConfig', 'getPresets', 'planAction', 'postComment', 'memberOp', 'disband', 'createTask', 'createTasks', 'updateTask', 'assignTask', 'participateTask', 'rescopeTask', 'cancelTask', 'batchTaskOp', 'reviewTask', 'getArchive', 'getArchives', 'adoptKnowledge', 'roleOp', 'applyRoles', 'handoff'])
+  assert.deepEqual(names, ['getBoard', 'getTaskDetail', 'getTokens', 'getInbox', 'getAudit', 'getConfig', 'getPresets', 'planAction', 'postComment', 'memberOp', 'disband', 'createTask', 'createTasks', 'updateTask', 'assignTask', 'participateTask', 'rescopeTask', 'cancelTask', 'batchTaskOp', 'reviewTask', 'getArchive', 'getArchives', 'adoptKnowledge', 'roleOp', 'applyRoles', 'handoff', 'getContributions', 'reloadContributions'])
   assert.ok(desc.methods.every((m: any) => m.invocation.kind === 'direct'))
 })
 

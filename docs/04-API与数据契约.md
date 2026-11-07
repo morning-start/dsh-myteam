@@ -17,6 +17,8 @@
 | `myteam_edit_task`（CHG-70/73 修；**CHG-86 改名**，原 `myteam_update_task`） | `{teamId, taskId, patch:{title?,description?,acceptanceCriteria?,deliverableSpec?,deps?,requiredRole?,taskType?,gateChain?,priority?,estimate?,tags?}, rescope?: {reason}, memberIds?}` | `{status:'updated', taskId, changes:[{field,from,to}]}` / `{status:'rescoped', …}` | **编辑 = 白名单补丁合并，不改状态机 / attempt / 证据**；空补丁/未知字段/依赖成环/名册外角色/AC 为空 → `MT_VALIDATION`；**CHG-73**：字段级 `changes` 随事件落账（详情「改动记录」与证据过期判定同源）；`rescope` 走一键重规划管线（任何非终态 + reason 必填）。**CHG-86（P0-4）**：改名原因 = 与成员作用域 `myteam_update_task`（申报进度）**重名**，同名跨层注册时宿主按解析顺序取其一——若队长侧生效，成员即可绕过 attemptId 校验直接改任务结构（越权）。改后两作用域**零重名** | `task.updated`（带 changes）/ `task.rescoped` |
 | `myteam_review_task`（**CHG-86 新增**，M2-C；**CHG-87 补 verify 门**，FR-5.3） | `{teamId, taskId, verdict:'pass'\|'fail', reviewerMemberId?, reason?, confirm?, expectedRevision?}` | `{status:'gate-pass'\|'gate-fail'\|'needs-human', gate, taskState, rejectCount?, note?, code?, message?, verify?{argv,exitCode,signal,durationMs,outputTail,truncated}, forcedBy?}` | **门禁裁决唯一入口**（修复前没有任何入口能提交 `task.gate.result`）。① `gate:review` → 只认**显式结论行**，且**强制交叉审查**（`reviewerMemberId` 必填且 ≠ 实现者；同成员 → `MT_CROSS_REVIEW`，FR-5.1）；② **`gate:verify`（CHG-87 / FR-5.3）→ 真跑命令，不是人工裁决**：host 按任务声明的 `verifyCommand` 执行（`argv` 数组直传、**无 shell 解释**），exitCode 决定 verdict，payload 记 `command{argv,cwd?}` / `exitCode` / `signal` / `durationMs` / `outputTail`（尾部 2000 字符，截断时前置 `…[truncated N chars]…`）/ `executedBy:'host'`；**修复的缺陷**：旧实现把 verify 门当 review 门处理（要 `reviewerMemberId` 人工裁决），等于「门禁本来要防的模型自述『测试通过』反而从 verify 门漏了进来」；任务未声明 `verifyCommand` → `MT_VERIFY_NO_COMMAND`；宿主无 `subprocess` 服务 → `MT_UNAVAILABLE`（**不猜、不静默降级**）；超时取「任务声明」与 `config.gates.commandTimeoutMs` 的**更严格者**（K5）；③ `gate:archive` → **不是人工裁决门**：host 按 `deliverableSpec` 约定路径做落位校验（FR-10.4），review 通过后自动推进到 `done`；④ **打回预算**（FR-5.2）：单门 fail 轮数 ≥ `GATE_REJECT_BUDGET`(2) 后队长侧 pass 被拒（`MT_REJECT_BUDGET` → `needs-human`），只有人工 `confirm=true` **且 `reason` 非空**能放行（payload 标 `forcedBy:'human'`，这是唯一不跑命令的出口且留痕）；⑤ 非 `gate:*` 状态 → `MT_VALIDATION`；⑥ **`expectedRevision`（CHG-87 / QA-4 乐观锁）**：可选，给了就先比 `projection.revision` 再碰任何状态，不等 → `MT_REVISION_CONFLICT` + 回显 `currentRevision`，**账本零写入** | `task.gate.result`（+`task.deliverable`，archive 门 pass 时） |
 | `myteam_apply_roles`（**CHG-87 新增**，FR-16.1 单角色调用） | `{teamId?, roles:string[], remove?:string[], confirm?}` | `{status:'applied'\|'confirm-required', roles, removed?, sessionDefaultsPath, promptSection, effectiveAt:'next-wake'}` | `/myteam+<id>` 单角色调用的落地工具（**修复的缺陷**：客户端原来只有一个硬编码演示卡 `MyTeamApplyRolesToolView`（假角色名），而本工具**不存在**——UI 展示的是假数据）。`roles` 累加启用、`remove` 卸载；**不入团队账本**（单角色调用不是团队）；两段确认；未知角色 → `MT_ROLE_NOT_FOUND`。落盘 `.team-workplace/config/session-defaults.json`（**不是 `config/roles/`**——`listProjectRoles()` 把 `config/roles/` 下所有 `*.json` 当角色定义读，放这里会让整个角色目录 `MT_ROLE_CORRUPT`）。**诚实告知**：`promptSection` **下次唤醒/重启**才生效（宿主 `systemPrompt.section()` 是会话建立时注册的，运行期改不了，NFR-7.3「系统提示稳定」），不假装即时生效 | 无（单角色调用不进团队账本） |
+| `myteam_list_contributions`（**CHG-92 新增**，插件团队贡献契约 v1 §12.1） | `{teamId?}` | `{status, root, ok, scannedAt, plugins[], roles[], teams[], warnings[]}` | 只读 | 无（贡献物是插件资产，**不进账本**） |
+| `myteam_reload_contributions`（**CHG-92 新增**） | `{teamId?}` | 同 `myteam_list_contributions` | 只读（重扫 `$DSH_HOME/myteam/plugins/`） | 无 |
 | `myteam_reassign_task` | `{teamId, taskId, fromMemberId?, toMemberId?, reason}` | `{attemptId}` | 目标成员角色匹配；先 revoke 旧 attempt | `task.attempt.revoked` `task.assigned` |
 | `myteam_revoke_attempt` | `{teamId, taskId, attemptId, reason}` | `{}` | attempt 属于该任务 | `task.attempt.revoked` |
 | `myteam_spawn_member` | `{teamId, roleId, instanceName?, skills?, mcpAllowlist?}` | `{memberId, sessionId}` | maxMembers（ADR-008）；角色在项目库；技能/MCP 覆写写入成员身份快照，并在成员 setup 内**硬隔离**（CHG-58：MCP 用 `tools.restrict` deny + 执行期 `guard`；技能用作用域同名占位 provider，`modelInvocable:false`、正文不可读）；allowlist 为空 = 不限制 | `member.spawned`（payload 含 skills/mcpAllowlist，若覆写） |
@@ -196,6 +198,56 @@ staleSince: 2026-10-27         # v2.7：staleness 标（touchStale 写入；refi
 
 > 源码权威：`plugin/src/core/gates/command-gate.ts`（`validateVerifyCommand` / `classifyVerifyResult` / `truncateOutput` / `resolveTimeoutMs` / `runVerifyCommand`；适配注入的 `ctx.subprocess`，形状兼容 `handle.done()` / `handle.done` Promise / thenable）。
 
+### 1.3d 门禁结论可信度（`TaskProjection.gateResults`，CHG-93）
+
+`task.gate.result` 折叠进投影时同时记下**谁执行的 / 是否人工强制放行**：
+
+```ts
+gateResults?: Record<string, {
+  verdict: 'pass' | 'fail'
+  executedBy?: string   // 'host' = 宿主 subprocess 真跑了命令（按退出码判定）
+  forcedBy?: string    // 'human' = 打回预算用尽后人工确认放行
+  exitCode?: number | null
+  at: number            // 裁决时刻（面板排序）
+}>
+```
+
+**为什么必须上屏**：这两个字段**账本里一直有、界面一直没画**——等于「可审计但看不见」。
+而它们直接决定结论可信度：`executedBy:'host'` 是「真跑了」，`forcedBy:'human'` 是「人越预算硬放」。
+面板渲染为绿色「宿主执行」/ 黄色「人工强制放行」chip。
+
+### 1.3e 团队章程注入（CHG-93 / FR-18 职责③ F8）
+
+`core/host/team-charter.ts` 是 `.team-workplace/structure.md` 的**唯一读取方**：
+
+- `readTeamCharter(workspaceRoot)` → `{ text, path, truncated, bytes }`（纯函数，可单测）；
+- 注入方式：`systemPrompt.variable('myteam_team_charter', () => readTeamCharter(...).text)`
+  + `systemPrompt.section({ name:'myteam:team-charter', order:610, text:'{{myteam_team_charter}}' })`；
+- **为什么用 variable 而不是静态 section**：静态 section 是**会话建立时**取值（NFR-7.3 系统提示稳定），
+  改章程要重启；variable 的 provider **每次组装求值** → 改了下一次请求生效；
+- 宿主无 `variable` API 时**降级为静态注入并如实告知**（改动下次重启生效，不假装即时生效）；
+- 边界：**章程是给模型看的约定，不是权限**——不改 `toolPolicy`、不绕门禁；
+  文件缺失是合法状态（新项目首次启动就是空的），不注册 section、不阻断会话建立；
+- 上限 64 KiB（≈16k tokens）并显式标注截断——一份 100KB 章程会把 system prompt 挤爆，比没有更糟。
+
+### 1.3f 会话索引（`HandoffSummaryMetadata.sessionIndex`，CHG-94 / FR-16.4①）
+
+```ts
+interface HandoffSessionRef {
+  sessionId: string                        // 写成 `session:<id>` 即为合法证据指针
+  kind: 'captain' | 'member'
+  title: string
+  taskId?: string; memberId?: string; roleId?: string
+}
+```
+
+**为什么是索引不是摘要**：FR-16.3 否决原地变身的两条理由里，第二条是「旧会话历史整段混进队长上下文
+→ 模型按旧上下文继续干活」。摘要虽已截断，但**截断仍是内容**。索引只给 `session:<id>` 指针，
+新队长需要时按需深读（读取留痕 `session.read`）。
+
+四条不变量：队长会话**永远排第一** · **没有 `sessionId` 的成员不进索引**（编造 id 比没有更糟）·
+**去重** · **有界**（`HANDOFF_SESSION_INDEX_LIMIT = 20`）。摘要里明确写「**未深读的内容不在你的上下文里**」——
+不写这句模型会以为已经给全了。
 ### 1.3c scope 完成审计（`TaskProjection.scopeAudit`，CHG-87 / FR-5.4）
 
 任务声明 `writeScopes`，完成时把「实际写事件」对照声明做越界审计。
@@ -263,7 +315,6 @@ staleSince: 2026-10-27         # v2.7：staleness 标（touchStale 写入；refi
 | `getOfflineTokens({workspaceRoot, teamId})` | **离线成本（CHG-47）**：直接读团队目录 `tokens.json` 侧车（无会话也可看四桶）；返回与 `getTokens` 同构的视图（`source:'tokenMeter'`、`caliber:'heuristic'`、`nonBillable:true`）；侧车缺失/损坏 → `status:'empty'` | 读（侧车文件） |
 | `getOfflineAudit({workspaceRoot, teamId, limit?, beforeSeq?})` | **离线审计（CHG-49）**：账本事件流新→旧分页（归档回放）；返回 `{status:'ok', readOnly:true, total, events:[{seq,ts,actor,type,taskId?}], nextBeforeSeq}`；参数非法 → `MT_VALIDATION` | 读（账本文件） |
 | `getOfflinePresets({workspaceRoot, teamId})` | **离线开箱团队（CHG-50）**：与在线同一 loader 读三层目录（`builtin` 代码内置 / `global` `<ws>/../.dsh/myteam/presets` / `project` `<ws>/.team-workplace/config/presets`），返回 `{status:'ok', readOnly:true, entries, warnings, dirs}`；团队 id 仅用于路径安全校验 | 读（配置目录） |
-| ~~`getWorkspaceState()`~~ | **未实装（CHG-87 勘误）**：`plugin/src` 与 `plugin/client` 全量零命中——本行是文档承诺、代码不存在。同数据由**非网关通道** `MyTeamRemote.describe()`（活跃团队信息卡 + 成员摘要 + 任务计数，`remote/service.ts`）提供，门面 `listTeams()` 内部聚合它。**判定：删行还是补端点，待 PM 定**；此处先标注，不再当作对外契约 | 读（投影） |
 | `disband(teamId, confirm?)` | 解散两段确认：`confirm:false` → `{status:'confirm-required', impact:{members,tasks}}`；`confirm:true` → 落 `team.disbanded` **并真的写归档文件**（**CHG-86 / P0-2**：返回 `archive:{dir, relativeDir, files[]}`，写失败 → `MT_ARCHIVE_FAILED`） | 写→账本 + 文件 |
 | `reviewTask({teamId?, taskId, verdict:'pass'\|'fail', reviewerMemberId?, reason?, confirm?})` | **门禁裁决（CHG-86 / M2-C，FR-5.1~5.2）**：面板任务详情「门禁裁决」区的唯一写入口，与队长工具 `myteam_review_task` 同一条管线（`actor:'human'`）。review/verify 门强制交叉审查（`reviewerMemberId` 必填且 ≠ 实现者）；archive 门由 host 落位校验；`confirm:true` 是打回预算超限后的人工放行开关 | 写→账本（actor=human） |
 | `getArchive({teamId?})` | **归档快照（CHG-86 / P0-2）**：面板归档回放视图的读面，返回 `{status:'ok', teamId, archive:{version,teamId,name,goal,state,archivedAt,archivedBy,ledgerPath,eventCount,revision,members[],tasks[],artifacts[],tokens}, root}`；未归档 → `archive:null`（按"未归档"渲染，不猜半个快照） | 读（`.team-workplace/archive/<id>/`） |
@@ -283,7 +334,18 @@ staleSince: 2026-10-27         # v2.7：staleness 标（touchStale 写入；refi
 | `memberOp(teamId, memberId, op:'suspend'\|'archive'\|'remove'\|'restore', confirm?)` | 成员管理（FR-14.2，**CHG-48 已实装**）：写 `member.released`/`member.archived`/`member.restored`（actor=human）；`remove` 两段确认（confirm:false → `confirm-required`）；`restore` 仅允许 suspended/archived；成员仍有在跑任务 → `MT_DRAIN_PENDING`；已处于目标态/未知 op → `MT_VALIDATION` | 写→账本 |
 | `roleOp({workspaceRoot, op, payload})` | **角色库写操作统一入口（CHG-87 实装，FR-13.1）**：修复「§2 列了 `roleOp(op, payload)`、实现只有 `saveRole`/`deleteRole`」的**文档承诺与实现分叉**。`op ∈ save` / `delete` / `publish` / `fork`，host 侧（`MyTeamHost.roleOp`，用插件配置解析的角色库路径）与面板侧（`MyTeamPanelFacade.roleOp`，用 `projectRolePaths(workspaceRoot)`）**共用同一份实现**（`core/roles/role-ops.ts`），离线团队（无活动会话）也能改角色库——角色是配置资产，不需要会话。① `save` = 新建/覆盖（同名 `confirm` 两段确认）；② `delete` = 只删项目库，C7 占用面（`bindings`）拒绝并列占用方，captain → `MT_ROLE_CAPTAIN`；③ `publish` = 项目库角色 → 全局库（`~/.dsh/myteam/roles/`），两段确认，captain 拒绝；④ `fork` = 任意来源复制成新 id（同名 → `MT_ROLE_EXISTS`）。参数非法 → `MT_VALIDATION`；角色不存在 → `MT_ROLE_NOT_FOUND` | 写→角色库 |
 | `applyRoles({teamId?, roles, remove?, confirm?})` | **单角色调用（CHG-87 实装，FR-16.1）**：`/myteam+<id>` 的落地端，与队长工具 `myteam_apply_roles` 同一条管线。累加启用 / `remove` 卸载；**不入团队账本**；两段确认；未知角色 → `MT_ROLE_NOT_FOUND`。返回 `{status, roles, removed?, sessionDefaultsPath, promptSection, effectiveAt:'next-wake'}`——`promptSection` **下次唤醒/重启**才生效（宿主 `systemPrompt.section()` 会话建立时注册，运行期改不了，NFR-7.3）。**离线团队无会话可注入 → `MT_UNAVAILABLE`**（不假装成功） | 写（配置资产，非账本） |
+| `getContributions({workspaceRoot})` | **插件贡献只读视图（CHG-92 实装，docs/16 §12.1）**：第三方插件贡献进全局团队库的角色与团队模板。**根级**（只收 query，离线团队也能看）。返回 `{status, root, ok, scannedAt, plugins[], roles[{id,name,origin}], teams[{id,name,namespace,members}], warnings[]}`——列表**不带 `systemPrompt`**（面板不需要，避免上千字正文）；`warnings[]` 每条带 `code` + 中文修法（P4 大声）。 |
+| `reloadContributions({workspaceRoot})` | **显式重载（CHG-92）**：插件装/卸后不必重启宿主。清缓存重扫，返回与 `getContributions` 同构。**只读**：不写任何文件、不写账本。 |
 
+> **契约勘误（CHG-93 裁决）：`getWorkspaceState()` 不实装。**
+>
+> 这条端点曾列在本表（CHG-16 订立），但 `plugin/src` 与 `plugin/client` **全量零命中**——文档承诺、代码不存在。
+> 同数据由**非网关通道** `MyTeamRemote.describe()` 提供（活跃团队信息卡 + 成员摘要 + 任务计数，`remote/service.ts`），
+> 门面 `listTeams()` 内部聚合它。
+>
+> **裁决理由**：新增一个只读端点的唯一价值是「给外部消费者一个稳定入口」，但本插件是**单一消费者**（面板），
+> `describe()` 已经是内部稳定面；再加一层网关封装是**纯转发**，只会多一个需要同步维护的契约面。
+> 故**删行不补端点**——表里只留真实存在的端点，历史记在 CHG-87 / CHG-93 变更单里。
 错误统一结构：`{code: string, message: string, detail?: object}`。
 
 ## 3. 数据模型
@@ -372,6 +434,14 @@ staleSince: 2026-10-27         # v2.7：staleness 标（touchStale 写入；refi
 | `MT_REVISION_CONFLICT` | **乐观锁冲突（CHG-87 已实装，QA-4 关闭）**：调用方传的 `expectedRevision` 与 `projection.revision`（= 已应用事件数 = 末事件 seq + 1）不相等。**先比版本再碰任何状态，账本零写入** | 提示重取后重试；响应回显 `currentRevision` |
 | `MT_VERIFY_NO_COMMAND` | **（CHG-87 / FR-5.3）** 任务处于 `gate:verify` 但没声明 `verifyCommand`——verify 门没有可执行命令 | 提示给任务补 `verifyCommand.argv`；**不猜默认命令、不降级成人工裁决** |
 | `MT_UNAVAILABLE` | **（CHG-87）** 宿主缺少所需服务：`gate:verify` 时没有 `subprocess` 服务；单角色调用时没有活动队长会话（离线团队无会话可注入） | 如实说明「不可用」，**不静默降级**、不假装成功 |
+| `MT_PLUGIN_MANIFEST_INVALID` | **（CHG-92 / docs/16 §9）** 插件清单坏 JSON / 缺必需字段 / `roles` 不是数组（**插件级**：整插件跳过） | 面板「插件贡献」红条 + 具体原因 |
+| `MT_PLUGIN_CONTRACT_UNSUPPORTED` | **（CHG-92）** `contractVersion` 高于 myteam 支持集（当前 `[1]`）。**不做「尽力解析」**——尽力解析的失败模式是字段被静默丢弃 | 提示升级 myteam；该插件 0 贡献 |
+| `MT_PLUGIN_ID_INVALID` / `MT_PLUGIN_ID_MISMATCH` / `MT_PLUGIN_ID_DUPLICATE` | **（CHG-92）** 插件 id 不合规（`^[a-z][a-z0-9-]{1,63}$`）/ 清单与目录名不一致 / 两个目录声明同一 id（字典序后者失败） | 红条点名目录与清单 |
+| `MT_CONTRIBUTION_FILE_MISSING` / `MT_CONTRIBUTION_TOO_LARGE` / `MT_CONTRIBUTION_ID_MISMATCH` / `MT_CONTRIBUTION_PATH_TRAVERSAL` | **（CHG-92）** 清单列了但文件不存在 / 单文件 > 256 KiB / 文件内 id ≠ 清单 / `file` 含 `..` 或绝对路径（**条目级**：只丢该条目） | 红条带相对路径 |
+| `MT_ROLE_CONTRIBUTION_CONFLICT` | **（CHG-92）** 插件角色 id 撞 **builtin** 或**另一个插件**——**硬失败**（静默替换语义字段是最危险的 bug 类型）。撞全局库/项目库**允许**（用户那份生效，插件那份标 `shadowedBy`） | 消息给改名建议（加 namespace 前缀） |
+| `MT_ROLE_CAPTAIN_RESERVED` | **（CHG-92）** 插件贡献了 `isCaptain: true`——队长是名册锚点，只能来自内置 `captain` | 提示删掉该字段 |
+| `MT_TEAM_TEMPLATE_CONFLICT` / `MT_TEAM_TEMPLATE_CAPTAIN` / `MT_TEAM_TEMPLATE_UNRESOLVED` | **（CHG-92）** 团队模板 id 撞 builtin/插件 / `members` 含 `captain` / `members[].roleId` 解析不到 | 消息列出冲突方或解析不到的 id |
+| `MT_ROLE_READONLY` | **（CHG-92 / P3 单向流动）** 对 `plugin` 来源角色做 `save`/`delete`/`publish` | 「插件贡献的角色只读；想改请先『复制到项目』」 |
 | `MT_ATTEMPT_STALE` | attemptId 非当前（FR-4.3） | 成员工具返回，重新 get_task |
 | `MT_NOT_CLAIMABLE` | 调度条件不满足（deps/角色/优先级归属） | 列出未满足条件 |
 | `MT_TASK_STRUCTURAL_EDIT` | 任务在 in_progress / gate 阶段修改结构字段（AC/交付物/依赖/角色/门禁链） | 提示走 rescope（先撤 attempt）或就绪前改 |

@@ -1,0 +1,16 @@
+{
+  "contractVersion": 1,
+  "pluginId": "acme-workflow",
+  "displayName": "Acme 工作流插件",
+  "version": "1.0.0",
+  "description": "需求 → 实现 → 复核 的 Acme 风格团队（3 名队员 + 1 个团队模板）",
+  "namespace": "acme",
+  "roles": [
+    { "id": "acme-requirement", "file": "roles/requirement.json" },
+    { "id": "acme-implementer", "file": "roles/implementer.json" },
+    { "id": "acme-reviewer", "file": "roles/reviewer.json" }
+  ],
+  "teams": [
+    { "id": "acme-trio", "file": "teams/trio.json" }
+  ]
+}

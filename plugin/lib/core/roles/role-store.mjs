@@ -39,7 +39,7 @@ export class RoleError extends Error {
                             
                     
                             
-                                                 
+                                                        
                    
      
                                              
@@ -47,14 +47,26 @@ export class RoleError extends Error {
                                               
      
                          
+     
+                                                           
+                        
+     
+                   
  
 
-/** CHG-74：同名副本的来源优先级（数字大者优先；项目库 = 运行时真相） */
+/**
+ * CHG-74 来源优先级（数字大者优先；项目库 = 运行时真相）。
+ *
+ * CHG-91 插入 `plugin: 1`（原 `global: 1 / project-role: 2 / project: 3` 整体 +1）：
+ * 插件贡献的是**默认能力**，用户一旦在全局库/项目库写了同 id，**用户那份赢**。
+ * 这条顺序是契约 §7.1 的可执行形式，改动必须同步 `docs/16` 与面板 `role.origin.*` 词条。
+ */
 export const ROLE_ORIGIN_PRECEDENCE                             = {
   builtin: 0,
-  global: 1,
-  'project-role': 2,
-  project: 3,
+  plugin: 1,
+  global: 2,
+  'project-role': 3,
+  project: 4,
 }
 
                                  
@@ -253,10 +265,18 @@ export function resolveRuntimeRole(paths                , id        )           
  * **同名副本口径**：同一个 id 可能同时存在多份（内置只读 / 全局个人资产 / 项目库副本 / 项目自身角色）。
  * 目录**不隐藏**任何一份（隐藏会让人以为自己的角色丢了），而是按来源优先级裁决出「生效的那份」，
  * 其余标注 `shadowedBy`（谁让我让位）——运行时真相恒为项目库（R13）。
+ *
+ * @param contributions CHG-91：插件贡献的角色（已由 `parseContributions` 盖 `origin: 'plugin:<id>'`）。
+ *   缺省 = 没有插件贡献。**优先级在 builtin 与 global 之间**（契约 §7.1）。
  */
-export function listRoleCatalog(paths                )              {
+export function listRoleCatalog(paths                , contributions                            )              {
   const out              = []
   for (const def of BUILTIN_ROLES) out.push({ origin: 'builtin', definition: def })
+  for (const def of contributions ?? []) {
+    // 插件贡献的定义里 `origin` 存的是 `plugin:<pluginId>`（盖章），条目 origin 是 `plugin`
+    const pluginId = String(def.origin ?? '').replace(/^plugin:/, '') || undefined
+    out.push({ origin: 'plugin', definition: def, ...(pluginId ? { pluginId } : {}) })
+  }
   if (paths.globalRolesDir && existsSync(paths.globalRolesDir)) {
     for (const def of listProjectRoles(paths.globalRolesDir)) out.push({ origin: 'global', definition: def })
   }
@@ -271,7 +291,7 @@ export function listRoleCatalog(paths                )              {
 
 /**
  * CHG-74：同名副本裁决——每个 id 只保留一份「生效条目」，其余标 `shadowedBy`。
- * 优先级：project > project-role > global > builtin（项目库 = 运行时真相）。
+ * 优先级：project > project-role > global > plugin > builtin（项目库 = 运行时真相，用户压得过插件）。
  */
 export function markShadowedRoles(entries             )              {
   const byId = new Map                     ()
@@ -300,11 +320,24 @@ export function resolveEffectiveRole(entries             , roleId        )      
   return candidates.reduce((best, entry) => (ROLE_ORIGIN_PRECEDENCE[entry.origin] > ROLE_ORIGIN_PRECEDENCE[best.origin] ? entry : best))
 }
 
-/** 引用即复制：从任意来源复制为项目角色；同名已存在 → 拒绝（单向、不覆盖） */
-export function copyToProject(paths                , id        , source            )                       {
+/**
+ * 引用即复制：从任意来源复制为项目角色；同名已存在 → 拒绝（单向、不覆盖）
+ *
+ * CHG-91：`source === 'plugin'` 时从 `contributions` 里找定义（插件贡献物不在任何可写目录里，
+ * 只能从装载结果取）。复制后 `origin` 保留 `plugin:<pluginId>` 溯源，用户改的是项目库那份。
+ */
+export function copyToProject(
+  paths                ,
+  id        ,
+  source            ,
+  contributions                            ,
+)                       {
   let def                            
   if (source === 'builtin') def = builtinRole(id)
-  else if (source === 'global') {
+  else if (source === 'plugin') {
+    def = contributions?.find((role) => role.id === id)
+    if (!def) throw new RoleError('MT_ROLE_NOT_FOUND', `role "${id}" not found in plugin contributions`)
+  } else if (source === 'global') {
     if (!paths.globalRolesDir) throw new RoleError('MT_ROLE_NO_GLOBAL_DIR', 'global roles dir not configured')
     def = readProjectRole(paths.globalRolesDir, id)
   } else if (source === 'project-role') {
@@ -316,7 +349,7 @@ export function copyToProject(paths                , id        , source         
   if (readProjectRole(paths.projectRolesDir, id)) {
     throw new RoleError('MT_ROLE_EXISTS', `project role "${id}" already exists; copy refused (no silent overwrite)`)
   }
-  // fork 内置 → origin 标记；升级不追溯（CHG-6）
+  // fork 内置 → origin 标记；升级不追溯（CHG-6）。插件来源保留自己的 `plugin:<id>` 溯源。
   const copy                 =
     source === 'builtin'
       ? { ...structuredClone(def), origin: `builtin:${id}` }
@@ -326,7 +359,20 @@ export function copyToProject(paths                , id        , source         
 
 /* ── 校验 ───────────────────────────────────────────────────── */
 
-const TOOL_ALLOW_PATTERNS = [/^myteam_\*$/, /^myteam_[a-z_]+$/, /^[a-z][a-z0-9_]*$/]
+/**
+ * `toolPolicy.allow` 允许的条目形状。
+ *
+ * CHG-91（修 CHG-58 遗留的真 bug）：原模式是 `^[a-z][a-z0-9_]*$`——**只认小写**，
+ * 于是 `allow: ["Read"]` 被判非法。但宿主原生工具名就是 PascalCase
+ * （`Read` / `Write` / `Edit` / `Bash` / `Grep` / `Glob`），`buildToolMask` 又是
+ * **原样**传给 `restrict({allow})` 的——即「合法名字写不进去，写进去的都是查不到的小写名」。
+ *
+ * 现在的口径（宽松但仍可判定）：
+ *  - `myteam_*` 通配（团队工具面）；
+ *  - 任意 `[A-Za-z][A-Za-z0-9_]*`（覆盖 PascalCase 原生工具、snake_case 成员工具、`mcp__server__tool`）。
+ * **仍然拒绝**：空串、含空格/分号/点/斜杠的注入尝试（`'Bash; rm'` 这类）。
+ */
+const TOOL_ALLOW_PATTERNS = [/^myteam_\*$/, /^[A-Za-z][A-Za-z0-9_]*$/]
 
 export function assertValidRole(def                )       {
   if (typeof def.id !== 'string' || !/^[a-z][a-z0-9-]{1,63}$/.test(def.id)) {

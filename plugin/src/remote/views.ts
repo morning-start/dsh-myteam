@@ -74,6 +74,8 @@ export interface BoardTaskView {
   gateVerdicts: Record<string, 'pass' | 'fail'>
   /** CHG-86（FR-5.2）：各门禁已打回轮数（超 `GATE_REJECT_BUDGET` 后面板提示需人工放行） */
   gateRejects?: Record<string, number>
+  /** CHG-93：各门禁最近一次裁决的「谁执行 / 是否人工强制放行」（面板 badge 的唯一来源） */
+  gateResults?: Record<string, { verdict: 'pass' | 'fail'; executedBy?: string; forcedBy?: string; exitCode?: number | null; at: number }>
   /** CHG-62：证据条数（看板卡徽标，来自投影 evidenceRefs，不额外读账本） */
   evidenceCount: number
   /** CHG-69（FR-21）：参与团队（主责 1 / 协作 N） */
@@ -130,6 +132,8 @@ export interface TaskDetailView {
   gateVerdicts: Record<string, 'pass' | 'fail'>
   /** CHG-86（FR-5.2）：各门禁已打回轮数（打回预算的展示面） */
   gateRejects?: Record<string, number>
+  /** CHG-93：各门禁最近一次裁决的「谁执行 / 是否人工强制放行」（面板 badge 的唯一来源） */
+  gateResults?: Record<string, { verdict: 'pass' | 'fail'; executedBy?: string; forcedBy?: string; exitCode?: number | null; at: number }>
   createdAt: number
   waitingSince?: number
   /** CHG-63：证据按 attempt 分组（attemptId 来自 task.evidence 事件载荷，缺失时为旧账本） */
@@ -244,6 +248,8 @@ export function buildBoardView(service: ProjectionSource, columnMapping: Record<
       gates: t.gates,
       gateVerdicts: t.gateVerdicts,
       ...(t.gateRejects && Object.keys(t.gateRejects).length > 0 ? { gateRejects: { ...t.gateRejects } } : {}),
+    ...(t.gateResults && Object.keys(t.gateResults).length > 0 ? { gateResults: { ...t.gateResults } } : {}),
+      ...(t.gateResults && Object.keys(t.gateResults).length > 0 ? { gateResults: { ...t.gateResults } } : {}),
       evidenceCount: t.evidenceRefs.length,
       participants: participantsOf(proj, t.id),
       ...(diagnosis ? { diagnosis } : {}),

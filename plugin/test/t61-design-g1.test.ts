@@ -269,7 +269,7 @@ test('t61-8: 详情页保留全部 RPC 动作（重新规划 / 取消 / 编辑 /
   assert.ok(detail.includes('onClick: () => onCancel?.(detail)'), '取消（cancel）')
   assert.ok(detail.includes('onClick: () => onEdit?.(detail)'), '编辑（edit）')
   assert.ok(detail.includes('api.postComment({ teamId, taskId, content: comment.trim() })'), '留言（postComment）')
-  assert.ok(detail.includes('j(DiagFix, { t, api, teamId, taskId, diagnosis: detail.diagnosis, readOnly, onFixed: onDiagnosisFixed })'), '诊断一键修复')
+  assert.ok(detail.includes('j(DiagFix, { t, api, teamId, taskId, diagnosis: detail.diagnosis, readOnly, onFixed: onDiagnosisFixed, expectedRevision: detail.revision })'), '诊断一键修复')
   assert.ok(detail.includes("t('task.readonlyTitle')") && detail.includes("t('action.unavailable')"), '只读 / 不可用说明（title）')
   for (const cls of ['mt-banner-stale', 'mt-banner-cancel', 'mt-banner-rewired']) {
     assert.ok(detail.includes(cls), `横幅保留: ${cls}`)

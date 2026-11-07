@@ -34,7 +34,11 @@ import { assertValidRole, deleteProjectRoleSafe, listRoleCatalog, readProjectRol
 // CHG-87（docs/04 §2 承诺的 roleOp 端点）：与 host 侧共用同一份角色库写实现
 import { roleOp as roleOpImpl } from './core/roles/role-ops.ts'
 import { mcpServerOf } from './core/members/capability-guard.ts'
-import { readPresetCatalog } from './core/presets/preset-store.ts'
+import { readPresetCatalog, BUILTIN_PRESET_IDS } from './core/presets/preset-store.ts'
+// CHG-91（插件团队贡献契约 v1）：面板读取插件贡献（只读；贡献物本身没有写入口）
+import { loadContributions } from './core/contributions/parse.ts'
+import { contributionsRoot } from './core/contributions/discover.ts'
+import { CONTRIBUTION_CODES, type ContributionCatalog } from './core/contributions/contract.ts'
 
 /** 门面可见的最小 Agent 面（真实实例由网关 lookup 注入；测试用 mock） */
 type AgentLike = { session: { id: string } }
@@ -136,6 +140,14 @@ function offlineTarget(query: Record<string, unknown> | undefined): { workspaceR
 export class MyTeamPanelFacade extends TypertRemoteService {
   /** 跨工作区索引路径（测试可注入；缺省 ~/.dsh/myteam/workspaces.json） */
   private globalIndexPath?: string
+  /**
+   * CHG-91：插件贡献目录缓存（按工作区）。
+   *
+   * 为什么要缓存：`listRoleCatalog` 在面板的多条读路径上（角色库 / 能力目录 / 角色详情），
+   * 每次都重新扫盘会把一次页面渲染变成 N 次 IO。贡献目录很小，按 workspaceRoot 缓存足够；
+   * 插件装/卸后用户点「重新扫描插件」走 `reloadContributions` 清缓存。
+   */
+  private contributionCache = new Map<string, ContributionCatalog>()
 
   constructor(ctx: unknown, opts: { globalIndexPath?: string } = {}) {
     // cordis 服务名 = "myteamPanel"；typert namespace = "myteam"（客户端端点 myteam/* 不变，
@@ -149,6 +161,45 @@ export class MyTeamPanelFacade extends TypertRemoteService {
     const registry = (this.ctx as Record<string, unknown> as { agentPresets?: { serviceFor?: (a: unknown, n: string) => unknown } }).agentPresets
     if (!registry || typeof registry.serviceFor !== 'function') return undefined
     return registry.serviceFor(agent, 'myteam') as RemoteLike | undefined
+  }
+
+  /* ── CHG-91：插件贡献（只读装载；按工作区缓存）────────────────── */
+
+  /**
+   * 装载（或取缓存）某个工作区的插件贡献。
+   *
+   * 冲突裁决需要「内置 id」与「模板可解析集合」——两者都从**不含插件**的基准目录算，
+   * 否则插件角色会自我放行（把自己的 id 当成「已知」）。
+   */
+  private contributionsFor(workspaceRoot: string): ContributionCatalog {
+    const cached = this.contributionCache.get(workspaceRoot)
+    if (cached) return cached
+    // **基准目录**：故意取「不含插件」的那一份——否则插件角色会把自己的 id 当成「已知」
+    // 而自我放行（撞内置也发现不了）。
+    const base = listRoleCatalog(projectRolePaths(workspaceRoot))
+    const catalog = loadContributions(contributionsRoot(), {
+      builtinRoleIds: new Set(base.filter((entry) => entry.origin === 'builtin').map((entry) => entry.definition.id)),
+      builtinTemplateIds: new Set(BUILTIN_PRESET_IDS),
+      resolvableRoleIds: new Set(base.map((entry) => entry.definition.id)),
+    })
+    this.contributionCache.set(workspaceRoot, catalog)
+    return catalog
+  }
+
+  /** CHG-91：显式重载（面板「重新扫描插件」/ 端点 `reloadContributions`） */
+  private reloadContributionsFor(workspaceRoot: string): ContributionCatalog {
+    this.contributionCache.delete(workspaceRoot)
+    return this.contributionsFor(workspaceRoot)
+  }
+
+  /** CHG-91：角色目录（含插件贡献）——面板所有读路径统一走这里 */
+  private roleCatalogFor(workspaceRoot: string) {
+    return listRoleCatalog(projectRolePaths(workspaceRoot), this.contributionsFor(workspaceRoot).roles)
+  }
+
+  /** CHG-91：团队模板目录（含插件贡献） */
+  private presetCatalogFor(workspaceRoot: string) {
+    return readPresetCatalog(workspaceRoot, this.contributionsFor(workspaceRoot).teams)
   }
 
   /**
@@ -307,7 +358,7 @@ export class MyTeamPanelFacade extends TypertRemoteService {
     // CHG-73：删除按钮还要求「模板没引用它」——模板是配置资产，删角色会让模板引用悬空
     try {
       const presetRoleIds = new Set(
-        readPresetCatalog(workspaceRoot).entries.flatMap((entry) => (entry.definition.members ?? []).map((member) => member.roleId)),
+        this.presetCatalogFor(workspaceRoot).entries.flatMap((entry) => (entry.definition.members ?? []).map((member) => member.roleId)),
       )
       for (const role of view.roles) role.canDelete = role.canDelete && !presetRoleIds.has(role.id)
     } catch {
@@ -422,6 +473,21 @@ export class MyTeamPanelFacade extends TypertRemoteService {
     if (!isAbsolute(workspaceRoot)) return OFFLINE_INVALID
     const op = String(query?.op ?? '')
     const payload = (query?.payload as Record<string, unknown> | undefined) ?? {}
+    // CHG-91（契约 P3 单向流动）：插件贡献的角色**只读**——面板与工具同一份守门
+    if (op === 'save' || op === 'delete' || op === 'publish') {
+      const directId = String(payload.roleId ?? '')
+      const saveId = String((payload as { role?: { id?: unknown } }).role?.id ?? '')
+      const contributed = this.contributionsFor(workspaceRoot).roles
+      const readonlyId = contributed.some((role) => role.id === directId) ? directId : (saveId && contributed.some((role) => role.id === saveId) ? saveId : '')
+      if (readonlyId) {
+        return {
+          status: 'error',
+          code: CONTRIBUTION_CODES.ROLE_READONLY,
+          roleId: readonlyId,
+          message: `插件贡献的角色「${readonlyId}」只读；想改请先「复制到项目」再编辑项目库那份`,
+        }
+      }
+    }
     // delete 的 C7 占用面（团队在册 / 模板引用 / 项目自身角色）先算好再交给角色库层
     const roleId = String(payload.roleId ?? '')
     const bindings = op === 'delete' && roleId ? roleUsage(workspaceRoot, roleId).bindings : []
@@ -429,6 +495,47 @@ export class MyTeamPanelFacade extends TypertRemoteService {
       ...payload,
       ...(query?.confirm === true ? { confirm: true } : {}),
     })
+  }
+
+  /**
+   * CHG-91（契约 §12.1）：插件贡献的**只读**视图。
+   *
+   * 根级端点（只收 `query`，不需要活动会话）——插件贡献是**配置资产**，离线团队也能看
+   * （与 `roleOp` / `getCapabilityCatalog` 同口径）。
+   *
+   * 为什么没有写入端点：贡献物由插件安装时写盘（P3 单向流动），myteam 只读不写。
+   */
+  async getContributions(query: Record<string, unknown>) {
+    const workspaceRoot = String(query?.workspaceRoot ?? '')
+    if (!isAbsolute(workspaceRoot)) return OFFLINE_INVALID
+    const catalog = this.contributionsFor(workspaceRoot)
+    return {
+      status: 'ok',
+      root: catalog.root,
+      ok: catalog.ok,
+      scannedAt: catalog.scannedAt,
+      plugins: catalog.plugins,
+      roles: catalog.roles.map((role) => ({ id: role.id, name: role.name, origin: role.origin })),
+      teams: catalog.teams.map((team) => ({ id: team.id, name: team.name, namespace: team.namespace, members: team.members })),
+      warnings: catalog.warnings,
+    }
+  }
+
+  /** CHG-91：显式重载贡献目录（面板「重新扫描插件」；工具 `myteam_reload_contributions` 同源） */
+  async reloadContributions(query: Record<string, unknown>) {
+    const workspaceRoot = String(query?.workspaceRoot ?? '')
+    if (!isAbsolute(workspaceRoot)) return OFFLINE_INVALID
+    const catalog = this.reloadContributionsFor(workspaceRoot)
+    return {
+      status: 'ok',
+      root: catalog.root,
+      ok: catalog.ok,
+      scannedAt: catalog.scannedAt,
+      plugins: catalog.plugins,
+      roles: catalog.roles.map((role) => ({ id: role.id, name: role.name, origin: role.origin })),
+      teams: catalog.teams.map((team) => ({ id: team.id, name: team.name, namespace: team.namespace, members: team.members })),
+      warnings: catalog.warnings,
+    }
   }
 
   /**
@@ -472,7 +579,7 @@ export class MyTeamPanelFacade extends TypertRemoteService {
     const mcp = new Map<string, 'host' | 'role'>()
     try {
       if (workspaceRoot && isAbsolute(workspaceRoot)) {
-        for (const entry of listRoleCatalog(projectRolePaths(workspaceRoot))) {
+        for (const entry of this.roleCatalogFor(workspaceRoot)) {
           for (const skill of entry.definition.skills ?? []) skills.set(skill, 'role')
           for (const name of entry.definition.mcpAllowlist ?? []) mcp.set(name, 'role')
         }
@@ -605,7 +712,7 @@ export class MyTeamPanelFacade extends TypertRemoteService {
     } catch {
       // 目录不存在 = 没有账本，正常
     }
-    const entries = listRoleCatalog(projectRolePaths(workspaceRoot))
+    const entries = this.roleCatalogFor(workspaceRoot)
     return { inputs, entries, warnings }
   }
 
@@ -834,7 +941,9 @@ markRemoteMethods(MyTeamPanelFacade.prototype, ['listTeams', 'getProject', 'getR
   // CHG-87（FR-13.1/FR-16.1）：角色库统一写入口 + 单角色调用
   'roleOp', 'applyRoles',
   // CHG-88（M2-E / FR-16.3）：会话移交
-  'handoff'])
+  'handoff',
+  // CHG-91（插件团队贡献契约 v1）：插件贡献的只读视图 + 显式重载
+  'getContributions', 'reloadContributions'])
 
 /**
  * 顶层装载行 apply（cordis.patch.yml myteam-panel 行）：

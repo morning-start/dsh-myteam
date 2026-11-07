@@ -375,7 +375,7 @@ test('t64-11: 设置页渲染——三层 + 生效层高亮（mt-cur）+ 6 行�
   assert.equal(cur.length, 1, '只有一层生效')
   assert.ok(textOf(cur[0]).startsWith('settings.layer.project'), '生效层 = 项目配置')
   assert.ok(textOf(cur[0]).includes('settings.layer.effective'), '设计稿的「（生效）」后缀')
-  assert.equal(countClass(tree, 'mt-setrow'), 8, '六行行为配置 + 两行生命周期')
+  assert.equal(countClass(tree, 'mt-setrow'), 9, '六行行为配置 + 三行生命周期（归档 / 移交到新会话 / 解散）')
   assert.equal(countClass(tree, 'mt-toggle'), 3, '三个开关')
   assert.equal(countClass(tree, 'mt-readonly-val'), 3, '三个硬上限只读列')
   assert.ok(textOf(tree).includes('settings.ceiling'), '硬上限文案')

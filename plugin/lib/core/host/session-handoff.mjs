@@ -35,6 +35,15 @@ export const HANDOFF_SECTION_LIMITS = {
   notes: 8,
 }         
 
+/**
+ * 会话索引的条目上限（M2-D ①：摘要升级为索引）。
+ *
+ * 为什么单独给一个上限：索引是**指针列表**（每行一个 `session:<id>`），
+ * 不是内容摘要——它不占上下文预算的大头，但也不能无界（一个百人团队就是一百行）。
+ * 20 条 ≈ 一屏，超出折叠成「省略 N 个会话」。
+ */
+export const HANDOFF_SESSION_INDEX_LIMIT = 20
+
 /* ── 纯函数域（无 IO、无 ctx）─────────────────────────────────── */
 
 /** 摘要输入里的任务条目（字段可缺省——缺省即"没有这一维"） */
@@ -54,6 +63,31 @@ export const HANDOFF_SECTION_LIMITS = {
                        
                  
                         
+                                                            
+                    
+ 
+
+/**
+ * M2-D ①（FR-16.4①）：会话索引的一条。
+ *
+ * 为什么是「索引」不是「摘要」：整段注入旧会话历史会让新队长按**旧上下文**继续干活
+ * （FR-16.3 明确否决原地变身的第二条理由）。索引只给**指针**——
+ * 新队长知道「哪些会话值得看」，需要时用 `session:<id>` 深读，
+ * 读取本身留痕（`session.read` 账本事件，CHG-87）。
+ */
+                                    
+                                          
+                   
+                        
+                            
+                        
+               
+                                          
+                 
+                               
+                   
+                               
+                 
  
 
 /** 摘要输入里的最近事件 */
@@ -121,6 +155,64 @@ function countBy(items          )                         {
  *  - 任务/成员/事件/备注分段输出，每段超出上限折叠成「（省略 N 项）」；
  *  - 全程不抛异常：缺字段 / 类型不对都退化成"这一段没有"，不因一条脏数据毁掉整个移交。
  */
+/**
+ * M2-D ①（FR-16.4①）：构建**会话索引**——把「有哪些会话可深读」变成指针列表。
+ *
+ * ## 为什么是索引而不是摘要
+ *
+ * FR-16.3 否决原地变身的两条理由里，第二条是「旧会话历史整段混进队长上下文 →
+ * 模型按旧上下文继续干活」。摘要虽然已经截断，但**截断仍是内容**——
+ * 新队长读到的是「上一个团队做了什么」，而不是「哪里能查到」。
+ *
+ * 索引只给指针：`session:<id>` 是 CHG-87 定义的第三类证据指针，
+ * 新队长需要时按需深读（读取留痕 `session.read`），不需要就完全不占上下文。
+ *
+ * ## 口径
+ *
+ * - 队长会话（`sourceSessionId`）**永远排第一**——它是上下文最完整的一条；
+ * - 成员会话按名册顺序（与面板名册一致，便于对照）；
+ * - **没有 sessionId 的成员不进索引**（编造 id 比没有更糟——深读会落到不存在的会话）；
+ * - 去重（同一 sessionId 只出现一次，取首次）。
+ *
+ * @param input 摘要输入（复用同一份，不额外取数）
+ * @returns 有界、去重、稳定的会话索引（最多 {@link HANDOFF_SESSION_INDEX_LIMIT} 条）
+ */
+export function buildSessionIndex(input                     )                      {
+  const refs                      = []
+  const seen = new Set        ()
+  const push = (ref                   )       => {
+    if (ref.sessionId.length === 0 || seen.has(ref.sessionId)) return
+    seen.add(ref.sessionId)
+    refs.push(ref)
+  }
+
+  const sourceSessionId = textOf(input?.sourceSessionId)
+  if (sourceSessionId.length > 0) {
+    push({ sessionId: sourceSessionId, kind: 'captain', title: '队长会话（上一个团队，上下文最完整）' })
+  }
+
+  const members = Array.isArray(input?.members) ? input.members : []
+  for (const member of members) {
+    const sessionId = textOf(member?.sessionId)
+    if (sessionId.length === 0) continue
+    const memberId = textOf(member.id)
+    const roleId = textOf(member.roleId)
+    const instanceName = textOf(member.instanceName)
+    const label = [roleId, instanceName].filter(Boolean).join(' / ')
+    const taskId = textOf(member.currentTaskId)
+    push({
+      sessionId,
+      kind: 'member',
+      title: memberId + (label ? `（${label}）` : ''),
+      ...(taskId ? { taskId } : {}),
+      ...(memberId ? { memberId } : {}),
+      ...(roleId ? { roleId } : {}),
+    })
+  }
+
+  return refs.slice(0, HANDOFF_SESSION_INDEX_LIMIT)
+}
+
 export function buildHandoffSummary(input                     )                       {
   const teamId = textOf(input?.teamId)
   const teamName = textOf(input?.teamName)
@@ -135,6 +227,7 @@ export function buildHandoffSummary(input                     )                 
     .map((note) => textOf(note))
     .filter((note) => note.length > 0)
 
+  const sessionIndex = buildSessionIndex(input)
   const taskStates = tasks.map((t) => textOf(t.state) || 'unknown')
   const metadata                         = {
     teamId,
@@ -148,6 +241,7 @@ export function buildHandoffSummary(input                     )                 
     taskIds: tasks.map((t) => textOf(t.id)).filter((id) => id.length > 0),
     memberIds: members.map((m) => textOf(m.id)).filter((id) => id.length > 0),
     ...(sourceSessionId ? { sourceSessionId } : {}),
+    ...(sessionIndex.length > 0 ? { sessionIndex } : {}),
   }
 
   const lines           = []
@@ -193,6 +287,20 @@ export function buildHandoffSummary(input                     )                 
     }
   }
 
+  /* M2-D ①（FR-16.4①）：会话索引——只给指针，不整段注入。
+   * 明确框成「按需深读」而不是「以下是历史」：后者会让模型以为内容已经给全了。 */
+  if (sessionIndex.length > 0) {
+    lines.push('会话索引（需要细节时按 `session:<id>` 深读；未深读的内容不在你的上下文里）：')
+    for (const ref of sessionIndex) {
+      const kind = ref.kind === 'captain' ? '队长' : '成员'
+      const tail = ref.taskId ? ` 当前任务：${ref.taskId}` : ''
+      lines.push(`- \`session:${ref.sessionId}\` [${kind}] ${ref.title}${tail}`)
+    }
+    const totalRefs = 1 + (Array.isArray(input?.members) ? input.members.filter((m) => textOf(m?.sessionId).length > 0).length : 0)
+    if (totalRefs > sessionIndex.length) {
+      lines.push(`（其余 ${totalRefs - sessionIndex.length} 个会话省略）`)
+    }
+  }
   if (recentEvents.length > 0) {
     lines.push('最近事件：')
     for (const event of recentEvents.slice(-HANDOFF_SECTION_LIMITS.events)) {

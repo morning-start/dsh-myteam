@@ -75,6 +75,14 @@ export interface TaskProjection {
    * 这是"打回闭环成本"（TF r9 实测 61% 调用）的硬上限，不是提示。
    */
   gateRejects?: Record<string, number>
+  /**
+   * CHG-93（docs/14 §7.4 遗留）：各门禁**最近一次**裁决的摘要。
+   *
+   * 为什么需要它：`gateVerdicts` 只存 pass/fail，看不出「谁跑的 / 是不是人工强制放行的」——
+   * 而这两件事直接决定结论可信度（`executedBy:'host'` = 宿主真跑了命令；`forcedBy:'human'` = 人
+   * 越过预算硬放的）。账本里有这两个字段，但面板一直没渲染，等于「可审计但看不见」。
+   */
+  gateResults?: Record<string, { verdict: 'pass' | 'fail'; executedBy?: string; forcedBy?: string; exitCode?: number | null; at: number }>
   evidenceRefs: number[]      // 账本 seq 引用
   deliverables: { path: string; seq: number }[]
   createdAt: number

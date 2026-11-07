@@ -239,7 +239,11 @@ window.__ModuleLoader__.load({
       'detail.deliverables': '交付物',
       'detail.attempt': '尝试',
       'detail.gatePending': '待裁决',
-      'detail.gatePass': '通过',
+      /* CHG-93（docs/14 §7.4）：verify 结果的可信度徽标 —— 账本里一直有，界面没画 */
+      'detail.gateExecutedByHost': '宿主执行',
+      'detail.gateExecutedByHint': '命令由宿主 subprocess 真实执行，按退出码判定（不是人工自述）',
+      'detail.gateForcedByHuman': '人工强制放行',
+      'detail.gateForcedByHint': '打回预算已用尽，由人工确认放行——结论可信度低于自动判定',      'detail.gatePass': '通过',
       'detail.gateFail': '未通过',
       'member.suspend': '暂停',
       'member.archive': '归档',
@@ -302,8 +306,25 @@ window.__ModuleLoader__.load({
       'role.snapshot': '召唤时固化身份快照；之后改角色不影响在跑实例。',
       'role.origin.project-role': '项目自身角色',
       'role.origin.builtin': '内置',
+      'role.origin.plugin': '插件',
       'role.origin.global': '全局',
       'role.origin.project': '项目',
+      /* CHG-91（插件团队贡献契约 v1）：插件贡献的角色只读 + 插件贡献区 */
+      'contrib.title': '插件贡献',
+      'contrib.desc': '第三方插件装好后贡献进全局角色库与团队模板的角色。只读——想改请「复制到项目」再编辑。',
+      'contrib.empty': '当前没有插件贡献（把插件装进 $DSH_HOME/myteam/plugins/ 即可）',
+      'contrib.reload': '重新扫描插件',
+      'contrib.reloading': '扫描中…',
+      'contrib.reloaded': '已重新扫描：{plugins} 个插件 · {roles} 个角色 · {teams} 个团队模板',
+      'contrib.pluginCount': '{n} 个插件',
+      'contrib.roles': '角色',
+      'contrib.teams': '团队模板',
+      'contrib.providedBy': '由插件「{plugin}」提供',
+      'contrib.readonly': '插件贡献的角色只读；想改请先「复制到项目」再编辑项目库那份',
+      'contrib.warnTitle': '插件贡献有问题（{n} 条 error）',
+      'contrib.warnHint': '这些条目已被跳过。按每条提示改插件目录后点「重新扫描插件」。',
+      'contrib.ok': '插件贡献装载正常（{plugins} 个插件 / {roles} 个角色 / {teams} 个团队模板）',
+      'contrib.root': '贡献目录：{root}',
       /* CHG-74：同名副本（内置/全局/项目库可能有同一 id）——被压过的那份标注「谁让位」 */
       'role.shadowedBy': '同名{origin}副本（以此为准）',
       'role.effective': '生效中',
@@ -425,6 +446,7 @@ window.__ModuleLoader__.load({
       'action.unavailable': '当前状态不可用',
       'task.rescope': '重新规划',
       'task.rescopeDone': '已重新规划 {id}（{state}）',
+      'task.revisionConflict': '保存失败：这份任务已被改过（当前版本 {current}，你基于版本 {snapshot}）。请关闭表单重新打开，确认最新内容后再改——本次没有写入任何内容。',
       'task.rescopeFailed': '重新规划失败：{msg}',
       'task.rescopeNeedReason': '请填写重新规划的理由',
       'task.readonlyTitle': '离线/只读团队：写操作已禁用',
@@ -535,6 +557,14 @@ window.__ModuleLoader__.load({
       'role.deleteOccupied': '该角色仍被模板或在册团队占用，不能删除（先解除聘任/模板引用）。',
       'role.deleted': '已删除 {id}',
       'role.deleteFailed': '删除失败：{msg}',
+      'role.published': '已发布到全局角色库：{id}',
+      'role.publishBtn': '发布到全局',
+      'role.publishHint': '把这份项目库角色写进全局角色库（该工作区所有项目可见）',
+      'role.publishConfirm': '确认发布到全局角色库？',
+      'role.publishImpact': '将写入：{path}。全局库对所有项目可见——单向流动，发布后各项目仍需显式「复制到项目」才进各自项目库。',
+      'role.publishImpactNote': '全局库是复制源，不是发布源：内置/全局角色不能再发布。',
+      'role.publishConfirmBtn': '确认发布',
+      'role.publishFailed': '发布失败：{msg}',
       'role.deletePresets': '占用模板：{presets}',
       /* ── CHG-76 P3：A 批量改挂档 / B 批量新建草稿 / C 无人可领一键修复 ── */
       'batch.leave': '只取消所选任务',
@@ -892,6 +922,16 @@ window.__ModuleLoader__.load({
       'settings.archiveTitle': '归档此团队',
       'settings.archiveSub': '在册角色会被排空释放，账本与 token 记录归档到 archive/，可随时重新打开查看',
       'settings.archiveBtn': '归档',
+      'settings.handoffTitle': '移交到新会话',
+      'settings.handoffSub': '把当前团队的上下文摘要带进一个新建的团队预设会话；原会话保留不动',
+      'settings.handoffBtn': '移交',
+      'settings.handoffHint': '只移交上下文：不复制名册、不复制任务，新队长自行决定分工',
+      'settings.handoffConfirm': '确认移交到新会话？',
+      'settings.handoffConfirmBody': '将为「{team}」新建一个团队预设会话，并把上下文摘要作为首条消息注入。原会话保持原样（不做原地变身）。',
+      'settings.handoffConfirmBtn': '新建会话并注入',
+      'settings.handoffDone': '移交完成 · 新会话',
+      'settings.handoffPartial': '会话已建，但摘要注入失败（可手动粘贴）',
+      'settings.handoffFailed': '移交失败：{msg}',
       'settings.disbandTitle': '解散此团队',
       'settings.disbandSub': '不可撤销。{members} 个在册角色将被排空释放，{tasks} 个未完成任务转 blocked',
       'settings.disbandBtn': '解散',
@@ -1328,7 +1368,10 @@ window.__ModuleLoader__.load({
       'detail.deliverables': 'Deliverables',
       'detail.attempt': 'Attempt',
       'detail.gatePending': 'pending',
-      'detail.gatePass': 'pass',
+      'detail.gateExecutedByHost': 'Host-executed',
+      'detail.gateExecutedByHint': 'The command ran in the host subprocess and was judged by its real exit code (not a self-report)',
+      'detail.gateForcedByHuman': 'Human force-release',
+      'detail.gateForcedByHint': 'The reject budget was exhausted and a human released it - lower confidence than an automatic verdict',      'detail.gatePass': 'pass',
       'detail.gateFail': 'fail',
       'member.suspend': 'Suspend',
       'member.archive': 'Archive',
@@ -1390,8 +1433,25 @@ window.__ModuleLoader__.load({
       'role.snapshot': 'Identity snapshot is frozen at summon time; later role edits do not affect running instances.',
       'role.origin.project-role': 'Project role',
       'role.origin.builtin': 'Built-in',
+      'role.origin.plugin': 'Plugin',
       'role.origin.global': 'Global',
       'role.origin.project': 'Project',
+      /* CHG-91: plugin-contributed roles are read-only */
+      'contrib.title': 'Plugin contributions',
+      'contrib.desc': 'Roles that third-party plugins contribute into the global role library and team templates. Read-only - copy to project to edit.',
+      'contrib.empty': 'No plugin contributions (drop a plugin into $DSH_HOME/myteam/plugins/)',
+      'contrib.reload': 'Rescan plugins',
+      'contrib.reloading': 'Scanning…',
+      'contrib.reloaded': 'Rescanned: {plugins} plugin(s) · {roles} role(s) · {teams} team template(s)',
+      'contrib.pluginCount': '{n} plugin(s)',
+      'contrib.roles': 'Roles',
+      'contrib.teams': 'Team templates',
+      'contrib.providedBy': 'Provided by plugin "{plugin}"',
+      'contrib.readonly': 'Plugin-contributed roles are read-only; copy to project to edit that copy',
+      'contrib.warnTitle': 'Plugin contributions have {n} error(s)',
+      'contrib.warnHint': 'Those entries were skipped. Fix the plugin directory per each message, then click "Rescan plugins".',
+      'contrib.ok': 'Plugin contributions loaded ({plugins} plugin(s) / {roles} role(s) / {teams} team template(s))',
+      'contrib.root': 'Contribution root: {root}',
       /* CHG-74: same-id copies (built-in / global / project) — the shadowed one says who won */
       'role.shadowedBy': 'Same id in {origin} (that one wins)',
       'role.effective': 'Effective',
@@ -1513,6 +1573,7 @@ window.__ModuleLoader__.load({
       'action.unavailable': 'Not available in this state',
       'task.rescope': 'Re-plan',
       'task.rescopeDone': 'Re-planned {id} ({state})',
+      'task.revisionConflict': 'Save failed: this task changed since you opened it (current revision {current}, your snapshot {snapshot}). Close the form and reopen it to see the latest content - nothing was written.',
       'task.rescopeFailed': 'Re-plan failed: {msg}',
       'task.rescopeNeedReason': 'Enter a reason for re-planning',
       'task.readonlyTitle': 'Offline / read-only team: write actions are disabled',
@@ -1623,6 +1684,14 @@ window.__ModuleLoader__.load({
       'role.deleteOccupied': 'This role is still used by a preset or an appointed team member; it cannot be deleted (release the appointment/preset reference first).',
       'role.deleted': 'Deleted {id}',
       'role.deleteFailed': 'Delete failed: {msg}',
+      'role.published': 'Published to the global role library: {id}',
+      'role.publishBtn': 'Publish to global',
+      'role.publishHint': 'Write this project-library role into the global role library (visible to every project in this workspace)',
+      'role.publishConfirm': 'Publish to the global role library?',
+      'role.publishImpact': 'Will write: {path}. The global library is visible to all projects - the flow is one-way, each project still has to "copy to project" explicitly.',
+      'role.publishImpactNote': 'The global library is a copy source, not a publish source: builtin/global roles cannot be published again.',
+      'role.publishConfirmBtn': 'Publish',
+      'role.publishFailed': 'Publish failed: {msg}',
       'role.deletePresets': 'Used by presets: {presets}',
       /* CHG-76 P3 */
       'batch.leave': 'Cancel selected tasks only',
@@ -1971,6 +2040,16 @@ window.__ModuleLoader__.load({
       'settings.archiveTitle': 'Archive this team',
       'settings.archiveSub': 'Appointed roles are drained and released; the ledger and token records are archived under archive/ and can be replayed any time',
       'settings.archiveBtn': 'Archive',
+      'settings.handoffTitle': 'Hand off to a new session',
+      'settings.handoffSub': 'Carry this team\'s context summary into a freshly created team-preset session; the current session stays untouched',
+      'settings.handoffBtn': 'Hand off',
+      'settings.handoffHint': 'Context only: no roster, no tasks are copied - the new captain decides the split',
+      'settings.handoffConfirm': 'Hand off to a new session?',
+      'settings.handoffConfirmBody': 'This creates a new team-preset session for "{team}" and injects the context summary as its first message. The current session is left as-is (no in-place transformation).',
+      'settings.handoffConfirmBtn': 'Create session and inject',
+      'settings.handoffDone': 'Handoff complete - new session',
+      'settings.handoffPartial': 'Session created, but injecting the summary failed (you can paste it manually)',
+      'settings.handoffFailed': 'Handoff failed: {msg}',
       'settings.disbandTitle': 'Disband this team',
       'settings.disbandSub': 'Irreversible. {members} appointed role(s) will be drained and released, {tasks} unfinished task(s) turn blocked',
       'settings.disbandBtn': 'Disband',
@@ -2597,6 +2676,10 @@ window.__ModuleLoader__.load({
         // CHG-73 P2：项目级配置资产（删除角色 / 能力目录）——无会话，只发 query
         deleteRole: (query) => rpcCall(connection, 'myteam/deleteRole', { query }),
         getCapabilityCatalog: (query) => rpcCall(connection, 'myteam/getCapabilityCatalog', { query }),
+        /* CHG-91（插件团队贡献契约 v1）：插件贡献的只读视图 + 显式重载。
+         * 根级端点（只发 query）——插件贡献是配置资产，离线团队也能看。 */
+        getContributions: (query) => rpcCall(connection, 'myteam/getContributions', { query }),
+        reloadContributions: (query) => rpcCall(connection, 'myteam/reloadContributions', { query }),
         // CHG-73 P2：账本写（重新规划 / 取消 / 批量编排）——绑定队长会话
         rescopeTask: (query) => call('rescopeTask', query),
         cancelTask: (query) => call('cancelTask', query),
@@ -2619,6 +2702,13 @@ window.__ModuleLoader__.load({
          * `applyRoles({ teamId?, roles: string[], remove?: string[], confirm? })`——
          * 面板 `/myteam+<roleId>` / `/myteam-<roleId>` 语法解析后落到这里。 */
         applyRoles: (query) => call('applyRoles', query),
+        /* CHG-89（FR-13.1 / docs/04 §2）：角色库统一写入口。
+         * `roleOp({ op, payload, confirm })`，op ∈ save / delete / publish / fork——
+         * 面板的「发布到全局」按钮走这里（publish 两段确认）。 */
+        roleOp: (query) => rpcCall(connection, 'myteam/roleOp', { query }),
+        /* CHG-88/89（M2-E / FR-16.3）：会话移交（摘要 → 新团队预设会话；不写团队账本）。
+         * 服务端链路 CHG-88 已通，这里补面板入口——此前 client 零命中，用户点不到。 */
+        handoff: (query) => call('handoff', query),
         getBoard: (query) => call('getBoard', query),
         getTaskDetail: (query) => call('getTaskDetail', query),
         getTokens: (query) => call('getTokens', query),
@@ -3221,7 +3311,7 @@ window.__ModuleLoader__.load({
       '.mt-detail-title{margin:0;font-size:20px;font-weight:600;letter-spacing:-.02em;line-height:1.4;text-wrap:balance;color:var(--dsw-alias-label-primary)}',
       '.mt-detail-desc{margin:10px 0 0;padding-top:10px;border-top:.5px solid var(--dsw-alias-border-l2);max-width:60ch;font-size:13px;line-height:1.75;color:var(--dsw-alias-label-secondary);white-space:pre-wrap}',
       '.mt-sec{display:flex;flex-direction:column;min-width:0;padding:12px 16px;background:var(--dsw-alias-bg-layer-1);border:.5px solid var(--dsw-alias-border-l2);border-radius:8px}',
-      '.mt-dsec-head h4{margin:0;font-size:12px;font-weight:600;letter-spacing:.03em;color:var(--dsw-alias-label-secondary)}',
+      '.mt-dsec-head h4{margin:0;font-size:12px;font-weight:600;letter-spacing:.03em;color:var(--dsw-alias-label-tertiary)}',
       '.mt-dsec-head .mt-line{flex:1;height:1px;background:var(--dsw-alias-border-l2)}',
       '.mt-dsec-head .mt-n{font-size:12px;color:var(--dsw-alias-label-tertiary);font-variant-numeric:tabular-nums}',
       '.mt-ac-list{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:6px}',
@@ -3364,7 +3454,7 @@ window.__ModuleLoader__.load({
       /* CHG-82 G2：角色库（design/roles.html 的 .page-head / .dsec-head / .filterbar / .card / 创建卡） */
       '.mt-page-head h2{margin:0;font-size:20px;font-weight:600;letter-spacing:-.01em}',
       '.mt-page-head p{margin:6px 0 0;font-size:13px;line-height:1.6;color:var(--dsw-alias-label-secondary);max-width:78ch}',
-      '.mt-dsec-head h4{margin:0;font-size:12px;font-weight:600;letter-spacing:.03em;color:var(--dsw-alias-label-secondary)}',
+      '.mt-dsec-head h4{margin:0;font-size:12px;font-weight:600;letter-spacing:.03em;color:var(--dsw-alias-label-tertiary)}',
       '.mt-dsec-block{display:flex;flex-direction:column;gap:8px}',
       '.mt-searchfield{display:inline-flex;align-items:center;gap:6px;flex:0 1 240px;min-width:160px;border:.5px solid var(--dsw-alias-border-l2);border-radius:6px;background:var(--dsw-alias-bg-base);padding:3px 8px}',
       '.mt-searchfield-ico{flex:none;font-size:12px;line-height:1;color:var(--dsw-alias-label-tertiary)}',
@@ -3381,7 +3471,19 @@ window.__ModuleLoader__.load({
       '.mt-avatar-a2{background:color-mix(in srgb, var(--dsw-alias-state-ok-primary) 14%, transparent);border-color:color-mix(in srgb, var(--dsw-alias-state-ok-primary) 32%, transparent);color:var(--dsw-alias-state-ok-primary)}',
       '.mt-avatar-a3{background:color-mix(in srgb, var(--dsw-alias-state-warning-primary) 14%, transparent);border-color:color-mix(in srgb, var(--dsw-alias-state-warning-primary) 32%, transparent);color:var(--dsw-alias-state-warning-primary)}',
       '.mt-avatar-a4{background:color-mix(in srgb, var(--dsw-alias-state-error-primary) 12%, transparent);border-color:color-mix(in srgb, var(--dsw-alias-state-error-primary) 30%, transparent);color:var(--dsw-alias-state-error-primary)}',
-      '.mt-chip-origin{flex:none;color:var(--dsw-alias-label-secondary)}',
+      '.mt-chip-origin{flex:none;color:var(--dsw-alias-label-tertiary)}',
+      /* CHG-91（插件团队贡献契约 v1）：插件贡献区块 —— 与角色库同层级但不抢视觉 */
+      '.mt-contrib{margin-bottom:16px}',
+      '.mt-contrib-plugins{display:flex;flex-wrap:wrap;gap:8px;margin:8px 0}',
+      '.mt-contrib-plugin{display:flex;align-items:center;gap:8px;padding:6px 10px;border:1px solid var(--dsw-alias-line-soft);border-radius:8px;background:var(--dsw-alias-surface-raised)}',
+      '.mt-contrib-rolelist,.mt-contrib-teamlist{display:flex;flex-direction:column;gap:6px;margin-top:6px}',
+      '.mt-contrib-role,.mt-contrib-team{display:flex;align-items:center;gap:8px;flex-wrap:wrap;padding:6px 8px;border-radius:6px;background:var(--dsw-alias-surface-raised)}',
+      '.mt-contrib-warns{margin:6px 0 0;padding-left:18px;display:flex;flex-direction:column;gap:4px;font-size:12px}',
+      '.mt-contrib-warn-err{color:var(--dsw-alias-state-error-primary)}',
+      '.mt-contrib-warn-info{color:var(--dsw-alias-label-secondary)}',
+      /* CHG-93：门禁结论的可信度徽标（宿主执行 / 人工强制放行）——用状态色区分分量 */
+      '.mt-chip-executed{color:var(--dsw-alias-state-ok-primary);border-color:color-mix(in srgb, var(--dsw-alias-state-ok-primary) 32%, transparent)}',
+      '.mt-chip-forced{color:var(--dsw-alias-state-warning-primary);border-color:color-mix(in srgb, var(--dsw-alias-state-warning-primary) 32%, transparent)}',
       '.mt-rolechip-mono{font-variant-numeric:tabular-nums;letter-spacing:.01em}',
       '.mt-rolecard-fork{font-size:12px;color:var(--dsw-alias-label-tertiary)}',
       '.mt-rolecard-fork-ico{color:var(--dsw-alias-label-tertiary)}',
@@ -3900,7 +4002,7 @@ window.__ModuleLoader__.load({
       '.mt-mavatar-a3{background:color-mix(in srgb, var(--dsw-alias-state-warning-primary) 14%, transparent);border-color:color-mix(in srgb, var(--dsw-alias-state-warning-primary) 32%, transparent);color:var(--dsw-alias-state-warning-primary)}',
       '.mt-mavatar-a4{background:color-mix(in srgb, var(--dsw-alias-state-error-primary) 14%, transparent);border-color:color-mix(in srgb, var(--dsw-alias-state-error-primary) 32%, transparent);color:var(--dsw-alias-state-error-primary)}',
       '.mt-dsec-head{display:flex;align-items:center;gap:6px;margin-bottom:8px;flex-wrap:wrap}',
-      '.mt-dsec-head h4{margin:0;font-size:12px;font-weight:600;letter-spacing:.03em;color:var(--dsw-alias-label-secondary)}',
+      '.mt-dsec-head h4{margin:0;font-size:12px;font-weight:600;letter-spacing:.03em;color:var(--dsw-alias-label-tertiary)}',
       '.mt-dsec-head .mt-line{flex:1;min-width:12px;height:1px;background:var(--dsw-alias-border-l2)}',
       '.mt-dsec-head .mt-n{font-size:12px;color:var(--dsw-alias-label-tertiary);font-variant-numeric:tabular-nums}',
       '.mt-dsec-head .mt-mini-link{margin-left:auto}',
@@ -5062,7 +5164,7 @@ window.__ModuleLoader__.load({
         ] }) : null,
             j(DiagChips, { t, diagnosis: detail.diagnosis }),
             /* CHG-76 C：诊断一键修复（assignable → 一键指派 / roleSwap → 改用已有人角色 / spawnRole → 纯提示） */
-            j(DiagFix, { t, api, teamId, taskId, diagnosis: detail.diagnosis, readOnly, onFixed: onDiagnosisFixed }),
+            j(DiagFix, { t, api, teamId, taskId, diagnosis: detail.diagnosis, readOnly, onFixed: onDiagnosisFixed, expectedRevision: detail.revision }),
             /* 门禁裁决（CHG-86 / M2-C）：任务处于 gate:* 时的唯一人工裁决入口 */
             j(GateReview, {
               t,
@@ -5239,11 +5341,22 @@ window.__ModuleLoader__.load({
                 ? j('div', { className: 'mt-hint', children: t('detail.gatesEmpty') })
                 : js('div', { className: 'mt-dt-rows', children: gates.map((gate) => {
                   const verdict = detail.gateVerdicts?.[gate]
+                  /* CHG-93：最近一次裁决的完整摘要（executedBy / forcedBy / 退出码） */
+                  const gateResult = detail.gateResults?.[gate]
                   const label = verdict === 'pass' ? t('detail.gatePass') : verdict === 'fail' ? t('detail.gateFail') : t('detail.gatePending')
                   return js('div', { key: gate, className: 'mt-dt-row', children: [
                     js('div', { className: 'mt-dt-row-main', children: [
                       j('div', { className: 'mt-dt-row-title', children: gateLabel(gate) }),
-                      j('div', { className: 'mt-dt-row-sub', children: label }),
+                      j('div', { className: 'mt-dt-row-sub', children: [
+                        label,
+                        /* CHG-93：可信度徽标——「谁跑的 / 是不是人硬放的」直接决定结论分量 */
+                        gateResult?.executedBy === 'host'
+                          ? j('span', { className: 'mt-mini-chip mt-chip-executed', title: t('detail.gateExecutedByHint'), children: t('detail.gateExecutedByHost') })
+                          : null,
+                        gateResult?.forcedBy === 'human'
+                          ? j('span', { className: 'mt-mini-chip mt-chip-forced', title: t('detail.gateForcedByHint'), children: t('detail.gateForcedByHuman') })
+                          : null,
+                      ] }),
                     ] }),
                     j('span', { className: 'mt-gate' + (verdict ? ` mt-gate-${verdict}` : ''), children: verdict === 'pass' ? t('detail.gatePass') : label }),
                   ] })
@@ -6701,6 +6814,11 @@ window.__ModuleLoader__.load({
       const [busy, setBusy] = react.useState(false)
       const [err, setErr] = react.useState(null)
       const [showJson, setShowJson] = react.useState(false)
+      /* CHG-89（M2-E / FR-16.3）：会话移交——摘要 → 新团队预设会话。
+       * 两段确认：第一段无 confirm 只做能力探测 + 摘要预览，第二段才真建会话。 */
+      const [handoffBusy, setHandoffBusy] = react.useState(false)
+      const [handoffErr, setHandoffErr] = react.useState(null)
+      const [handoffResult, setHandoffResult] = react.useState(null)
       if (config === undefined) return j('div', { className: 'mt-empty', children: t('state.loading') })
       if (!config) return j('div', { className: 'mt-empty', children: offline ? t('settings.offline') : t('settings.notWired') })
       const c = config.config ?? {}
@@ -6725,6 +6843,43 @@ window.__ModuleLoader__.load({
           setImpact(null)
           onDisbanded?.()
         } catch (e) { setErr(String(e?.message ?? e)) } finally { setBusy(false) }
+      }
+      /**
+       * CHG-89（M2-E / FR-16.3）：会话移交的两段式入口。
+       *
+       * 为什么面板侧要加一段确认：移交会**程序化新建一个团队预设会话**并注入摘要——
+       * 这是用户可见的副作用（新会话会出现），不能点一下就发生。服务端 `handoffTeam`
+       * 本身是单段的（它只管「建会话 + 注入」），确认放在这里。
+       *
+       * 失败不静默：`MT_UNAVAILABLE`（宿主无 sessionController）与「注入失败但会话已建」
+       * 都原样回显——后者服务端会带 `sessionId`，人可以手动粘贴摘要。
+       */
+      const askHandoff = () => {
+        if (!team?.online || !team?.sessionId || handoffBusy) return
+        setHandoffErr(null)
+        setHandoffResult({ stage: 'confirm' })
+      }
+      const doHandoff = async () => {
+        if (!team?.online || !team?.sessionId || handoffBusy) return
+        setHandoffErr(null)
+        setHandoffBusy(true)
+        try {
+          const r = await makeApi(connection, team.sessionId).handoff({
+            teamId: team.teamId,
+            sourceSessionId: team.sessionId,
+          })
+          if (r?.status === 'ok') {
+            setHandoffResult({ stage: 'done', sessionId: r.sessionId, summary: r.summary, metadata: r.metadata, note: r.note })
+            return
+          }
+          /* 会话已建但注入失败：把 sessionId 一起显示，用户可手动粘贴摘要 */
+          setHandoffResult(r?.sessionId ? { stage: 'partial', sessionId: r.sessionId, message: r.message ?? r.code } : null)
+          setHandoffErr(r?.message ?? r?.code ?? t('settings.handoffFailed').replace('{msg}', ''))
+        } catch (e) {
+          setHandoffErr(t('settings.handoffFailed').replace('{msg}', String(e?.message ?? e)))
+        } finally {
+          setHandoffBusy(false)
+        }
       }
       const layerRow = (key, title, src, path, n, unit) => js('div', { className: 'mt-layer', children: [
         j('span', { className: `mt-layer-ico mt-layer-${key}`, 'aria-hidden': true, children: layerIcon(key) }),
@@ -6812,6 +6967,8 @@ window.__ModuleLoader__.load({
           ] }),
           js('div', { className: 'mt-setrows', children: [
             row('archive', t('settings.archiveTitle'), t('settings.archiveSub'), [j('button', { className: 'mt-btn mt-btn-sm', disabled: true, title: t('settings.readonlyTip'), children: t('settings.archiveBtn') })]),
+            /* CHG-89（M2-E / FR-16.3）：会话移交——把当前团队上下文摘要带进一个新团队预设会话 */
+            row('handoff', t('settings.handoffTitle'), t('settings.handoffSub'), [j('button', { className: 'mt-btn mt-btn-sm', disabled: !team?.online || handoffBusy, title: team?.online ? t('settings.handoffHint') : t('settings.offline'), onClick: askHandoff, children: handoffBusy ? t('state.loading') : t('settings.handoffBtn') })]),
             row('disband', j('span', { className: 'mt-danger-ink', children: t('settings.disbandTitle') }), t('settings.disbandSub').replace('{members}', String((team?.members ?? []).length)).replace('{tasks}', String(pending)), [j('button', { className: 'mt-btn mt-btn-danger mt-btn-sm', disabled: !team?.online, onClick: askDisband, children: t('settings.disbandBtn') })]),
           ] }),
           impact ? js('div', { className: 'mt-impact-box', children: [
@@ -6821,6 +6978,25 @@ window.__ModuleLoader__.load({
               j('button', { className: 'mt-btn', onClick: () => setImpact(null), children: t('settings.cancelDisband') }),
             ] }),
           ] }) : null,
+          /* CHG-89：移交确认 / 结果（新会话 id + 摘要预览；原会话保留） */
+          handoffResult?.stage === 'confirm' ? js('div', { className: 'mt-impact-box', children: [
+            j('strong', { children: t('settings.handoffConfirm') }),
+            j('span', { children: t('settings.handoffConfirmBody').replace('{team}', String(team?.name ?? team?.teamId ?? '')) }),
+            js('div', { className: 'mt-form-actions', children: [
+              j('button', { className: 'mt-btn mt-btn-primary', disabled: handoffBusy, onClick: doHandoff, children: handoffBusy ? t('state.loading') : t('settings.handoffConfirmBtn') }),
+              j('button', { className: 'mt-btn', onClick: () => setHandoffResult(null), children: t('action.cancel') }),
+            ] }),
+          ] }) : null,
+          handoffResult?.stage === 'done' || handoffResult?.stage === 'partial' ? js('div', { className: 'mt-impact-box', children: [
+            j('strong', { children: handoffResult.stage === 'done' ? t('settings.handoffDone') : t('settings.handoffPartial') }),
+            j('span', { className: 'mt-rolechip mt-rolechip-mono', children: String(handoffResult.sessionId ?? '—') }),
+            handoffResult.note ? j('span', { children: String(handoffResult.note) }) : null,
+            handoffResult.summary ? j('pre', { className: 'mt-prompt-block', children: String(handoffResult.summary) }) : null,
+            js('div', { className: 'mt-form-actions', children: [
+              j('button', { className: 'mt-btn', onClick: () => setHandoffResult(null), children: t('action.close') }),
+            ] }),
+          ] }) : null,
+          handoffErr ? j('div', { className: 'mt-form-note mt-error-banner', role: 'alert', children: handoffErr }) : null,
         ] }),
         js('p', { className: 'mt-note-box', children: [j('b', { children: t('settings.footNote') }), j('span', { children: t('settings.footNoteSub') })] }),
         (config.warnings ?? []).length > 0 ? j('div', { className: 'mt-note-box mt-note-info', children: `${t('settings.warnings')}：${config.warnings.join('；')}` }) : null,
@@ -6934,7 +7110,7 @@ window.__ModuleLoader__.load({
               js('div', { className: 'mt-rolecard-title', children: [
                 j('strong', { children: role.name }),
                 j('span', { className: 'mt-rolecard-id', children: role.id }),
-                j('span', { className: 'mt-chip mt-chip-origin', children: role.origin === 'builtin' ? `🔒 ${t('role.origin.builtin')}` : t(`role.origin.${role.origin}`) }),
+                j('span', { className: 'mt-chip mt-chip-origin', title: role.pluginId ? t('contrib.providedBy').replace('{plugin}', role.pluginId) : undefined, children: role.origin === 'builtin' || role.origin === 'plugin' ? `🔒 ${t(`role.origin.${role.origin}`)}` : t(`role.origin.${role.origin}`) }),
               ] }),
               j('div', { className: 'mt-rolecard-sub', children: role.description }),
               js('div', { className: 'mt-rolecard-row', children: [
@@ -7093,10 +7269,127 @@ window.__ModuleLoader__.load({
      *  左列：定义与设定（职责 / 边界 / 兴趣词 + 系统提示词块 + 模型路由）· 技能（启用开关）· MCP 与工具；
      *  侧列：在册情况（跨团队聘任与实例）· 快照规则 · 操作（复制到项目 / 在队长会话试召唤 / 删除）。
      *  CHG-73：删除角色两段确认（先展示 usage）。 */
-    function RoleDetailDrawer({ t, data, onClose, teamName, onEdit, onDelete, deleteHint, onCopyToProject, onGuest, skillTotal }) {
+    /**
+     * CHG-91（插件团队贡献契约 v1 / docs/16 §12.3）：「插件贡献」区块。
+     *
+     * 为什么要有它（而不是让插件角色混在全局库里）：**用户必须能看出「这个角色是谁给的」**——
+     *  - 插件来源只读（想改走「复制到项目」），混在可编辑列表里会让人以为编辑坏了；
+     *  - 插件装载失败必须**大声**（P4）：有 error 时顶部红条 + 每条带修法；
+     *  - 装/卸插件不必重启宿主：一个「重新扫描插件」按钮。
+     */
+    /**
+     * CHG-93：插件贡献区块的**纯渲染函数**（无状态）。
+     *
+     * 为什么抽出来：面板只负责「取数 + 触发重扫」，而「空态 / 有插件 / 有 error 红条」
+     * 三个分支是**数据决定的**——抽成纯函数才能逐分支断言（CDP 只能验一个真实状态，
+     * 单测能验全部）。
+     *
+     * @param data `undefined` = 加载中（渲染外壳 + loading 占位，不闪烁）
+     */
+    function contributionsBody(t, data, { busy = false, onReload, err } = {}) {
+      const loading = data === undefined
+      const plugins = data?.plugins ?? []
+      const roles = data?.roles ?? []
+      const teams = data?.teams ?? []
+      const warnings = data?.warnings ?? []
+      const errors = warnings.filter((warning) => warning.level === 'error')
+      const displayNameOf = (pluginId) => (plugins.find((plugin) => plugin.pluginId === pluginId)?.displayName ?? pluginId)
+      return js('section', { className: 'mt-sec mt-contrib', id: 'mt-contributions-section', children: [
+        js('div', { className: 'mt-dsec-head', children: [
+          j('h4', { children: t('contrib.title') }),
+          j('span', { className: 'mt-dsec-line', 'aria-hidden': true }),
+          j('button', { className: 'mt-btn mt-btn-sm', disabled: busy, onClick: onReload, children: busy ? t('contrib.reloading') : t('contrib.reload') }),
+        ] }),
+        j('p', { className: 'mt-hint', children: t('contrib.desc') }),
+        errors.length > 0
+          ? js('div', { className: 'mt-banner mt-error-banner', role: 'alert', children: [
+            j('strong', { children: t('contrib.warnTitle').replace('{n}', String(errors.length)) }),
+            j('div', { className: 'mt-hint', children: t('contrib.warnHint') }),
+            js('ul', { className: 'mt-contrib-warns', children: warnings.map((warning, index) => j('li', {
+              key: `w-${index}`,
+              className: warning.level === 'error' ? 'mt-contrib-warn-err' : 'mt-contrib-warn-info',
+              children: [j('code', { children: warning.code }), ` ${warning.message}`],
+            })) }),
+          ] })
+          : null,
+        loading
+          ? j('div', { className: 'mt-hint', children: t('state.loading') })
+          : plugins.length === 0
+            ? j('div', { className: 'mt-empty', children: t('contrib.empty') })
+            : js('div', { children: [
+              js('div', { className: 'mt-contrib-plugins', children: plugins.map((plugin) => js('div', { key: plugin.pluginId, className: 'mt-contrib-plugin', children: [
+                j('strong', { children: plugin.displayName }),
+                j('span', { className: 'mt-rolecard-id', children: `${plugin.pluginId} · v${plugin.version}` }),
+                j('span', { className: 'mt-hint', children: `角色 ${plugin.roles.length} · 模板 ${plugin.teams.length}` }),
+              ] })) }),
+              roles.length > 0 ? js('div', { className: 'mt-sec', children: [
+                j('h5', { children: t('contrib.roles') }),
+                js('div', { className: 'mt-contrib-rolelist', children: roles.map((role) => js('div', { key: role.id, className: 'mt-contrib-role', children: [
+                  j('span', { className: 'mt-rolechip mt-rolechip-mono', children: role.id }),
+                  j('span', { children: role.name }),
+                  j('span', { className: 'mt-hint', children: t('contrib.providedBy').replace('{plugin}', displayNameOf(String(role.origin ?? '').replace(/^plugin:/, ''))) }),
+                  j('span', { className: 'mt-chip mt-chip-origin', children: `🔒 ${t('contrib.readonly')}` }),
+                ] })) }),
+              ] }) : null,
+              teams.length > 0 ? js('div', { className: 'mt-sec', children: [
+                j('h5', { children: t('contrib.teams') }),
+                js('div', { className: 'mt-contrib-teamlist', children: teams.map((team) => js('div', { key: team.id, className: 'mt-contrib-team', children: [
+                  j('strong', { children: team.name }),
+                  j('span', { className: 'mt-rolecard-id', children: team.id }),
+                  j('span', { className: 'mt-hint', children: (team.members ?? []).map((member) => member.roleId).join(' · ') }),
+                ] })) }),
+              ] }) : null,
+            ] }),
+        j('div', { className: 'mt-hint', children: t('contrib.root').replace('{root}', String(data?.root ?? '')) }),
+        err ? j('div', { className: 'mt-form-note mt-error-banner', role: 'alert', children: err }) : null,
+      ] })
+    }
+
+    function ContributionsSection({ t, api, workspaceRoot, onChanged, onNotice }) {
+      const [data, setData] = react.useState(undefined)
+      const [busy, setBusy] = react.useState(false)
+      const [err, setErr] = react.useState(null)
+      const load = react.useCallback(async () => {
+        if (!api) return
+        try {
+          setData((await api.getContributions({ workspaceRoot })) ?? { status: 'ok', plugins: [], roles: [], teams: [], warnings: [] })
+        } catch (e) {
+          setErr(String(e?.message ?? e))
+          setData({ status: 'ok', plugins: [], roles: [], teams: [], warnings: [] })
+        }
+      }, [api, workspaceRoot])
+      react.useEffect(() => { load() }, [load])
+      const reload = async () => {
+        if (busy || !api) return
+        setBusy(true)
+        setErr(null)
+        try {
+          const r = await api.reloadContributions({ workspaceRoot })
+          setData(r ?? { status: 'ok', plugins: [], roles: [], teams: [], warnings: [] })
+          onNotice?.(t('contrib.reloaded')
+            .replace('{plugins}', String((r?.plugins ?? []).length))
+            .replace('{roles}', String((r?.roles ?? []).length))
+            .replace('{teams}', String((r?.teams ?? []).length)))
+          onChanged?.()
+        } catch (e) {
+          setErr(String(e?.message ?? e))
+        } finally {
+          setBusy(false)
+        }
+      }
+      /* CHG-93：渲染体抽成纯函数（`contributionsBody`）——面板只负责取数，
+       * 纯函数可对「空态 / 有插件 / 有 error」三个分支直接断言（CDP 只能验一个真实状态）。 */
+      return contributionsBody(t, data, { busy, onReload: reload, err })
+    }
+
+    function RoleDetailDrawer({ t, data, onClose, teamName, onEdit, onDelete, deleteHint, onCopyToProject, onGuest, skillTotal, onPublish }) {
       const [usage, setUsage] = react.useState(null)
       const [delBusy, setDelBusy] = react.useState(false)
       const [delErr, setDelErr] = react.useState(null)
+      /* CHG-89（FR-13.1「发布到全局库」）：两段确认——全局库对该工作区所有项目可见，是显式动作 */
+      const [pubBusy, setPubBusy] = react.useState(false)
+      const [pubErr, setPubErr] = react.useState(null)
+      const [pubImpact, setPubImpact] = react.useState(null)
       if (!data) return js('div', { className: 'mt-drawer', children: [j('div', { className: 'mt-drawer-head', children: j('button', { className: 'mt-btn', onClick: onClose, children: t('action.close') }) }), j('div', { className: 'mt-empty', children: t('state.loading') })] })
       const def = data.definition ?? {}
       const readOnlyRole = data.origin !== 'project'
@@ -7144,6 +7437,37 @@ window.__ModuleLoader__.load({
           setDelBusy(false)
         }
       }
+      /** 第一段：不带 confirm 调用，拿发布影响面（目标全局库路径 + 可见范围） */
+      const askPublish = async () => {
+        if (!onPublish || pubBusy) return
+        setPubErr(null)
+        setPubBusy(true)
+        try {
+          const r = await onPublish(false)
+          if (r?.status === 'confirm-required') { setPubImpact(r.impact ?? {}); return }
+          if (r?.status === 'published') return
+          setPubErr(t('role.publishFailed').replace('{msg}', r?.message ?? r?.code ?? ''))
+        } catch (e) {
+          setPubErr(t('role.publishFailed').replace('{msg}', String(e?.message ?? e)))
+        } finally {
+          setPubBusy(false)
+        }
+      }
+      /** 第二段：带 confirm:true 落盘到全局库 */
+      const doPublish = async () => {
+        if (!onPublish || pubBusy) return
+        setPubErr(null)
+        setPubBusy(true)
+        try {
+          const r = await onPublish(true)
+          if (r?.status === 'published') { setPubImpact(null); return }
+          setPubErr(t('role.publishFailed').replace('{msg}', r?.message ?? r?.code ?? ''))
+        } catch (e) {
+          setPubErr(t('role.publishFailed').replace('{msg}', String(e?.message ?? e)))
+        } finally {
+          setPubBusy(false)
+        }
+      }
       const membershipRows = (data.memberships ?? []).length === 0
         ? j('div', { className: 'mt-hint', children: t('role.membershipsEmpty') })
         : js('div', { children: (data.memberships ?? []).map((membership, index) => js('div', { className: 'mt-membership', key: `${membership.teamId}-${membership.instanceName}-${index}`, children: [
@@ -7161,7 +7485,7 @@ window.__ModuleLoader__.load({
           j('span', { className: `mt-avatar ${avatarClassOf(def.id ?? data.roleId)}`, 'aria-hidden': true, children: avatarCharOf(def.name, def.id ?? data.roleId) }),
           j('strong', { children: def.name ?? data.roleId }),
           j('span', { className: 'mt-rolecard-id', children: def.id }),
-          j('span', { className: 'mt-chip mt-chip-origin', children: t(`role.origin.${data.origin}`) }),
+          j('span', { className: 'mt-chip mt-chip-origin', children: data.origin === 'plugin' ? `🔒 ${t('role.origin.plugin')}` : t(`role.origin.${data.origin}`) }),
           readOnlyRole ? j('span', { className: 'mt-chip mt-chip-idle', children: t('role.readonlyBadge') }) : null,
           j('button', { className: 'mt-btn', onClick: onClose, children: t('action.close') }),
         ] }),
@@ -7274,6 +7598,8 @@ window.__ModuleLoader__.load({
                 readOnlyRole
                   ? j('button', { className: 'mt-btn mt-btn-primary', onClick: () => (onCopyToProject ? onCopyToProject(def) : onEdit?.(data)), children: t('roles.copyToProjectFresh') })
                   : (onEdit ? j('button', { className: 'mt-btn mt-btn-primary', onClick: () => onEdit(data), children: t('role.edit') }) : null),
+                /* CHG-89（FR-13.1）：项目库角色可「发布到全局库」——内置/全局来源没有发布意义，故不渲染 */
+                onPublish ? j('button', { className: 'mt-btn', disabled: pubBusy, title: t('role.publishHint'), onClick: askPublish, children: pubBusy ? t('state.loading') : t('role.publishBtn') }) : null,
                 onGuest ? j('button', { className: 'mt-btn', onClick: () => onGuest(def), children: t('role.tryInCaptain') }) : null,
                 onDelete
                   ? j('button', { className: 'mt-btn mt-btn-danger', disabled: delBusy, title: t('role.delete'), onClick: askDelete, children: delBusy ? t('state.loading') : t('role.delete') })
@@ -7288,7 +7614,18 @@ window.__ModuleLoader__.load({
                   j('button', { className: 'mt-btn mt-btn-danger', disabled: delBusy, onClick: doDelete, children: delBusy ? t('state.loading') : t('role.deleteConfirmBtn') }),
                 ] }),
               ] }) : null,
+              /* CHG-89：发布影响面确认框（全局库对所有项目可见 → 必须显式确认） */
+              pubImpact ? js('div', { className: 'mt-usagebox', role: 'alert', children: [
+                j('strong', { children: t('role.publishConfirm') }),
+                j('span', { children: t('role.publishImpact').replace('{path}', String(pubImpact.filePath ?? '—')) }),
+                t('role.publishImpactNote') ? j('span', { children: t('role.publishImpactNote') }) : null,
+                js('div', { className: 'mt-form-actions', children: [
+                  j('button', { className: 'mt-btn', onClick: () => setPubImpact(null), children: t('action.cancel') }),
+                  j('button', { className: 'mt-btn mt-btn-primary', disabled: pubBusy, onClick: doPublish, children: pubBusy ? t('state.loading') : t('role.publishConfirmBtn') }),
+                ] }),
+              ] }) : null,
               delErr ? j('div', { className: 'mt-form-note mt-error-banner', role: 'alert', children: delErr }) : null,
+              pubErr ? j('div', { className: 'mt-form-note mt-error-banner', role: 'alert', children: pubErr }) : null,
             ] }),
             /* CHG-74：同名副本说明——让用户知道「为什么详情是这份」而不是另一份 */
             (data.shadowed ?? []).length > 0
@@ -7668,7 +8005,7 @@ window.__ModuleLoader__.load({
      *  - roleSwap 非空 → 「改用已有人角色」下拉（选中即 updateTask patch.requiredRole）
      *  - 都没有但有 spawnRole → 纯提示「去召唤 <角色> 成员」（不自动执行）
      *  离线/只读：按钮 disabled + title 用既有只读文案。 */
-    function DiagFix({ t, api, teamId, taskId, diagnosis, readOnly, onFixed }) {
+    function DiagFix({ t, api, teamId, taskId, diagnosis, readOnly, onFixed, expectedRevision }) {
       const [busy, setBusy] = react.useState(false)
       const [err, setErr] = react.useState(null)
       const [chosenRole, setChosenRole] = react.useState('')
@@ -7692,14 +8029,28 @@ window.__ModuleLoader__.load({
         }
       }
       const assign = (option) => run(async () => {
-        const r = await api.assignTask({ teamId, taskId, memberIds: [option.memberId] })
+        const r = await api.assignTask({
+          teamId,
+          taskId,
+          memberIds: [option.memberId],
+          /* CHG-89（QA-4 乐观锁）：诊断修复也是写路径——详情页打开时的版本快照必须回传，
+           * 否则「表单那条路有锁、诊断这条路没有」就是同一个洞开了两个口。 */
+          ...(typeof expectedRevision === 'number' ? { expectedRevision } : {}),
+        })
+        if (r?.code === 'MT_REVISION_CONFLICT') throw new Error(t('task.revisionConflict').replace('{current}', String(r?.currentRevision ?? '—')).replace('{snapshot}', String(expectedRevision)))
         if (r?.status === 'error') throw new Error(r.message ?? r.code ?? 'assign failed')
       }, t('diag.fixAssignDone').replace('{member}', option.instanceName ?? option.memberId))
       const swapRole = (roleId) => {
         setChosenRole(roleId)
         if (!roleId) return
         run(async () => {
-          const r = await api.updateTask({ teamId, taskId, patch: { requiredRole: roleId } })
+          const r = await api.updateTask({
+            teamId,
+            taskId,
+            patch: { requiredRole: roleId },
+            ...(typeof expectedRevision === 'number' ? { expectedRevision } : {}),
+          })
+          if (r?.code === 'MT_REVISION_CONFLICT') throw new Error(t('task.revisionConflict').replace('{current}', String(r?.currentRevision ?? '—')).replace('{snapshot}', String(expectedRevision)))
           if (r?.status === 'error') throw new Error(r.message ?? r.code ?? 'update failed')
         }, t('diag.fixRoleSwapDone').replace('{role}', roleLabel(roleId)))
       }
@@ -8195,6 +8546,10 @@ window.__ModuleLoader__.load({
       const [coops, setCoops] = react.useState(new Set((initial?.participants ?? []).filter((p) => p.role === 'coop').map((p) => p.teamId)))
       const [busy, setBusy] = react.useState(false)
       const [err, setErr] = react.useState(null)
+      /* CHG-89（QA-4 乐观锁）：编辑表单打开时的版本快照。保存时回传 expectedRevision，
+       * 服务端与当前 revision 不等即 MT_REVISION_CONFLICT（账本零写入）——
+       * 面板据此提示「别人刚改过，重新加载再改」，而不是静默覆盖对方的修改。 */
+      const expectedRevision = typeof initial?.revision === 'number' ? initial.revision : undefined
       const [structural, setStructural] = react.useState(null)
       const [rescopeReason, setRescopeReason] = react.useState('')
       const team = teams.find((item) => item.teamId === teamId)
@@ -8218,6 +8573,15 @@ window.__ModuleLoader__.load({
         return next
       }
       const running = initial ? (initial.state === 'in_progress' || String(initial.state ?? '').startsWith('gate:')) : false
+      /**
+       * CHG-89（QA-4）：版本冲突的统一提示。
+       *
+       * 服务端在 `MT_REVISION_CONFLICT` 时回显 `currentRevision`——直接展示两侧版本号，
+       * 用户才知道「我基于哪一版改、现在是哪一版」，而不是只看到一句「保存失败」。
+       */
+      const conflictText = (r) => t('task.revisionConflict')
+        .replace('{current}', String(r?.currentRevision ?? '—'))
+        .replace('{snapshot}', String(expectedRevision ?? '—'))
       /** mode: 'save' 普通保存 | 'meta' 只保存元数据 | 'rescope' 保存并重新规划（理由必填） */
       const submit = async (intent = 'save') => {
         if (busy) return
@@ -8289,7 +8653,9 @@ window.__ModuleLoader__.load({
               reason: rescopeReason.trim(),
               ...(Object.keys(patch).length > 0 ? { patch } : {}),
               ...(assigneesChanged && assignees.size > 0 ? { memberIds: [...assignees] } : {}),
+              ...(expectedRevision !== undefined ? { expectedRevision } : {}),
             })
+            if (r?.code === 'MT_REVISION_CONFLICT') { setErr(conflictText(r)); return }
             if (r?.status === 'error') throw new Error(r.message ?? r.code ?? 'rescope failed')
             if (r?.status !== 'rescoped') throw new Error(r?.message ?? 'rescope failed')
             onSaved(null, t('task.rescopeDone').replace('{id}', String(initial.id)).replace('{state}', stateLabel(r.state)))
@@ -8298,13 +8664,29 @@ window.__ModuleLoader__.load({
           if (metaOnly) for (const key of structuralKeys) delete patch[key]
           if (Object.keys(patch).length === 0 && !assigneesChanged) { onClose(); return }
           let updated = null
-          if (Object.keys(patch).length > 0) updated = await api.updateTask({ teamId, taskId: initial.id, patch })
+          if (Object.keys(patch).length > 0) {
+            updated = await api.updateTask({
+              teamId,
+              taskId: initial.id,
+              patch,
+              ...(expectedRevision !== undefined ? { expectedRevision } : {}),
+            })
+          }
+          if (updated?.code === 'MT_REVISION_CONFLICT') { setErr(conflictText(updated)); return }
           if (updated?.status === 'error' && updated?.code === 'MT_TASK_STRUCTURAL_EDIT') {
             setStructural(structuralKeys.length > 0 ? structuralKeys : ['acceptanceCriteria'])
             return
           }
           if (updated && updated.status !== 'updated') throw new Error(updated?.message ?? updated?.code ?? 'update failed')
-          if (assigneesChanged && assignees.size > 0) await api.assignTask({ teamId, taskId: initial.id, memberIds: [...assignees] })
+          if (assigneesChanged && assignees.size > 0) {
+            const assigned = await api.assignTask({
+              teamId,
+              taskId: initial.id,
+              memberIds: [...assignees],
+              ...(expectedRevision !== undefined ? { expectedRevision } : {}),
+            })
+            if (assigned?.code === 'MT_REVISION_CONFLICT') { setErr(conflictText(assigned)); return }
+          }
           for (const coopId of coops) {
             if ((initial.participants ?? []).some((p) => p.teamId === coopId)) continue
             await api.participateTask({ teamId, taskId: initial.id, participantTeamId: coopId, role: 'coop' })
@@ -8717,7 +9099,7 @@ window.__ModuleLoader__.load({
     }
 
     /** 重新规划对话框（CHG-73 §4.3）：理由必填 + 可选结构补丁 + 可选重派队员 → rescopeTask */
-    function RescopeDialog({ t, api, teamId, taskId, title, input, members, tasks, onClose, onDone }) {
+    function RescopeDialog({ t, api, teamId, taskId, title, input, members, tasks, expectedRevision, onClose, onDone }) {
       const src = input ?? {}
       const [reason, setReason] = react.useState('')
       const [showPatch, setShowPatch] = react.useState(false)
@@ -8764,7 +9146,12 @@ window.__ModuleLoader__.load({
             reason: trimmed,
             ...(Object.keys(patch).length > 0 ? { patch } : {}),
             ...(memberIds.size > 0 ? { memberIds: [...memberIds] } : {}),
+            /* CHG-89（QA-4 乐观锁）：与编辑表单同一条规则——基于过期版本的重新规划不落地 */
+            ...(typeof expectedRevision === 'number' ? { expectedRevision } : {}),
           })
+          if (r?.code === 'MT_REVISION_CONFLICT') {
+            throw new Error(t('task.revisionConflict').replace('{current}', String(r?.currentRevision ?? '—')).replace('{snapshot}', String(expectedRevision)))
+          }
           if (r?.status === 'error') throw new Error(r.message ?? r.code ?? 'rescope failed')
           if (r?.status !== 'rescoped') throw new Error(r?.message ?? 'rescope failed')
           onDone?.(r)
@@ -9522,6 +9909,19 @@ window.__ModuleLoader__.load({
           ] }),
           js('div', { className: 'mt-workspace', children: [
           js('div', { className: 'mt-page', children: [
+            /* CHG-96：插件贡献区块必须在**全局作用域**可见。
+             *
+             * 为什么：`$DSH_HOME/myteam/plugins` 是全局位置，贡献的角色进的就是「全局角色库」——
+             * 而这一段原本只在「项目」作用域的「角色」tab 里渲染，且「项目」按钮在未选工作区时
+             * 是 disabled 的。结果：用户装完插件、打开面板（默认停「全局」）看不到任何入口，
+             * 区块自己的文案却说「贡献进全局角色库」。放在这里才和它的语义一致。 */
+            j(ContributionsSection, {
+              t,
+              api: discoveryApi,
+              workspaceRoot: projectRoot,
+              onNotice: setNotice,
+              onChanged: () => loadProject(projectRoot),
+            }),
             /* CHG-80：区块顺序对齐设计稿——内置 → 全局 → 随行资产；每段「标题 · N + 横线 + 右侧说明」 */
             js('div', { id: 'mt-roles-section', className: 'mt-section-head', children: [
               j('h3', { children: `${t('roles.page.builtin')} · ${builtinRoles.length}` }),
@@ -9652,6 +10052,8 @@ window.__ModuleLoader__.load({
           sessionId: openTask?.sessionId,
           title: detail?.input?.title ?? detail?.id ?? '',
           input: detail?.input ?? {},
+          /* CHG-89（QA-4 乐观锁）：重新规划也是写路径——快照打开时的 revision */
+          revision: detail?.revision,
           members: ownerTeam?.members ?? [],
           tasks: (pv.tasks ?? []).filter((task) => task.ownerTeamId === ownerTeamId),
         })
@@ -9711,16 +10113,27 @@ window.__ModuleLoader__.load({
       }
       /* CHG-73：批量编排——按主责团队分组逐个 batchTaskOp（每条事件同一 batchId 由服务端落） */
       /* 角色页（design/roles.html）：三层来源分区 + 搜索/来源筛选 + 引用计数 + 复制/对比 + 创建卡 */
-      const rolesPage = j(RoleLibrary, {
-        t,
-        pv,
-        onOpen: setOpenRole,
-        onGuest: guestRoleCommand,
-        onCopyToProject: copyRoleToProject,
-        onCompare: (role) => setOpenRole(role.id),
-        onCreate: () => openRoleEditor({ mode: 'create' }),
-        onIntroGlobal: () => { setScope('global'); setProjectTab('roles') },
-      })
+      const rolesPage = js('div', { children: [
+        /* CHG-91：插件贡献（只读 + 装载告警 + 重新扫描）——放在角色库顶部，
+         * 因为「这个角色是谁给的」必须在用户看列表之前就有答案 */
+        j(ContributionsSection, {
+          t,
+          api: discoveryApi,
+          workspaceRoot: projectRoot,
+          onNotice: setNotice,
+          onChanged: () => loadProject(projectRoot),
+        }),
+        j(RoleLibrary, {
+          t,
+          pv,
+          onOpen: setOpenRole,
+          onGuest: guestRoleCommand,
+          onCopyToProject: copyRoleToProject,
+          onCompare: (role) => setOpenRole(role.id),
+          onCreate: () => openRoleEditor({ mode: 'create' }),
+          onIntroGlobal: () => { setScope('global'); setProjectTab('roles') },
+        }),
+      ] })
 
       /* 团队页：列表 or 团队工作台（队员/参与任务/知识/审计/设置） */
       const participatingCount = (teamId) => (pv.tasks ?? []).filter((task) => (task.participants ?? []).some((p) => p.teamId === teamId)).length
@@ -10067,6 +10480,9 @@ window.__ModuleLoader__.load({
                   ownerOnline: true,
                   ownerSessionId: openTask.sessionId,
                   state: detail.state,
+                  /* CHG-89（QA-4 乐观锁）：打开表单时快照 revision，保存时作为
+                   * expectedRevision 回传——服务端不等即 MT_REVISION_CONFLICT（账本零写入）。 */
+                  revision: detail.revision,
                   input: detail.input,
                   assignees: detail.assignees,
                   participants: detail.participants,
@@ -10691,6 +11107,23 @@ window.__ModuleLoader__.load({
         }
         return result
       }
+      /**
+       * CHG-89（FR-13.1「发布到全局库」）：项目库角色 → 全局角色库。
+       *
+       * 两段确认：第一段只问影响面（目标文件 + 「全局库对该工作区所有项目可见」），
+       * 第二段带 `confirm:true` 才落盘。**单向流动**——发布后各项目仍需显式
+       * copyToProject 才进各自项目库，所以这里不做「已发布」的本地状态推断，
+       * 只把服务端返回的 filePath 如实回显。
+       */
+      const publishRoleFlow = async (roleId, confirm) => {
+        if (!roleId) return { status: 'error', code: 'MT_VALIDATION', message: 'missing roleId' }
+        const result = await discoveryApi.roleOp({ workspaceRoot: projectRoot, op: 'publish', payload: { roleId }, confirm })
+        if (result?.status === 'published') {
+          setNotice(t('role.published').replace('{id}', roleId))
+          await loadProject(projectRoot)
+        }
+        return result
+      }
       /** 角色能力目录（getCapabilityCatalog；失败降级为「已有角色出现过的名字」并提示） */
       const fallbackCatalog = (() => {
         const collect = (key) => [...new Set((pv.roles ?? []).flatMap((role) => role?.[key] ?? []))].sort()
@@ -10744,6 +11177,8 @@ window.__ModuleLoader__.load({
               ownerOnline: true,
               ownerSessionId: openTask.sessionId,
               state: detail.state,
+              /* CHG-89（QA-4 乐观锁）：同上看板入口——快照 revision 供保存时回传 */
+              revision: detail.revision,
               input: detail.input,
               assignees: detail.assignees,
               participants: detail.participants,
@@ -10773,6 +11208,8 @@ window.__ModuleLoader__.load({
             onEdit: (data) => openRoleEditor({ mode: data.origin === 'project' ? 'edit' : 'create', fork: data.origin !== 'project', forkOrigin: data.origin, definition: data.definition }),
             onCopyToProject: copyRoleToProject,
             onGuest: guestRoleCommand,
+            /* CHG-89（FR-13.1）：只有「项目库」来源才有发布到全局的语义（内置/全局是复制源不是发布源） */
+            onPublish: openRoleEntry?.origin === 'project' ? (confirm) => publishRoleFlow(openRole ?? roleDetail?.roleId, confirm) : undefined,
             skillTotal: (capCatalog?.skills ?? []).length || undefined,
             onDelete: canDeleteOpenRole ? (confirm) => deleteRoleFlow(openRole ?? roleDetail?.roleId, confirm) : undefined,
             /* CHG-73：deleteRole 是根级端点（只要 workspaceRoot）——离线项目也能清理未占用角色，
@@ -10851,6 +11288,7 @@ window.__ModuleLoader__.load({
           input: rescopeFor.input,
           members: rescopeFor.members,
           tasks: rescopeFor.tasks,
+          expectedRevision: rescopeFor.revision,
           onClose: () => setRescopeFor(null),
           onDone: submitRescope,
         }) : null,
@@ -11457,6 +11895,11 @@ window.__ModuleLoader__.load({
       TeamPlanTasksCard, TeamCollapsedCard, ApplyRolesCard, GuestCallComposer, DockChip,
     }
 
-    return { apply, inject, __test, __testG4, __testG6 }
+    /* 测试专用出口（t75-chg89-gaps）：CHG-89 三个新入口所在组件的纯渲染面。
+     * 生产路径不消费它（官方只认 apply / inject）——存在只为让「按钮到底渲没渲染」
+     * 能在 mock loader 下断言，而不是只 grep 源码字符串。 */
+    const __testG89 = { RoleDetailDrawer, TaskFormDrawer, SettingsTab, DiagFix, RescopeDialog, ContributionsSection, contributionsBody }
+
+    return { apply, inject, __test, __testG4, __testG6, __testG89 }
   },
 })

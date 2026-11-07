@@ -227,6 +227,15 @@ export function applyEvent(proj: TeamProjection, event: LedgerEvent): void {
     case 'task.gate.result': {
       const t = requireTask(proj, p.taskId, event.seq)
       t.gateVerdicts[p.gate] = p.verdict as 'pass' | 'fail'
+      // CHG-93：同时记下「谁执行的 / 是否人工强制放行」——面板据此显示 badge（否则账本有、界面无）
+      t.gateResults = { ...(t.gateResults ?? {}) }
+      t.gateResults[p.gate] = {
+        verdict: p.verdict as 'pass' | 'fail',
+        ...(typeof p.executedBy === 'string' ? { executedBy: p.executedBy } : {}),
+        ...(typeof p.forcedBy === 'string' ? { forcedBy: p.forcedBy } : {}),
+        ...(typeof p.exitCode === 'number' || p.exitCode === null ? { exitCode: p.exitCode as number | null } : {}),
+        at: event.ts,
+      }
       // CHG-87（FR-5.4）：scope 审计结论随门禁结果落投影（看板徽标 / 详情审计块的唯一来源）
       applyScopeAudit(t, p.scopeAudit)
       if (p.verdict === 'pass') {

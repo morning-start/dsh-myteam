@@ -74,6 +74,8 @@ export function taskActionsOf(task                )              {
                                                
                                                                    
                                       
+                                                          
+                                                                                                                                          
                                                     
                        
                                         
@@ -130,6 +132,8 @@ export function taskActionsOf(task                )              {
                                                
                                           
                                       
+                                                          
+                                                                                                                                          
                    
                        
                                                                        
@@ -244,6 +248,8 @@ export function buildBoardView(service                  , columnMapping         
       gates: t.gates,
       gateVerdicts: t.gateVerdicts,
       ...(t.gateRejects && Object.keys(t.gateRejects).length > 0 ? { gateRejects: { ...t.gateRejects } } : {}),
+    ...(t.gateResults && Object.keys(t.gateResults).length > 0 ? { gateResults: { ...t.gateResults } } : {}),
+      ...(t.gateResults && Object.keys(t.gateResults).length > 0 ? { gateResults: { ...t.gateResults } } : {}),
       evidenceCount: t.evidenceRefs.length,
       participants: participantsOf(proj, t.id),
       ...(diagnosis ? { diagnosis } : {}),

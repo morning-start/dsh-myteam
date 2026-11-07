@@ -3,9 +3,10 @@
  *
  * 预设是团队模板（开箱即用团队）：**标准队长（myteam-captain，所有团队相同，不在队员名册里）
  * + 队员列表（每名队员可单独绑定技能与 MCP）** + 看板列 + 泳道 + 门禁链 + 任务类型。
- * 与角色库的分层差异（CHG-52 用户定案）：
- *   - **全局只保留角色**（角色定位能力），不存团队模板；
- *   - 团队模板只在**项目层**（任务维度）组合角色得到；
+ * 与角色库的分层差异（CHG-52 用户定案，**CHG-91 修订**）：
+ *   - CHG-52：**全局只保留角色**（角色定位能力），不存团队模板；团队模板只在**项目层**；
+ *   - CHG-91：新增 `plugin` 来源——**插件贡献的团队模板跨项目可见**（插件资产，不是用户资产）。
+ *     用户自建模板仍只在项目层（原意不变：不该全局污染）；
  *   - builtin：随插件分发、只读的开箱团队（标准队长 + 3 名队员）；
  *   - project：`<workspaceRoot>/.team-workplace/config/presets/*.json`。
  *
@@ -18,7 +19,8 @@ import { existsSync, mkdirSync, readdirSync, readFileSync, renameSync, unlinkSyn
 import { dirname, join } from 'node:path'
 import { DEFAULT_CONFIG } from '../config/team-config.mjs'
 
-                                                
+/** 团队模板来源（CHG-91 增 `plugin`：插件贡献，跨项目可见） */
+                                                           
 
                                
                 
@@ -39,6 +41,19 @@ import { DEFAULT_CONFIG } from '../config/team-config.mjs'
                                                                         
                                                           
                                                      
+                  
+     
+                                               
+                              
+     
+                    
+     
+                                               
+    
+                                                          
+                                                           
+                             
+     
                   
  
 
@@ -163,6 +178,9 @@ function normalizePreset(raw         , origin              , filePath           
       }
       : {}),
     ...(typeof obj.version === 'number' ? { version: obj.version } : {}),
+    // CHG-91：插件贡献的两个可选字段（用户自建模板通常留空）
+    ...(typeof obj.namespace === 'string' && obj.namespace.trim().length > 0 ? { namespace: obj.namespace.trim() } : {}),
+    ...(typeof obj.charter === 'string' && obj.charter.trim().length > 0 ? { charter: obj.charter } : {}),
   }
 }
 
@@ -187,8 +205,17 @@ export function readPresetsFromDir(dir        , origin              , warnings  
   return out
 }
 
-/** 团队模板目录（builtin + project；全局只存角色，不存团队模板，CHG-52） */
-export function readPresetCatalog(workspaceRoot        )                {
+/**
+ * 团队模板目录（builtin + plugin + project）。
+ *
+ * CHG-52 曾定「全局只存角色，不存团队模板」——**CHG-91 修订**：`plugin` 来源的模板
+ * **跨项目可见**（与 builtin 同级可见性，来源可区分）。原意（用户自建模板不该全局污染）
+ * 仍成立：插件模板是**插件资产**，不是用户资产；否则每开一个新项目都要手动复制一次，
+ * 「插件带了团队」就不成立（docs/16 §6.4）。
+ *
+ * @param contributions CHG-91：插件贡献的团队模板（已由 `parseContributions` 校验）。
+ */
+export function readPresetCatalog(workspaceRoot        , contributions                              )                {
   const dirs = presetDirs(workspaceRoot)
   const warnings           = []
   const builtin                = BUILTIN_PRESETS.map((definition) => ({
@@ -196,8 +223,13 @@ export function readPresetCatalog(workspaceRoot        )                {
     definition: structuredClone(definition),
     warnings: [],
   }))
+  const plugin                = (contributions ?? []).map((definition) => ({
+    origin: 'plugin'         ,
+    definition: structuredClone(definition),
+    warnings: [],
+  }))
   const project = readPresetsFromDir(dirs.project, 'project', warnings)
-  const entries = [...project, ...builtin].sort((a, b) => a.definition.id.localeCompare(b.definition.id))
+  const entries = [...project, ...builtin, ...plugin].sort((a, b) => a.definition.id.localeCompare(b.definition.id))
   return { entries, warnings, dirs }
 }
 

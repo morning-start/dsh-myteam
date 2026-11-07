@@ -73,12 +73,12 @@ test('t13p-1: typertRemote 绑定 serviceKey=myteamPanel + namespace=myteam（�
   assert.equal(binding.namespace, 'myteam')
 })
 
-test('t13p-2: marker 39 方法全部 direct invocation（listTeams + getProject/getRoleDetail/saveRole/deleteRole/getCapabilityCatalog + 5 个离线只读 + 25 个会话门面 + CHG-87 roleOp/applyRoles + CHG-88 handoff）', () => {
+test('t13p-2: marker 41 方法全部 direct invocation（listTeams + getProject/getRoleDetail/saveRole/deleteRole/getCapabilityCatalog + 5 个离线只读 + 25 个会话门面 + CHG-87 roleOp/applyRoles + CHG-88 handoff + CHG-91 getContributions/reloadContributions）', () => {
   const d = (MyTeamPanelFacade.prototype as any)[DESCRIPTOR]
   assert.ok(d, 'prototype 上必须有 remote-methods 描述符')
   assert.equal(d.version, 1)
   const names = d.methods.map((m: any) => m.method)
-  assert.deepEqual(names, ['listTeams', 'getProject', 'getRoleDetail', 'saveRole', 'deleteRole', 'getCapabilityCatalog', 'getOfflineBoard', 'getOfflineTaskDetail', 'getOfflineTokens', 'getOfflineAudit', 'getOfflinePresets', 'getBoard', 'getTaskDetail', 'getTokens', 'getInbox', 'getAudit', 'getConfig', 'getPresets', 'getRoles', 'getKnowledge', 'planAction', 'postComment', 'memberOp', 'disband', 'createTask', 'createTasks', 'updateTask', 'assignTask', 'participateTask', 'rescopeTask', 'cancelTask', 'batchTaskOp', 'reviewTask', 'getArchive', 'getArchives', 'adoptKnowledge', 'roleOp', 'applyRoles', 'handoff'])
+  assert.deepEqual(names, ['listTeams', 'getProject', 'getRoleDetail', 'saveRole', 'deleteRole', 'getCapabilityCatalog', 'getOfflineBoard', 'getOfflineTaskDetail', 'getOfflineTokens', 'getOfflineAudit', 'getOfflinePresets', 'getBoard', 'getTaskDetail', 'getTokens', 'getInbox', 'getAudit', 'getConfig', 'getPresets', 'getRoles', 'getKnowledge', 'planAction', 'postComment', 'memberOp', 'disband', 'createTask', 'createTasks', 'updateTask', 'assignTask', 'participateTask', 'rescopeTask', 'cancelTask', 'batchTaskOp', 'reviewTask', 'getArchive', 'getArchives', 'adoptKnowledge', 'roleOp', 'applyRoles', 'handoff', 'getContributions', 'reloadContributions'])
   for (const m of d.methods) assert.deepEqual(m.invocation, { kind: 'direct' })
 })
 
@@ -299,7 +299,7 @@ test('t13p-8: 隔离服务 MyTeamRemote 的 marker 不含 defaultTeamId（门面
   const d = (MyTeamRemote.prototype as any)[DESCRIPTOR]
   const names = d.methods.map((m: any) => m.method)
   assert.ok(!names.includes('defaultTeamId'), 'defaultTeamId 只作门面发现通道，不应暴露为网关端点')
-  assert.equal(names.length, 26)
+  assert.equal(names.length, 28)
 })
 
 test('t13p-9: 载体行 guard —— hostApply(ctx, {carrier:true}) 直接返回（dsh-client-modules 组图载体）', () => {
