@@ -77,7 +77,7 @@ test('T40: 增量 apply 与全量重放逐字段一致，revision 严格等于�
   const before = JSON.stringify(service.projectionSnapshot)
   // 每步提交后 revision 必须恰好 +1（漏应用或多应用都会被抓到）
   assert.equal(service.projectionSnapshot.revision, 15)
-  const { events } = openLedger(join(ws, '.team-workplace', 'state', 'teams', 't1', 'ledger.jsonl'))
+  const { events } = openLedger(join(ws, '.dsh-myteam', 'tasks', 't1', 'ledger.jsonl'))
   assert.equal(events.length, 15)
   const replayed = foldEvents('t1', events)
   assert.deepEqual(JSON.parse(before), JSON.parse(JSON.stringify(replayed)))
@@ -95,7 +95,7 @@ test('T40: 折返失败不落账本、不动投影（先算后写）', () => {
     payload: { teamId: 't1', name: 'n', goal: 'g', roster: [{ roleId: 'captain' }, { roleId: 'implementer' }] },
   })
   service.commit({ actor: 'lead', type: 'task.created', payload: { teamId: 't1', taskId: 'k1', task: task() } })
-  const ledgerPath = join(ws, '.team-workplace', 'state', 'teams', 't1', 'ledger.jsonl')
+  const ledgerPath = join(ws, '.dsh-myteam', 'tasks', 't1', 'ledger.jsonl')
   const linesBefore = readFileSync(ledgerPath, 'utf8').split('\n').filter((l) => l.trim().length > 0)
   const projBefore = JSON.stringify(service.projectionSnapshot)
 
@@ -126,7 +126,7 @@ test('T40: 冷启动重放结果与增量结果一致（重启不改变投影）
   // 重开后继续写：seq 延续、投影仍与全量重放一致
   const more = reopened.commit({ actor: 'm1', type: 'task.claimed', payload: { teamId: 't1', taskId: 'k2', memberId: 'm1', attemptId: 'a2' } })
   assert.equal(more.ok, true)
-  const { events } = openLedger(join(ws, '.team-workplace', 'state', 'teams', 't1', 'ledger.jsonl'))
+  const { events } = openLedger(join(ws, '.dsh-myteam', 'tasks', 't1', 'ledger.jsonl'))
   assert.equal(events.length, 16)
   const replayed = foldEvents('t1', events)
   assert.equal(JSON.stringify(replayed), JSON.stringify(reopened.projectionSnapshot))

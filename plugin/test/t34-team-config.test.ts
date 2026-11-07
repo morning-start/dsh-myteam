@@ -1,6 +1,6 @@
 /**
  * T34（CHG-55）：团队模板配置生效 —— 模板的看板列/泳道/门禁/任务类型落成
- * `.team-workplace/state/teams/<teamId>/team.config.json`，并在 TeamService →
+ * `.dsh-myteam/tasks/<teamId>/team.config.json`，并在 TeamService →
  * 看板/门禁链/配置视图/离线快照里生效。
  *  - 落盘：建团时（service 首次构造之前）写入；无配置段落的模板不落文件；
  *  - 生效：getBoard 列、getConfig 来源链（team 层）、create_task 按 taskType 展开门禁链；
@@ -36,7 +36,7 @@ function setup(root: string) {
 }
 
 const presetFile = (root: string, id: string, value: unknown) => {
-  const dir = join(root, '.team-workplace', 'config', 'presets')
+  const dir = join(root, '.dsh-myteam', 'config', 'teams')
   mkdirSync(dir, { recursive: true })
   writeFileSync(join(dir, `${id}.json`), JSON.stringify(value))
 }

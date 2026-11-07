@@ -73,12 +73,12 @@ test('t13p-1: typertRemote 绑定 serviceKey=myteamPanel + namespace=myteam（�
   assert.equal(binding.namespace, 'myteam')
 })
 
-test('t13p-2: marker 41 方法全部 direct invocation（listTeams + getProject/getRoleDetail/saveRole/deleteRole/getCapabilityCatalog + 5 个离线只读 + 25 个会话门面 + CHG-87 roleOp/applyRoles + CHG-88 handoff + CHG-91 getContributions/reloadContributions）', () => {
+test('t13p-2: marker 43 方法全部 direct invocation（listTeams/getStoreState/initStore + getProject/getRoleDetail/saveRole/deleteRole/getCapabilityCatalog + 5 个离线只读 + 25 个会话门面 + CHG-87 roleOp/applyRoles + CHG-88 handoff + CHG-91 getContributions/reloadContributions + CHG-102 项目存储）', () => {
   const d = (MyTeamPanelFacade.prototype as any)[DESCRIPTOR]
   assert.ok(d, 'prototype 上必须有 remote-methods 描述符')
   assert.equal(d.version, 1)
   const names = d.methods.map((m: any) => m.method)
-  assert.deepEqual(names, ['listTeams', 'getProject', 'getRoleDetail', 'saveRole', 'deleteRole', 'getCapabilityCatalog', 'getOfflineBoard', 'getOfflineTaskDetail', 'getOfflineTokens', 'getOfflineAudit', 'getOfflinePresets', 'getBoard', 'getTaskDetail', 'getTokens', 'getInbox', 'getAudit', 'getConfig', 'getPresets', 'getRoles', 'getKnowledge', 'planAction', 'postComment', 'memberOp', 'disband', 'createTask', 'createTasks', 'updateTask', 'assignTask', 'participateTask', 'rescopeTask', 'cancelTask', 'batchTaskOp', 'reviewTask', 'getArchive', 'getArchives', 'adoptKnowledge', 'roleOp', 'applyRoles', 'handoff', 'getContributions', 'reloadContributions'])
+  assert.deepEqual(names, ['listTeams', 'getStoreState', 'initStore', 'getProject', 'getRoleDetail', 'saveRole', 'deleteRole', 'getCapabilityCatalog', 'getOfflineBoard', 'getOfflineTaskDetail', 'getOfflineTokens', 'getOfflineAudit', 'getOfflinePresets', 'getBoard', 'getTaskDetail', 'getTokens', 'getInbox', 'getAudit', 'getConfig', 'getPresets', 'getRoles', 'getKnowledge', 'planAction', 'postComment', 'memberOp', 'disband', 'createTask', 'createTasks', 'updateTask', 'assignTask', 'participateTask', 'rescopeTask', 'cancelTask', 'batchTaskOp', 'reviewTask', 'getArchive', 'getArchives', 'adoptKnowledge', 'roleOp', 'applyRoles', 'handoff', 'getContributions', 'reloadContributions'])
   for (const m of d.methods) assert.deepEqual(m.invocation, { kind: 'direct' })
 })
 
@@ -96,7 +96,7 @@ test('t13p-3: 方法签名 = 简单标识符 (agent, query)；listTeams/saveRole
   const lt = proto.listTeams.toString()
   assert.match(lt, /^async\s+listTeams\s*\(\s*\)/, 'listTeams 必须无参（无参 args={} 直连调用）')
   // T25：离线视图方法没有 agent 首参（网关 args 只发 {query}），形参必须是单个 query
-  for (const name of ['getOfflineBoard', 'getOfflineTaskDetail', 'getOfflineTokens', 'getOfflineAudit', 'getOfflinePresets', 'saveRole', 'roleOp']) {
+  for (const name of ['getOfflineBoard', 'getOfflineTaskDetail', 'getOfflineTokens', 'getOfflineAudit', 'getOfflinePresets', 'saveRole', 'roleOp', 'getStoreState', 'initStore']) {
     const m = proto[name].toString().match(/^async\s+\w+\s*\(([^)]*)\)/)
     assert.ok(m, `${name} 应为 async 方法`)
     assert.deepEqual(m![1].split(',').map((s) => s.trim()).filter(Boolean), ['query'], `${name} 只接受 query`)
@@ -223,7 +223,7 @@ test('t13p-6d: 离线视图参数校验（相对路径 / 路径穿越 / 空 team
 test('t13p-6e: 离线看板/详情从 ledger.jsonl 折叠（无队长会话，只读）', async () => {
   const ws = mkdtempSync(join(tmpdir(), 'myteam-offline-'))
   try {
-    const teamDir = join(ws, '.team-workplace', 'state', 'teams', 't-off')
+    const teamDir = join(ws, '.dsh-myteam', 'tasks', 't-off')
     mkdirSync(teamDir, { recursive: true })
     const ts = Date.now()
     const events = [

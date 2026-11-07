@@ -67,7 +67,7 @@ test('T22-3: submit_plan 不带名册 → 按预置团队成团（team.created.r
     assert.equal(sub.status, 'staged')
     assert.match(String(sub.note), /预置团队/)
     // 名册落账：读团队账本 team.created 事件
-    const ledger = readFileSync(join(root, '.team-workplace', 'state', 'teams', String(sub.teamId), 'ledger.jsonl'), 'utf8')
+    const ledger = readFileSync(join(root, '.dsh-myteam', 'tasks', String(sub.teamId), 'ledger.jsonl'), 'utf8')
     const created = ledger.split('\n').filter(Boolean).map((l) => JSON.parse(l)).find((e) => e.type === 'team.created')
     assert.deepEqual(created.payload.roster.map((r: any) => r.roleId), ['captain', 'req-validator', 'developer', 'acceptor'])
   } finally {
@@ -87,7 +87,7 @@ test('T22-4: 显式名册行为不变；三人组成员可 spawn（内置角色�
     // 三人组成员 spawn（引用即复制：req-validator 内置 → 项目库）
     const sp = host.spawnMember(String(sub.teamId), 'developer') as any
     assert.equal(sp.status, 'spawned')
-    const copied = readProjectRole(join(root, '.team-workplace', 'config', 'roles'), 'developer')
+    const copied = readProjectRole(join(root, '.dsh-myteam', 'config', 'roles'), 'developer')
     assert.ok(copied, 'developer 内置角色已复制进项目库')
     assert.equal(copied!.origin, 'builtin:developer')
   } finally {

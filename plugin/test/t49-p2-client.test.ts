@@ -79,7 +79,8 @@ test('t49-7: 角色删除与技能/MCP 目录 —— canDelete 门控、两段�
   assert.match(source, /function CapabilityPicker\(/)
   assert.match(source, /discoveryApi\.getCapabilityCatalog\(\{ workspaceRoot: projectRoot \}\)/)
   assert.match(source, /const canDeleteOpenRole = Boolean\(openRoleEntry\)/)
-  assert.match(source, /discoveryApi\.deleteRole\(\{ workspaceRoot: projectRoot, roleId, confirm \}\)/)
+  // CHG-103：删除带作用域（缺省项目级；全局另需 confirmGlobal）
+  assert.match(source, /const deleteRoleFlow = async \(roleId, confirm, scope\) => \{[\s\S]{0,400}?discoveryApi\.deleteRole\(\{[\s\S]{0,300}?confirm,/)
   assert.ok(source.includes("'role.deleteUsage'"))
   assert.ok(source.includes("'role.deletePresets'"))
   // 目录只是提示：允许自由输入（不是白名单）

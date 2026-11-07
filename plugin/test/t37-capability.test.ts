@@ -211,7 +211,7 @@ test('t37-6: 角色 toolPolicy.allow 只按全局已知名收窄（own-layer 成
       toolPolicy: { allow: ['bash', 'myteam_claim_task'] },
     }, {})
     assert.equal(created.status, 'created', JSON.stringify(created))
-    const dir = join(root, '.team-workplace', 'config', 'presets')
+    const dir = join(root, '.dsh-myteam', 'config', 'teams')
     mkdirSync(dir, { recursive: true })
     writeFileSync(join(dir, 'team-limited.json'), JSON.stringify({
       id: 'team-limited', name: '受限模板', members: [{ roleId: 'limited' }],
@@ -232,7 +232,7 @@ test('t37-6: 角色 toolPolicy.allow 只按全局已知名收窄（own-layer 成
 test('t37-5: spawn 接线——模板成员声明技能/MCP 时，setup 内自动收窄', async () => {
   const root = mkdtempSync(join(tmpdir(), 'myteam-t37-'))
   try {
-    const dir = join(root, '.team-workplace', 'config', 'presets')
+    const dir = join(root, '.dsh-myteam', 'config', 'teams')
     mkdirSync(dir, { recursive: true })
     writeFileSync(join(dir, 'team-cap.json'), JSON.stringify({
       id: 'team-cap',

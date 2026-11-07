@@ -1,5 +1,5 @@
 /**
- * T35（CHG-56）：项目层配置接线 —— `.team-workplace/config/team.config.json`
+ * T35（CHG-56）：项目层配置接线 —— `.dsh-myteam/config/team.config.json`
  * 与团队级配置组成三层合并：内置默认 < 项目 < 团队模板。
  *  - 只项目层：看板列/任务类型生效，getConfig source='project'；
  *  - 项目 + 团队模板：团队层覆盖同名字段，未声明段落保留项目层值；
@@ -29,13 +29,13 @@ function setup(root: string) {
 }
 
 const writeProjectConfig = (root: string, value: unknown) => {
-  const dir = join(root, '.team-workplace', 'config')
+  const dir = join(root, '.dsh-myteam', 'config')
   mkdirSync(dir, { recursive: true })
   writeFileSync(join(dir, 'team.config.json'), JSON.stringify(value))
 }
 
 const presetFile = (root: string, id: string, value: unknown) => {
-  const dir = join(root, '.team-workplace', 'config', 'presets')
+  const dir = join(root, '.dsh-myteam', 'config', 'teams')
   mkdirSync(dir, { recursive: true })
   writeFileSync(join(dir, `${id}.json`), JSON.stringify(value))
 }

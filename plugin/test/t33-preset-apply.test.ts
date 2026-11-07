@@ -34,15 +34,16 @@ function makeRuntime(root: string) {
 }
 
 const presetFile = (root: string, id: string, value: unknown) => {
-  const dir = join(root, '.team-workplace', 'config', 'presets')
+  const dir = join(root, '.dsh-myteam', 'config', 'teams')
   mkdirSync(dir, { recursive: true })
   writeFileSync(join(dir, `${id}.json`), JSON.stringify(value))
 }
 
-const roleFile = (root: string, id: string) => join(root, '.team-workplace', 'config', 'roles', `${id}.json`)
+const roleFile = (root: string, id: string) => join(root, '.dsh-myteam', 'config', 'roles', `${id}.json`)
 
 function memberIdentities(root: string, teamId: string): any[] {
-  const dir = join(root, '.team-workplace', 'state', 'teams', teamId, 'members')
+  // CHG-102：成员身份快照落 `history/members/<teamId>/<memberId>/`（不是任务目录）
+  const dir = join(root, '.dsh-myteam', 'history', 'members', teamId)
   if (!existsSync(dir)) return []
   return readdirSync(dir).map((name) => JSON.parse(readFileSync(join(dir, name, 'identity.json'), 'utf8')))
 }

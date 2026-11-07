@@ -16,9 +16,10 @@ import {
 
 const member = { memberId: 'm1-implementer', roleId: 'implementer', instanceName: 'implementer-1', teamId: 't1' }
 
-test('t19a: memoryDirFor 布局符合契约（state/teams/<t>/members/<m>/memory）', () => {
+test('t19a: memoryDirFor 布局符合契约（history/members/<t>/<m>/memory，CHG-102）', () => {
   const dir = memoryDirFor('/ws', 't1', 'm1-implementer')
-  assert.equal(dir, '/ws/.team-workplace/state/teams/t1/members/m1-implementer/memory')
+  // 布局用 resolve()（根是绝对路径），跨平台断言只看尾部段
+  assert.ok(dir.endsWith(join('.dsh-myteam', 'history', 'members', 't1', 'm1-implementer', 'memory')), dir)
 })
 
 test('t19b: seedMemoryIfMissing 播种 + 幂等（已存在不覆盖，FR-6.1）', () => {

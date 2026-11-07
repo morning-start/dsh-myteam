@@ -63,7 +63,7 @@ function teamWithTask(root: string) {
 }
 
 function ledgerTypes(root: string, teamId: string): string[] {
-  const p = join(root, '.team-workplace/state/teams', teamId, 'ledger.jsonl')
+  const p = join(root, '.dsh-myteam/tasks', teamId, 'ledger.jsonl')
   return readFileSync(p, 'utf8').split('\n').filter((l) => l.trim()).map((l) => JSON.parse(l).type as string)
 }
 
@@ -123,7 +123,7 @@ test('t74-1: split 提案批准 → 子任务出现 + 原任务 cancelled + 账�
     assert.ok(iCancel > iCreated, `原任务取消应晚于子任务创建: ${types.join(',')}`)
     assert.ok(iResolved > iCancel, `裁决留痕应最后: ${types.join(',')}`)
     // 同一 batchId 串起子任务
-    const p = join(root, '.team-workplace/state/teams', teamId, 'ledger.jsonl')
+    const p = join(root, '.dsh-myteam/tasks', teamId, 'ledger.jsonl')
     const evs = readFileSync(p, 'utf8').split('\n').filter((l) => l.trim()).map((l) => JSON.parse(l))
     const childEvents = evs.filter((e) => e.type === 'task.created' && e.payload.fromProposal === proposalId)
     assert.equal(childEvents.length, 2, '两个子任务都带 fromProposal 关联')

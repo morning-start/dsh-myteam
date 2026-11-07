@@ -42,7 +42,7 @@ test('t30-1: 内置开箱团队（标准队长隐式 + 3 名队员；看板列/�
 
 test('t30-2: 项目模板目录读取 + 坏文件与校验告警（不抛错）', () => {
   withWorkspace((ws) => {
-    const projectDir = join(ws, '.team-workplace', 'config', 'presets')
+    const projectDir = join(ws, '.dsh-myteam', 'config', 'teams')
     writePreset(projectDir, 'alpha.json', {
       id: 'alpha', name: 'Alpha',
       members: [
@@ -83,7 +83,7 @@ test('t30-3: 目录不存在 → 仅 builtin；全局不参与团队模板（CHG
   withWorkspace((ws) => {
     const catalog = readPresetCatalog(ws)
     assert.deepEqual(catalog.entries.map((entry) => entry.origin), ['builtin'])
-    assert.equal(catalog.dirs.project, join(ws, '.team-workplace', 'config', 'presets'))
+    assert.equal(catalog.dirs.project, join(ws, '.dsh-myteam', 'config', 'teams'))
     assert.deepEqual(Object.keys(catalog.dirs).sort(), ['builtin', 'project'], '全局只存角色，没有团队模板目录')
     assert.deepEqual(Object.keys(presetDirs(ws)).sort(), ['builtin', 'project'])
   })
@@ -91,7 +91,7 @@ test('t30-3: 目录不存在 → 仅 builtin；全局不参与团队模板（CHG
 
 test('t30-4: 旧 roster 格式兼容——队长隐式剔除，成员技能/MCP 保留', () => {
   withWorkspace((ws) => {
-    const dir = join(ws, '.team-workplace', 'config', 'presets')
+    const dir = join(ws, '.dsh-myteam', 'config', 'teams')
     writePreset(dir, 'legacy.json', {
       id: 'legacy', name: 'Legacy',
       roster: [

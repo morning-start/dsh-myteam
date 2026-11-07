@@ -95,7 +95,7 @@ test('t13r-4: postComment 以 actor=human 落账本并进任务 thread', async (
     const detail = await remote.getTaskDetail({ teamId: 'default', taskId })
     assert.ok(detail.detail.messages.some((m: any) => m.actor === 'human'), 'human 留痕进 thread')
     // 账本验证 actor
-    const ledger = readFileSync(join(root, '.team-workplace', 'state', 'teams', 'default', 'ledger.jsonl'), 'utf8')
+    const ledger = readFileSync(join(root, '.dsh-myteam', 'tasks', 'default', 'ledger.jsonl'), 'utf8')
     const events = ledger.split('\n').filter((l) => l.trim()).map((l) => JSON.parse(l))
     const msg = events.filter((e) => e.type === 'message.sent').pop()
     assert.equal(msg.actor, 'human')

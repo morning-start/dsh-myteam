@@ -32,7 +32,7 @@ function setup() {
   return { root, host, registered }
 }
 
-const roleFile = (root: string, id: string) => join(root, '.team-workplace', 'config', 'roles', `${id}.json`)
+const roleFile = (root: string, id: string) => join(root, '.dsh-myteam', 'config', 'roles', `${id}.json`)
 
 test('t32-1: create-role 写项目库；重名 / 非法 id / 空提示词拒绝', () => {
   const { root, host } = setup()
@@ -118,7 +118,8 @@ test('t32-3: 队长技能注册（model 可调用，用户命令不可调用）'
     const names = registered.map((skill) => skill.name).sort()
     // CHG-88：新增 create-team 章程技能（M2-F）——断言改为「必备集合 + 数量」，
     // 避免每加一个技能就要改一次硬编码列表（脆断言）。必备项仍逐个点名，缺一即失败。
-    for (const required of ['choose-team-template', 'create-role', 'manage-team-template', 'modify-role']) {
+    // CHG-102：`create-team` 拆分——建团队（名册 + 任务 DAG）与写章程（structure.md）是两个技能。
+    for (const required of ['choose-team-template', 'create-role', 'create-team', 'manage-team-template', 'modify-role', 'write-team-charter']) {
       assert.ok(names.includes(required), `missing captain skill ${required}`)
     }
     assert.equal(new Set(names).size, names.length, '技能名不得重复')
@@ -128,7 +129,10 @@ test('t32-3: 队长技能注册（model 可调用，用户命令不可调用）'
       assert.equal(skill.invocation.userInvocable, false)
       assert.ok(skill.description.length > 10)
       if (skill.name.endsWith('-role')) assert.match(skill.content, /myteam_(create|update)_role/)
-      else if (skill.name === 'create-team') assert.match(skill.content, /structure\.md/)
+      // CHG-102：建团队落 .dsh-myteam/（config/teams + tasks/<teamId>/ledger.jsonl）
+      else if (skill.name === 'create-team') assert.match(skill.content, /\.dsh-myteam\//)
+      // 章程技能只写 structure.md（与建团队分家）
+      else if (skill.name === 'write-team-charter') assert.match(skill.content, /structure\.md/)
       else assert.match(skill.content, /myteam_(list|save|copy|delete)_preset|myteam_reset_team_config/)
     }
   } finally {

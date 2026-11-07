@@ -2,7 +2,7 @@
  * T78 · CHG-93：两笔「文档承诺、实现分叉」的收口。
  *
  * ① **团队章程注入队长 system prompt**（FR-18 职责③ F8）——CHG-88 实装了 create-team
- *    技能**写** `.team-workplace/structure.md`，但**没有任何读取方**：章程写进磁盘就没人看，
+ *    技能**写** `.dsh-myteam/structure.md`，但**没有任何读取方**：章程写进磁盘就没人看，
  *    队长自己的系统提示里一个字都没有。
  * ② **`drained.pending` 硬编码 0**（docs/14 §7.4 遗留）——账本上写「排空完成」，
  *    实际成员收件箱里还压着消息。释放是**不可逆**动作（`mode:'remove'` 删私有空间），
@@ -53,7 +53,7 @@ function setup(root: string, opts: { withSystemPrompt?: boolean; withVariable?: 
 }
 
 function writeCharter(root: string, content: string): void {
-  const dir = join(root, '.team-workplace')
+  const dir = join(root, '.dsh-myteam')
   mkdirSync(dir, { recursive: true })
   writeFileSync(join(dir, 'structure.md'), content, 'utf8')
 }
@@ -122,8 +122,8 @@ test('t78-6: 空白章程 —— 静态路径不注册 section（空 section 是
   // 注意：initialize() 会播种默认 structure.md（ensureWorkplaceDirs），所以「没有章程」
   // 的真实形态是「文件存在但只有空白」——先造出这个状态再初始化。
   const root = mkdtempSync(join(tmpdir(), 't78-empty-'))
-  mkdirSync(join(root, '.team-workplace'), { recursive: true })
-  writeFileSync(join(root, '.team-workplace', 'structure.md'), '   \n\n  ', 'utf8')
+  mkdirSync(join(root, '.dsh-myteam'), { recursive: true })
+  writeFileSync(join(root, '.dsh-myteam', 'structure.md'), '   \n\n  ', 'utf8')
   const { runtime } = setup(root, { withVariable: false })
   assert.equal(runtime.__sections.filter((item) => item.name === TEAM_CHARTER_SECTION.name).length, 0, '空白章程不注册 section')
 })
@@ -151,7 +151,7 @@ function approvedTeam(root: string) {
 }
 
 function ledgerEvents(root: string, teamId: string): any[] {
-  const path = join(root, '.team-workplace', 'state', 'teams', teamId, 'ledger.jsonl')
+  const path = join(root, '.dsh-myteam', 'tasks', teamId, 'ledger.jsonl')
   return readFileSync(path, 'utf8').split('\n').filter(Boolean).map((line: string) => JSON.parse(line))
 }
 

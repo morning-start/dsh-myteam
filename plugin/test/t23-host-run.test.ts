@@ -137,7 +137,7 @@ function makeRunTeam(root: string, deliverablePath: string) {
 }
 
 function ledgerEvents(root: string, teamId: string): any[] {
-  const p = join(root, '.team-workplace', 'state', 'teams', teamId, 'ledger.jsonl')
+  const p = join(root, '.dsh-myteam', 'tasks', teamId, 'ledger.jsonl')
   return readFileSync(p, 'utf8').split('\n').filter((l) => l.trim()).map((l) => JSON.parse(l))
 }
 

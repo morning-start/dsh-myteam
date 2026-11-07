@@ -233,6 +233,6 @@ test('T18: adopt writes entry with contributor attribution; duplicate id refused
 
 test('T18: knowledge dir lives under config (committable, not state) (FR-17.1)', () => {
   const p = knowledgeDirOf('E:/ws').replace(/\\/g, '/')
-  assert.ok(p.includes('.team-workplace/config/knowledge'))
+  assert.ok(p.includes('.dsh-myteam/config/knowledge'))
   assert.ok(!p.includes('/state/'))
 })

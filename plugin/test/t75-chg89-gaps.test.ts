@@ -113,7 +113,7 @@ function setup(root: string, capability?: SessionHandoffCapability) {
 }
 
 function ledgerEvents(root: string, teamId: string): any[] {
-  const path = join(root, '.team-workplace', 'state', 'teams', teamId, 'ledger.jsonl')
+  const path = join(root, '.dsh-myteam', 'tasks', teamId, 'ledger.jsonl')
   if (!existsSync(path)) return []
   return readFileSync(path, 'utf8').split('\n').filter(Boolean).map((line) => JSON.parse(line))
 }

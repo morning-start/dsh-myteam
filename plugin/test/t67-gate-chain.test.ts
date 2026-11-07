@@ -236,7 +236,7 @@ test('t67-6: disband 真的落盘归档（team.json / tokens.json / members/ / a
 
   const r = host.executeLeadTool('myteam_disband', { teamId, confirm: true }, {}) as any
   assert.equal(r.status, 'disbanded', `unexpected: ${JSON.stringify(r)}`)
-  const archiveDir = join(root, '.team-workplace', 'archive', teamId)
+  const archiveDir = join(root, '.dsh-myteam', 'history', 'archive', teamId)
   for (const file of ['team.json', 'tokens.json', 'MANIFEST.json', 'artifacts/artifacts.json']) {
     assert.ok(existsSync(join(archiveDir, file)), `missing archive file ${file}`)
   }
@@ -259,7 +259,7 @@ test('t67-6: disband 真的落盘归档（team.json / tokens.json / members/ / a
 test('t67-7: token 侧车按天桶保留历史（修复前每次读盘只剩一天）', async () => {
   const root = mkdtempSync(join(tmpdir(), 't67-tokens-'))
   const { host, teamId } = await team(root)
-  const dir = join(root, '.team-workplace', 'state', 'teams', teamId)
+  const dir = join(root, '.dsh-myteam', 'tasks', teamId)
   mkdirSync(dir, { recursive: true })
   // 造一份"昨天"的历史（模拟跨天已经记过账）
   writeFileSync(

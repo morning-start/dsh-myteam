@@ -141,7 +141,7 @@ test('t21b: update_task done 收口触发审计——无证据记忆条目落 me
     assert.ok(done.memoryAudit, '收口返回带 memoryAudit 提示')
     assert.equal(done.memoryAudit.violations, 1)
     // 账本验证：memory.audit 事件存在且 findings 正确
-    const ledger = readFileSync(join(root, '.team-workplace', 'state', 'teams', teamId, 'ledger.jsonl'), 'utf8')
+    const ledger = readFileSync(join(root, '.dsh-myteam', 'tasks', teamId, 'ledger.jsonl'), 'utf8')
     const events = ledger.split('\n').filter((l) => l.trim()).map((l) => JSON.parse(l))
     const audit = events.find((e) => e.type === 'memory.audit')
     assert.ok(audit, 'memory.audit event in ledger')
@@ -171,7 +171,7 @@ test('t21c: 有证据条目 + 种子态记忆 → 收口零违规、不产生 me
     }) as any
     assert.equal(done.status, 'completed')
     assert.equal(done.memoryAudit, undefined, '零违规不携带审计提示')
-    const ledger = readFileSync(join(root, '.team-workplace', 'state', 'teams', teamId, 'ledger.jsonl'), 'utf8')
+    const ledger = readFileSync(join(root, '.dsh-myteam', 'tasks', teamId, 'ledger.jsonl'), 'utf8')
     const events = ledger.split('\n').filter((l) => l.trim()).map((l) => JSON.parse(l))
     assert.equal(events.find((e) => e.type === 'memory.audit'), undefined, '零违规不落事件')
   } finally {
@@ -190,7 +190,7 @@ test('t21d: release 前审计——违规记忆在释放返回中提示并落账
     assert.equal(rel.status, 'suspend', JSON.stringify(rel))
     assert.ok(rel.memoryAudit, 'release 返回带 memoryAudit')
     assert.equal(rel.memoryAudit.violations, 1)
-    const ledger = readFileSync(join(root, '.team-workplace', 'state', 'teams', teamId, 'ledger.jsonl'), 'utf8')
+    const ledger = readFileSync(join(root, '.dsh-myteam', 'tasks', teamId, 'ledger.jsonl'), 'utf8')
     const events = ledger.split('\n').filter((l) => l.trim()).map((l) => JSON.parse(l))
     const audit = events.filter((e) => e.type === 'memory.audit')
     assert.equal(audit.length, 1)

@@ -27,7 +27,7 @@ const tmpWs = () => mkdtempSync(join(tmpdir(), 'myteam-idx-'))
 const ev = (seq: number, type: string, payload: Record<string, unknown>, ts = 1000 + seq) => ({ seq, ts, actor: 'lead', type, payload })
 
 function writeLedger(ws: string, teamId: string, events: Array<Record<string, unknown>>): void {
-  const dir = join(ws, '.team-workplace', 'state', 'teams', teamId)
+  const dir = join(ws, '.dsh-myteam', 'tasks', teamId)
   mkdirSync(dir, { recursive: true })
   writeFileSync(join(dir, 'ledger.jsonl'), `${events.map((event) => JSON.stringify(event)).join('\n')}\n`, 'utf8')
 }
@@ -70,7 +70,7 @@ test('t24-2: scanWorkspaceIndex 从账本全量重建（含空目录与坏行容
   writeLedger(ws, 'alpha', teamLedger('alpha', '目标 A'))
   writeLedger(ws, 'beta', teamLedger('beta', '目标 B'))
   // 坏行：不应让整个扫描失败
-  const badDir = join(ws, '.team-workplace', 'state', 'teams', 'gamma')
+  const badDir = join(ws, '.dsh-myteam', 'tasks', 'gamma')
   mkdirSync(badDir, { recursive: true })
   writeFileSync(join(badDir, 'ledger.jsonl'), '{"seq":0,"ts":1,"type":"team.created"\n', 'utf8')
 

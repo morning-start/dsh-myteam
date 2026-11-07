@@ -30,7 +30,7 @@ function withWorkspace(fn: (ws: string) => void): void {
 }
 
 function writeLedger(ws: string, teamId: string, lines: string[]): void {
-  const dir = join(ws, '.team-workplace', 'state', 'teams', teamId)
+  const dir = join(ws, '.dsh-myteam', 'tasks', teamId)
   mkdirSync(dir, { recursive: true })
   writeFileSync(join(dir, 'ledger.jsonl'), lines.join('\n') + '\n')
 }
@@ -44,7 +44,7 @@ test('t25-1: teamId 白名单 + 绝对工作区（禁止路径穿越）', () => 
   assert.equal(isSafeTeamId(''), false)
   assert.equal(teamLedgerPath('relative/ws', 't1'), undefined, '相对路径拒绝')
   assert.equal(teamLedgerPath(tmpdir(), '../t1'), undefined)
-  assert.ok(teamLedgerPath(tmpdir(), 't1')?.endsWith(join('.team-workplace', 'state', 'teams', 't1', 'ledger.jsonl')))
+  assert.ok(teamLedgerPath(tmpdir(), 't1')?.endsWith(join('.dsh-myteam', 'tasks', 't1', 'ledger.jsonl')))
 })
 
 test('t25-2: foldTolerant 跳过非法事件、保留此前折叠结果', () => {
@@ -82,7 +82,7 @@ test('t25-5: 离线 tokens 侧车读取（缺失/损坏/版本不符 → undefin
     assert.equal(buildOfflineTokens(ws, 'no-team'), undefined)
 
     writeLedger(ws, 't-tok', [JSON.stringify(ev(1, 'team.created', { teamId: 't-tok', name: 'n', goal: 'g' }))])
-    const dir = join(ws, '.team-workplace', 'state', 'teams', 't-tok')
+    const dir = join(ws, '.dsh-myteam', 'tasks', 't-tok')
     writeFileSync(join(dir, 'tokens.json'), JSON.stringify({
       version: 1, teamId: 't-tok', updatedAt: 1, days: {},
       totals: { m1: { uncachedInput: 30, cacheRead: 70, cacheWrite: 0, output: 10, calls: 1 } },

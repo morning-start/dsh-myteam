@@ -83,7 +83,7 @@ test('T17/场景7: 澄清硬终止——clarify 超 N=3 轮 submit_plan 被拦�
     }
     const fourth = host.executeLeadTool('myteam_submit_plan', args, {}) as any
     assert.equal(fourth.status, 'clarify-limit', '第 4 轮触发硬终止（FR-1.6）')
-    const ledger = readFileSync(join(root, '.team-workplace', 'state', 'teams', 'default', 'ledger.jsonl'), 'utf8')
+    const ledger = readFileSync(join(root, '.dsh-myteam', 'tasks', 'default', 'ledger.jsonl'), 'utf8')
     const events = ledger.split('\n').filter((l) => l.trim()).map((l) => JSON.parse(l))
     assert.ok(events.filter((e) => e.type === 'plan.clarify').length === 3, '被拦截的启动在账本留 plan.clarify ×3')
   } finally {
@@ -167,14 +167,14 @@ test('T17/场景31-机制部分: done 附 knowledgeDraft → knowledge.proposed 
     // 队长采纳（myteam_adopt_knowledge：策展门 + 落库带归因）
     const adopt = host.executeLeadTool('myteam_adopt_knowledge', { teamId, draftId: 'kb-orders-soft-delete', decision: 'adopted' }, {}) as any
     assert.equal(adopt.status, 'adopted', JSON.stringify(adopt))
-    const led = readFileSync(join(root, '.team-workplace', 'state', 'teams', teamId, 'ledger.jsonl'), 'utf8')
+    const led = readFileSync(join(root, '.dsh-myteam', 'tasks', teamId, 'ledger.jsonl'), 'utf8')
     const events = led.split('\n').filter((l) => l.trim()).map((l) => JSON.parse(l))
     const proposed = events.find((e) => e.type === 'knowledge.proposed')
     assert.ok(proposed, 'knowledge.proposed 已落账本')
     assert.equal((proposed.payload.draft as any).evidence, cr.taskId, '证据=任务 id')
     assert.ok(events.find((e) => e.type === 'knowledge.adopted'), 'knowledge.adopted 已落账本')
     // 落库验证：config/knowledge/ 有条目文件且带 contributor/evidence
-    const entryText = readFileSync(join(root, '.team-workplace', 'config', 'knowledge', 'kb-orders-soft-delete.md'), 'utf8')
+    const entryText = readFileSync(join(root, '.dsh-myteam', 'config', 'knowledge', 'kb-orders-soft-delete.md'), 'utf8')
     assert.match(entryText, /contributor:/, '归因落库（FR-17.3 E9）')
     assert.match(entryText, /evidence:/, '证据指针落库（FR-17.3 E8）')
   } finally {
@@ -246,7 +246,7 @@ test('T17/场景4-机制部分: 杀进程重启 → 账本重放一致 + 滞留 
     const after = host2.service(teamId).projectionSnapshot
     assert.equal(after.tasks[cr.taskId].state, 'ready', '恢复后任务回 ready 供重新 claim')
     // 账本重放一致性：旧事件数 + 新恢复事件
-    const led = readFileSync(join(root, '.team-workplace', 'state', 'teams', teamId, 'ledger.jsonl'), 'utf8')
+    const led = readFileSync(join(root, '.dsh-myteam', 'tasks', teamId, 'ledger.jsonl'), 'utf8')
     const events = led.split('\n').filter((l) => l.trim()).map((l) => JSON.parse(l))
     assert.ok(events.length > 0 && events[0].type === 'rules.version.adopted')
     void before

@@ -58,7 +58,7 @@ test('t36-1: list_presets 返回内置开箱团队（只读）+ 项目模板摘�
     const saved: any = host.executeLeadTool('myteam_save_preset', { preset: PRESET }, {})
     assert.equal(saved.status, 'created', JSON.stringify(saved))
     assert.equal(saved.version, 1)
-    assert.equal(saved.presetPath, '.team-workplace/config/presets/team-save.json')
+    assert.equal(saved.presetPath, '.dsh-myteam/config/teams/team-save.json')
 
     const listed2: any = host.executeLeadTool('myteam_list_presets', {}, {})
     const project = listed2.presets.find((preset: any) => preset.id === 'team-save')
@@ -107,7 +107,7 @@ test('t36-2: save_preset 守门——未知角色/空队员/内置 id/覆写两�
     }, {})
     assert.equal(updated.status, 'updated', JSON.stringify(updated))
     assert.equal(updated.version, 2)
-    const file: any = JSON.parse(readFileSync(join(root, '.team-workplace', 'config', 'presets', 'team-save.json'), 'utf8'))
+    const file: any = JSON.parse(readFileSync(join(root, '.dsh-myteam', 'config', 'teams', 'team-save.json'), 'utf8'))
     assert.equal(file.name, '改过的名字')
     assert.equal(file.version, 2)
     assert.equal(file.members.length, 1)
@@ -125,7 +125,7 @@ test('t36-3: copy_preset 内置→项目 fork；目标内置/已存在拒绝', (
     }, {})
     assert.equal(copied.status, 'copied', JSON.stringify(copied))
     assert.equal(copied.fromPresetId, 'starter-team')
-    const file: any = JSON.parse(readFileSync(join(root, '.team-workplace', 'config', 'presets', 'my-starter.json'), 'utf8'))
+    const file: any = JSON.parse(readFileSync(join(root, '.dsh-myteam', 'config', 'teams', 'my-starter.json'), 'utf8'))
     assert.equal(file.name, '我的开箱团队')
     assert.equal(file.members.length, 3)
     assert.equal(file.version, 1)
@@ -152,11 +152,11 @@ test('t36-4: delete_preset 内置拒删、confirm 两段确认、不存在报错
     host.executeLeadTool('myteam_save_preset', { preset: PRESET }, {})
     const needConfirm: any = host.executeLeadTool('myteam_delete_preset', { presetId: 'team-save' }, {})
     assert.equal(needConfirm.status, 'confirm-required')
-    assert.ok(existsSync(join(root, '.team-workplace', 'config', 'presets', 'team-save.json')))
+    assert.ok(existsSync(join(root, '.dsh-myteam', 'config', 'teams', 'team-save.json')))
 
     const deleted: any = host.executeLeadTool('myteam_delete_preset', { presetId: 'team-save', confirm: true }, {})
     assert.equal(deleted.status, 'deleted', JSON.stringify(deleted))
-    assert.equal(existsSync(join(root, '.team-workplace', 'config', 'presets', 'team-save.json')), false)
+    assert.equal(existsSync(join(root, '.dsh-myteam', 'config', 'teams', 'team-save.json')), false)
 
     const again: any = host.executeLeadTool('myteam_delete_preset', { presetId: 'team-save', confirm: true }, {})
     assert.equal(again.code, 'MT_PRESET_NOT_FOUND')
@@ -169,7 +169,7 @@ test('t36-5: reset_team_config 删除团队级配置并重建缓存；二次调�
   const root = mkdtempSync(join(tmpdir(), 'myteam-t36e-'))
   try {
     const host = setup(root)
-    const dir = join(root, '.team-workplace', 'config', 'presets')
+    const dir = join(root, '.dsh-myteam', 'config', 'teams')
     mkdirSync(dir, { recursive: true })
     writeFileSync(join(dir, 'team-reset.json'), JSON.stringify({ ...PRESET, id: 'team-reset', name: '恢复模板' }))
 

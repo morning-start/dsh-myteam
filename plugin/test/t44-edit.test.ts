@@ -49,7 +49,7 @@ function approvedTeam(root: string) {
 }
 
 function ledgerEvents(root: string, teamId: string): any[] {
-  const path = join(root, '.team-workplace', 'state', 'teams', teamId, 'ledger.jsonl')
+  const path = join(root, '.dsh-myteam', 'tasks', teamId, 'ledger.jsonl')
   return readFileSync(path, 'utf8').split('\n').filter(Boolean).map((line) => JSON.parse(line))
 }
 
@@ -161,7 +161,7 @@ test('t44-4: 团队名/目标编辑（team.updated）；空值被拒；冷启动
   // 冷启动重放：新 TeamService 从账本重建，名称/目标/任务补丁一致
   const svc = new TeamService({
     workspaceRoot: root, teamId,
-    rolePaths: { projectRolesDir: join(root, '.team-workplace', 'config', 'roles') },
+    rolePaths: { projectRolesDir: join(root, '.dsh-myteam', 'config', 'roles') },
   })
   assert.equal(svc.projectionSnapshot.name, '新名字')
   assert.equal(svc.projectionSnapshot.goal, '新目标')

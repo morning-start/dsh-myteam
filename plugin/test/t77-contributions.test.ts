@@ -100,7 +100,7 @@ function makeHost(): { host: MyTeamHost; root: string } {
 }
 
 function ledgerPath(root: string, teamId: string): string {
-  return join(root, '.team-workplace', 'state', 'teams', teamId, 'ledger.jsonl')
+  return join(root, '.dsh-myteam', 'tasks', teamId, 'ledger.jsonl')
 }
 
 /* ── 1. 装载进目录（origin = plugin）────────────────────────────── */

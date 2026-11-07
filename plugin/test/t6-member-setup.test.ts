@@ -60,5 +60,5 @@ test('T6: member prompt section carries role identity + discipline rules', () =>
 
 test('T6: scratch path nests per team/member (FR-10.5, R26 member mkdirs)', () => {
   const p = scratchPathFor('E:/ws', 't1', 'm1')
-  assert.ok(p.includes('.team-workplace/state/scratch/t1/m1') || p.includes('.team-workplace\\state\\scratch\\t1\\m1'))
+  assert.ok(p.includes('.dsh-myteam/state/scratch/t1/m1') || p.includes('.dsh-myteam\\state\\scratch\\t1\\m1'))
 })

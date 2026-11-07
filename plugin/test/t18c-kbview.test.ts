@@ -20,7 +20,7 @@ function setup() {
   }
   writeKnowledgeEntry(knowledgeDirOf(ws), entry)
   // 团队 t1：一条未裁决提案 + 一条已驳回提案 + 一条演化事件
-  const dir1 = join(ws, '.team-workplace', 'state', 'teams', 't1')
+  const dir1 = join(ws, '.dsh-myteam', 'tasks', 't1')
   mkdirSync(dir1, { recursive: true })
   const lines = [
     { seq: 1, ts: Date.now(), actor: 'member:m1', type: 'knowledge.proposed', payload: { teamId: 't1', draftId: 'd-pending', draft: { id: 'd-pending', title: '新条目提案', tags: ['api'], relation: 'new', evidence: ['task-k9'] }, proposedBy: 'm1' } },

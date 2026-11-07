@@ -96,7 +96,7 @@ async function seedTeam(host: MyTeamHost, goal = '把登录流程改成 SSO') {
 }
 
 function ledgerEvents(root: string, teamId: string): unknown[] {
-  const path = join(root, '.team-workplace', 'state', 'teams', teamId, 'ledger.jsonl')
+  const path = join(root, '.dsh-myteam', 'tasks', teamId, 'ledger.jsonl')
   return readFileSync(path, 'utf8')
     .split('\n')
     .filter((line) => line.trim().length > 0)
