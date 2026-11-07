@@ -568,3 +568,35 @@ test('t75-14 (CHG-93): contributionsBody 有 error 时红条 —— 列出每条
   assert.ok(text.includes('请改用带前缀的 id'), '必须带修法（只说「失败了」等于没说）')
   assert.ok(collect(tree).some((node) => classOf(node).includes('mt-error-banner')), '红条要有告警样式')
 })
+
+test('t75-15 (CHG-105): 贡献区块改为「每插件一张卡 + 卡内扁平行列表」——不再三层套嵌卡片', () => {
+  const { contributionsBody } = G89()
+  const tree = contributionsBody(t, {
+    status: 'ok', root: '/h/myteam/plugins', ok: true,
+    plugins: [{ pluginId: 'acme-review-kit', displayName: 'Acme 评审工具包', version: '1.0.0', namespace: 'acme', roles: ['acme-security-auditor'], teams: ['acme-review-squad'], status: 'ok' }],
+    roles: [{ id: 'acme-security-auditor', name: '安全审计', origin: 'plugin:acme-review-kit' }],
+    teams: [{ id: 'acme-review-squad', name: 'Acme 评审小队', namespace: 'acme', members: [{ roleId: 'acme-security-auditor' }, { roleId: 'reviewer' }] }],
+    warnings: [],
+  })
+  const classes = collect(tree).flatMap((node) => classOf(node).split(/\s+/).filter(Boolean))
+  const unique = new Set(classes)
+
+  // ① 只有一层卡片：mt-sec 只出现在最外层 section 上（原实现内部还有两个 mt-sec 卡片）
+  const secCount = classes.filter((cls) => cls === 'mt-sec').length
+  assert.equal(secCount, 1, `mt-sec 只能出现一次（外层区块），实际 ${secCount} 次 —— 内部再套卡片就是三层边框`)
+  // ② 行列表容器是扁平的 group，旧的带框列表容器必须消失
+  assert.ok(unique.has('mt-contrib-group'), '角色/模板分组用 mt-contrib-group')
+  assert.ok(!unique.has('mt-contrib-rolelist'), '不再使用带框的 rolelist 容器')
+  assert.ok(!unique.has('mt-contrib-teamlist'), '不再使用带框的 teamlist 容器')
+  // ③ 插件头一行放「名字 + id·版本 + 计数」，计数靠右
+  assert.ok(unique.has('mt-contrib-plugin-head'), '插件头单独一行')
+  assert.ok(unique.has('mt-contrib-counts'), '计数靠右（mt-contrib-counts）')
+  // ④ 只读徽标是短标签 + title 承载完整说明（原实现长句直接铺满整行）
+  const lock = collect(tree).find((node) => classOf(node).includes('mt-contrib-lock'))
+  assert.ok(lock, '只读徽标要有 mt-contrib-lock（靠右不拉伸）')
+  assert.ok(String(lock.props?.title ?? '').length > 10, '完整说明放 title（悬停可读，不占版面）')
+  assert.equal(String(lock.children?.[0] ?? lock.children ?? ''), `🔒 ${t('contrib.readonly')}`, '徽标正文必须是短标签')
+  // ⑤ 行内 id 用设计系统的 chip（不新增字体族覆盖）
+  assert.ok(unique.has('mt-rolechip'), 'id 用既有 mt-rolechip')
+  assert.ok(unique.has('mt-rolechip-mono'), 'id 用等宽数字 chip')
+})

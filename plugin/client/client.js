@@ -413,7 +413,8 @@ window.__ModuleLoader__.load({
       'contrib.roles': '角色',
       'contrib.teams': '团队模板',
       'contrib.providedBy': '由插件「{plugin}」提供',
-      'contrib.readonly': '插件贡献的角色只读；想改请先「复制到项目」再编辑项目库那份',
+      'contrib.readonly': '只读',
+      'contrib.readonlyHint': '插件贡献的角色只读；想改请先「复制到项目」再编辑项目库那份',
       'contrib.warnTitle': '插件贡献有问题（{n} 条 error）',
       'contrib.warnHint': '这些条目已被跳过。按每条提示改插件目录后点「重新扫描插件」。',
       'contrib.ok': '插件贡献装载正常（{plugins} 个插件 / {roles} 个角色 / {teams} 个团队模板）',
@@ -1552,7 +1553,8 @@ window.__ModuleLoader__.load({
       'contrib.roles': 'Roles',
       'contrib.teams': 'Team templates',
       'contrib.providedBy': 'Provided by plugin "{plugin}"',
-      'contrib.readonly': 'Plugin-contributed roles are read-only; copy to project to edit that copy',
+      'contrib.readonly': 'Read-only',
+      'contrib.readonlyHint': 'Plugin-contributed roles are read-only; copy to project to edit that copy',
       'contrib.warnTitle': 'Plugin contributions have {n} error(s)',
       'contrib.warnHint': 'Those entries were skipped. Fix the plugin directory per each message, then click "Rescan plugins".',
       'contrib.ok': 'Plugin contributions loaded ({plugins} plugin(s) / {roles} role(s) / {teams} team template(s))',
@@ -3593,12 +3595,24 @@ window.__ModuleLoader__.load({
       '.mt-avatar-a3{background:color-mix(in srgb, var(--dsw-alias-state-warning-primary) 14%, transparent);border-color:color-mix(in srgb, var(--dsw-alias-state-warning-primary) 32%, transparent);color:var(--dsw-alias-state-warning-primary)}',
       '.mt-avatar-a4{background:color-mix(in srgb, var(--dsw-alias-state-error-primary) 12%, transparent);border-color:color-mix(in srgb, var(--dsw-alias-state-error-primary) 30%, transparent);color:var(--dsw-alias-state-error-primary)}',
       '.mt-chip-origin{flex:none;color:var(--dsw-alias-label-tertiary)}',
-      /* CHG-91（插件团队贡献契约 v1）：插件贡献区块 —— 与角色库同层级但不抢视觉 */
+      /* CHG-91（插件团队贡献契约 v1）：插件贡献区块 —— 与角色库同层级但不抢视觉
+       * CHG-105：从「三层套嵌卡片」改成**每插件一张卡 + 卡内扁平行列表**
+       * （原先 插件贡献 > 角色/团队模板 各一层带框卡片，单条数据也撑出大块留白，
+       *   右侧只读徽标又被拉成长条 → 整块又高又空）。 */
       '.mt-contrib{margin-bottom:16px}',
-      '.mt-contrib-plugins{display:flex;flex-wrap:wrap;gap:8px;margin:8px 0}',
-      '.mt-contrib-plugin{display:flex;align-items:center;gap:8px;padding:6px 10px;border:1px solid var(--dsw-alias-line-soft);border-radius:8px;background:var(--dsw-alias-surface-raised)}',
-      '.mt-contrib-rolelist,.mt-contrib-teamlist{display:flex;flex-direction:column;gap:6px;margin-top:6px}',
-      '.mt-contrib-role,.mt-contrib-team{display:flex;align-items:center;gap:8px;flex-wrap:wrap;padding:6px 8px;border-radius:6px;background:var(--dsw-alias-surface-raised)}',
+      '.mt-contrib-body{display:flex;flex-direction:column;gap:8px;margin-top:8px}',
+      '.mt-contrib-plugin{border:1px solid var(--dsw-alias-line-soft);border-radius:8px;overflow:hidden;background:var(--dsw-alias-surface-raised)}',
+      '.mt-contrib-plugin-head{display:flex;align-items:baseline;gap:8px;padding:8px 12px;background:var(--dsw-alias-bg-layer-2);border-bottom:1px solid var(--dsw-alias-line-soft)}',
+      '.mt-contrib-counts{margin-left:auto;flex:none;font-size:11px;color:var(--dsw-alias-label-tertiary);font-variant-numeric:tabular-nums}',
+      '.mt-contrib-group{display:flex;flex-direction:column;gap:2px;padding:8px 12px}',
+      '.mt-contrib-group+.mt-contrib-group{border-top:1px solid var(--dsw-alias-line-soft)}',
+      '.mt-contrib-group-label{font-size:11px;font-weight:600;letter-spacing:.02em;color:var(--dsw-alias-label-tertiary);margin-bottom:2px}',
+      '.mt-contrib-role,.mt-contrib-team{display:flex;align-items:center;gap:8px;min-height:24px;padding:1px 6px;border-radius:4px;font-size:12px}',
+      '.mt-contrib-role:hover,.mt-contrib-team:hover{background:var(--dsw-alias-bg-layer-2)}',
+      '.mt-contrib-name{flex:none;color:var(--dsw-alias-label-primary)}',
+      '.mt-contrib-meta{min-width:0;color:var(--dsw-alias-label-tertiary);font-size:11px;overflow-wrap:anywhere}',
+      /* 只读徽标只占自己那一格：短标签 + title 承载完整说明，不再拉满整行 */
+      '.mt-contrib-lock{margin-left:auto;flex:none}',
       '.mt-contrib-warns{margin:6px 0 0;padding-left:18px;display:flex;flex-direction:column;gap:4px;font-size:12px}',
       '.mt-contrib-warn-err{color:var(--dsw-alias-state-error-primary)}',
       '.mt-contrib-warn-info{color:var(--dsw-alias-label-secondary)}',
@@ -7429,30 +7443,36 @@ window.__ModuleLoader__.load({
           ? j('div', { className: 'mt-hint', children: t('state.loading') })
           : plugins.length === 0
             ? j('div', { className: 'mt-empty', children: t('contrib.empty') })
-            : js('div', { children: [
-              js('div', { className: 'mt-contrib-plugins', children: plugins.map((plugin) => js('div', { key: plugin.pluginId, className: 'mt-contrib-plugin', children: [
+            : js('div', { className: 'mt-contrib-body', children: plugins.map((plugin) => js('div', { key: plugin.pluginId, className: 'mt-contrib-plugin', children: [
+              /* 插件头：名字 + id·版本 + 计数（计数靠右，和列表左对齐形成一条干净的中轴） */
+              js('div', { className: 'mt-contrib-plugin-head', children: [
                 j('strong', { children: plugin.displayName }),
-                j('span', { className: 'mt-rolecard-id', children: `${plugin.pluginId} · v${plugin.version}` }),
-                j('span', { className: 'mt-hint', children: `角色 ${plugin.roles.length} · 模板 ${plugin.teams.length}` }),
-              ] })) }),
-              roles.length > 0 ? js('div', { className: 'mt-sec', children: [
-                j('h5', { children: t('contrib.roles') }),
-                js('div', { className: 'mt-contrib-rolelist', children: roles.map((role) => js('div', { key: role.id, className: 'mt-contrib-role', children: [
+                j('span', { className: 'mt-rolechip mt-rolechip-mono', children: `${plugin.pluginId} · v${plugin.version}` }),
+                j('span', { className: 'mt-contrib-counts', children: `${t('contrib.roles')} ${plugin.roles.length} · ${t('contrib.teams')} ${plugin.teams.length}` }),
+              ] }),
+              roles.length > 0 ? js('div', { className: 'mt-contrib-group', children: [
+                j('span', { className: 'mt-contrib-group-label', children: t('contrib.roles') }),
+                ...roles.map((role) => js('div', { key: role.id, className: 'mt-contrib-role', children: [
                   j('span', { className: 'mt-rolechip mt-rolechip-mono', children: role.id }),
-                  j('span', { children: role.name }),
-                  j('span', { className: 'mt-hint', children: t('contrib.providedBy').replace('{plugin}', displayNameOf(String(role.origin ?? '').replace(/^plugin:/, ''))) }),
-                  j('span', { className: 'mt-chip mt-chip-origin', children: `🔒 ${t('contrib.readonly')}` }),
-                ] })) }),
+                  j('span', { className: 'mt-contrib-name', children: role.name }),
+                  j('span', { className: 'mt-contrib-meta', children: t('contrib.providedBy').replace('{plugin}', displayNameOf(String(role.origin ?? '').replace(/^plugin:/, ''))) }),
+                  /* 只读徽标只占自己那一格（短标签 + title 说明），不再拉一条长条撑满整行 */
+                  j('span', {
+                    className: 'mt-chip mt-chip-origin mt-contrib-lock',
+                    title: t('contrib.readonlyHint'),
+                    children: `🔒 ${t('contrib.readonly')}`,
+                  }),
+                ] })),
               ] }) : null,
-              teams.length > 0 ? js('div', { className: 'mt-sec', children: [
-                j('h5', { children: t('contrib.teams') }),
-                js('div', { className: 'mt-contrib-teamlist', children: teams.map((team) => js('div', { key: team.id, className: 'mt-contrib-team', children: [
-                  j('strong', { children: team.name }),
-                  j('span', { className: 'mt-rolecard-id', children: team.id }),
-                  j('span', { className: 'mt-hint', children: (team.members ?? []).map((member) => member.roleId).join(' · ') }),
-                ] })) }),
+              teams.length > 0 ? js('div', { className: 'mt-contrib-group', children: [
+                j('span', { className: 'mt-contrib-group-label', children: t('contrib.teams') }),
+                ...teams.map((team) => js('div', { key: team.id, className: 'mt-contrib-team', children: [
+                  j('span', { className: 'mt-rolechip mt-rolechip-mono', children: team.id }),
+                  j('span', { className: 'mt-contrib-name', children: team.name }),
+                  j('span', { className: 'mt-contrib-meta', children: (team.members ?? []).map((member) => member.roleId).join(' · ') }),
+                ] })),
               ] }) : null,
-            ] }),
+            ] })) }),
         j('div', { className: 'mt-hint', children: t('contrib.root').replace('{root}', String(data?.root ?? '')) }),
         err ? j('div', { className: 'mt-form-note mt-error-banner', role: 'alert', children: err }) : null,
       ] })
