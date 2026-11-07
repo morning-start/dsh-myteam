@@ -226,3 +226,46 @@ test('t62-9: 离线/只读降级——实例菜单禁用、只读提示可见', 
   assert.ok(source.includes("t('offline.readonlyTip')"), '离线团队只读横幅')
   assert.ok(source.includes('disabled: readOnly || busy'), '只读禁用写动作')
 })
+
+/**
+ * CHG-97：**同一顶层选择器不允许出现多次**。
+ *
+ * 为什么这条值得单独立测试：CSS 层叠是**按属性**生效的——后一条没写的属性不会重置，
+ * 前一条的声明仍然生效。所以「复制粘贴出来的一份样式」删掉任何一份都会改变渲染，
+ * 而改了没生效的声明（如 `.mt-tstat b` 的 `color`）又永远不会有人发现。
+ *
+ * 历史：CHG-82 把 app.css 的工具类分给 4 组各抄一份，留下 11 个重复选择器；
+ * CHG-96 量对比度时才发现 `.mt-dsec-head h4` 有 4 条、其中第 3 条（label-tertiary）
+ * 被第 4 条（label-secondary）盖掉——「写了但没生效」，而且连续 4 轮 UI 复检都没抓到。
+ *
+ * `@media` / `@supports` 块内不算（响应式覆盖必须允许重复）。
+ */
+test('t62-10: 样式表里同一顶层选择器只定义一次（重复 = 后者静默覆盖前者）', () => {
+  const { css } = loadClient()
+  assert.ok(css.length > 1000, '样式表非空')
+
+  const seen = new Map()
+  let depth = 0
+  let selStart = 0
+  for (let i = 0; i < css.length; i++) {
+    const ch = css[i]
+    if (ch === '{') {
+      if (depth === 0) {
+        const sel = css.slice(selStart, i).trim()
+        /* 取下一条规则之前的选择器可能带上前面规则的 `}`，从最后一个 } 处切 */
+        const clean = sel.slice(sel.lastIndexOf('}') + 1).trim()
+        if (clean && !clean.startsWith('@') && !clean.startsWith('/*')) {
+          seen.set(clean, (seen.get(clean) ?? 0) + 1)
+        }
+      }
+      depth += 1
+    } else if (ch === '}') {
+      depth = Math.max(0, depth - 1)
+      if (depth === 0) selStart = i + 1
+    }
+  }
+
+  const dups = [...seen.entries()].filter(([, n]) => n > 1)
+  assert.deepEqual(dups, [], `同一顶层选择器被定义了多次（后者会静默覆盖前者）：${dups.map(([s, n]) => `${s} ×${n}`).join(' | ')}`)
+  assert.ok(seen.size > 500, `解析到足够多的选择器（实际 ${seen.size}），防止解析器写错导致空断言`)
+})
