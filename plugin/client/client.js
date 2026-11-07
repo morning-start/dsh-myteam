@@ -11785,97 +11785,6 @@ window.__ModuleLoader__.load({
         j('span', { className: 'mt-toolcard-chev', 'aria-hidden': true, children: '›' }),
       ] }) })
     }
-    /** myteam_apply_roles 注入卡（design/guest.html）：系统提示 / 工具策略只收窄 / 技能 / MCP 交集 / 模型路由五行 */
-    function ApplyRolesCard({ t }) {
-      const dark = useDarkTheme()
-      const themeAttr = { 'data-theme': dark ? 'dark' : 'light' }
-      const chips = (list) => list.map((item, index) => j('span', { key: `${item}-${index}`, className: 'mt-mini-chip', children: item }))
-      const rows = [
-        ['systemPrompt', [
-          j('span', { key: 'a', children: '追加 2 段角色提示（' }),
-          j('code', { key: 'b', children: 'reviewer' }),
-          j('span', { key: 'c', children: ' 审查准则、' }),
-          j('code', { key: 'd', children: 'tech-writer' }),
-          j('span', { key: 'e', children: ' 文档骨架）' }),
-          j('span', { key: 'f', className: 'mt-mini-chip', children: t('g6.guest.onceInject') }),
-        ]],
-        ['toolPolicy', [
-          j('span', { key: 'a', children: '取交集后收窄 2 项：' }),
-          j('code', { key: 'b', children: 'bash' }),
-          j('span', { key: 'c', children: ' 移除 · ' }),
-          j('code', { key: 'd', children: 'write' }),
-          j('span', { key: 'e', children: ' 限文档目录' }),
-          j('span', { key: 'f', className: 'mt-mini-chip mt-mini-chip-lead', children: t('g6.guest.narrowOnly') }),
-        ]],
-        ['skills', chips(['review-playbook', 'doc-outline'])],
-        ['mcp', [
-          j('span', { key: 'a', children: '连接层 ∩ allowlist = ' }),
-          /* 演示样本走 locale（t63-6：实现里不硬编码设计稿演示数据），最后一个＝未连接的降级项 */
-          ...t('g6.guest.mcpSamples').split(' · ').map((name, index, all) => j('span', {
-            key: `mcp-${index}`,
-            className: index === all.length - 1 ? 'mt-mini-chip mt-mini-chip-coop' : 'mt-mini-chip',
-            children: index === all.length - 1 ? `⚠ ${name}` : name,
-          })),
-        ]],
-        ['modelRoute', [
-          j('code', { key: 'a', children: 'claude-opus-4.6' }),
-          j('span', { key: 'b', children: '（来自 reviewer，冲突时取后加载的那个）' }),
-        ]],
-      ]
-      return js('div', { className: 'mt-toolcard', ...themeAttr, children: [
-        js('div', { className: 'mt-toolcard-head', children: [
-          j('span', { className: 'mt-note-icon', 'aria-hidden': true, children: '⛓' }),
-          j('span', { className: 'mt-toolcard-name', children: 'myteam_apply_roles' }),
-          j('span', { className: 'mt-toolcard-stat', children: t('g6.guest.applyStat').replace('{n}', '2') }),
-          j('span', { className: 'mt-toolcard-chev', 'aria-hidden': true, children: '⌄' }),
-        ] }),
-        js('div', { className: 'mt-toolcard-body', children: rows.map(([key, value]) => js('div', { key, className: 'mt-injrow', children: [
-          j('span', { className: 'mt-inj-k', children: t(`g6.guest.${key}`) }),
-          j('span', { className: 'mt-inj-v', children: value }),
-        ] })) }),
-        js('div', { className: 'mt-toolcard-foot', children: [
-          j('button', { className: 'mt-btn mt-btn-sm', children: t('g6.guest.seeRole') }),
-          j('button', { className: 'mt-btn mt-btn-sm', children: t('g6.guest.seeSkills') }),
-        ] }),
-      ] })
-    }
-    /** /myteam+ 命令输入 + 前缀匹配候选弹层（多义回显不猜：把全部匹配列出来让人点选） */
-    function GuestCallComposer({ t }) {
-      const [value, setValue] = react.useState('tech-w')
-      const label = t('g6.guest.candCap').replace('{n}', '2')
-      return js('div', { children: [
-        js('div', { className: 'mt-composerbox', children: [
-          j('span', { className: 'mt-cmdprefix', 'aria-hidden': true, children: '/myteam+' }),
-          j('input', {
-            className: 'mt-cmdinput',
-            value,
-            'aria-label': t('g6.guest.section'),
-            autoComplete: 'off',
-            onChange: (event) => setValue(event.target.value),
-          }),
-          j('button', { className: 'mt-btn mt-btn-sm', 'aria-label': t('action.send'), children: '↑' }),
-        ] }),
-        js('div', { className: 'mt-candpop', role: 'listbox', 'aria-label': label, children: [
-          j('div', { className: 'mt-cand-cap', children: label }),
-          js('div', { className: 'mt-cand', role: 'option', 'aria-selected': 'true', children: [
-            j('span', { className: 'mt-mavatar mt-mavatar-a4', 'aria-hidden': true, children: '文' }),
-            j('span', { className: 'mt-cand-name', children: 'tech-writer' }),
-            j('span', { className: 'mt-src mt-src-project', children: t('roles.origin.project') }),
-            j('span', { className: 'mt-cand-sub', children: 'gpt-5.1 · 迁移说明与对外文档' }),
-          ] }),
-          js('div', { className: 'mt-cand', role: 'option', 'aria-selected': 'false', children: [
-            j('span', { className: 'mt-mavatar mt-mavatar-a4', 'aria-hidden': true, children: '文' }),
-            j('span', { className: 'mt-cand-name', children: 'tech-writer-cn' }),
-            j('span', { className: 'mt-src mt-src-global', children: t('roles.origin.global') }),
-            j('span', { className: 'mt-cand-sub', children: '继承队长路由 · 只写中文文档' }),
-          ] }),
-          j('div', { className: 'mt-cand-foot', children: t('g6.guest.candFoot') }),
-        ] }),
-        j('p', { className: 'mt-composerhint', children: t('g6.guest.hint') }),
-      ] })
-    }
-    /** CHG-107：`ConvTurn`（假对话轮次）已随演示数据一起删除——团队视图不再伪造对话。 */
-    /** 会话页团队视图（conversation.view 落点）：真实团队头 + 概览 + 任务 + 成员 + dock chip */
     /**
      * 会话页团队视图（conversation.view 落点）——**只渲染真实账本数据**。
      *
@@ -12246,7 +12155,7 @@ window.__ModuleLoader__.load({
     const __testG6 = {
       TeamCreateDrawer, MyTeamConversationView,
       MyTeamPlanTasksToolView, MyTeamApprovePlanToolView, MyTeamPeerMessageToolView, MyTeamApplyRolesToolView,
-      TeamPlanTasksCard, TeamCollapsedCard, ApplyRolesCard, GuestCallComposer, DockChip,
+      TeamPlanTasksCard, TeamCollapsedCard, DockChip,
     }
 
     /* 测试专用出口（t75-chg89-gaps）：CHG-89 三个新入口所在组件的纯渲染面。
