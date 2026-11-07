@@ -1235,6 +1235,20 @@ window.__ModuleLoader__.load({
       'g6.teamTasks.note': '任务与团队是两件事：任务在项目里独立存在（派单、依赖、门禁、证据都在任务上），团队只是「参与」它。同一张任务被多个团队参与时，各自出人、各管各的队员，门禁由任务的验收口径统一裁决。',
       'g6.dock.running': '{n} 个角色在跑',
       'g6.dock.gates': '{n} 个门禁待审',
+      /* CHG-107：会话页团队视图 —— 只读真实账本（空态说清楚，不画假数据） */
+      'conv.emptyTitle': '这个会话还没进入团队模式',
+      'conv.emptySub': '团队视图只显示真实账本',
+      'conv.emptyBody': '团队视图读的是账本里的真实团队、任务与成员。这个会话还没有团队，所以这里是空的——不是加载失败。',
+      'conv.emptyCmd': '在对话里输入该命令组建团队',
+      'conv.openPanel': '打开面板',
+      'conv.stat.tasks': '任务',
+      'conv.stat.live': '进行中',
+      'conv.stat.gates': '门禁',
+      'conv.stat.roles': '角色',
+      'conv.section.tasks': '任务',
+      'conv.section.members': '成员',
+      'conv.noTasks': '账本里还没有任务（只读真实账本，不展示演示数据）',
+      'conv.noMembers': '还没有成员上岗',
       'g6.conv.view': '团队视图',
       'g6.conv.chat': '对话',
       'g6.conv.planStat': '· {tasks} 个任务 · {roles} 个角色 · {gates} 轮门禁',
@@ -2370,6 +2384,20 @@ window.__ModuleLoader__.load({
       'g6.dock.running': '{n} roles running',
       'g6.dock.gates': '{n} gates pending',
       'g6.conv.view': 'Team view',
+      /* CHG-107: conversation team view — real ledger only */
+      'conv.emptyTitle': 'This session is not in team mode yet',
+      'conv.emptySub': 'The team view only shows the real ledger',
+      'conv.emptyBody': 'The team view reads the real team, tasks and members from the ledger. This session has no team yet, so it is empty - not a load failure.',
+      'conv.emptyCmd': 'Type this command in the chat to form a team',
+      'conv.openPanel': 'Open panel',
+      'conv.stat.tasks': 'Tasks',
+      'conv.stat.live': 'Running',
+      'conv.stat.gates': 'Gates',
+      'conv.stat.roles': 'Roles',
+      'conv.section.tasks': 'Tasks',
+      'conv.section.members': 'Members',
+      'conv.noTasks': 'No tasks in the ledger yet (real ledger only, no demo data)',
+      'conv.noMembers': 'No members onboard yet',
       'g6.conv.chat': 'Chat',
       'g6.conv.planStat': '· {tasks} tasks · {roles} roles · {gates} gate rounds',
       'g6.conv.openPanel': 'Open in panel',
@@ -4197,6 +4225,15 @@ window.__ModuleLoader__.load({
       '.mt-conv-title b{font-size:13px;font-weight:600}',
       '.mt-conv-title span{display:block;font-size:11px;color:var(--dsw-alias-label-tertiary)}',
       '.mt-team-mark{width:26px;height:26px;border-radius:8px;display:inline-flex;place-items:center;background:var(--dsw-alias-bg-layer-2);color:var(--dsw-alias-label-emphasis, var(--dsw-alias-label-primary));flex:none;align-items:center;justify-content:center;border:.5px solid var(--dsw-alias-border-l2);font-size:12px}',
+      /* CHG-107：会话页团队视图的真实数据面（概览计数 / 空态 / 成员名册 / 命令提示） */
+      '.mt-conv-stats{display:flex;flex-wrap:wrap;gap:8px;padding:12px 0}',
+      '.mt-conv-stat{display:flex;flex-direction:column;gap:2px;min-width:68px;padding:6px 10px;border:1px solid var(--dsw-alias-line-soft);border-radius:8px;background:var(--dsw-alias-bg-layer-2)}',
+      '.mt-conv-stat b{font-size:16px;font-weight:600;font-variant-numeric:tabular-nums;color:var(--dsw-alias-label-primary)}',
+      '.mt-conv-stat span{font-size:11px;color:var(--dsw-alias-label-tertiary)}',
+      '.mt-conv-body{display:flex;flex-direction:column;gap:10px;padding:16px 0}',
+      '.mt-conv-cmd{display:flex;align-items:center;gap:8px;flex-wrap:wrap}',
+      '.mt-conv-cmd code{font-size:12px;padding:2px 8px;border-radius:6px;border:1px solid var(--dsw-alias-line-soft);background:var(--dsw-alias-bg-layer-2);color:var(--dsw-alias-label-primary)}',
+      '.mt-conv-members{display:flex;flex-wrap:wrap;gap:6px}',
       '.mt-conv-seg{display:inline-flex;align-items:center;gap:2px;margin-left:auto;padding:2px;border:.5px solid var(--dsw-alias-border-l2);border-radius:999px;background:var(--dsw-alias-bg-layer-1);flex:none}',
       '.mt-conv-seg button{border:0;background:none;padding:3px 10px;border-radius:999px;color:var(--dsw-alias-label-secondary);font:inherit;font-size:12px;cursor:pointer}',
       '.mt-conv-seg .mt-conv-seg-on{background:var(--dsw-alias-bg-layer-2);color:var(--dsw-alias-label-primary);font-weight:600}',
@@ -11613,60 +11650,51 @@ window.__ModuleLoader__.load({
       : state === 'in_progress' || state === 'running' || state === 're-scoping' ? 'mt-status-run'
       : 'mt-status-idle')
     /**
-     * 演示数据开关（R34 / UI-1：**会话页演示数据不得污染真实视图**）。
+     * CHG-107：**演示数据已彻底删除**（连同调试开关）。
      *
-     * 修复前：`useState(CONV_DEMO_TASKS)` 让会话页初始 state 就是 11 条硬编码任务，
-     * 任何真实会话打开都先闪一遍别人的结算页任务——真实看板为空时更是永远显示假数据。
-     * 现在默认**不展示**；只有显式打开调试开关 `globalThis.__MYTEAM_DEMO__ === true`
-     * （设计稿对齐 / 截图用）才回落到演示样本。
+     * 历史：会话页的初始 state 一度是十几条硬编码任务；后来改成「调试开关 + 样本兜底」，
+     * 但「开关 + 样本」本身就是假数据的入口——团队视图里出现「没发生过的任务 / 对话」
+     * 正是从这里来的。现在没有样本常量、没有开关：读不到看板就是空数组，渲染侧给空态。
      */
-    const convDemoOn = () => {
-      try { return globalThis.__MYTEAM_DEMO__ === true } catch { return false }
-    }
-    /** 会话页演示数据（仅调试开关打开时用作「读不到看板」的兜底，与 design/conversation.html 同源口径） */
-    const CONV_DEMO_TASKS = [
-      { id: 't7', title: '抽结算服务边界与接口草案', state: 'in_progress', who: '实现者' },
-      { id: 't6', title: '结算页 UI 迁移到模块包', state: 'in_progress', who: '实现者 2' },
-      { id: 't4', title: '替换调用点并跑通 4 条冒烟', state: 'gates', who: '验收员' },
-      { id: 't1', title: '梳理结算页现有调用点清单', state: 'backlog', who: '需求验证' },
-      { id: 't2', title: '确定模块包对外 API 契约', state: 'done', who: '评审者' },
-      { id: 't3', title: '移除旧结算组件目录', state: 'gates', who: '需求验证员' },
-      { id: 't5', title: '旧调用点替换与灰度开关', state: 'ready', who: '评审者' },
-      { id: 't8', title: '补 12 条结算回归用例', state: 'ready', who: '需求验证员' },
-      { id: 't9', title: '结算页性能基线', state: 'backlog', who: '实现者' },
-      { id: 'v1', title: '评审口径对齐', state: 'done', who: '评审者' },
-      { id: 'v2', title: '锁定 v0.2 对外契约基线', state: 'in_progress', who: '接口评审' },
-    ]
     /**
-     * 会话页 / 工具卡共用的看板数据源（真实优先）。
+     * 会话页 / 工具卡共用的看板数据源（**只读真实数据**）。
      *
-     * 返回 `{ tasks, live, gates, roles, loaded }`：全部来自 `getBoard` 现算，
-     * **不用任何硬编码计数**；读不到时是空数组 / 0（渲染侧用 `—` 占位），
-     * 只有 `__MYTEAM_DEMO__` 打开时才回落到演示样本。
+     * 返回 `{ tasks, live, gates, roles, members, team, loaded }`：
+     *  - 任务/成员/计数全部来自 `getBoard` 现算；
+     *  - 团队名与状态来自根级 `listTeams`（按 sessionId 命中，**不是硬编码**）；
+     *  - 读不到时是空数组 / 0（渲染侧用 `—` 占位）。
+     *
+     * CHG-107：**删掉演示回落**。旧实现在「真实看板为空」时回落到演示样本，
+     * 于是团队视图里会冒出没发生过的任务。现在没有演示分支：没有数据就是空态。
      */
     function useConvBoard(connection, sessionId) {
-      const [state, setState] = react.useState(() => ({ tasks: [], live: 0, gates: 0, roles: 0, loaded: false }))
+      const [state, setState] = react.useState(() => ({ tasks: [], live: 0, gates: 0, roles: 0, members: [], team: undefined, loaded: false }))
       react.useEffect(() => {
         if (!sessionId || !connection) return undefined
         let alive = true
-        makeApi(connection, sessionId).getBoard({}).then((data) => {
-          if (!alive || !data) return
-          const members = data.board?.members ?? []
-          const boardTasks = (data.board?.columns ?? []).flatMap((column) => column.tasks ?? [])
+        const api = makeApi(connection, sessionId)
+        const teamsCall = typeof api.listTeams === 'function' ? api.listTeams().catch(() => undefined) : Promise.resolve(undefined)
+        Promise.all([api.getBoard({}).catch(() => undefined), teamsCall]).then(([data, teamsData]) => {
+          if (!alive) return
+          const members = data?.board?.members ?? []
+          const boardTasks = (data?.board?.columns ?? []).flatMap((column) => column.tasks ?? [])
           const mapped = boardTasks.map((task) => ({
             id: String(task.id),
             title: task.title,
             state: task.state,
             who: (task.assignees ?? []).map((id) => String(id)).join('、'),
           }))
+          const team = (teamsData?.teams ?? []).find((entry) => entry.sessionId === sessionId)
           setState({
-            tasks: mapped.length > 0 ? mapped : (convDemoOn() ? CONV_DEMO_TASKS : []),
+            tasks: mapped,
             live: members.filter((member) => member.status === 'active' && member.currentTaskId).length,
             gates: boardTasks.filter((task) => String(task.state).startsWith('gate') || task.state === 'gates').length,
             roles: new Set(members.map((member) => member.roleId).filter(Boolean)).size,
-            loaded: true,
+            members,
+            team,
+            loaded: Boolean(data || teamsData),
           })
-        }).catch(() => {})
+        }).catch(() => { if (alive) setState((prev) => ({ ...prev, loaded: true })) })
         return () => { alive = false }
       }, [sessionId, connection])
       return state
@@ -11815,87 +11843,108 @@ window.__ModuleLoader__.load({
         j('p', { className: 'mt-composerhint', children: t('g6.guest.hint') }),
       ] })
     }
-    /** 对话轮次（design .turn） */
-    function ConvTurn({ avatar, human, who, time, children }) {
-      return js('div', { className: 'mt-turn', children: [
-        j('span', { className: human ? 'mt-turn-av mt-turn-av-human' : 'mt-turn-av', 'aria-hidden': true, children: avatar }),
-        js('div', { className: 'mt-turn-body', children: [
-          js('div', { className: 'mt-turn-meta', children: [j('b', { children: who }), j('span', { children: time })] }),
-          ...(Array.isArray(children) ? children : [children]),
-        ] }),
-      ] })
-    }
-    /** 会话页团队视图（conversation.view 落点）：会话头 seg + 工具卡 + 输入框上方 dock chip + 单角色调用演示 */
+    /** CHG-107：`ConvTurn`（假对话轮次）已随演示数据一起删除——团队视图不再伪造对话。 */
+    /** 会话页团队视图（conversation.view 落点）：真实团队头 + 概览 + 任务 + 成员 + dock chip */
+    /**
+     * 会话页团队视图（conversation.view 落点）——**只渲染真实账本数据**。
+     *
+     * CHG-107（用户：「这个团队视图怎么回事？」）：
+     * 旧实现把**假对话**（几条写死的「你 21:12 …」+ 写死的团队名 / id / 计数 + 假 guest chips）
+     * 直接画成了会话视图，而且「对话 / 团队视图」seg 只切按钮高亮、**不切内容**。
+     *
+     * 现在：团队名/id/状态/任务/成员/计数**全部来自 getBoard + listTeams**；
+     * 没有团队就画空态；不再有任何演示样本。宿主的「对话 / 团队视图」切换器负责切视图，
+     * 我们不再自己造一个假的 seg。
+     */
     function MyTeamConversationView(props) {
       const { ctx, sessionId, t: tProp } = props ?? {}
       const t = tProp ?? ((k) => zh[k] ?? k)
-      /* CHG-99（C13）：会话视图根（`.mt-conv`）也是表面根 */
+      /* CHG-99（C13）：会话视图根（.mt-conv）也是表面根 */
       const dark = useDarkTheme()
       const themeAttr = { 'data-theme': dark ? 'dark' : 'light' }
-      const [view, setView] = react.useState('chat')
-      /* 真实数据源（getBoard 现算）；默认空，不再用 CONV_DEMO_TASKS 当初始 state（R34 / P0-5） */
       const board = useConvBoard(props?.connection, sessionId)
-      const tasks = board.tasks
-      const live = board.live
-      const gates = board.gates
+      const team = board.team
       const openPanel = () => {
         try {
           const workspace = typeof ctx?.get === 'function' ? ctx.get('uiWorkspace') : undefined
           workspace?.openPanel?.(PANEL_KEY)
         } catch { /* 降级：无 openPanel 时静默 */ }
       }
-      /* 摘要行：全部来自真实计数；未加载 / 取不到时显示 — 占位，不写死 5 / 3 */
+      const stat = (label, value) => js('div', { key: label, className: 'mt-conv-stat', children: [
+        j('b', { children: board.loaded ? String(value) : '—' }),
+        j('span', { children: label }),
+      ] })
+      const head = (title, sub) => js('div', { className: 'mt-conv-head', children: [
+        j('span', { className: 'mt-team-mark', 'aria-hidden': true, children: '⬢' }),
+        js('div', { className: 'mt-conv-title', children: [j('b', { children: title }), j('span', { children: sub })] }),
+        j('button', { className: 'mt-btn mt-btn-sm', onClick: openPanel, children: t('conv.openPanel') }),
+      ] })
+
+      /* 空态：这个会话还没进团队模式 —— 明确说清楚，不画任何假数据 */
+      if (!team) {
+        return js('div', { className: 'mt-conv', ...themeAttr, children: [
+          head(t('conv.emptyTitle'), t('conv.emptySub')),
+          js('div', { className: 'mt-conv-body', children: [
+            j('p', { className: 'mt-hint', children: board.loaded ? t('conv.emptyBody') : t('state.loading') }),
+            js('div', { className: 'mt-conv-cmd', children: [
+              j('code', { children: '/myteam' }),
+              j('span', { className: 'mt-hint', children: t('conv.emptyCmd') }),
+            ] }),
+            js('div', { className: 'mt-conv-stats', children: [
+              stat(t('conv.stat.tasks'), 0),
+              stat(t('conv.stat.live'), 0),
+              stat(t('conv.stat.gates'), 0),
+              stat(t('conv.stat.roles'), 0),
+            ] }),
+          ] }),
+        ] })
+      }
+
       const planStat = t('g6.conv.planStat')
-        .replace('{tasks}', convCount(tasks.length, board.loaded))
-        .replace('{roles}', convCount(board.roles, board.loaded))
-        .replace('{gates}', convCount(board.gates, board.loaded))
+        .replace('{tasks}', String(board.tasks.length))
+        .replace('{roles}', String(board.roles))
+        .replace('{gates}', String(board.gates))
       return js('div', { className: 'mt-conv', ...themeAttr, children: [
-        js('div', { className: 'mt-conv-head', children: [
-          j('span', { className: 'mt-team-mark', 'aria-hidden': true, children: '⬢' }),
-          js('div', { className: 'mt-conv-title', children: [
-            j('b', { children: '结算页模块化' }),
-            j('span', { children: `队长 · 队长 · t-8f3a2c` }),
-          ] }),
-          js('div', { className: 'mt-conv-seg', role: 'group', 'aria-label': t('g6.conv.view'), children: [
-            j('button', { className: view === 'chat' ? 'mt-conv-seg-on' : '', 'aria-pressed': view === 'chat', onClick: () => setView('chat'), children: t('g6.conv.chat') }),
-            j('button', { className: view === 'team' ? 'mt-conv-seg-on' : '', 'aria-pressed': view === 'team', onClick: () => setView('team'), children: t('g6.conv.view') }),
-          ] }),
-          j('button', { className: 'mt-btn mt-btn-sm', 'aria-label': t('team.tab.audit'), onClick: openPanel, children: '⋯' }),
+        head(team.name || team.teamId, team.teamId + ' · ' + stateLabel(team.state) + ' · ' + board.members.length + ' 名成员'),
+        /* 概览：四个真实计数（未加载时显示 —，不写死） */
+        js('div', { className: 'mt-conv-stats', children: [
+          stat(t('conv.stat.tasks'), board.tasks.length),
+          stat(t('conv.stat.live'), board.live),
+          stat(t('conv.stat.gates'), board.gates),
+          stat(t('conv.stat.roles'), board.roles),
         ] }),
-        js('div', { className: 'mt-stream', children: [
-          j(ConvTurn, { avatar: '你', human: true, who: '你', time: '21:12', children: j('p', { className: 'mt-bubble', children: '把结算页拆成独立模块，补齐回归测试并替换旧调用点。先给我看拆分计划再动手。' }) }),
-          j(ConvTurn, {
-            avatar: '岚',
-            who: '队长 · 队长',
-            time: '21:13',
-            children: [
-              j('p', { className: 'mt-bubble', children: '拆完了，11 个任务、5 个角色，其中 t7 是硬前置 —— 它不产出接口契约，后面的 UI 迁移会整个返工。计划已暂存，等你裁决。' }),
-              j(TeamPlanTasksCard, { t, tasks, stat: planStat, onOpenPanel: openPanel, onOpenTask: openPanel, loaded: board.loaded }),
-            ],
-          }),
-          j(ConvTurn, { avatar: '你', human: true, who: '你', time: '21:20', children: j('p', { className: 'mt-bubble', children: '批准。t7 交付后先给我看一眼接口契约再往下派。' }) }),
-          j(ConvTurn, {
-            avatar: '岚',
-            who: '队长 · 队长',
-            time: '21:21',
-            children: [
-              j('p', { className: 'mt-bubble', children: '已把 5 个角色拉进团队。t7 交付时我会把契约摘出来单独发你，未批准前不派 t6 之后的任务。' }),
-              j(TeamCollapsedCard, { icon: '✓', name: 'myteam_approve_plan', stat: t('g6.conv.approvedStat').replace('{n}', '5') }),
-              j(TeamCollapsedCard, { icon: '✉', name: 'myteam_peer_message', stat: t('g6.conv.peerStat').replace('{from}', '实现者').replace('{to}', '队长') }),
-            ],
-          }),
-          j(ConvTurn, { avatar: '你', human: true, who: '你', time: '21:41', children: j('p', { className: 'mt-bubble', children: '评审者那个门禁超时我看一下，先别让他跳过。' }) }),
+        /* 任务：真实看板；没有就是空态 */
+        js('div', { className: 'mt-conv-section', children: [
+          j('h4', { className: 'mt-conv-section-title', children: t('conv.section.tasks') }),
+          !board.loaded
+            ? j('div', { className: 'mt-hint', children: t('state.loading') })
+            : board.tasks.length === 0
+              ? j('div', { className: 'mt-empty', children: t('conv.noTasks') })
+              : j(TeamPlanTasksCard, { t, tasks: board.tasks, stat: planStat, onOpenPanel: openPanel, onOpenTask: openPanel, loaded: board.loaded }),
         ] }),
-        /* 输入框上方 composer.dock 状态 chip。
-         * design/conversation.html 的 `.dockrow` 是会话视图的**固定组成部分**（不随数据有无增删），
-         * 计数一律来自真实看板（0 是真实值，不是演示数据）；只有 DockChip（composer 槽）才在
-         * live=0 且 unread=0 时整块不渲染。 */
+        /* 成员：真实上岗名册（角色 · 实例 · 状态） */
+        js('div', { className: 'mt-conv-section', children: [
+          j('h4', { className: 'mt-conv-section-title', children: t('conv.section.members') }),
+          board.members.length === 0
+            ? j('div', { className: 'mt-empty', children: t('conv.noMembers') })
+            : js('div', { className: 'mt-conv-members', children: board.members.map((member, index) => js('span', {
+              key: String(member.memberId ?? member.roleId ?? index),
+              className: 'mt-mini-chip',
+              title: String(member.roleId ?? ''),
+              children: [
+                j('span', { className: 'mt-mavatar mt-mavatar-a' + ((index % 4) + 1), 'aria-hidden': true, children: String(member.roleId ?? '?').slice(0, 1) }),
+                j('span', { children: String(member.instanceName ?? member.memberId ?? member.roleId ?? '—') }),
+                j('span', { className: 'mt-contrib-chip-id', children: memberStateLabel(member.status) }),
+              ],
+            })) }),
+        ] }),
+        /* 输入框上方 composer.dock 状态 chip（真实计数；0 是真实值） */
         js('div', { className: 'mt-dockrow', children: [
           j('button', { className: 'mt-dockchip', onClick: openPanel, children: [
             j('span', { className: 'mt-dot', 'aria-hidden': true }),
-            j('span', { children: t('g6.dock.running').replace('{n}', convCount(live, board.loaded)) }),
+            j('span', { children: t('g6.dock.running').replace('{n}', convCount(board.live, board.loaded)) }),
             j('span', { className: 'mt-vline', 'aria-hidden': true }),
-            j('span', { children: t('g6.dock.gates').replace('{n}', convCount(gates, board.loaded)) }),
+            j('span', { children: t('g6.dock.gates').replace('{n}', convCount(board.gates, board.loaded)) }),
             j('span', { className: 'mt-go', 'aria-hidden': true, children: '→' }),
           ] }),
           j('span', { className: 'mt-spacer' }),
@@ -11903,32 +11952,11 @@ window.__ModuleLoader__.load({
         js('div', { className: 'mt-composerhint', children: [
           j('span', { children: t('g6.conv.hint').replace('{cmd}', '/myteam+reviewer') }),
           j('span', { children: ' ' }),
-          j('button', { className: 'mt-mini-link', children: t('g6.conv.hintLink') }),
-        ] }),
-        /* 单角色调用（guest.html）：头部角色 chips + 不属于任何团队的横幅 + 注入卡 + /myteam+ 命令输入 + 候选弹层 */
-        js('div', { className: 'mt-conv-section', children: [
-          j('h4', { className: 'mt-conv-section-title', children: t('g6.guest.section') }),
-          js('div', { className: 'mt-guestchips', children: [
-            js('span', { className: 'mt-mini-chip mt-mini-chip-lead', children: [
-              j('span', { className: 'mt-mavatar mt-mavatar-a2', 'aria-hidden': true, children: '评' }),
-              j('span', { children: 'reviewer' }),
-            ] }),
-            js('span', { className: 'mt-mini-chip', children: [
-              j('span', { className: 'mt-mavatar mt-mavatar-a4', 'aria-hidden': true, children: '文' }),
-              j('span', { children: 'tech-writer' }),
-            ] }),
-            j('button', { className: 'mt-btn mt-btn-sm', 'aria-label': t('g6.guest.unload'), children: '✕' }),
-          ] }),
-          js('div', { className: 'mt-guestbar', children: [
-            j('span', { className: 'mt-note-icon', 'aria-hidden': true, children: '⛨' }),
-            j('span', { children: [j('b', { children: t('g6.guest.banner').replace('{n}', '2') }), t('g6.guest.bannerBody')] }),
-            j('button', { className: 'mt-btn mt-btn-sm', children: t('g6.guest.inspect') }),
-          ] }),
-          j(ApplyRolesCard, { t }),
-          j(GuestCallComposer, { t }),
+          j('button', { className: 'mt-mini-link', onClick: openPanel, children: t('g6.conv.hintLink') }),
         ] }),
       ] })
     }
+
     /** 四个 myteam_* 工具卡（tool.call.toolview 的 keyed 组件，按 wire 工具名精确注册） */
     /** myteam_plan_tasks 工具卡（R34 / P0-5）：真实看板数据源，默认不再展示演示任务 */
     function MyTeamPlanTasksToolView(props) {

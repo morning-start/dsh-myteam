@@ -272,30 +272,46 @@ test('t66-5: 团队参与任务（team-tasks.html）——本队角色筛选 + �
   assert.ok(source.includes("t('g6.teamTasks.rest')"), '其余 N 个去向')
 })
 
-test('t66-6: 会话页（conversation.html）——conversation.view 团队视图 + 三张工具卡 + composer.dock 状态 chip', () => {
-  const { module } = loadClient()
+test('t66-6: 会话页团队视图（conversation.view）—— 只读真实账本，空态说清楚，不画假数据', () => {
+  const { module, source } = loadClient()
   const G6 = module.__testG6
   assert.equal(typeof G6.MyTeamConversationView, 'function', '团队视图组件')
-  const tree = G6.MyTeamConversationView({ t: (k) => k, ctx: {}, sessionId: undefined })
-  const classes = collectClasses(tree)
-  for (const name of ['mt-conv', 'mt-conv-head', 'mt-team-mark', 'mt-conv-title', 'mt-conv-seg', 'mt-conv-seg-on', 'mt-stream', 'mt-turn', 'mt-turn-av', 'mt-turn-av-human', 'mt-turn-body', 'mt-turn-meta', 'mt-bubble', 'mt-toolcard', 'mt-toolcard-head', 'mt-toolcard-name', 'mt-toolcard-stat', 'mt-toolcard-body', 'mt-toolcard-row', 'mt-toolcard-foot', 'mt-toolcard-note', 'mt-dockrow', 'mt-dockchip', 'mt-dot', 'mt-vline', 'mt-go', 'mt-composerhint', 'mt-conv-section', 'mt-guestbar', 'mt-guestchips', 'mt-injrow', 'mt-candpop', 'mt-cand', 'mt-cand-cap', 'mt-cand-foot', 'mt-composerbox', 'mt-cmdprefix', 'mt-cmdinput', 'mt-status-chip']) {
-    assert.ok(classes.has(name), `会话页渲染出 .${name}`)
+
+  /* ① 没有 team 时：空态（不是假对话） */
+  const emptyTree = G6.MyTeamConversationView({ t: (k) => k, ctx: {}, sessionId: undefined })
+  const emptyClasses = collectClasses(emptyTree)
+  for (const name of ['mt-conv', 'mt-conv-head', 'mt-team-mark', 'mt-conv-title', 'mt-conv-body', 'mt-conv-cmd', 'mt-conv-stats', 'mt-conv-stat']) {
+    assert.ok(emptyClasses.has(name), `空态渲染出 .${name}`)
   }
-  const text = collectText(tree).join('')
-  for (const copy of ['g6.conv.chat', 'g6.conv.view', 'g6.conv.planStat', 'g6.conv.openPanel', 'g6.conv.openDetail', 'g6.conv.ledger', 'g6.conv.approvedStat', 'g6.conv.peerStat', 'g6.conv.hint', 'g6.dock.running', 'g6.dock.gates', 'myteam_plan_tasks', 'myteam_approve_plan', 'myteam_peer_message']) {
-    assert.ok(text.includes(copy), `会话页文案含 ${copy}`)
+  const emptyText = collectText(emptyTree).join('')
+  for (const copy of ['conv.emptyTitle', 'conv.emptySub', 'conv.emptyCmd', 'conv.openPanel', 'conv.stat.tasks', 'conv.stat.live', 'conv.stat.gates', 'conv.stat.roles']) {
+    assert.ok(emptyText.includes(copy), `空态文案含 ${copy}`)
   }
-  // 工具卡只给摘要 + 两个出口（不把整个看板塞进对话流）：迷你列表最多 4 行 + 一个「另有 N 个」
-  const rows = collectClasses(tree).size > 0
-  assert.ok(rows)
-  assert.ok(text.includes('g6.conv.moreTasks'), '迷你任务列表有「另有 N 个」')
-  // dock chip：live=0 且 unread=0 时不渲染
-  const { source } = loadClient()
+  assert.ok(emptyText.includes('/myteam'), '空态给出组建命令')
+
+  /* ② CHG-107：**渲染出来的树里**不得再有演示对话/演示团队 */
+  const emptyTextAll = collectText(emptyTree).join('')
+  for (const fake of ['结算页模块化', '把结算页拆成独立模块', 't-8f3a2c', '11 个任务', '实现者', '评审者']) {
+    assert.ok(!emptyTextAll.includes(fake), `团队视图不得渲染演示内容「${fake}」`)
+  }
+  for (const gone of ['mt-stream', 'mt-turn', 'mt-bubble', 'mt-guestbar', 'mt-guestchips', 'mt-conv-seg']) {
+    assert.ok(!emptyClasses.has(gone), `团队视图不得再渲染 .${gone}（旧演示结构）`)
+  }
+  assert.ok(!source.includes('CONV_DEMO_TASKS'), '演示任务常量必须删除')
+  assert.ok(!source.includes('__MYTEAM_DEMO__'), '演示开关必须删除')
+
+  /* ③ 数据源必须真实：getBoard + listTeams（团队名/状态） */
+  assert.ok(source.includes('makeApi(connection, sessionId)'), '看板数据源')
+  assert.ok(source.includes('api.listTeams()'), '团队名/状态来自 listTeams')
+  assert.ok(source.includes('.find((entry) => entry.sessionId === sessionId)'), '按 sessionId 命中真实团队')
+  /* ④ 成员名册与 composer dock 仍在（真实计数） */
+  assert.ok(source.includes("t('conv.section.members')") && source.includes('mt-conv-members'), '成员名册区块')
+  assert.ok(source.includes("t('g6.dock.running')") && source.includes("t('g6.dock.gates')"), 'composer dock 真实计数')
   assert.ok(source.includes('if (live === 0 && unread === 0) return null'), 'dock chip 空态不渲染')
 })
 
-test('t66-7: 单角色调用（guest.html）——角色 chips + 不属于任何团队横幅 + apply_roles 五行 + /myteam+ 命令与候选弹层', () => {
-  const { module, source } = loadClient()
+test('t66-7: 单角色调用组件（ApplyRolesCard / GuestCallComposer）独立可渲染', () => {
+  const { module } = loadClient()
   const G6 = module.__testG6
   const card = G6.ApplyRolesCard({ t: (k) => k })
   const cardClasses = collectClasses(card)
@@ -315,12 +331,8 @@ test('t66-7: 单角色调用（guest.html）——角色 chips + 不属于任何
   for (const copy of ['/myteam+', 'g6.guest.candCap', 'g6.guest.candFoot', 'g6.guest.hint', 'tech-writer', 'tech-writer-cn']) {
     assert.ok(composerText.includes(copy), `命令输入文案含 ${copy}`)
   }
-  // 头部角色 chips + 「不属于任何团队、不进团队账本」横幅（会话页 section 内）
-  assert.ok(source.includes("t('g6.guest.banner').replace('{n}', '2')") && source.includes("t('g6.guest.bannerBody')"), '不属于任何团队横幅')
-  assert.ok(source.includes("t('g6.guest.unload')") && source.includes('mt-guestchips'), '头部角色 chips + 卸载')
-  assert.ok(source.includes("t('g6.guest.section')"), '单角色调用演示区块')
   // 多义回显不猜：候选弹层把所有前缀匹配列出来（aria-selected 只是焦点，不是猜测）
-  assert.ok(source.includes("role: 'listbox'") && source.includes("role: 'option'"), '候选弹层语义')
+  assert.ok(loadClient().source.includes("role: 'listbox'") && loadClient().source.includes("role: 'option'"), '候选弹层语义')
 })
 
 test('t66-8: 样式纪律——G6 规则只用 --dsw-alias-* token，无十六进制色、无 font-family', () => {

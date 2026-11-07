@@ -89,8 +89,9 @@ test('t76r-5: C13 · 深色规则只挂在 .mt-*[data-theme="dark"] 表面根上
   const usages = source.match(/\$\{DARK_SURFACE\}/g) ?? []
   assert.ok(usages.length >= 13, `深色覆盖组应完整保留（实际 ${usages.length} 组，修复前 13 组 color-mix/color-scheme）`)
   /* 每个表面根组件都要把 data-theme 写出去，否则对应插槽里的覆盖不生效
-   * CHG-104：未初始化引导改为**非阻塞横幅**，mt-panel 回到 6 处（不再有整屏空态） */
-  for (const [cls, count] of [['mt-panel', 6], ['mt-conv', 1], ['mt-dockrow', 1], ['mt-toolcard', 3], ['mt-entry', 1]] as const) {
+   * CHG-104：未初始化引导改为**非阻塞横幅**，mt-panel 回到 6 处（不再有整屏空态）
+   * CHG-107：团队视图两态（空态 / 有团队）各一个根，mt-conv 1 → 2 */
+  for (const [cls, count] of [['mt-panel', 6], ['mt-conv', 2], ['mt-dockrow', 1], ['mt-toolcard', 3], ['mt-entry', 1]] as const) {
     const hits = source.match(new RegExp(`className: '${cls}', \\.\\.\\.themeAttr`, 'g')) ?? []
     assert.equal(hits.length, count, `${cls} 根节点都要带 data-theme（期望 ${count} 处，实际 ${hits.length} 处）`)
   }
