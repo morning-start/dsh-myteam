@@ -361,6 +361,18 @@ window.__ModuleLoader__.load({
       'project.root': '项目',
       'project.pick': '选择项目',
       'team.tab.participating': '参与任务',
+      /* ── CHG-102：项目级存储空态（还没进团队模式时只画这一屏） ── */
+      'store.emptyTitle': '这个项目还没进入团队模式',
+      'store.emptyBody': '团队模式的所有内容都放在项目级目录里：角色 / 团队 / 技能 / 工具（config/）、任务与依赖（tasks/）、流程与历史（history/）。初始化只会建目录与 .gitignore，不会建团队、不会召唤成员。',
+      'store.init': '初始化 .dsh-myteam',
+      'store.initDone': '已初始化项目存储：{path}',
+      'store.uploadHint': '上传纪律写在 .dsh-myteam/.gitignore 里：config/ 与 tasks/ 随仓库共享；state/、history/、export/ 不入库（可从账本重建）。',
+      /* ── CHG-103：角色作用域（全局必须明示） ── */
+      'role.scope': '作用域',
+      'role.scope.project': '项目级（默认）',
+      'role.scope.projectHint': '只对本项目可见，随仓库共享',
+      'role.scope.global': '全局',
+      'role.scope.globalHint': '所有项目可见；需二次确认',
       'team.backList': '← 团队列表',
       'task.participants': '参与团队',
       'task.assignees': '负责队员',
@@ -962,7 +974,7 @@ window.__ModuleLoader__.load({
       'audit.ledgerNote': '本页只读，数据 100% 从账本派生，不产生新事件。账本 append-only，归档后仍可在此回放。',
       'audit.emptyTask': '这个任务还没有账本事件。',
       'settings.page.title': '团队设置',
-      'settings.page.desc': '这里的改动写入 .team-workplace/config/team.config.json。插件默认 < 项目配置 < 团队模板，后者优先级最高；数组是整条替换，不做深度合并。',
+      'settings.page.desc': '这里的改动写入 .dsh-myteam/config/team.config.json。插件默认 < 项目配置 < 团队模板，后者优先级最高；数组是整条替换，不做深度合并。',
       'settings.jsonView': 'JSON 源视图',
       'settings.sourceTitle': '配置来源',
       'settings.sourceNote': '后者覆盖前者',
@@ -971,8 +983,8 @@ window.__ModuleLoader__.load({
       'settings.layer.team': '团队模板',
       'settings.layer.effective': '（生效）',
       'settings.layer.defaultPath': 'plugin/config/team.config.default.json · 随插件升级',
-      'settings.layer.projectPath': '.team-workplace/config/team.config.json · 只写你改过的项',
-      'settings.layer.teamPath': '.team-workplace/state/teams/<teamId>/team.config.json · 建团时按模板落盘',
+      'settings.layer.projectPath': '.dsh-myteam/config/team.config.json · 只写你改过的项',
+      'settings.layer.teamPath': '.dsh-myteam/tasks/<teamId>/team.config.json · 建团时按模板落盘',
       'settings.layer.items': '{n} 项',
       'settings.layer.covered': '{n} 项覆盖',
       'settings.layer.idle': '未生效',
@@ -1488,6 +1500,18 @@ window.__ModuleLoader__.load({
       'project.root': 'Project',
       'project.pick': 'Choose project',
       'team.tab.participating': 'Participating',
+      /* CHG-102: project store empty state */
+      'store.emptyTitle': 'This project has not entered team mode yet',
+      'store.emptyBody': 'Everything team-mode owns lives under the project store: roles / teams / skills / tools (config/), tasks and dependencies (tasks/), workflow history (history/). Initializing only creates the directory and its .gitignore — no team, no members.',
+      'store.init': 'Initialize .dsh-myteam',
+      'store.initDone': 'Project store initialized: {path}',
+      'store.uploadHint': 'Upload policy lives in .dsh-myteam/.gitignore: config/ and tasks/ are shared; state/, history/ and export/ stay out (rebuildable from the ledger).',
+      /* CHG-103: role scope (global must be explicit) */
+      'role.scope': 'Scope',
+      'role.scope.project': 'Project (default)',
+      'role.scope.projectHint': 'Visible in this project only; shared with the repo',
+      'role.scope.global': 'Global',
+      'role.scope.globalHint': 'Visible to every project; needs confirmation',
       'team.backList': '← Teams',
       'task.participants': 'Teams',
       'task.assignees': 'Assignees',
@@ -2080,7 +2104,7 @@ window.__ModuleLoader__.load({
       'audit.ledgerNote': 'This page is read-only: every number is derived from the ledger and writes nothing. The ledger is append-only, so archived teams can still be replayed here.',
       'audit.emptyTask': 'No ledger events for this task yet.',
       'settings.page.title': 'Team settings',
-      'settings.page.desc': 'Changes land in .team-workplace/config/team.config.json. Plugin defaults < project config < team template, later wins; arrays are replaced whole, never deep-merged.',
+      'settings.page.desc': 'Changes land in .dsh-myteam/config/team.config.json. Plugin defaults < project config < team template, later wins; arrays are replaced whole, never deep-merged.',
       'settings.jsonView': 'JSON source view',
       'settings.sourceTitle': 'Config sources',
       'settings.sourceNote': 'later overrides earlier',
@@ -2089,8 +2113,8 @@ window.__ModuleLoader__.load({
       'settings.layer.team': 'Team template',
       'settings.layer.effective': ' (active)',
       'settings.layer.defaultPath': 'plugin/config/team.config.default.json · ships with the plugin',
-      'settings.layer.projectPath': '.team-workplace/config/team.config.json · only the keys you changed',
-      'settings.layer.teamPath': '.team-workplace/state/teams/<teamId>/team.config.json · written from the template',
+      'settings.layer.projectPath': '.dsh-myteam/config/team.config.json · only the keys you changed',
+      'settings.layer.teamPath': '.dsh-myteam/tasks/<teamId>/team.config.json · written from the template',
       'settings.layer.items': '{n} keys',
       'settings.layer.covered': '{n} overrides',
       'settings.layer.idle': 'not applied',
@@ -2395,7 +2419,7 @@ window.__ModuleLoader__.load({
       'kb3.consensusUnit': '文件',
       'kb3.shared': '项目共享库',
       'kb3.sharedSrc': '本团队 + 同项目其他团队',
-      'kb3.sharedPath': '.team-workplace/config/knowledge/ · 入库共享，索引常驻 40 行，正文按需读',
+      'kb3.sharedPath': '.dsh-myteam/config/knowledge/ · 入库共享，索引常驻 40 行，正文按需读',
       'kb3.sharedUnit': '条目',
       'kb3.private': '实例私有',
       'kb3.privateSrc': '只有本人能读',
@@ -2451,7 +2475,7 @@ window.__ModuleLoader__.load({
       'preset3.layer.globalPath': '../.dsh/myteam/presets · 换项目也带着，可复制进任意项目',
       'preset3.layer.project': '项目',
       'preset3.layer.projectSrc': '可编辑 · 运行时真相',
-      'preset3.layer.projectPath': '.team-workplace/config/presets · 新建团队时能选的只有这一层',
+      'preset3.layer.projectPath': '.dsh-myteam/config/teams · 新建团队时能选的只有这一层',
       'preset3.unit': '预设',
       'preset3.globalOff': '全局只存角色，不存团队模板',
       'preset3.restore': '恢复默认',
@@ -2517,7 +2541,7 @@ window.__ModuleLoader__.load({
       'skill3.layer.globalPath': '../.dsh/myteam/skills · 你自己的技能，换项目也带着',
       'skill3.layer.project': '项目',
       'skill3.layer.projectSrc': '可编辑 · 运行时真相',
-      'skill3.layer.projectPath': '.team-workplace/config/skills · 这个项目里所有角色都能用',
+      'skill3.layer.projectPath': '.dsh-myteam/config/skills · 这个项目里所有角色都能用',
       'skill3.layer.bound': '角色绑定',
       'skill3.layer.boundSrc': '按角色声明',
       'skill3.layer.boundPath': '角色配置里的 skill 引用列表 · 只对声明了它的角色实例生效',
@@ -2569,7 +2593,7 @@ window.__ModuleLoader__.load({
       'kb3.consensusUnit': 'file',
       'kb3.shared': 'Project library',
       'kb3.sharedSrc': 'this team + other teams in the project',
-      'kb3.sharedPath': '.team-workplace/config/knowledge/ · shared on adoption, 40-line resident index, bodies on demand',
+      'kb3.sharedPath': '.dsh-myteam/config/knowledge/ · shared on adoption, 40-line resident index, bodies on demand',
       'kb3.sharedUnit': 'entries',
       'kb3.private': 'Instance private',
       'kb3.privateSrc': 'only the owner can read',
@@ -2624,7 +2648,7 @@ window.__ModuleLoader__.load({
       'preset3.layer.globalPath': '../.dsh/myteam/presets · travels with you, copyable into any project',
       'preset3.layer.project': 'Project',
       'preset3.layer.projectSrc': 'editable · runtime truth',
-      'preset3.layer.projectPath': '.team-workplace/config/presets · the only layer selectable when creating a team',
+      'preset3.layer.projectPath': '.dsh-myteam/config/teams · the only layer selectable when creating a team',
       'preset3.unit': 'presets',
       'preset3.globalOff': 'the global layer holds roles only, no team templates',
       'preset3.restore': 'Restore default',
@@ -2690,7 +2714,7 @@ window.__ModuleLoader__.load({
       'skill3.layer.globalPath': '../.dsh/myteam/skills · your own skills, they travel with you',
       'skill3.layer.project': 'Project',
       'skill3.layer.projectSrc': 'editable · runtime truth',
-      'skill3.layer.projectPath': '.team-workplace/config/skills · usable by every role in this project',
+      'skill3.layer.projectPath': '.dsh-myteam/config/skills · usable by every role in this project',
       'skill3.layer.bound': 'Role bindings',
       'skill3.layer.boundSrc': 'declared per role',
       'skill3.layer.boundPath': 'the skill reference list in role config · effective only for instances of roles that declare it',
@@ -3299,6 +3323,12 @@ window.__ModuleLoader__.load({
       '.mt-field input,.mt-field textarea,.mt-field select{width:100%;box-sizing:border-box;background:var(--dsw-alias-bg-base);border:.5px solid var(--dsw-alias-border-l2);border-radius:6px;color:var(--dsw-alias-label-primary);padding:4px 8px;font:inherit;font-size:12px}',
       '.mt-field textarea{min-height:64px;resize:vertical;line-height:1.45}',
       '.mt-field-row{display:grid;grid-template-columns:1fr 1fr;gap:8px}',
+      /* CHG-103：角色作用域选择（项目级默认 / 全局需确认） */
+      '.mt-rolescope-row{display:grid;grid-template-columns:1fr 1fr;gap:8px}',
+      '.mt-rolescope-chip{display:flex;flex-direction:column;gap:2px;padding:8px 10px;border:1px solid var(--dsw-alias-line-divider);border-radius:8px;cursor:pointer;font-size:12px;color:var(--dsw-alias-label-secondary)}',
+      '.mt-rolescope-chip small{font-size:11px;line-height:1.4;color:var(--dsw-alias-label-tertiary)}',
+      '.mt-rolescope-chip input{margin:0 6px 0 0;vertical-align:middle}',
+      '.mt-rolescope-chip-active{border-color:var(--dsw-alias-brand-primary);color:var(--dsw-alias-label-primary);background:color-mix(in srgb,var(--dsw-alias-brand-primary) 8%,transparent)}',
       '.mt-checklist{display:flex;flex-wrap:wrap;gap:4px 10px;max-height:118px;overflow:auto;border:.5px solid var(--dsw-alias-border-l2);border-radius:6px;padding:6px 8px}',
       '.mt-check{display:inline-flex;align-items:center;gap:4px;font-size:11px;color:var(--dsw-alias-label-secondary)}',
       '.mt-form-actions{display:flex;gap:8px;justify-content:flex-end;margin-top:8px;flex-wrap:wrap}',
@@ -6829,7 +6859,7 @@ window.__ModuleLoader__.load({
               ...auditAttempts(pickedGroup?.events ?? []).flatMap(attemptBlock),
               js('div', { className: 'mt-note-box mt-note-info', children: [
                 j('span', { children: t('audit.ledgerNote') }),
-                j('div', { className: 'mt-audit-ledger-path', children: `.team-workplace/state/teams/${pickedId ?? '—'}/ledger.jsonl · ${audit.total ?? events.length}` }),
+                j('div', { className: 'mt-audit-ledger-path', children: `.dsh-myteam/tasks/${pickedId ?? '—'}/ledger.jsonl · ${audit.total ?? events.length}` }),
               ] }),
               audit.nextBeforeSeq
                 ? j('button', { className: 'mt-btn', onClick: onMore, children: t('audit.loadMore').replace('{n}', '100') })
@@ -8496,6 +8526,8 @@ window.__ModuleLoader__.load({
       const [model, setModel] = react.useState(def.model?.model ?? '')
       const [err, setErr] = react.useState(null)
       const [confirm, setConfirm] = react.useState(false)
+      /* CHG-103：作用域（缺省项目级；全局必须明示 + 二次确认） */
+      const [scope, setScope] = react.useState(initial?.scope === 'global' ? 'global' : 'project')
       const [busy, setBusy] = react.useState(false)
       const deriveId = (value) => String(value ?? '').toLowerCase().trim().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 64)
       react.useEffect(() => {
@@ -8521,8 +8553,13 @@ window.__ModuleLoader__.load({
         if (provider.trim() && model.trim()) role.model = { provider: provider.trim(), model: model.trim() }
         setBusy(true)
         try {
-          const result = await save(role, confirm)
-          if (result?.status === 'confirm-required') { setConfirm(true); return }
+          const result = await save(role, confirm, scope)
+          if (result?.status === 'confirm-required') {
+            setConfirm(true)
+            /* 服务端确认文案随作用域不同（全局影响所有项目），原样展示 */
+            setErr(result?.message ?? null)
+            return
+          }
           if (result?.status !== 'saved') throw new Error(result?.message ?? result?.code ?? 'save failed')
           onClose()
         } catch (e) {
@@ -8546,6 +8583,22 @@ window.__ModuleLoader__.load({
             js('div', { className: 'mt-field', children: [
               j('label', { children: t('role.id') }),
               j('input', { value: id, onChange: (e) => { setIdTouched(true); setId(e.target.value) } }),
+            ] }),
+          ] }),
+          /* CHG-103：作用域（缺省项目级；全局必须明示——用户定案「全局一定要明示」） */
+          js('div', { className: 'mt-field', children: [
+            j('label', { children: t('role.scope') }),
+            js('div', { className: 'mt-rolescope-row', role: 'radiogroup', children: [
+              j('label', { className: scope === 'project' ? 'mt-rolescope-chip mt-rolescope-chip-active' : 'mt-scope-chip', children: [
+                j('input', { type: 'radio', name: 'role-scope', checked: scope === 'project', onChange: () => { setScope('project'); setConfirm(false); setErr(null) } }),
+                j('span', { children: t('role.scope.project') }),
+                j('small', { children: t('role.scope.projectHint') }),
+              ] }),
+              j('label', { className: scope === 'global' ? 'mt-rolescope-chip mt-rolescope-chip-active' : 'mt-scope-chip', children: [
+                j('input', { type: 'radio', name: 'role-scope', checked: scope === 'global', onChange: () => { setScope('global'); setConfirm(false); setErr(null) } }),
+                j('span', { children: t('role.scope.global') }),
+                j('small', { children: t('role.scope.globalHint') }),
+              ] }),
             ] }),
           ] }),
           js('div', { className: 'mt-field', children: [
@@ -9625,6 +9678,14 @@ window.__ModuleLoader__.load({
       const [scope, setScope] = react.useState('global')          // 全局 | 项目
       const [projectTab, setProjectTab] = react.useState('tasks') // 角色 | 团队 | 任务
       const [projectRoot, setProjectRoot] = react.useState('')
+      /**
+       * CHG-102：项目级存储状态（`.dsh-myteam/` 是否已初始化）。
+       *
+       * 为什么必须有：用户还没进团队模式时，面板此前照样渲染角色库/团队/任务
+       * （内置角色 + 全局库 + 别的项目的离线团队）——「所有项目看起来都一样、
+       * 还没开始就一堆内容」。未初始化时只画一句空态 + 初始化入口。
+       */
+      const [storeState, setStoreState] = react.useState(undefined)
       const [teams, setTeams] = react.useState(null)
       const [project, setProject] = react.useState(null)
       const [error, setError] = react.useState(null)
@@ -9776,6 +9837,25 @@ window.__ModuleLoader__.load({
         if (!projectRoot || !rootCandidates.includes(projectRoot)) setProjectRoot(rootCandidates[0])
       }, [rootCandidates, projectRoot])
       react.useEffect(() => { loadProject(projectRoot) }, [projectRoot, loadProject])
+      /* CHG-102：项目存储状态（换项目即重读；未初始化 → 空态，不渲染任何项目内容） */
+      react.useEffect(() => {
+        if (!projectRoot) { setStoreState(undefined); return undefined }
+        let alive = true
+        discoveryApi.getStoreState({ workspaceRoot: projectRoot }).then((r) => {
+          if (alive) setStoreState(r?.status === 'ok' ? r : null)
+        }).catch(() => { if (alive) setStoreState(null) })
+        return () => { alive = false }
+      }, [projectRoot, discoveryApi])
+      /** 空态里的「初始化」：只建目录与元文件（幂等，不建团队不写账本） */
+      const initStore = async () => {
+        if (!projectRoot) return
+        try {
+          const r = await discoveryApi.initStore({ workspaceRoot: projectRoot })
+          if (r?.status !== 'ok') { setError(r?.message ?? String(r)); return }
+          setNotice(t('store.initDone').replace('{path}', String(r.root ?? '')))
+          await loadProject(projectRoot)
+        } catch (e) { setError(String(e?.message ?? e)) }
+      }
       /* 5s 轮询（POLL_MS）：切到后台（visibilityState=hidden）时跳过本轮，不请求网关；
        * 回到可见时立刻补一次，避免「切回来要等一个周期才更新」。监听器在 effect 清理时移除。 */
       react.useEffect(() => {
@@ -10132,6 +10212,32 @@ window.__ModuleLoader__.load({
 
       if (!projectRoot) {
         return js('div', { className: 'mt-panel', ...themeAttr, children: [topbar, j('div', { className: 'mt-empty', children: [t('global.empty'), j('br'), t('global.emptyHint')] })] })
+      }
+      /**
+       * CHG-102 空态门：项目还没进团队模式（`.dsh-myteam/` 未初始化）时，
+       * **一个角色/团队/任务都不渲染**——否则内置角色 + 全局库会被误读成「这个项目已经有团队」。
+       * 已初始化的项目才继续往下走（storeState 为 undefined/null 时按加载中处理，避免闪空态）。
+       */
+      if (scope === 'project' && storeState === null) {
+        return js('div', { className: 'mt-panel', ...themeAttr, children: [topbar, j('div', { className: 'mt-empty', children: error ?? t('state.loading') })] })
+      }
+      if (scope === 'project' && storeState && storeState.initialized === false) {
+        return js('div', { className: 'mt-panel', ...themeAttr, children: [
+          topbar,
+          js('div', { className: 'mt-page', children: [
+            js('div', { className: 'mt-empty', children: [
+              j('b', { children: t('store.emptyTitle') }),
+              j('br'),
+              j('span', { children: t('store.emptyBody') }),
+              j('br'),
+              j('code', { children: String(storeState.layout?.root ?? '') }),
+            ] }),
+            js('div', { className: 'mt-page-head-actions', children: [
+              j('button', { className: 'mt-btn mt-btn-primary', onClick: initStore, children: t('store.init') }),
+            ] }),
+            j('p', { className: 'mt-hint', children: t('store.uploadHint') }),
+          ] }),
+        ] })
       }
       if (!pv) {
         return js('div', { className: 'mt-panel', ...themeAttr, children: [topbar, j('div', { className: 'mt-empty', children: error ?? t('state.loading') })] })
@@ -11181,19 +11287,31 @@ window.__ModuleLoader__.load({
         setDetailToken((value) => value + 1)
         await loadProject(projectRoot)
       }
-      /** 角色保存（CHG-72）：配置资产写文件，同名两段确认由服务端返回 confirm-required */
-      const saveRoleDef = async (role, confirm) => {
-        const result = await discoveryApi.saveRole({ workspaceRoot: projectRoot, role, confirm })
+      /** 角色保存（CHG-72 / CHG-103）：配置资产写文件；作用域缺省项目级，全局由服务端返回 confirm-required */
+      const saveRoleDef = async (role, confirm, scope) => {
+        const result = await discoveryApi.saveRole({
+          workspaceRoot: projectRoot,
+          role,
+          scope: scope === 'global' ? 'global' : 'project',
+          ...(scope === 'global' ? { confirmGlobal: confirm === true } : {}),
+          confirm,
+        })
         if (result?.status === 'saved') {
           setNotice(t('role.saved').replace('{id}', String(role.id)))
           await loadProject(projectRoot)
         }
         return result
       }
-      /** 角色删除（CHG-73）：deleteRole 两段确认；服务端返回 usage 由抽屉展示 */
-      const deleteRoleFlow = async (roleId, confirm) => {
+      /** 角色删除（CHG-73 / CHG-103）：deleteRole 两段确认；全局作用域需 confirmGlobal */
+      const deleteRoleFlow = async (roleId, confirm, scope) => {
         if (!roleId) return { status: 'error', code: 'MT_VALIDATION', message: 'missing roleId' }
-        const result = await discoveryApi.deleteRole({ workspaceRoot: projectRoot, roleId, confirm })
+        const result = await discoveryApi.deleteRole({
+          workspaceRoot: projectRoot,
+          roleId,
+          scope: scope === 'global' ? 'global' : 'project',
+          ...(scope === 'global' ? { confirmGlobal: confirm === true } : {}),
+          confirm,
+        })
         if (result?.status === 'deleted') {
           setNotice(t('role.deleted').replace('{id}', roleId))
           setOpenRole(null)
