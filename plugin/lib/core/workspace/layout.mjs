@@ -49,7 +49,7 @@
  */
 import { existsSync, mkdirSync, readFileSync, renameSync, rmSync, writeFileSync } from 'node:fs'
 import { homedir } from 'node:os'
-import { basename, isAbsolute, join, normalize, resolve, sep } from 'node:path'
+import { basename, isAbsolute, join, normalize, relative, resolve, sep } from 'node:path'
 
 /* ── 常量 ─────────────────────────────────────────────────────── */
 
@@ -495,6 +495,30 @@ export function readManifest(projectRoot        )                               
     return parsed && typeof parsed === 'object' ? (parsed                           ) : undefined
   } catch {
     return undefined
+  }
+}
+
+/**
+ * 展示用路径（CHG-107，用户定案）：「用户名不该显示，应显示 ~」。
+ *
+ * 面板里到处显示绝对路径（`$HOME/.dsh/myteam/plugins`）有两个问题：
+ *  1. 泄露本机账户名（截图 / 录屏 / 提 issue 时尤其糟糕）；
+ *  2. 太长，挤占本来就紧的横排空间。
+ *
+ * 规则：路径在 `$HOME` 内 → 前缀换成 `~`（`~/` 或 `~\`）；不在 `$HOME` 内 → 原样返回。
+ * **只用于展示**——`title` 里仍保留真实绝对路径，方便复制与排障。
+ */
+export function displayPath(absPath        , env                    = process.env)         {
+  if (!absPath) return absPath
+  const home = env.USERPROFILE || env.HOME || homedir()
+  if (!home) return absPath
+  try {
+    const rel = relative(resolve(home), resolve(absPath))
+    if (rel === '') return '~'
+    if (rel.startsWith('..') || isAbsolute(rel)) return absPath
+    return `~${sep}${rel}`
+  } catch {
+    return absPath
   }
 }
 
