@@ -1,0 +1,9 @@
+# 派生数据：索引可重建，日志可重放。记忆正文与回执进 git。
+index/
+ledger.jsonl
+export/
+# 遥测与队列：每轮召回 / 每轮捕获都会改它们。留在 git 里就是让 git status 永远脏。
+stats.json
+inbox/
+pending/rejected/
+*.tmp-*

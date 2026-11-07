@@ -1,0 +1,70 @@
+{
+  "autonomy": "balanced",
+  "capture": {
+    "draft": "template",
+    "draftProvider": "in-process",
+    "enabled": true,
+    "mode": "strict",
+    "signals": [
+      "S1",
+      "S2",
+      "S3",
+      "S4",
+      "S5",
+      "S6"
+    ]
+  },
+  "conflict": {
+    "semantic": false
+  },
+  "embedding": {
+    "endpoint": null,
+    "g1Threshold": null,
+    "model": "text-embedding-3-small",
+    "provider": "none",
+    "timeoutMs": 10000
+  },
+  "promote": {
+    "format": "both",
+    "includeProjectSpecific": true,
+    "minConfidence": "verified"
+  },
+  "quota": {
+    "growthThreshold": 50,
+    "repo": 200
+  },
+  "recall": {
+    "inject": true,
+    "maxBytes": 4000,
+    "maxPointers": 3
+  },
+  "safety": {
+    "forbidden": []
+  },
+  "schema": "dsh-memory.config/v1",
+  "template": [
+    "功能名",
+    "生效条件",
+    "子功能",
+    "执行",
+    "验证方式",
+    "不适用条件"
+  ],
+  "thresholds": {
+    "autoAcceptFloor": 0.6,
+    "content": {
+      "decision": 0.65,
+      "error": 0.7,
+      "identifier": 0.6,
+      "mixed": 0.65,
+      "natural": 0.65,
+      "path": 0.7
+    },
+    "contentTier": 0.85,
+    "coverageFloor": 0.45,
+    "deferFloor": 0.35,
+    "duplicate": 0.82,
+    "exactAnchorContent": 0.5
+  },
+  "version": 1
+}

@@ -1,0 +1,317 @@
+{
+  "receipts": [
+    {
+      "actionRisk": "R1",
+      "change": {
+        "baseContentHash": null,
+        "mode": "import"
+      },
+      "contentHash": "131dfe4d277083a65fc0850dcf479881c8e3f3138e7c9db2dc7a0b7068d5a0cf",
+      "evidenceRoot": "5e2829f48c8bbdf48dc26585e1862edeb83ef7e6bed16b0ced7cc0159182a854",
+      "hashVersion": 2,
+      "issuedAt": "2026-11-07T10:46:58Z",
+      "lifecycle": "active",
+      "memoryId": "ledger_seq_never_renumbered",
+      "rollback": {
+        "previousContentHash": null,
+        "previousEvidenceRoot": null
+      },
+      "scopes": [
+        "repo:dsh-myteam"
+      ],
+      "verifier": {
+        "id": "mrp-v1",
+        "kind": "gate"
+      }
+    },
+    {
+      "actionRisk": "R1",
+      "change": {
+        "baseContentHash": null,
+        "mode": "import"
+      },
+      "contentHash": "b5e0793953d6394647ea33ba3f636b164759848c804ca98ac42c668b3b18c98f",
+      "evidenceRoot": "70e5229087f0295aa16a5b8944d4ceaab7390f784f0633196387b156ae3a791a",
+      "hashVersion": 2,
+      "issuedAt": "2026-11-07T10:47:05Z",
+      "lifecycle": "active",
+      "memoryId": "verify_gate_runs_real_command",
+      "rollback": {
+        "previousContentHash": null,
+        "previousEvidenceRoot": null
+      },
+      "scopes": [
+        "repo:dsh-myteam"
+      ],
+      "verifier": {
+        "id": "mrp-v1",
+        "kind": "gate"
+      }
+    },
+    {
+      "actionRisk": "R1",
+      "change": {
+        "baseContentHash": null,
+        "mode": "import"
+      },
+      "contentHash": "dc46f50e312347a599303b912b075161e18cb8694d7a633868d1717957243813",
+      "evidenceRoot": "41a986183c6e9d22d71634bd9c65da0b58b9683a20bdbf507620be1c3a8132f0",
+      "hashVersion": 2,
+      "issuedAt": "2026-11-07T10:47:11Z",
+      "lifecycle": "active",
+      "memoryId": "write_scopes_undeclared_means_no_audit",
+      "rollback": {
+        "previousContentHash": null,
+        "previousEvidenceRoot": null
+      },
+      "scopes": [
+        "repo:dsh-myteam"
+      ],
+      "verifier": {
+        "id": "mrp-v1",
+        "kind": "gate"
+      }
+    },
+    {
+      "actionRisk": "R1",
+      "change": {
+        "baseContentHash": null,
+        "mode": "import"
+      },
+      "contentHash": "6ca8c64e88ff1e31e882aff254b17b03457286ac37d22dd2a10e5cd488096c69",
+      "evidenceRoot": "216c96cedfeff0df2c6f5ba607e0d55353d1b936a75b197c55fc25bb804dfb19",
+      "hashVersion": 2,
+      "issuedAt": "2026-11-07T10:47:17Z",
+      "lifecycle": "active",
+      "memoryId": "optimistic_lock_conflict_writes_nothing",
+      "rollback": {
+        "previousContentHash": null,
+        "previousEvidenceRoot": null
+      },
+      "scopes": [
+        "repo:dsh-myteam"
+      ],
+      "verifier": {
+        "id": "mrp-v1",
+        "kind": "gate"
+      }
+    },
+    {
+      "actionRisk": "R1",
+      "change": {
+        "baseContentHash": null,
+        "mode": "import"
+      },
+      "contentHash": "19b101df9b1622ed74efba6fe326db4c0ebaa7c518ab0c061a49793c718f31e3",
+      "evidenceRoot": "36b14c1da6c56f1f8f09e6b58a85e98b373ec060e263c8e365f02533e119c43b",
+      "hashVersion": 2,
+      "issuedAt": "2026-11-07T10:47:24Z",
+      "lifecycle": "active",
+      "memoryId": "role_dir_holds_only_role_files",
+      "rollback": {
+        "previousContentHash": null,
+        "previousEvidenceRoot": null
+      },
+      "scopes": [
+        "repo:dsh-myteam"
+      ],
+      "verifier": {
+        "id": "mrp-v1",
+        "kind": "gate"
+      }
+    },
+    {
+      "actionRisk": "R2",
+      "change": {
+        "baseContentHash": null,
+        "mode": "import"
+      },
+      "contentHash": "01b9e3b144f62ce2ed853aa3349978ff480927540433cf0d5d482435499a1aaf",
+      "evidenceRoot": "98f96f77f6c78ce74188952e3da3c15113469c60cf00b32a36e41fdddc262b2e",
+      "hashVersion": 2,
+      "issuedAt": "2026-11-07T10:47:30Z",
+      "lifecycle": "active",
+      "memoryId": "gate_tests_must_use_real_entry",
+      "rollback": {
+        "previousContentHash": null,
+        "previousEvidenceRoot": null
+      },
+      "scopes": [
+        "repo:dsh-myteam"
+      ],
+      "verifier": {
+        "id": "mrp-v1",
+        "kind": "gate"
+      }
+    },
+    {
+      "actionRisk": "R2",
+      "change": {
+        "baseContentHash": null,
+        "mode": "import"
+      },
+      "contentHash": "c67e307d26b68a34adf3ae81158964bbc381c5401c3e1eeec0ba58db744c7208",
+      "evidenceRoot": "43a0cf5968834977428783fa3481d28d3323337e57df3724c99147686b52d8bf",
+      "hashVersion": 2,
+      "issuedAt": "2026-11-07T10:47:36Z",
+      "lifecycle": "active",
+      "memoryId": "bundle_required_after_src_change",
+      "rollback": {
+        "previousContentHash": null,
+        "previousEvidenceRoot": null
+      },
+      "scopes": [
+        "repo:dsh-myteam"
+      ],
+      "verifier": {
+        "id": "mrp-v1",
+        "kind": "gate"
+      }
+    },
+    {
+      "actionRisk": "R2",
+      "change": {
+        "baseContentHash": null,
+        "mode": "import"
+      },
+      "contentHash": "29bf7e3122fff24bb56af813441b7a7f88b5bb71c9f34d9dae23646513c1b346",
+      "evidenceRoot": "fa2114ef1f8bbc4a5ea100c77f435d58d10fbdce524755c727dba99c5a2cc386",
+      "hashVersion": 2,
+      "issuedAt": "2026-11-07T10:47:43Z",
+      "lifecycle": "active",
+      "memoryId": "line_ending_lf_crlf_split",
+      "rollback": {
+        "previousContentHash": null,
+        "previousEvidenceRoot": null
+      },
+      "scopes": [
+        "repo:dsh-myteam"
+      ],
+      "verifier": {
+        "id": "mrp-v1",
+        "kind": "gate"
+      }
+    },
+    {
+      "actionRisk": "R1",
+      "change": {
+        "baseContentHash": null,
+        "mode": "import"
+      },
+      "contentHash": "6f8b8beae8ff53bd84e1bb6b917f3edbf615e4efe347f1c386b2645dfed7aee0",
+      "evidenceRoot": "1b461aae5d0e6b9676cc9b8a749143f6a415ea2e8486673c100b30865f51c17d",
+      "hashVersion": 2,
+      "issuedAt": "2026-11-07T10:47:49Z",
+      "lifecycle": "active",
+      "memoryId": "powershell_encoding_traps",
+      "rollback": {
+        "previousContentHash": null,
+        "previousEvidenceRoot": null
+      },
+      "scopes": [
+        "repo:dsh-myteam"
+      ],
+      "verifier": {
+        "id": "mrp-v1",
+        "kind": "gate"
+      }
+    },
+    {
+      "actionRisk": "R2",
+      "change": {
+        "baseContentHash": null,
+        "mode": "import"
+      },
+      "contentHash": "fe8e637ebe2016e7cad7eccf390d68eff9ac6a15b7f7a0be06c96e98ba42c53c",
+      "evidenceRoot": "a21cf208a455481432d6c87a1fa6034c5d85579d70f05e9454bc66a4fc195803",
+      "hashVersion": 2,
+      "issuedAt": "2026-11-07T10:47:56Z",
+      "lifecycle": "active",
+      "memoryId": "single_file_anchor_append_protocol",
+      "rollback": {
+        "previousContentHash": null,
+        "previousEvidenceRoot": null
+      },
+      "scopes": [
+        "repo:dsh-myteam"
+      ],
+      "verifier": {
+        "id": "mrp-v1",
+        "kind": "gate"
+      }
+    },
+    {
+      "actionRisk": "R3",
+      "change": {
+        "baseContentHash": null,
+        "mode": "import"
+      },
+      "contentHash": "82061fbdd8bc855b3c286a3c0252593a49d2369ffeb5a6efbd03b5c1faf9bd94",
+      "evidenceRoot": "1192ca9d95c59e89e26408ef75707b262edc3634765f7fe922b28565c443aa49",
+      "hashVersion": 2,
+      "issuedAt": "2026-11-07T10:48:03Z",
+      "lifecycle": "active",
+      "memoryId": "only_dsw_alias_tokens_no_hex",
+      "rollback": {
+        "previousContentHash": null,
+        "previousEvidenceRoot": null
+      },
+      "scopes": [
+        "repo:dsh-myteam"
+      ],
+      "verifier": {
+        "id": "mrp-v1",
+        "kind": "gate"
+      }
+    },
+    {
+      "actionRisk": "R5",
+      "change": {
+        "baseContentHash": null,
+        "mode": "import"
+      },
+      "contentHash": "5b07cdd639bdc59a91af58cc3aed1d6be49db0c4abf66f88483b4089daaf930f",
+      "evidenceRoot": "a0bfe67778f39df38120199bdefa9047fa4cad79811f25c79569b294b87904a5",
+      "hashVersion": 2,
+      "issuedAt": "2026-11-07T10:48:10Z",
+      "lifecycle": "active",
+      "memoryId": "member_is_appointment_not_entity",
+      "rollback": {
+        "previousContentHash": null,
+        "previousEvidenceRoot": null
+      },
+      "scopes": [
+        "repo:dsh-myteam"
+      ],
+      "verifier": {
+        "id": "mrp-v1",
+        "kind": "gate"
+      }
+    },
+    {
+      "actionRisk": "R1",
+      "change": {
+        "baseContentHash": null,
+        "mode": "import"
+      },
+      "contentHash": "fd4a2d9611408388542b4659033af6b7990bdfb25fce296f613bbd2a1ec79eae",
+      "evidenceRoot": "79fe200fe369b771d9c896c06dc47cdde89244b95a805aa7da9325ed24348204",
+      "hashVersion": 2,
+      "issuedAt": "2026-11-07T10:48:18Z",
+      "lifecycle": "active",
+      "memoryId": "panel_is_full_page_not_overlay",
+      "rollback": {
+        "previousContentHash": null,
+        "previousEvidenceRoot": null
+      },
+      "scopes": [
+        "repo:dsh-myteam"
+      ],
+      "verifier": {
+        "id": "mrp-v1",
+        "kind": "gate"
+      }
+    }
+  ],
+  "schema": "dsh-memory.trust/v1"
+}
