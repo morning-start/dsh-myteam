@@ -135,4 +135,4 @@ export function auditMemoryContent(fileName        , text        )              
 }
 
 
-//# sourceURL=file:///E:/Workplace/extension/dsh-myteam/plugin/src/core/members/memory.ts
+//# sourceURL=./src/core/members/memory.ts

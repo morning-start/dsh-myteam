@@ -63,4 +63,4 @@ export function looksLikeContribution(dir        )          {
 }
 
 
-//# sourceURL=file:///E:/Workplace/extension/dsh-myteam/plugin/src/core/contributions/discover.ts
+//# sourceURL=./src/core/contributions/discover.ts

@@ -628,4 +628,4 @@ export function buildConfigView(svc                                             
 }
 
 
-//# sourceURL=file:///E:/Workplace/extension/dsh-myteam/plugin/src/remote/views.ts
+//# sourceURL=./src/remote/views.ts

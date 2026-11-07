@@ -230,4 +230,4 @@ export function listArchives(workspaceRoot        )           {
 }
 
 
-//# sourceURL=file:///E:/Workplace/extension/dsh-myteam/plugin/src/core/archive/archive-store.ts
+//# sourceURL=./src/core/archive/archive-store.ts

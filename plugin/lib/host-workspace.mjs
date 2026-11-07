@@ -124,4 +124,4 @@ export default function activate(ctx              ) {
 }
 
 
-//# sourceURL=file:///E:/Workplace/extension/dsh-myteam/plugin/src/host-workspace.ts
+//# sourceURL=./src/host-workspace.ts

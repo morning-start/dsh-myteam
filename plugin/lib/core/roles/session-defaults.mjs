@@ -111,4 +111,4 @@ export function buildRolePromptSection(roles                  )         {
 }
 
 
-//# sourceURL=file:///E:/Workplace/extension/dsh-myteam/plugin/src/core/roles/session-defaults.ts
+//# sourceURL=./src/core/roles/session-defaults.ts

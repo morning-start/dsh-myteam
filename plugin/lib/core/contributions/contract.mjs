@@ -176,4 +176,4 @@ export function describeContribution(code        , detail                       
 }
 
 
-//# sourceURL=file:///E:/Workplace/extension/dsh-myteam/plugin/src/core/contributions/contract.ts
+//# sourceURL=./src/core/contributions/contract.ts

@@ -124,4 +124,4 @@ export async function smokeMain(ctx     )                   {
 }
 
 
-//# sourceURL=file:///E:/Workplace/extension/dsh-myteam/plugin/src/core/members/smoke.ts
+//# sourceURL=./src/core/members/smoke.ts

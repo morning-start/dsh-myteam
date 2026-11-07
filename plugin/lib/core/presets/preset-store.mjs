@@ -296,4 +296,4 @@ export function deleteProjectPreset(workspaceRoot        , presetId        )    
 }
 
 
-//# sourceURL=file:///E:/Workplace/extension/dsh-myteam/plugin/src/core/presets/preset-store.ts
+//# sourceURL=./src/core/presets/preset-store.ts

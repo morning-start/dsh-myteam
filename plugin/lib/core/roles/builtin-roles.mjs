@@ -151,4 +151,4 @@ export function builtinRole(id        )                             {
 }
 
 
-//# sourceURL=file:///E:/Workplace/extension/dsh-myteam/plugin/src/core/roles/builtin-roles.ts
+//# sourceURL=./src/core/roles/builtin-roles.ts

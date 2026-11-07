@@ -45,6 +45,87 @@ window.__ModuleLoader__.load({
     /** 后台标签页是否该跳过本轮（无 document 的 SSR/测试环境一律视为可见） */
     const isHidden = () => (typeof document === 'undefined' ? false : document.visibilityState === 'hidden')
 
+    /* ── CHG-99（C13）：宿主深色信号 ──────────────────────────────────────────
+     * 宿主 ui-layout 的 ThemePresenter 把**解析后的**主题写在 `body[data-ds-dark-theme]`
+     * （dark → `setAttribute("")`，light → `removeAttribute`），同一份 apply 里还写
+     * `document.documentElement.style.color-scheme` 与 `data-ds-theme-source`。
+     * 面板原来读「系统偏好」媒体查询：用户在宿主里手动切深色（不跟随系统）时它不触发
+     * → 13 组 color-mix 叠加色不重算 → 深色底上叠出浅色胶囊
+     * （`.mt-note-info` / `.mt-mini-chip-lead` / `.mt-rolecard-captain` / `.mt-guestbar` /
+     * `.mt-status-filled` 等，对比度低于 2:1）。
+     * 现在按宿主自己的发布方式读：MutationObserver 订阅 body 属性 +
+     * useSyncExternalStore 接进 React（参照 dsh-talk-map `use-dark.ts`）。
+     * **降级是必需项**：老宿主从不发布该属性 → 回退 `matchMedia` 的系统偏好（见 darkMediaQuery）。
+     * 全程 try/catch：factory 求值期与渲染期都不得抛（宿主把插件 entry 未激活当致命错误）。 */
+    const DARK_ATTRIBUTE = 'data-ds-dark-theme'
+    /** 宿主是否在发布「解析后的主题」（新宿主同时写 root 的 color-scheme / data-ds-theme-source） */
+    const hostPublishesResolvedTheme = () => {
+      if (typeof document === 'undefined') return false
+      try {
+        const root = document.documentElement
+        if (!root) return false
+        if (root.style && root.style.colorScheme) return true
+        return typeof root.hasAttribute === 'function' && root.hasAttribute('data-ds-theme-source')
+      } catch {
+        return false
+      }
+    }
+    /** 系统偏好媒体查询（老宿主的降级通道；没有 matchMedia 的环境返回 null） */
+    const darkMediaQuery = () => {
+      try {
+        return typeof window !== 'undefined' && typeof window.matchMedia === 'function'
+          ? window.matchMedia('(prefers-color-scheme: dark)')
+          : null
+      } catch {
+        return null
+      }
+    }
+    /** 系统是否偏好深色（无 matchMedia 一律浅色） */
+    const systemPrefersDark = () => darkMediaQuery()?.matches === true
+    /** 当前**解析后**的深色态：宿主信号优先，老宿主回退系统偏好（返回裸布尔，快照才稳定） */
+    const readDarkTheme = () => {
+      if (typeof document === 'undefined') return false
+      try {
+        const body = document.body
+        if (body && typeof body.hasAttribute === 'function' && body.hasAttribute(DARK_ATTRIBUTE)) return true
+        return hostPublishesResolvedTheme() ? false : systemPrefersDark()
+      } catch {
+        return false
+      }
+    }
+    /** 订阅：body 的主题属性变化 +（老宿主）系统偏好变化；返回退订函数 */
+    const subscribeDarkTheme = (listener) => {
+      if (typeof document === 'undefined' || !document.body) return () => {}
+      const unsubs = []
+      try {
+        if (typeof MutationObserver === 'function') {
+          const observer = new MutationObserver(() => listener())
+          observer.observe(document.body, { attributes: true, attributeFilter: [DARK_ATTRIBUTE] })
+          unsubs.push(() => observer.disconnect())
+        }
+      } catch { /* 无 MutationObserver：退化为一次性快照，至少首帧正确 */ }
+      try {
+        const media = darkMediaQuery()
+        if (media && typeof media.addEventListener === 'function') {
+          media.addEventListener('change', listener)
+          unsubs.push(() => media.removeEventListener('change', listener))
+        }
+      } catch { /* 同上 */ }
+      return () => { for (const off of unsubs) { try { off() } catch { /* 退订失败不影响卸载 */ } } }
+    }
+    /** useSyncExternalStore 的兜底（老 React / 测试替身没有该 API 时退化为 useState + useEffect） */
+    const useSyncExternalStoreSafe = typeof react.useSyncExternalStore === 'function'
+      ? react.useSyncExternalStore
+      : (subscribe, getSnapshot) => {
+        const [value, setValue] = react.useState(getSnapshot)
+        react.useEffect(() => subscribe(() => setValue(getSnapshot())), [subscribe, getSnapshot])
+        return value
+      }
+    /** useRef 的兜底（测试替身没有 useRef 时不 throw；与 DAG 测量处的写法一致） */
+    const useRefSafe = react.useRef ?? ((init) => ({ current: init }))
+    /** 面板表面根：把「解析后的深色态」写到插件自己的根节点上（见 CHG-99 / C13） */
+    const useDarkTheme = () => useSyncExternalStoreSafe(subscribeDarkTheme, readDarkTheme) === true
+
     /* ── locale 字典（ui-plugin.md：visible text 走 locale service；zh 为键源，en 对照）── */
     const zh = {
       'panel.title': 'myteam 团队面板',
@@ -2877,6 +2958,15 @@ window.__ModuleLoader__.load({
      */
     const impactCountText = (value) => (value === null || value === undefined || !Number.isFinite(Number(value)) ? '—' : String(Number(value)))
 
+    /**
+     * 深色覆盖的作用域根（CHG-99 / C13）。
+     *
+     * 面板在各插槽里是**互不相邻的根节点**（main 面板 / 会话视图 / composer dock / 侧栏入口 /
+     * 工具卡），没有共同祖先；宿主自己的容器不能挂属性（会污染面板之外）。
+     * 所以 `data-theme` 写在每个 `.mt-*` 表面根上，深色规则统一以本选择器作前缀。
+     */
+    const DARK_SURFACE = ':is(.mt-panel,.mt-conv,.mt-dockrow,.mt-entry,.mt-toolcard)[data-theme="dark"]'
+
     /* ── 样式（单文件形态；只用 --dsw-alias-* token；由 ctx.effect 持有）── */
     const css = [
       '.mt-panel{position:relative;display:flex;flex-direction:column;height:100%;min-width:0;color:var(--dsw-alias-label-primary);font-size:13px}',
@@ -3392,7 +3482,6 @@ window.__ModuleLoader__.load({
       '.mt-gate-spin{display:inline-flex;align-items:center;gap:6px;font-size:12px;color:var(--dsw-alias-label-secondary)}',
       '.mt-gate-spin::before{content:"";width:10px;height:10px;border:1.5px solid var(--dsw-alias-border-l3);border-top-color:var(--dsw-alias-label-emphasis, var(--dsw-alias-label-primary));border-radius:50%;animation:mt-gate-spin .9s linear infinite}',
       '@keyframes mt-gate-spin{to{transform:rotate(360deg)}}',
-      '@media (prefers-reduced-motion: reduce){.mt-gate-spin::before{animation:none}}',
       '.mt-gate-result{margin-top:8px;display:flex;flex-direction:column;gap:6px}',
       '.mt-gate-result-meta{display:flex;flex-wrap:wrap;align-items:center;gap:6px;font-size:12px;color:var(--dsw-alias-label-secondary)}',
       '.mt-gate-result pre.mt-ev-code{max-height:220px;overflow:auto;white-space:pre-wrap;overflow-wrap:anywhere}',
@@ -3938,7 +4027,6 @@ window.__ModuleLoader__.load({
       '.mt-lock-icon{flex:none;display:inline-flex;align-items:center;color:var(--dsw-alias-label-tertiary)}',
       '.mt-task-shake{animation:mt-shake 150ms ease}',
       '@keyframes mt-shake{0%,100%{transform:translateX(0)}25%{transform:translateX(-4px)}75%{transform:translateX(4px)}}',
-      '@media (prefers-reduced-motion: reduce){.mt-task-shake{animation:none;outline:2px solid var(--dsw-alias-state-error-primary);outline-offset:1px}}',
       '@media (max-width: 980px){.mt-task-lift{right:24px;top:40px}}',
       /* [G6 flow] design/new-team.html · new-team-1.html · conversation.html · guest.html · tasks.html · team-tasks.html */
       /* CHG-84：向导是绝对定位浮层，必须让工作区成为定位祖先（否则会被裁到视口外/丢失背景遮罩） */
@@ -4108,51 +4196,49 @@ window.__ModuleLoader__.load({
       '.mt-skeleton-line{height:10px;max-width:70%;border-radius:4px;background:var(--dsw-alias-bg-layer-2);animation:mt-skeleton-pulse 1.2s ease-in-out infinite}',
       '.mt-skeleton-line-lg{height:12px;max-width:100%}',
       '@keyframes mt-skeleton-pulse{0%,100%{opacity:.55}50%{opacity:1}}',
-      '@media (prefers-reduced-motion: reduce){.mt-skeleton-dot,.mt-skeleton-line{animation:none}}',
       '.mt-note-warn{flex-wrap:wrap;background:color-mix(in srgb, var(--dsw-alias-state-warning-primary) 10%, transparent);border-color:var(--dsw-alias-state-warning-primary);color:var(--dsw-alias-label-primary)}',
       '.mt-note-warn .mt-note-icon{color:var(--dsw-alias-state-warning-primary)}',
       '.mt-status-filled{background:color-mix(in srgb, var(--dsw-alias-label-emphasis, var(--dsw-alias-label-primary)) 10%, transparent);border-color:var(--dsw-alias-border-accent, var(--dsw-alias-border-l3));color:var(--dsw-alias-label-emphasis, var(--dsw-alias-label-primary))}',
       '.mt-status-filled .mt-shape{border-radius:50%}',
       '.mt-status-dashed{border-style:dashed;color:var(--dsw-alias-label-secondary)}',
-      /* ── 深色模式（R34 / UI-1 过门条件）─────────────────────────────────────
+      /* ── 深色模式（R34 / UI-1 过门条件；CHG-99 C13 改为读宿主**解析后**的信号）──────
        * design/design-notes.md §九：颜色按「角色」定义，深色整段换值、变量名不动。
-       * 这里**两条都写**：① `@media (prefers-color-scheme: dark)` 跟随系统，放前面；
-       * ② `[data-theme="dark"]` 属性选择器（宿主用属性表达主题时），放后面以便显式覆盖；
-       * ③ `:not([data-theme="light"])` 保证宿主显式给浅色时不被系统深色盖掉。
+       * **修复前这里是 13 组双写**：`@media`（系统偏好媒体查询）+ `:root[data-theme="dark"]`
+       * （自建属性）。媒体查询读的是**系统**偏好——用户在宿主里
+       * 手动切深色（不跟随系统）时它不触发，13 组 color-mix 叠加色停在旧模式，深色底上叠出
+       * 浅色胶囊（`.mt-note-info` / `.mt-mini-chip-lead` / `.mt-rolecard-captain` /
+       * `.mt-guestbar` / `.mt-status-filled` 对比度掉到 2:1 以下）。
+       * 现在只保留属性选择器：`data-theme` 由 `useDarkTheme()`（读宿主
+       * `body[data-ds-dark-theme]`，老宿主回退 `matchMedia`）写到面板表面根上；
+       * 作用域钉在 `.mt-*` 根而不是 `:root` —— **不污染面板之外**。
        * 只从 --dsw-alias-* 取色，**不新增 hex**；深色下低透明度 wash 会被暗底吃掉，
        * 故按「暗底上视觉等价」上调混合百分比（同一个 token，不是新色）。 */
-      '@media (prefers-color-scheme: dark){:root:not([data-theme="light"]) :is(.mt-panel,.mt-dockrow,.mt-entry,.mt-conv){color-scheme:dark}}',
-      ':root[data-theme="dark"] :is(.mt-panel,.mt-dockrow,.mt-entry,.mt-conv){color-scheme:dark}',
+      `${DARK_SURFACE}{color-scheme:dark}`,
       /* 浅底 wash（6~14%）在暗底几乎不可见 → 统一抬到 16% */
-      '@media (prefers-color-scheme: dark){:root:not([data-theme="light"]) :is(.mt-note-info,.mt-mini-chip-lead,.mt-kb3-note-info,.mt-layer-ico-project,.mt-layer-ico.mt-layer-project,.mt-src-project,.mt-src-project.mt-mini-chip,.mt-rolecard-captain,.mt-guestbar,.mt-cand[aria-selected="true"],.mt-status-filled,.mt-mini-chip-team,.mt-merge-chain b.mt-cur,.mt-note-box.mt-note-info){background:color-mix(in srgb, var(--dsw-alias-label-emphasis, var(--dsw-alias-label-primary)) 16%, transparent)}}',
-      ':root[data-theme="dark"] :is(.mt-note-info,.mt-mini-chip-lead,.mt-kb3-note-info,.mt-layer-ico-project,.mt-layer-ico.mt-layer-project,.mt-src-project,.mt-src-project.mt-mini-chip,.mt-rolecard-captain,.mt-guestbar,.mt-cand[aria-selected="true"],.mt-status-filled,.mt-mini-chip-team,.mt-merge-chain b.mt-cur,.mt-note-box.mt-note-info){background:color-mix(in srgb, var(--dsw-alias-label-emphasis, var(--dsw-alias-label-primary)) 16%, transparent)}',
-      '@media (prefers-color-scheme: dark){:root:not([data-theme="light"]) :is(.mt-note-info,.mt-mini-chip-lead,.mt-mini-chip-team,.mt-kb3-note-info,.mt-src-project,.mt-toolcard-row,.mt-impact){border-color:color-mix(in srgb, var(--dsw-alias-label-emphasis, var(--dsw-alias-label-primary)) 44%, transparent)}}',
-      ':root[data-theme="dark"] :is(.mt-note-info,.mt-mini-chip-lead,.mt-mini-chip-team,.mt-kb3-note-info,.mt-src-project,.mt-toolcard-row,.mt-impact){border-color:color-mix(in srgb, var(--dsw-alias-label-emphasis, var(--dsw-alias-label-primary)) 44%, transparent)}',
+      `${DARK_SURFACE} :is(.mt-note-info,.mt-mini-chip-lead,.mt-kb3-note-info,.mt-layer-ico-project,.mt-layer-ico.mt-layer-project,.mt-src-project,.mt-src-project.mt-mini-chip,.mt-rolecard-captain,.mt-guestbar,.mt-cand[aria-selected="true"],.mt-status-filled,.mt-mini-chip-team,.mt-merge-chain b.mt-cur,.mt-note-box.mt-note-info){background:color-mix(in srgb, var(--dsw-alias-label-emphasis, var(--dsw-alias-label-primary)) 16%, transparent)}`,
+      `${DARK_SURFACE} :is(.mt-note-info,.mt-mini-chip-lead,.mt-mini-chip-team,.mt-kb3-note-info,.mt-src-project,.mt-toolcard-row,.mt-impact){border-color:color-mix(in srgb, var(--dsw-alias-label-emphasis, var(--dsw-alias-label-primary)) 44%, transparent)}`,
       /* 成员四色头像（14% 底 / 30~32% 边）→ 24% / 48%，深底上头像仍能分辨 */
-      '@media (prefers-color-scheme: dark){:root:not([data-theme="light"]) :is(.mt-avatar-a1,.mt-mavatar-a1){background:color-mix(in srgb, var(--dsw-alias-label-emphasis, var(--dsw-alias-label-primary)) 24%, transparent);border-color:color-mix(in srgb, var(--dsw-alias-label-emphasis, var(--dsw-alias-label-primary)) 48%, transparent)}}',
-      ':root[data-theme="dark"] :is(.mt-avatar-a1,.mt-mavatar-a1){background:color-mix(in srgb, var(--dsw-alias-label-emphasis, var(--dsw-alias-label-primary)) 24%, transparent);border-color:color-mix(in srgb, var(--dsw-alias-label-emphasis, var(--dsw-alias-label-primary)) 48%, transparent)}',
-      '@media (prefers-color-scheme: dark){:root:not([data-theme="light"]) :is(.mt-avatar-a2,.mt-mavatar-a2){background:color-mix(in srgb, var(--dsw-alias-state-ok-primary) 24%, transparent);border-color:color-mix(in srgb, var(--dsw-alias-state-ok-primary) 48%, transparent)}}',
-      ':root[data-theme="dark"] :is(.mt-avatar-a2,.mt-mavatar-a2){background:color-mix(in srgb, var(--dsw-alias-state-ok-primary) 24%, transparent);border-color:color-mix(in srgb, var(--dsw-alias-state-ok-primary) 48%, transparent)}',
-      '@media (prefers-color-scheme: dark){:root:not([data-theme="light"]) :is(.mt-avatar-a3,.mt-mavatar-a3){background:color-mix(in srgb, var(--dsw-alias-state-warning-primary) 24%, transparent);border-color:color-mix(in srgb, var(--dsw-alias-state-warning-primary) 48%, transparent)}}',
-      ':root[data-theme="dark"] :is(.mt-avatar-a3,.mt-mavatar-a3){background:color-mix(in srgb, var(--dsw-alias-state-warning-primary) 24%, transparent);border-color:color-mix(in srgb, var(--dsw-alias-state-warning-primary) 48%, transparent)}',
-      '@media (prefers-color-scheme: dark){:root:not([data-theme="light"]) :is(.mt-avatar-a4,.mt-mavatar-a4){background:color-mix(in srgb, var(--dsw-alias-state-error-primary) 22%, transparent);border-color:color-mix(in srgb, var(--dsw-alias-state-error-primary) 46%, transparent)}}',
-      ':root[data-theme="dark"] :is(.mt-avatar-a4,.mt-mavatar-a4){background:color-mix(in srgb, var(--dsw-alias-state-error-primary) 22%, transparent);border-color:color-mix(in srgb, var(--dsw-alias-state-error-primary) 46%, transparent)}',
+      `${DARK_SURFACE} :is(.mt-avatar-a1,.mt-mavatar-a1){background:color-mix(in srgb, var(--dsw-alias-label-emphasis, var(--dsw-alias-label-primary)) 24%, transparent);border-color:color-mix(in srgb, var(--dsw-alias-label-emphasis, var(--dsw-alias-label-primary)) 48%, transparent)}`,
+      `${DARK_SURFACE} :is(.mt-avatar-a2,.mt-mavatar-a2){background:color-mix(in srgb, var(--dsw-alias-state-ok-primary) 24%, transparent);border-color:color-mix(in srgb, var(--dsw-alias-state-ok-primary) 48%, transparent)}`,
+      `${DARK_SURFACE} :is(.mt-avatar-a3,.mt-mavatar-a3){background:color-mix(in srgb, var(--dsw-alias-state-warning-primary) 24%, transparent);border-color:color-mix(in srgb, var(--dsw-alias-state-warning-primary) 48%, transparent)}`,
+      `${DARK_SURFACE} :is(.mt-avatar-a4,.mt-mavatar-a4){background:color-mix(in srgb, var(--dsw-alias-state-error-primary) 22%, transparent);border-color:color-mix(in srgb, var(--dsw-alias-state-error-primary) 46%, transparent)}`,
       /* 门禁 / 警示 chip（10~14% 底）→ 22% 底 / 58% 边 */
-      '@media (prefers-color-scheme: dark){:root:not([data-theme="light"]) :is(.mt-chip-gate,.mt-mini-chip-gate,.mt-detail-page .mt-mini-chip-gate,.mt-impact-gate,.mt-note-warn){background:color-mix(in srgb, var(--dsw-alias-state-warning-primary) 22%, transparent);border-color:color-mix(in srgb, var(--dsw-alias-state-warning-primary) 58%, transparent)}}',
-      ':root[data-theme="dark"] :is(.mt-chip-gate,.mt-mini-chip-gate,.mt-detail-page .mt-mini-chip-gate,.mt-impact-gate,.mt-note-warn){background:color-mix(in srgb, var(--dsw-alias-state-warning-primary) 22%, transparent);border-color:color-mix(in srgb, var(--dsw-alias-state-warning-primary) 58%, transparent)}',
+      `${DARK_SURFACE} :is(.mt-chip-gate,.mt-mini-chip-gate,.mt-detail-page .mt-mini-chip-gate,.mt-impact-gate,.mt-note-warn){background:color-mix(in srgb, var(--dsw-alias-state-warning-primary) 22%, transparent);border-color:color-mix(in srgb, var(--dsw-alias-state-warning-primary) 58%, transparent)}`,
       /* 通过 / 失败底（16% / 14%）→ 26% / 24% */
-      '@media (prefers-color-scheme: dark){:root:not([data-theme="light"]) :is(.mt-exit-ok,.mt-ac-pass .mt-ac-mark){background:color-mix(in srgb, var(--dsw-alias-state-ok-primary) 26%, transparent)}}',
-      ':root[data-theme="dark"] :is(.mt-exit-ok,.mt-ac-pass .mt-ac-mark){background:color-mix(in srgb, var(--dsw-alias-state-ok-primary) 26%, transparent)}',
-      '@media (prefers-color-scheme: dark){:root:not([data-theme="light"]) :is(.mt-exit-fail,.mt-mini-chip.mt-mini-chip-fail,.mt-impact){background:color-mix(in srgb, var(--dsw-alias-state-error-primary) 24%, transparent)}}',
-      ':root[data-theme="dark"] :is(.mt-exit-fail,.mt-mini-chip.mt-mini-chip-fail,.mt-impact){background:color-mix(in srgb, var(--dsw-alias-state-error-primary) 24%, transparent)}',
+      `${DARK_SURFACE} :is(.mt-exit-ok,.mt-ac-pass .mt-ac-mark){background:color-mix(in srgb, var(--dsw-alias-state-ok-primary) 26%, transparent)}`,
+      `${DARK_SURFACE} :is(.mt-exit-fail,.mt-mini-chip.mt-mini-chip-fail,.mt-impact){background:color-mix(in srgb, var(--dsw-alias-state-error-primary) 24%, transparent)}`,
       /* 遮罩：浅色用 62% 白纱；暗底上同比例几乎无遮罩感 → 80% 暗纱 */
-      '@media (prefers-color-scheme: dark){:root:not([data-theme="light"]) .mt-overlay{background:color-mix(in srgb, var(--dsw-alias-bg-base) 80%, transparent)}}',
-      ':root[data-theme="dark"] .mt-overlay{background:color-mix(in srgb, var(--dsw-alias-bg-base) 80%, transparent)}',
+      `${DARK_SURFACE} .mt-overlay{background:color-mix(in srgb, var(--dsw-alias-bg-base) 80%, transparent)}`,
       /* 阴影：浅色用「深字色 10~22%」投影；暗色下深字色变成近白，会成发光边 → 改用 bg-base 投影 */
-      '@media (prefers-color-scheme: dark){:root:not([data-theme="light"]) :is(.mt-dialog,.mt-menupop,.mt-candpop,.mt-wizard-dialog,.mt-dragtoast,.mt-task-lift,.mt-dag-card,.mt-dag-node-focus){box-shadow:0 10px 36px color-mix(in srgb, var(--dsw-alias-bg-base) 85%, transparent)}}',
-      ':root[data-theme="dark"] :is(.mt-dialog,.mt-menupop,.mt-candpop,.mt-wizard-dialog,.mt-dragtoast,.mt-task-lift,.mt-dag-card,.mt-dag-node-focus){box-shadow:0 10px 36px color-mix(in srgb, var(--dsw-alias-bg-base) 85%, transparent)}',
-      '@media (prefers-color-scheme: dark){:root:not([data-theme="light"]) .mt-batchbar{box-shadow:0 -4px 12px color-mix(in srgb, var(--dsw-alias-bg-base) 70%, transparent)}}',
-      ':root[data-theme="dark"] .mt-batchbar{box-shadow:0 -4px 12px color-mix(in srgb, var(--dsw-alias-bg-base) 70%, transparent)}',
+      `${DARK_SURFACE} :is(.mt-dialog,.mt-menupop,.mt-candpop,.mt-wizard-dialog,.mt-dragtoast,.mt-task-lift,.mt-dag-card,.mt-dag-node-focus){box-shadow:0 10px 36px color-mix(in srgb, var(--dsw-alias-bg-base) 85%, transparent)}`,
+      `${DARK_SURFACE} .mt-batchbar{box-shadow:0 -4px 12px color-mix(in srgb, var(--dsw-alias-bg-base) 70%, transparent)}`,
+      /* ── 动效降级（CHG-99 C14）：一条通配兜底覆盖全部 transition/animation ───────────
+       * 修复前只覆盖 3/8（3 个 @keyframes 各一条），5 处 transition（`.mt-toggle::after` /
+       * `.mt-card2-hoverable` / `.mt-team-card` / `.mt-titem` / `.mt-dag-card`）零覆盖。
+       * 用 0.01ms 而非 none：transitionend 仍会触发（依赖它的代码安全），动效瞬完成。
+       * 第二条保留「非法落点」的静态 outline 兜底——H4 三通道：运动去掉，语义通道保留。 */
+      '@media (prefers-reduced-motion: reduce){*,*::before,*::after{transition-duration:.01ms!important;animation-duration:.01ms!important;animation-iteration-count:1!important}}',
+      '@media (prefers-reduced-motion: reduce){.mt-task-shake{animation:none;outline:2px solid var(--dsw-alias-state-error-primary);outline-offset:1px}}',
     ].join('\n')
     const STYLE_ID = 'dsh-plugin-myteam/panel.css'
     /** 注入样式并返回清理函数（ctx.effect 持有；重复注入防重） */
@@ -9531,6 +9617,10 @@ window.__ModuleLoader__.load({
     function Panel(props) {
       const { ctx, connection, t: tProp } = props
       const t = tProp ?? ((k) => zh[k] ?? k)
+      /* CHG-99（C13）：宿主**解析后**的深色态写到面板表面根上；样式侧只用 `.mt-*[data-theme="dark"]`，
+       * 不再依赖系统偏好媒体查询（宿主手动切深色时媒体查询不触发）。 */
+      const dark = useDarkTheme()
+      const themeAttr = { 'data-theme': dark ? 'dark' : 'light' }
       const discoveryApi = react.useMemo(() => makeApi(connection), [connection])
       const [scope, setScope] = react.useState('global')          // 全局 | 项目
       const [projectTab, setProjectTab] = react.useState('tasks') // 角色 | 团队 | 任务
@@ -9640,12 +9730,30 @@ window.__ModuleLoader__.load({
         }
       }, [discoveryApi])
 
+      /* CHG-99（C3）：请求序号 + 项目根快照 —— 并发/切项目时只认**最后一次**请求的响应。
+       * 修复前 `loadProject` 无序号、无 alive 守卫，两个可复现 bug：
+       *  ① 切项目闪回：从「结算页」切到「插件 v0.2」时旧项目的 `getProject` 还在飞，
+       *     回来照样 `setProject(旧项目)` → 面板闪回上一个项目，等下次 5s 轮询才纠正；
+       *  ② 写后数据倒退：点「批准计划」→ `await planAction()` → `await loadProject()`
+       *     （9 处写后全量刷新）与 5s 轮询撞车时，慢的响应覆盖新状态 → 界面显示「批准前」，
+       *     用户以为没生效再点一次 → **二次操作**。
+       * 序号用 ref（useState 会多一轮渲染）；`projectRootRef` 是 projectRoot 的渲染期镜像——
+       * 异步回调里的 `projectRoot` 是发起时那次渲染的闭包值，读 ref 才是当前值。 */
+      const loadSeqRef = useRefSafe(0)
+      const projectRootRef = useRefSafe(projectRoot)
+      projectRootRef.current = projectRoot
       const loadProject = react.useCallback(async (root) => {
         if (!root) { setProject(null); return }
+        const seq = ++loadSeqRef.current
+        /** 过期响应：被更新的请求顶掉，或调用方的 root 已不是当前项目 */
+        const stale = () => seq !== loadSeqRef.current || root !== projectRootRef.current
         try {
           const p = await discoveryApi.getProject({ workspaceRoot: root })
+          if (stale()) return
           if (p?.status === 'ok') { setProject(p); setError(null) } else setError(p?.message ?? t('error.unreadable'))
         } catch (e) {
+          /* 错误分支同样要守卫：过期响应的 error 也不能盖掉当前项目的状态 */
+          if (stale()) return
           setError(String(e?.message ?? e))
         }
       }, [discoveryApi, t])
@@ -9842,7 +9950,7 @@ window.__ModuleLoader__.load({
        * 两层都是「入口不藏」：随行资产卡直接进，页内 teambar 的「← 全局」回角色库。 */
       if (scope === 'global' && projectRoot && globalPage !== 'roles') {
         const globalRoleList = [...(project?.roles ?? []), ...(project?.projectRole ? [project.projectRole] : [])]
-        return js('div', { className: 'mt-panel', children: [
+        return js('div', { className: 'mt-panel', ...themeAttr, children: [
           topbar,
           globalPage === 'presets'
             ? j(PresetsPage, {
@@ -9876,7 +9984,7 @@ window.__ModuleLoader__.load({
           for (const s of role.skills ?? []) skills.add(s)
           for (const m of role.mcpAllowlist ?? []) mcps.add(m)
         }
-        return js('div', { className: 'mt-panel', children: [
+        return js('div', { className: 'mt-panel', ...themeAttr, children: [
           topbar,
           /* CHG-80：信息条按 design/global.html 的 header.teambar——作用域标题 + 副标题 + 说明 + 主按钮 */
           js('div', { className: 'mt-teambar', children: [
@@ -10023,10 +10131,10 @@ window.__ModuleLoader__.load({
       ] })
 
       if (!projectRoot) {
-        return js('div', { className: 'mt-panel', children: [topbar, j('div', { className: 'mt-empty', children: [t('global.empty'), j('br'), t('global.emptyHint')] })] })
+        return js('div', { className: 'mt-panel', ...themeAttr, children: [topbar, j('div', { className: 'mt-empty', children: [t('global.empty'), j('br'), t('global.emptyHint')] })] })
       }
       if (!pv) {
-        return js('div', { className: 'mt-panel', children: [topbar, j('div', { className: 'mt-empty', children: error ?? t('state.loading') })] })
+        return js('div', { className: 'mt-panel', ...themeAttr, children: [topbar, j('div', { className: 'mt-empty', children: error ?? t('state.loading') })] })
       }
 
       /* CHG-73：详情抽屉动作条的打开器（重新规划 / 取消）；成功后刷新看板 + 详情就地重载 */
@@ -10413,7 +10521,7 @@ window.__ModuleLoader__.load({
               await loadProject(projectRoot)
             } catch (e) { setError(String(e?.message ?? e)) } finally { setDisbandBusy(false) }
           }
-          return js('div', { className: 'mt-panel', children: [
+          return js('div', { className: 'mt-panel', ...themeAttr, children: [
             js('div', { className: 'mt-topbar', children: [
               j('button', { className: 'mt-btn', onClick: closeTeam, children: t('team.backList') }),
               j('strong', { className: 'mt-title', children: team.name || team.teamId }),
@@ -11177,7 +11285,7 @@ window.__ModuleLoader__.load({
 
       const content = projectTab === 'roles' ? rolesPage : projectTab === 'teams' ? teamsPage : tasksTabContent
 
-      return js('div', { className: 'mt-panel', children: [
+      return js('div', { className: 'mt-panel', ...themeAttr, children: [
         topbar,
         projectTabs,
         error ? j('div', { className: 'mt-banner mt-error-banner', role: 'alert', children: error }) : null,
@@ -11302,7 +11410,10 @@ window.__ModuleLoader__.load({
     /** 工具卡外壳（design .toolcard）：图标 + 工具名 + 摘要 + 折叠箭头 + 体 + 脚 */
     function ToolCardShell({ t, icon, name, stat, expanded = true, children, foot }) {
       const [open, setOpen] = react.useState(expanded)
-      return js('div', { className: 'mt-toolcard', children: [
+      /* CHG-99（C13）：工具卡也是面板表面根（`.mt-toolcard`），深色态同源 */
+      const dark = useDarkTheme()
+      const themeAttr = { 'data-theme': dark ? 'dark' : 'light' }
+      return js('div', { className: 'mt-toolcard', ...themeAttr, children: [
         js('div', { className: 'mt-toolcard-head', children: [
           j('span', { className: 'mt-note-icon', 'aria-hidden': true, children: icon }),
           j('span', { className: 'mt-toolcard-name', children: name }),
@@ -11430,7 +11541,9 @@ window.__ModuleLoader__.load({
     }
     /** 折叠工具卡（myteam_approve_plan / myteam_peer_message）：只给一行摘要，不展开看板 */
     function TeamCollapsedCard({ icon, name, stat }) {
-      return js('div', { className: 'mt-toolcard', children: js('div', { className: 'mt-toolcard-head', children: [
+      const dark = useDarkTheme()
+      const themeAttr = { 'data-theme': dark ? 'dark' : 'light' }
+      return js('div', { className: 'mt-toolcard', ...themeAttr, children: js('div', { className: 'mt-toolcard-head', children: [
         j('span', { className: 'mt-note-icon', 'aria-hidden': true, children: icon }),
         j('span', { className: 'mt-toolcard-name', children: name }),
         j('span', { className: 'mt-toolcard-stat', children: stat }),
@@ -11439,6 +11552,8 @@ window.__ModuleLoader__.load({
     }
     /** myteam_apply_roles 注入卡（design/guest.html）：系统提示 / 工具策略只收窄 / 技能 / MCP 交集 / 模型路由五行 */
     function ApplyRolesCard({ t }) {
+      const dark = useDarkTheme()
+      const themeAttr = { 'data-theme': dark ? 'dark' : 'light' }
       const chips = (list) => list.map((item, index) => j('span', { key: `${item}-${index}`, className: 'mt-mini-chip', children: item }))
       const rows = [
         ['systemPrompt', [
@@ -11472,7 +11587,7 @@ window.__ModuleLoader__.load({
           j('span', { key: 'b', children: '（来自 reviewer，冲突时取后加载的那个）' }),
         ]],
       ]
-      return js('div', { className: 'mt-toolcard', children: [
+      return js('div', { className: 'mt-toolcard', ...themeAttr, children: [
         js('div', { className: 'mt-toolcard-head', children: [
           j('span', { className: 'mt-note-icon', 'aria-hidden': true, children: '⛓' }),
           j('span', { className: 'mt-toolcard-name', children: 'myteam_apply_roles' }),
@@ -11538,6 +11653,9 @@ window.__ModuleLoader__.load({
     function MyTeamConversationView(props) {
       const { ctx, sessionId, t: tProp } = props ?? {}
       const t = tProp ?? ((k) => zh[k] ?? k)
+      /* CHG-99（C13）：会话视图根（`.mt-conv`）也是表面根 */
+      const dark = useDarkTheme()
+      const themeAttr = { 'data-theme': dark ? 'dark' : 'light' }
       const [view, setView] = react.useState('chat')
       /* 真实数据源（getBoard 现算）；默认空，不再用 CONV_DEMO_TASKS 当初始 state（R34 / P0-5） */
       const board = useConvBoard(props?.connection, sessionId)
@@ -11555,7 +11673,7 @@ window.__ModuleLoader__.load({
         .replace('{tasks}', convCount(tasks.length, board.loaded))
         .replace('{roles}', convCount(board.roles, board.loaded))
         .replace('{gates}', convCount(board.gates, board.loaded))
-      return js('div', { className: 'mt-conv', children: [
+      return js('div', { className: 'mt-conv', ...themeAttr, children: [
         js('div', { className: 'mt-conv-head', children: [
           j('span', { className: 'mt-team-mark', 'aria-hidden': true, children: '⬢' }),
           js('div', { className: 'mt-conv-title', children: [
@@ -11733,6 +11851,8 @@ window.__ModuleLoader__.load({
     function DockChip(props) {
       const { ctx, connection, sessionId, t: tProp } = props
       const t = tProp ?? ((k) => zh[k] ?? k)
+      const dark = useDarkTheme()
+      const themeAttr = { 'data-theme': dark ? 'dark' : 'light' }
       const [unread, setUnread] = react.useState(0)
       const [live, setLive] = react.useState(0)
       react.useEffect(() => {
@@ -11763,7 +11883,7 @@ window.__ModuleLoader__.load({
       }, [sessionId, connection])
       /* design/conversation.html 的 .dockrow：live=0 且 unread=0 时整块不渲染 */
       if (live === 0 && unread === 0) return null
-      return js('div', { className: 'mt-dockrow', children: [
+      return js('div', { className: 'mt-dockrow', ...themeAttr, children: [
         j('button', {
           className: 'mt-dockchip',
           title: t('chip.title'),
@@ -11783,6 +11903,26 @@ window.__ModuleLoader__.load({
         }),
         j('span', { className: 'mt-spacer' }),
       ] })
+    }
+
+    /**
+     * 侧栏入口图标（CHG-99 / C13）。
+     *
+     * 它也是面板表面根之一（`.mt-entry`）：宿主侧栏里的 `color-scheme` 由这里带出来，
+     * 与面板共用同一份 `useDarkTheme()` 解析结果，避免「面板深色、入口还是浅色」。
+     */
+    function SidebarEntry() {
+      const dark = useDarkTheme()
+      const themeAttr = { 'data-theme': dark ? 'dark' : 'light' }
+      return j('span', { className: 'mt-entry', ...themeAttr, title: zh['panel.title'], 'aria-hidden': true, children: j('svg', {
+        width: 16, height: 16, viewBox: '0 0 16 16', fill: 'none', className: 'mt-navicon',
+        children: [
+          j('circle', { cx: 8, cy: 3.4, r: 2.1, stroke: 'currentColor', strokeWidth: 1.2 }),
+          j('circle', { cx: 3.6, cy: 11.8, r: 2.1, stroke: 'currentColor', strokeWidth: 1.2 }),
+          j('circle', { cx: 12.4, cy: 11.8, r: 2.1, stroke: 'currentColor', strokeWidth: 1.2 }),
+          j('path', { d: 'M6.7 5.3 4.7 9.9M9.3 5.3l2 4.6M5.7 11.8h4.6', stroke: 'currentColor', strokeWidth: 1.2, strokeLinecap: 'round' }),
+        ],
+      }) })
     }
 
     /* ── 注册（官方形态：inject 导出 + apply(ctx) + ctx.effect 持清理）── */
@@ -11817,15 +11957,7 @@ window.__ModuleLoader__.load({
         order: 20,
         locale: NS,
         label: () => 'myteam',
-      }, () => j('span', { className: 'mt-entry', title: zh['panel.title'], 'aria-hidden': true, children: j('svg', {
-        width: 16, height: 16, viewBox: '0 0 16 16', fill: 'none', className: 'mt-navicon',
-        children: [
-          j('circle', { cx: 8, cy: 3.4, r: 2.1, stroke: 'currentColor', strokeWidth: 1.2 }),
-          j('circle', { cx: 3.6, cy: 11.8, r: 2.1, stroke: 'currentColor', strokeWidth: 1.2 }),
-          j('circle', { cx: 12.4, cy: 11.8, r: 2.1, stroke: 'currentColor', strokeWidth: 1.2 }),
-          j('path', { d: 'M6.7 5.3 4.7 9.9M9.3 5.3l2 4.6M5.7 11.8h4.6', stroke: 'currentColor', strokeWidth: 1.2, strokeLinecap: 'round' }),
-        ],
-      }) })))
+      }, SidebarEntry))
       ctx.slots.inject('conversation.composer.dock', () => ctx.slots.register({
         name: 'conversation.composer.dock',
         id: PANEL_KEY,

@@ -212,4 +212,4 @@ export function upsertGlobalWorkspace(workspaceRoot        , index              
 }
 
 
-//# sourceURL=file:///E:/Workplace/extension/dsh-myteam/plugin/src/core/index/team-index.ts
+//# sourceURL=./src/core/index/team-index.ts

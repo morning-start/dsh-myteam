@@ -254,4 +254,4 @@ export function configOverrideFromPreset(preset
 
 
 
-//# sourceURL=file:///E:/Workplace/extension/dsh-myteam/plugin/src/core/config/team-config.ts
+//# sourceURL=./src/core/config/team-config.ts

@@ -528,4 +528,4 @@ export async function runHandoff(capability                          , options  
 }
 
 
-//# sourceURL=file:///E:/Workplace/extension/dsh-myteam/plugin/src/core/host/session-handoff.ts
+//# sourceURL=./src/core/host/session-handoff.ts

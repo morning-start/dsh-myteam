@@ -520,4 +520,4 @@ function contributionView(catalog                                               
 export { Remote }
 
 
-//# sourceURL=file:///E:/Workplace/extension/dsh-myteam/plugin/src/remote/service.ts
+//# sourceURL=./src/remote/service.ts

@@ -177,4 +177,4 @@ function roleOpError(e         )                          {
 }
 
 
-//# sourceURL=file:///E:/Workplace/extension/dsh-myteam/plugin/src/core/roles/role-ops.ts
+//# sourceURL=./src/core/roles/role-ops.ts

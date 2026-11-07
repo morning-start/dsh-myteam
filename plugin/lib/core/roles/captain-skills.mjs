@@ -280,4 +280,4 @@ export const CAPTAIN_SKILLS                 = [
 ]
 
 
-//# sourceURL=file:///E:/Workplace/extension/dsh-myteam/plugin/src/core/roles/captain-skills.ts
+//# sourceURL=./src/core/roles/captain-skills.ts

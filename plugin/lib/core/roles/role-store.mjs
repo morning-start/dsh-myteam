@@ -25,6 +25,9 @@ import { BUILTIN_ROLES,                                       builtinRole } from
  */
                                                                     
 
+/** CHG-98（审计 A7）：错误码走单一来源 `core/errors.ts`，拼错在编译期就被拦住。 */
+                                          
+
 export class RoleError extends Error {
   code        
   detail          
@@ -420,4 +423,4 @@ export function validateRoster(roster                      , paths              
 }
 
 
-//# sourceURL=file:///E:/Workplace/extension/dsh-myteam/plugin/src/core/roles/role-store.ts
+//# sourceURL=./src/core/roles/role-store.ts

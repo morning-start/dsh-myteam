@@ -118,9 +118,12 @@ const PAYLOAD_REQUIRED: Partial<Record<EventType, string[]>> = {
   'team.disbanded': ['teamId', 'archivedPaths'],
 }
 
+/** CHG-98（审计 A7）：错误码走单一来源 `core/errors.ts`，拼错在编译期就被拦住。 */
+import type { MtCode } from '../errors.ts'
+
 export class LedgerValidationError extends Error {
-  code: string
-  constructor(code: string, message: string) {
+  code: MtCode
+  constructor(code: MtCode, message: string) {
     super(message)
     this.name = 'LedgerValidationError'
     this.code = code

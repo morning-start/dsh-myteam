@@ -246,4 +246,4 @@ async function settleHandle(handle         )                                 {
 }
 
 
-//# sourceURL=file:///E:/Workplace/extension/dsh-myteam/plugin/src/core/gates/command-gate.ts
+//# sourceURL=./src/core/gates/command-gate.ts

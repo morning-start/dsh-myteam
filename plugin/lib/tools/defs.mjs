@@ -629,4 +629,4 @@ export function toolRegistryPlan()                                       {
 }
 
 
-//# sourceURL=file:///E:/Workplace/extension/dsh-myteam/plugin/src/tools/defs.ts
+//# sourceURL=./src/tools/defs.ts

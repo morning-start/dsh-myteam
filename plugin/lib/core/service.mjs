@@ -677,4 +677,4 @@ export function bootstrapTeam(service             , actor = 'host')             
 }
 
 
-//# sourceURL=file:///E:/Workplace/extension/dsh-myteam/plugin/src/core/service.ts
+//# sourceURL=./src/core/service.ts

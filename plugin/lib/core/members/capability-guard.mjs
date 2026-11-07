@@ -201,4 +201,4 @@ export function capabilitySummary(result                       )         {
 }
 
 
-//# sourceURL=file:///E:/Workplace/extension/dsh-myteam/plugin/src/core/members/capability-guard.ts
+//# sourceURL=./src/core/members/capability-guard.ts

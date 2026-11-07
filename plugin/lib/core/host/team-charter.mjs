@@ -107,4 +107,4 @@ export function readTeamCharter(workspaceRoot        )              {
 }
 
 
-//# sourceURL=file:///E:/Workplace/extension/dsh-myteam/plugin/src/core/host/team-charter.ts
+//# sourceURL=./src/core/host/team-charter.ts

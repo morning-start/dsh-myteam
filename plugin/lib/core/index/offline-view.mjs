@@ -320,4 +320,4 @@ export function buildOfflineProject(workspaceRoot        , opts                 
 }
 
 
-//# sourceURL=file:///E:/Workplace/extension/dsh-myteam/plugin/src/core/index/offline-view.ts
+//# sourceURL=./src/core/index/offline-view.ts

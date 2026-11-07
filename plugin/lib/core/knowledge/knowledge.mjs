@@ -59,6 +59,9 @@ export const KNOWLEDGE_RELATIONS = ['new', 'refine', 'contradict']
                
  
 
+/** CHG-98（审计 A7）：错误码走单一来源 `core/errors.ts`，拼错在编译期就被拦住。 */
+                                          
+
 export class KnowledgeError extends Error {
   code        
   constructor(code        , message        ) {
@@ -379,4 +382,4 @@ export function writeKnowledgeEntry(dir        , entry                )         
 }
 
 
-//# sourceURL=file:///E:/Workplace/extension/dsh-myteam/plugin/src/core/knowledge/knowledge.ts
+//# sourceURL=./src/core/knowledge/knowledge.ts

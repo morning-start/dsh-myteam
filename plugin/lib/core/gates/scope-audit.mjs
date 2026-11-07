@@ -123,4 +123,4 @@ function dedupe   (items     )      {
 }
 
 
-//# sourceURL=file:///E:/Workplace/extension/dsh-myteam/plugin/src/core/gates/scope-audit.ts
+//# sourceURL=./src/core/gates/scope-audit.ts

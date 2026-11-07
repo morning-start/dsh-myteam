@@ -140,4 +140,4 @@ export function memoryPromptSection(member                , memoryDir        , e
 }
 
 
-//# sourceURL=file:///E:/Workplace/extension/dsh-myteam/plugin/src/core/members/member-setup.ts
+//# sourceURL=./src/core/members/member-setup.ts

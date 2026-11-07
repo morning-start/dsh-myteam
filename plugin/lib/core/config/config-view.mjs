@@ -50,4 +50,4 @@ export function buildConfigPayload(config            , warnings          , sourc
 }
 
 
-//# sourceURL=file:///E:/Workplace/extension/dsh-myteam/plugin/src/core/config/config-view.ts
+//# sourceURL=./src/core/config/config-view.ts

@@ -118,6 +118,9 @@ const PAYLOAD_REQUIRED                                       = {
   'team.disbanded': ['teamId', 'archivedPaths'],
 }
 
+/** CHG-98（审计 A7）：错误码走单一来源 `core/errors.ts`，拼错在编译期就被拦住。 */
+                                          
+
 export class LedgerValidationError extends Error {
   code        
   constructor(code        , message        ) {
@@ -297,4 +300,4 @@ export function appendEvent(filePath        , event             )       {
 }
 
 
-//# sourceURL=file:///E:/Workplace/extension/dsh-myteam/plugin/src/core/ledger/ledger.ts
+//# sourceURL=./src/core/ledger/ledger.ts

@@ -59,9 +59,12 @@ export interface KnowledgeIndexItem {
   words: number
 }
 
+/** CHG-98（审计 A7）：错误码走单一来源 `core/errors.ts`，拼错在编译期就被拦住。 */
+import type { MtCode } from '../errors.ts'
+
 export class KnowledgeError extends Error {
-  code: string
-  constructor(code: string, message: string) {
+  code: MtCode
+  constructor(code: MtCode, message: string) {
     super(message)
     this.name = 'KnowledgeError'
     this.code = code

@@ -25,10 +25,13 @@ import { BUILTIN_ROLES, type RoleDefinition, type RoleOrigin, builtinRole } from
  */
 export type { RoleDefinition, RoleOrigin } from './builtin-roles.ts'
 
+/** CHG-98（审计 A7）：错误码走单一来源 `core/errors.ts`，拼错在编译期就被拦住。 */
+import type { MtCode } from '../errors.ts'
+
 export class RoleError extends Error {
-  code: string
+  code: MtCode
   detail?: unknown
-  constructor(code: string, message: string, detail?: unknown) {
+  constructor(code: MtCode, message: string, detail?: unknown) {
     super(message)
     this.name = 'RoleError'
     this.code = code

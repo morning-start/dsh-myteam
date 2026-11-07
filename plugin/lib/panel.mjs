@@ -959,4 +959,4 @@ Object.assign(apply, { inject })
 export default apply
 
 
-//# sourceURL=file:///E:/Workplace/extension/dsh-myteam/plugin/src/panel.ts
+//# sourceURL=./src/panel.ts

@@ -3573,4 +3573,4 @@ Object.assign(apply, { inject })
 export default apply
 
 
-//# sourceURL=file:///E:/Workplace/extension/dsh-myteam/plugin/src/host.ts
+//# sourceURL=./src/host.ts

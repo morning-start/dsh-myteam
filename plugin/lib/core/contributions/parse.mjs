@@ -435,4 +435,4 @@ export function loadContributions(root        , opts               = {})        
 }
 
 
-//# sourceURL=file:///E:/Workplace/extension/dsh-myteam/plugin/src/core/contributions/parse.ts
+//# sourceURL=./src/core/contributions/parse.ts
