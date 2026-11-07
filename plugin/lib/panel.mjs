@@ -28,6 +28,28 @@ import { isAbsolute, join } from 'node:path'
 import { readdirSync } from 'node:fs'
 import { markRemoteMethods, normalizeCtx } from './remote/service.mjs'
 
+/**
+ * CHG-112：**根级方法**（形参只有 query，不需要网关解析 Agent）。
+ *
+ * 判定与网关同源：网关用 `Function.toString` 读形参名，首参叫 `agent` 就是 agent 作用域。
+ * 批量调用只允许根级方法——批里拿不到 Agent，硬塞就是安全洞。
+ */
+function rootLevelMethods()           {
+  const descriptor = (MyTeamPanelFacade.prototype                                                                     )[
+    DESCRIPTOR_KEY
+  ]
+  return (descriptor?.methods ?? [])
+    .map((entry) => entry.method)
+    .filter((method) => {
+      const fn = (MyTeamPanelFacade.prototype                                      )[method]
+      if (typeof fn !== 'function') return false
+      const m = String(fn).match(/^\s*(?:async\s+)?[A-Za-z_$][\w$]*\s*\(([^)]*)\)/)
+      if (!m) return false
+      const params = m[1].split(',').map((s) => s.trim()).filter(Boolean)
+      return params.length === 0 || params[0] !== 'agent'
+    })
+}
+
 /** CHG-111：typert 描述符键 + 面板协议版本（方法表只增不减，新增能力时 +1） */
 const DESCRIPTOR_KEY = '@deepseek-ai/dsh-typert-protocol/remote-methods'
 const PANEL_PROTOCOL_VERSION = 1
@@ -1009,6 +1031,43 @@ export class MyTeamPanelFacade extends TypertRemoteService {
   }
 
   /**
+   * CHG-112：**批量调用**——首屏一次往返拿完（治「43 条路由没有批量」）。
+   *
+   * 语义：
+   *  - 入参 `{ calls: [{ kind, args }] }`，逐条并发执行，**一条失败不影响其它条**；
+   *  - 返回 `{ status:'ok', results: [{ ok, value } | { ok:false, error }] }`，顺序与入参一致；
+   *  - **只允许根级方法**（形参只有 `query`，不需要网关解析 agent）；agent 作用域的方法
+   *    （形参首参是 `agent`）一律拒 **单条** `MT_BATCH_NOT_ROOT`——否则批里拿不到 Agent，
+   *    只能瞎猜会话，那是安全洞；
+   *  - 未知方法 → 单条 `MT_UNKNOWN_METHOD`（不整体失败，客户端按条降级）。
+   *
+   * 为什么值得：面板首屏 `getProject` + `getStoreState` + `getContributions` 三次往返 → 一次。
+   * 偏斜面也从「43 个方法各自漏写」收敛到「一个 dispatch 表」，漏一个只影响该 kind。
+   */
+  async batch(query                         ) {
+    const calls = Array.isArray(query?.calls) ? (query.calls                                  ) : []
+    if (calls.length === 0) return { status: 'error', code: 'MT_VALIDATION', message: 'calls must be a non-empty array' }
+    if (calls.length > 32) return { status: 'error', code: 'MT_VALIDATION', message: 'calls exceeds 32 per batch' }
+    const root = new Set(rootLevelMethods())
+    const self = this                                                                  
+    const results = await Promise.all(calls.map(async (call) => {
+      const kind = String(call?.kind ?? '')
+      if (!kind) return { ok: false, error: { code: 'MT_VALIDATION', message: 'kind is required' } }
+      if (!root.has(kind)) {
+        return { ok: false, error: { code: 'MT_BATCH_NOT_ROOT', message: `"${kind}" is not a root-level method; call it individually` } }
+      }
+      const fn = self[kind]
+      if (typeof fn !== 'function') return { ok: false, error: { code: 'MT_UNKNOWN_METHOD', message: `unknown method "${kind}"` } }
+      try {
+        return { ok: true, value: await fn.call(this, call?.args ?? {}) }
+      } catch (e) {
+        return { ok: false, error: { code: (e                     )?.code ?? 'MT_INTERNAL', message: String((e         )?.message ?? e) } }
+      }
+    }))
+    return { status: 'ok', count: results.length, results }
+  }
+
+  /**
    * CHG-111：**能力协商**（治「两端方法表漂移」）。
    *
    * 为什么需要：43 条路由靠「服务端数组 + 客户端对象字面量」两份**手工**列表对齐，
@@ -1036,7 +1095,7 @@ export class MyTeamPanelFacade extends TypertRemoteService {
 }
 
 // 手动 Remote 标记：gateway 按 method 名发现端点（namespace=myteam，direct invocation）
-markRemoteMethods(MyTeamPanelFacade.prototype, ['describe', 'listTeams', 'getStoreState', 'initStore', 'getProject', 'getRoleDetail', 'saveRole', 'deleteRole', 'getCapabilityCatalog', 'getOfflineBoard', 'getOfflineTaskDetail', 'getOfflineTokens', 'getOfflineAudit', 'getOfflinePresets', 'getBoard', 'getTaskDetail', 'getTokens', 'getInbox', 'getAudit', 'getConfig', 'getPresets', 'getRoles', 'getKnowledge', 'planAction', 'postComment', 'memberOp', 'disband', 'createTask', 'createTasks', 'updateTask', 'assignTask', 'participateTask', 'rescopeTask', 'cancelTask', 'batchTaskOp',
+markRemoteMethods(MyTeamPanelFacade.prototype, ['batch', 'describe', 'listTeams', 'getStoreState', 'initStore', 'getProject', 'getRoleDetail', 'saveRole', 'deleteRole', 'getCapabilityCatalog', 'getOfflineBoard', 'getOfflineTaskDetail', 'getOfflineTokens', 'getOfflineAudit', 'getOfflinePresets', 'getBoard', 'getTaskDetail', 'getTokens', 'getInbox', 'getAudit', 'getConfig', 'getPresets', 'getRoles', 'getKnowledge', 'planAction', 'postComment', 'memberOp', 'disband', 'createTask', 'createTasks', 'updateTask', 'assignTask', 'participateTask', 'rescopeTask', 'cancelTask', 'batchTaskOp',
   // CHG-86：门禁裁决 / 归档快照 / 知识提案策展
   'reviewTask', 'getArchive', 'getArchives', 'adoptKnowledge',
   // CHG-87（FR-13.1/FR-16.1）：角色库统一写入口 + 单角色调用
