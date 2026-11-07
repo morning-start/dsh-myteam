@@ -403,7 +403,24 @@ export function assertValidRole(def                )       {
       }
     }
   }
-  // 队长唯一性由名册校验（validateRoster），此处不限制 isCaptain 标记本身
+  // 队长是**类**，全局唯一：只有 id === 'captain' 能带 isCaptain 标记。
+  //
+  // 为什么在这里拦（CHG-101）：`validateRoster` 是**按名册**判的（一个名册里恰好
+  // 一个队长），它管不到「不同团队各用一个不同的队长类」——那样「队长的设定」
+  // 就变成复数了，而模型要求它是单数（类全局唯一 / 实例每团队一个）。
+  //
+  // 想改队长的提示词或工具集？项目库覆写 `config/roles/captain.json` 即可 ——
+  // 换的是**同一份设定的实现**，不是新增第二个队长类。
+  //
+  // 注意这**不能**取代 `validateRoster`：手写 JSON（绕过 writeProjectRole 的
+  // assertValidRole）仍可能造出两个 isCaptain 定义，名册校验是那道兜底。
+  if (def.isCaptain === true && def.id !== 'captain') {
+    throw new RoleError(
+      'MT_ROLE_CAPTAIN_RESERVED',
+      `role "${def.id}" cannot declare isCaptain:true — captain is a builtin identity; ` +
+        'override the "captain" role in the project library instead of creating a second captain identity',
+    )
+  }
 }
 
 /** FR-10.1：名册必含且仅含一个队长（保存预设/创建团队时校验） */

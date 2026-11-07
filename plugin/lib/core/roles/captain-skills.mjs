@@ -35,7 +35,10 @@ const CREATE_ROLE_CONTENT = `# 创建角色（create-role）
 
 - 角色 = 职责 + 系统提示词 + 工具策略 + 技能 + MCP + 模型路由；
 - 成员 = 角色的一次实例化（独立会话、独立快照、独立 token 账）；
-- 队长是标准预设 \`myteam-captain\`，**不要创建第二个队长角色**（\`isCaptain\` 保持 false）。
+- 队长是**全局唯一的「类」**（内置 \`captain\`），每个团队各有一个**实例**（独立会话 + 独立快照）；
+  **只有 id === \`captain\` 能带 \`isCaptain: true\`** —— 第二个队长类会被 \`MT_ROLE_CAPTAIN_RESERVED\` 硬拒（CHG-101）。
+  想改队长的提示词或工具集？覆写项目库的 \`config/roles/captain.json\` —— 换的是**同一份设定的实现**，
+  不是新增第二个队长类。\`isCaptain\` 保持 \`false\` 即可（默认值，不用显式写）。
 
 ## 字段怎么写
 

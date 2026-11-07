@@ -85,14 +85,34 @@ test('T5: validateRoster — exactly one captain (FR-10.1, scenes 11/23)', () =>
     () => validateRoster([{ roleId: "implementer" }], p.paths),
     (e: unknown) => e instanceof RoleError && e.code === 'MT_ROSTER_NO_CAPTAIN',
   )
-  // 双队长
-  writeProjectRole(p.paths.projectRolesDir, projectDef('captain-2', { isCaptain: true }))
+  // 双队长（**手写 JSON** 绕过 assertValidRole —— 这正是名册校验存在的理由：
+  // 队长是全局唯一的「类」，走 writeProjectRole 会先被 MT_ROLE_CAPTAIN_RESERVED 拦下，
+  // 但手写配置文件仍可能造出两个 isCaptain 定义，名册是那道兜底）
+  writeFileSync(
+    join(p.paths.projectRolesDir, 'captain-2.json'),
+    `${JSON.stringify(projectDef('captain-2', { isCaptain: true }), null, 2)}\n`,
+    'utf8',
+  )
   assert.throws(
     () => validateRoster([{ roleId: "captain" }, { roleId: "captain-2" }], p.paths),
     (e: unknown) => e instanceof RoleError && e.code === 'MT_ROSTER_DUAL_CAPTAIN',
   )
   // 恰一个队长（项目库定义 + 内置定义混合判定）
   assert.doesNotThrow(() => validateRoster([{ roleId: "captain" }, { roleId: "implementer" }], p.paths))
+})
+
+test('T5: 队长是全局唯一的「类」—— 只有 id === captain 能带 isCaptain（CHG-101）', () => {
+  const p = paths()
+  mkdirSync(p.paths.projectRolesDir, { recursive: true })
+  // ① 第二个队长类：**写入即拒**（定义层唯一，不依赖名册）
+  assert.throws(
+    () => writeProjectRole(p.paths.projectRolesDir, projectDef('captain-2', { isCaptain: true })),
+    (e: unknown) => e instanceof RoleError && e.code === 'MT_ROLE_CAPTAIN_RESERVED',
+  )
+  // ② 显式 isCaptain:false 不受影响（普通角色照常可建）
+  assert.doesNotThrow(() => writeProjectRole(p.paths.projectRolesDir, projectDef('deputy', { isCaptain: false })))
+  // ③ 项目库**覆写 captain 本身**是允许的 —— 改的是同一份设定的实现，不是新增第二个类
+  assert.doesNotThrow(() => writeProjectRole(p.paths.projectRolesDir, projectDef('captain', { isCaptain: true })))
 })
 
 test('T5: role schema validation — C5 allow entries constrained', () => {

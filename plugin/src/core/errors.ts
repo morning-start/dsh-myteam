@@ -171,7 +171,7 @@ export const MT_CODE_DOCS: Record<MtCode, string> = {
   // 角色库
   MT_ROLE_BUILTIN: '内置角色的 id 被保留，不能创建同名项目角色。',
   MT_ROLE_CAPTAIN: '队长角色唯一：名册里已有队长时再指定第二个。',
-  MT_ROLE_CAPTAIN_RESERVED: '插件贡献的角色不能占用队长保留 id。',
+  MT_ROLE_CAPTAIN_RESERVED: '只有内置 `captain` 可以是队长角色（队长是全局唯一的「类」）；想改队长请覆写项目库的 `config/roles/captain.json`，不要新建第二个队长类。',
   MT_ROLE_CONTRIBUTION_CONFLICT: '插件贡献的角色 id 与已有角色（项目/全局/内置）冲突。',
   MT_ROLE_CORRUPT: '角色定义文件不可解析（常见原因：把非角色 JSON 放进了 `config/roles/`）。',
   MT_ROLE_EXISTS: '同 id 角色已存在且未带覆盖语义（两段确认）。',
