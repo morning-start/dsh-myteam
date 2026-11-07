@@ -23,7 +23,7 @@ import { join, isAbsolute, sep } from 'node:path'
 import { randomUUID, createHash } from 'node:crypto'
 import { existsSync, mkdirSync, writeFileSync, readFileSync, readdirSync, statSync, unlinkSync } from 'node:fs'
 import { ensureWorkplaceDirs, ensureGitignoreManagedBlock } from './host-workspace.ts'
-import { resolveProjectRoot, storeLayout, teamLedgerPath as teamLedgerPathOf, scratchDir as scratchDirOf, memberIdentityDir as memberIdentityDirOf, STORE_DIR } from './core/workspace/layout.ts'
+import { resolveProjectRoot, storeLayout, teamLedgerPath as teamLedgerPathOf, scratchDir as scratchDirOf, memberIdentityDir as memberIdentityDirOf, displayPath, STORE_DIR } from './core/workspace/layout.ts'
 // CHG-103：作用域契约（全局 vs 项目级）——角色两级都可用，任务/历史/状态只能项目级
 import { normalizeScope } from './core/workspace/scope.ts'
 import { TeamService, bootstrapTeam, type CommitDraft } from './core/service.ts'
@@ -3444,6 +3444,8 @@ export class MyTeamHost {
     return {
       status: 'ok',
       root: catalog.root,
+      /* CHG-107：展示用（用户名 → ~）；root 保留绝对路径供复制/排障 */
+      rootDisplay: displayPath(catalog.root),
       ok: catalog.ok,
       scannedAt: catalog.scannedAt,
       plugins: catalog.plugins.map((plugin) => ({

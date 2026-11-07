@@ -39,7 +39,7 @@ import { readPresetCatalog, BUILTIN_PRESET_IDS } from './core/presets/preset-sto
 import { loadContributions } from './core/contributions/parse.ts'
 import { contributionsRoot } from './core/contributions/discover.ts'
 import { CONTRIBUTION_CODES, type ContributionCatalog } from './core/contributions/contract.ts'
-import { isStoreInitialized, readManifest, storeLayout, ensureStore, rejectProjectRoot, STORE_DIR } from './core/workspace/layout.ts'
+import { isStoreInitialized, readManifest, storeLayout, ensureStore, rejectProjectRoot, displayPath, STORE_DIR } from './core/workspace/layout.ts'
 
 /** 门面可见的最小 Agent 面（真实实例由网关 lookup 注入；测试用 mock） */
 type AgentLike = { session: { id: string } }
@@ -282,6 +282,8 @@ export class MyTeamPanelFacade extends TypertRemoteService {
       status: 'ok',
       workspaceRoot,
       root: result.layout.root,
+      /* CHG-107：展示用（用户名 → ~）；root 保留绝对路径 */
+      rootDisplay: displayPath(result.layout.root),
       created: result.created,
       migrated: result.migrated,
       warnings: result.warnings,
@@ -310,6 +312,8 @@ export class MyTeamPanelFacade extends TypertRemoteService {
       /** 目录契约（面板「设置 → 存储」展示 / 排障用；路径不是秘密） */
       layout: {
         root: layout.root,
+        /* CHG-107：展示用（用户名 → ~） */
+        rootDisplay: displayPath(layout.root),
         gitignore: layout.gitignore,
         config: layout.config,
         tasks: layout.tasks,
@@ -575,6 +579,8 @@ export class MyTeamPanelFacade extends TypertRemoteService {
     return {
       status: 'ok',
       root: catalog.root,
+      /* CHG-107：展示用（用户名 → ~）；root 保留绝对路径供复制/排障 */
+      rootDisplay: displayPath(catalog.root),
       ok: catalog.ok,
       scannedAt: catalog.scannedAt,
       plugins: catalog.plugins,

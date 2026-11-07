@@ -7537,10 +7537,9 @@ window.__ModuleLoader__.load({
               /* 只读 + 目录：压到卡片脚注一行，不占正文高度 */
               js('div', { className: 'mt-contrib-foot', children: [
                 j('span', { className: 'mt-chip mt-chip-origin mt-contrib-lock', title: t('contrib.readonlyHint'), children: `🔒 ${t('contrib.readonly')}` }),
-                j('span', { className: 'mt-contrib-root', title: String(data?.root ?? ''), children: t('contrib.root').replace('{root}', String(data?.root ?? '')) }),
+                j('span', { className: 'mt-contrib-root', title: String(data?.root ?? ''), children: t('contrib.root').replace('{root}', String(data?.rootDisplay ?? data?.root ?? '')) }),
               ] }),
             ] })) }),
-        j('div', { className: 'mt-hint', children: t('contrib.root').replace('{root}', String(data?.root ?? '')) }),
         err ? j('div', { className: 'mt-form-note mt-error-banner', role: 'alert', children: err }) : null,
       ] })
     }
@@ -9953,7 +9952,7 @@ window.__ModuleLoader__.load({
         try {
           const r = await discoveryApi.initStore({ workspaceRoot: projectRoot })
           if (r?.status !== 'ok') { setError(r?.message ?? String(r)); return }
-          setNotice(t('store.initDone').replace('{path}', String(r.root ?? '')))
+          setNotice(t('store.initDone').replace('{path}', String(r.rootDisplay ?? r.root ?? '')))
           await loadProject(projectRoot)
         } catch (e) { setError(String(e?.message ?? e)) }
       }
@@ -10328,7 +10327,7 @@ window.__ModuleLoader__.load({
         ? js('div', { className: 'mt-banner mt-banner-info', role: 'status', children: [
             j('b', { children: t('store.emptyTitle') }),
             j('span', { className: 'mt-banner-text', children: t('store.emptyBody') }),
-            j('code', { className: 'mt-banner-path', children: String(storeState.layout?.root ?? '') }),
+            j('code', { className: 'mt-banner-path', title: String(storeState.layout?.root ?? ''), children: String(storeState.layout?.rootDisplay ?? storeState.layout?.root ?? '') }),
             j('button', { className: 'mt-btn mt-btn-primary mt-btn-sm', onClick: initStore, children: t('store.init') }),
           ] })
         : null
