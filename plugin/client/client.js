@@ -3001,6 +3001,23 @@ window.__ModuleLoader__.load({
       const parts = String(root).replace(/\\/g, '/').split('/').filter(Boolean)
       return parts[parts.length - 1] ?? String(root)
     }
+    /**
+     * 展示用路径（CHG-108 客户端版）：**家目录前缀缩成 `~`**，不把用户名打出来。
+     *
+     * 为什么客户端也要有一份：团队摘要里的 `workspaceRoot` 是**索引里的历史值**（可能属于
+     * 别的项目/机器），服务端的 `displayPath` 只能处理「本机 $HOME」，而浏览器里连
+     * `homedir()` 都没有。所以这里按「用户目录形状」做纯文本缩写：
+     *   `C:\Users\<名字>\...` / `/home/<名字>/...` / `/Users/<名字>/...` → `~/...`
+     * 认不出形状（或不是家目录）→ 原样返回，**绝不猜**。
+     */
+    const prettyPath = (value) => {
+      const path = String(value ?? '')
+      if (!path) return path
+      const match = path.match(/^(?:[A-Za-z]:[\\/](?:Users|Documents and Settings)[\\/][^\\/]+|\/(?:home|Users)\/[^/]+)(?=[\\/]|$)/)
+      if (!match) return path
+      const rest = path.slice(match[0].length)
+      return `~${rest || ''}`
+    }
     /** 时间戳 → 相对时间（索引的 updatedAt 为 epoch ms；0/缺失显示 —） */
     const relTime = (ts, t) => {
       if (!ts) return '—'
@@ -7906,7 +7923,7 @@ window.__ModuleLoader__.load({
             js('div', { className: 'mt-home-group-head', children: [
               j('b', { children: projectLabel(root) }),
               j('span', { className: 'mt-group-n', children: t('shell.groupCount').replace('{n}', String(group.length)) }),
-              j('span', { className: 'mt-group-path', title: root, children: root }),
+              j('span', { className: 'mt-group-path', title: root, children: prettyPath(root) }),
             ] }),
             ...group.map((team) => j(TeamCard, {
               key: team.teamId,
@@ -7956,9 +7973,12 @@ window.__ModuleLoader__.load({
         : tasksProp
       const tokens = snap ? (snap.tokens ?? tokensProp) : tokensProp
       const audit = snap ? { ...(auditProp ?? {}), total: snap.eventCount ?? auditProp?.total } : auditProp
-      /* 真实归档目录：优先 panel.getArchive 的 root，其次快照里的 dir，最后才回落相对路径 */
+      /* 真实归档目录（CHG-108）：优先用服务端的 `rootDisplay`（家目录已缩成 `~`），
+       * 其次才回落 `snap.dir`（绝对路径）/ 相对路径——**绝对路径不能直接上屏**。 */
       const archiveDir = snap
-        ? (snap.dir || (archiveRoot ? `${archiveRoot}/${snap.teamId ?? team?.teamId ?? ''}` : `archive/${snap.teamId ?? team?.teamId ?? '—'}/`))
+        ? (archiveRoot
+            ? `${archiveRoot.replace(/[\\/]+$/, '')}/${snap.teamId ?? team?.teamId ?? ''}`
+            : (snap.dir || `archive/${snap.teamId ?? team?.teamId ?? '—'}/`))
         : `archive/${team?.teamId ?? '—'}/`
       const artifacts = snap?.artifacts ?? []
       const [showAudit, setShowAudit] = react.useState(false)
@@ -10021,7 +10041,7 @@ window.__ModuleLoader__.load({
         makeApi(connection, selectedTeam.sessionId).getArchive({ teamId: selectedTeam.teamId }).then((r) => {
           if (!alive) return
           setArchiveSnap(r?.status === 'ok' ? (r.archive ?? null) : undefined)
-          setArchiveRoot(r?.root ? String(r.root) : '')
+          setArchiveRoot(r?.rootDisplay ? String(r.rootDisplay) : r?.root ? String(r.root) : '')
         }).catch(() => { if (alive) { setArchiveSnap(undefined); setArchiveRoot('') } })
         return () => { alive = false }
       }, [selectedTeam?.teamId, selectedTeam?.state, selectedTeam?.online, selectedTeam?.sessionId, connection])

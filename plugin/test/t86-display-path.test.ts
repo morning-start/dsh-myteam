@@ -56,6 +56,27 @@ test('t86-5: 服务端两个门面都产出 rootDisplay（贡献目录 / 存储�
   assert.match(panel, /rootDisplay: displayPath\(catalog\.root\)/, 'getContributions 必须带 rootDisplay')
   assert.match(panel, /rootDisplay: displayPath\(layout\.root\)/, 'getStoreState.layout 必须带 rootDisplay')
   assert.match(panel, /rootDisplay: displayPath\(result\.layout\.root\)/, 'initStore 回执必须带 rootDisplay')
+
+  // 归档两处（archiveView / archiveList）也要带——归档目录同样是绝对路径
+  const host = readFileSync(join(import.meta.dirname, '..', 'src', 'host.ts'), 'utf8')
+  const archiveView = host.slice(host.indexOf('archiveView(teamId?: string)'), host.indexOf('archiveList()'))
+  assert.ok(archiveView.includes('rootDisplay: displayPath(root)'), 'archiveView 必须带 rootDisplay')
+  const archiveList = host.slice(host.indexOf('archiveList()'), host.indexOf('archiveList()') + 400)
+  assert.ok(archiveList.includes('rootDisplay: displayPath(root)'), 'archiveList 必须带 rootDisplay')
+})
+
+test('t86-7: 归档目录展示只认 rootDisplay（绝对路径 snap.dir 不得上屏）', () => {
+  // archiveDir 必须优先 archiveRoot（display），snap.dir 只做兜底
+  const at = clientSource.indexOf('const archiveDir =')
+  assert.ok(at > 0, '找不到 archiveDir')
+  const block = clientSource.slice(at, at + 400)
+  const rootIdx = block.indexOf('archiveRoot')
+  const snapDirIdx = block.indexOf('snap.dir')
+  assert.ok(rootIdx > 0 && snapDirIdx > 0, 'archiveDir 必须同时考虑 archiveRoot 与 snap.dir')
+  assert.ok(rootIdx < snapDirIdx, 'archiveRoot（已 display）必须优先于 snap.dir（绝对路径）')
+  assert.ok(!/snap\.dir\s*\|\|\s*\(archiveRoot/.test(block), '不得再让 snap.dir 抢在前面')
+  // 且 archiveRoot 的来源必须是 rootDisplay
+  assert.match(clientSource, /setArchiveRoot\(r\?\.rootDisplay \? String\(r\.rootDisplay\) : r\?\.root \? String\(r\.root\) : ''\)/, 'archiveRoot 来源必须优先 rootDisplay')
 })
 
 test('t86-6: 客户端只展示 rootDisplay，绝对路径进 title（可复制/排障）', () => {
@@ -78,4 +99,26 @@ test('t86-6: 客户端只展示 rootDisplay，绝对路径进 title（可复制/
     !/t\('contrib\.root'\)\.replace\('\{root\}', String\(data\?\.root \?\? ''\)\)/.test(clientSource),
     '不得再直接展示绝对路径',
   )
+})
+
+test('t86-8: 客户端 prettyPath —— 团队摘要里的历史 workspaceRoot 也要缩成 ~', () => {
+  // ① 函数存在且被用于组头路径
+  const fnMatch = clientSource.match(/const prettyPath = \(value\) => \{[\s\S]*?\n    \}/)
+  assert.ok(fnMatch, '客户端必须有 prettyPath（浏览器里没有 homedir）')
+  assert.match(
+    clientSource,
+    /className: 'mt-group-path', title: root, children: prettyPath\(root\)/,
+    '组头路径必须展示 prettyPath，title 留原值',
+  )
+
+  // ② 行为：直接求值那段源码（自包含，无外部依赖）
+  const prettyPath = new Function(`return (${fnMatch[0].replace('const prettyPath = ', '')})`)() as (value: string) => string
+  assert.equal(prettyPath('C:\\Users\\Hanes\\.dsh\\myteam\\plugins'), '~\\.dsh\\myteam\\plugins')
+  assert.equal(prettyPath('/home/hanes/proj'), '~/proj')
+  assert.equal(prettyPath('/Users/hanes/proj'), '~/proj')
+  assert.equal(prettyPath('E:\\Workplace\\extension\\dsh-myteam'), 'E:\\Workplace\\extension\\dsh-myteam', '非家目录原样返回')
+  /* 客户端只看「形状」：任何 `Users\<x>` / `home/<x>` 都缩成 ~（隐私优先——别人的用户名同样不该上屏；
+   * 服务端 displayPath 知道本机 $HOME，所以要严格得多）。 */
+  assert.equal(prettyPath('C:\\Users\\Hanes2\\x'), '~\\x', '别的用户目录同样缩成 ~')
+  assert.equal(prettyPath(''), '')
 })
