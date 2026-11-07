@@ -35,7 +35,7 @@
 │  ┌──────────────────┐                          │    │ followup 唤醒    │
 │  │ myteam service   │◀──事件写────  成员工具调用 ┘    │（四种因果唤醒）  │
 │  │ ledger.jsonl 单写者│                            ▼                 │
-│  │ .team-workplace/ │──── tokens.json 侧车（tokenMeter 重放派生）    │
+│  │ .dsh-myteam/ │──── tokens.json 侧车（tokenMeter 重放派生）    │
 │  └──────────────────┘                                               │
 └──────────────────────────────────────────────────────────────────────┘
 ```
@@ -103,7 +103,7 @@
 ### ADR-005 插件装载形态：preset EntryGroup 组合装载（host/persona 均为 preset 子行）
 - 状态：已接受（2026-10-25，依据 T0-⑤ + TF 实证；**同日修订 R1**——官方插件生命周期对齐复核）
 - 背景：TF 实证 `insert:` 块语义（顶层行是"替换"语义，找不到目标被静默跳过）；name 必须用包根否则 client 端不装载（TF cordis.patch.yml 注释实锤）。
-- 决策：cordis.patch.yml `insert:` 块声明 **preset EntryGroup 组合**：`myteam-preset-captain`（name=@deepseek-ai/dsh-agent-preset，config.plugins 内嵌两子行——`myteam-host`（name=包根，服务+Lead 工具+Remote）与 `myteam-persona-captain`（name=@deepseek-ai/dsh-persona，队长身份提示词））。**host 行不再顶层挂载**：Entry._init 按 options.name 解析（子行缺 name = import 失败静默跳过）；dsh-persona 只能挂 agent scope（顶层与 deployment persona 冲突 fail loud）。副作用（已接受）：服务与工具仅在队长会话 scope 激活（NFR-7.4 强化），`.team-workplace` 目录初始化随队长会话首开而非应用启动；面板 Remote 通道在 M2 接 gateway 前显示友好不可用态。client 注入声明进 package.json `dsh.client`（inject 列表对齐官方 client 形态）。engines.dsh 写 `>=0.2.1-rc.0 <0.3.0`。
+- 决策：cordis.patch.yml `insert:` 块声明 **preset EntryGroup 组合**：`myteam-preset-captain`（name=@deepseek-ai/dsh-agent-preset，config.plugins 内嵌两子行——`myteam-host`（name=包根，服务+Lead 工具+Remote）与 `myteam-persona-captain`（name=@deepseek-ai/dsh-persona，队长身份提示词））。**host 行不再顶层挂载**：Entry._init 按 options.name 解析（子行缺 name = import 失败静默跳过）；dsh-persona 只能挂 agent scope（顶层与 deployment persona 冲突 fail loud）。副作用（已接受）：服务与工具仅在队长会话 scope 激活（NFR-7.4 强化），`.dsh-myteam` 目录初始化随队长会话首开而非应用启动；面板 Remote 通道在 M2 接 gateway 前显示友好不可用态。client 注入声明进 package.json `dsh.client`（inject 列表对齐官方 client 形态）。engines.dsh 写 `>=0.2.1-rc.0 <0.3.0`。
 - 入口形态（修订 R1 定稿）：host 导出 `apply(ctx, config)` + `inject = ['tools','agents']`（host-plugin.md 规范）；~~入口指向 `./src/host.ts`（Node 24 strip-types 直跑，不依赖构建产物）~~ **实际实现指向 `./lib/host.mjs`**（见 R1-勘误）；资源清理归 `ctx.effect`。
 - 备选方案：①单行多职责——否：client 检测按 entry 名解析 package.json；②host 顶层全局挂载——否：persona 顶层 fail loud + 服务可见性违反 NFR-7.4；③~~入口指向 lib/host.mjs——否：构建产物不存在即装载失败~~ **实际采用了此方案**（构建产物 `plugin/lib/**` 20 个 .mjs 随包分发，`files` 白名单含 `lib`）；strip-types 直跑 src 在 Node 24 可用但**未采纳为装载入口**。
 - 放弃原因：preset EntryGroup 是 Loader 官方组合语义（dsh-agent-preset EntryGroup + dsh-persona「No global mount」README 实证）。
@@ -121,7 +121,7 @@
 - 状态：已接受（2026-10-25）；**R1 修订（2026-11-01 CHG-72）：面板写边界细化**
 - 背景：FR-12.1（人留言写账本 actor=human）、NFR-7.2（面板读磁盘真相）、R20（双入口留痕形态）。
 - 决策：client 经 `ctx.remote.myteam.*`（TypertRemoteService，TF 同型）只读投影/侧车 + 提交写意图（留言/审批三动作/成员操作）；写意图落到 myteam service → 走与工具调用相同的账本写路径（同一校验、同一 seq 权威）。**面板绝不直写文件**。
-- 备选方案：面板直接读写 .team-workplace 文件——否：绕过校验与单写者，破坏账本完整性。
+- 备选方案：面板直接读写 .dsh-myteam 文件——否：绕过校验与单写者，破坏账本完整性。
 - 放弃原因：账本唯一权威是 I2 不变量。
 - 何时重构：无。
 - **R1 修订（CHG-72）**：面板从「只看 + 少量管理」扩到四类日常写入口，边界按「是不是账本实体」二分：

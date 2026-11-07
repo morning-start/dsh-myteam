@@ -166,6 +166,21 @@ teams/acme-trio.json → {"members": [{"roleId": "acme-reviewer"}, {"roleId": "a
 | 写 myteam 的账本 | 装载只读，没有写入口 |
 | 在贡献目录里放 `.js` 让它执行 | 只 `JSON.parse`，**永不执行**（会记 info） |
 
+### 项目级落盘（CHG-102，别写错地方）
+
+插件贡献物（`$DSH_HOME/myteam/plugins/<pluginId>/`）是**跨项目可见的插件资产**；
+而用户建团队后产生的项目内容一律落 **`<project>/.dsh-myteam/`**：
+
+| 内容 | 落点 | 入库 |
+|---|---|---|
+| 角色 / 团队 / 技能 / 工具 / 流程 | `.dsh-myteam/config/**` | ✅ |
+| 任务及依赖 | `.dsh-myteam/tasks/<teamId>/ledger.jsonl` | ✅ |
+| 归档 / token 计量 / 成员记忆 | `.dsh-myteam/history/**` | ❌ |
+| 索引 / scratch / 日志 | `.dsh-myteam/state/**` | ❌ |
+
+**不要**把项目内容写进 `$DSH_HOME`、用户家目录或 DSH profile —— 宿主会用
+`rejectProjectRoot()` 硬拒 `$DSH_HOME` 内的项目根（`docs/17-项目级存储架构.md`）。
+
 ---
 
 ## 检查清单（交付前逐条过）
