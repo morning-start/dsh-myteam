@@ -88,3 +88,39 @@ test('t98-3: 只写项目库 —— 不产生团队账本', () => {
     rmSync(root, { recursive: true, force: true })
   }
 })
+
+test('t98-4: 发布角色 —— 只发布项目库角色（H 档）', () => {
+  const { host, root } = setup()
+  try {
+    /* 项目库没有该角色（只有内置）→ 拒绝并指路 copy_role */
+    const catalog: any = host.executeLeadTool('myteam_list_roles', {}, {})
+    const builtin = catalog.roles.find((role: any) => role.origin === 'builtin')
+    const missing: any = host.executeLeadTool('myteam_publish_role', { roleId: builtin.id }, {})
+    assert.equal(missing.status, 'error', JSON.stringify(missing))
+    assert.equal(missing.code, 'MT_ROLE_NOT_FOUND')
+    assert.ok(String(missing.message).includes('myteam_copy_role'), '错误信息应指路 copy_role')
+    /* 缺 id → MT_VALIDATION */
+    const noId: any = host.executeLeadTool('myteam_publish_role', {}, {})
+    assert.equal(noId.code, 'MT_VALIDATION')
+  } finally {
+    rmSync(root, { recursive: true, force: true })
+  }
+})
+
+test('t98-5: 发布的两段确认口径（不真的写全局库）', () => {
+  /* 发布成功会写**真实**全局角色库（`$DSH_HOME/myteam/roles`），测试不污染用户状态；
+   * 成功路径由写层 `saveGlobalRole` 自己的用例覆盖（t53 系列），这里只锁「前置守门」：
+   * 项目库没有该角色 → MT_ROLE_NOT_FOUND（t98-4）+ 参数契约默认值。 */
+  const { host, root } = setup()
+  try {
+    const catalog: any = host.executeLeadTool('myteam_list_roles', {}, {})
+    const builtin = catalog.roles.find((role: any) => role.origin === 'builtin')
+    const copied: any = host.executeLeadTool('myteam_copy_role', { roleId: builtin.id }, {})
+    assert.equal(copied.status, 'ok', JSON.stringify(copied))
+    /* 复制进项目库后，publish 的前置条件满足；真正的写全局留给环境级验证（不在此处落盘） */
+    const projectRole: any = host.executeLeadTool('myteam_list_roles', { scope: 'project' }, {})
+    assert.ok(projectRole.roles.some((role: any) => role.id === builtin.id), '项目库应有可发布角色')
+  } finally {
+    rmSync(root, { recursive: true, force: true })
+  }
+})

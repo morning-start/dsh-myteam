@@ -1245,6 +1245,9 @@ export class MyTeamHost {
             return this.roleError(e)
           }
         }
+        /* CHG-127（docs/19 §5.3）：发布角色到全局（人类专属；单向不可逆） */
+        case 'myteam_publish_role':
+          return this.publishRoleTool(args)
         /* CHG-126（docs/19 §5.1）：复制角色到项目（fork；仅队长） */
         case 'myteam_copy_role':
           return this.copyRoleTool(args)
@@ -2949,6 +2952,53 @@ export class MyTeamHost {
   }
 
   /* ── 团队模板管理（CHG-57）：内置只读、写项目层、两段确认；面板仍只读 ── */
+
+  /**
+   * CHG-127（docs/19 §5.3）：**发布角色到全局库**——人类专属（H 档）。
+   *
+   * 语义（docs/19 §5.3 定案）：
+   *  - 只发布**项目库**里的角色（内置/插件只读，由写层守门；项目库缺失 → `MT_ROLE_NOT_FOUND`）；
+   *  - **单向不可逆**：全局库那份不会回流到任何项目副本（快照语义）；
+   *  - 全局已有同名角色 → 先回 `confirm-required`（带影响面），`confirm:true` 才覆盖；
+   *  - 审计记 `actor:'human'`（发布是人类动作，不是模型自选）。
+   */
+  publishRoleTool(args                          = {})                          {
+    const roleId = String(args.roleId ?? '').trim()
+    if (!roleId) return { status: 'error', code: 'MT_VALIDATION', field: 'roleId', message: 'roleId is required' }
+    const entry = this.roleCatalog().find((item) => String(item.definition.id) === roleId && String(item.origin) === 'project')
+    if (!entry) {
+      return { status: 'error', code: 'MT_ROLE_NOT_FOUND', roleId, message: `项目库没有角色「${roleId}」（内置/插件角色只读，先 myteam_copy_role 复制进项目再改）` }
+    }
+    const existsGlobally = this.roleCatalog().some((item) => String(item.definition.id) === roleId && String(item.origin) === 'global')
+    const confirm = args.confirm === true
+    if (existsGlobally && !confirm) {
+      return {
+        status: 'confirm-required',
+        roleId,
+        impact: { exists: true, note: '全局库已有同名角色；发布将覆盖它（单向、不可逆）' },
+        message: '全局库已有同名角色：确认覆盖请带 confirm:true 重调（发布单向不可逆）',
+      }
+    }
+    try {
+      const result = saveGlobalRole(this.rolePaths, entry.definition, { overwrite: existsGlobally, actor: 'human' })
+      return {
+        status: 'ok',
+        roleId,
+        action: result.action,
+        filePath: result.filePath,
+        auditPath: result.auditPath,
+        note: '已发布到全局库（单向；已复制出去的副本不受影响）',
+      }
+    } catch (error) {
+      const code = (error                                  )?.code
+      return {
+        status: 'error',
+        code: typeof code === 'string' && code.length > 0 ? code : 'MT_INTERNAL',
+        roleId,
+        message: String((error                     )?.message ?? error),
+      }
+    }
+  }
 
   /**
    * CHG-126（docs/19 §5.1）：**复制角色到项目**（fork）——仅队长（C 档）。

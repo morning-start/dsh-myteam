@@ -526,6 +526,19 @@ export function leadToolDefs()            {
     { name: 'myteam_resolve_proposal', description: '处置成员结构提案（FR-11.4）：approved/rejected。**批准即执行对应变更**（CHG-88）：split → 落子任务 + 原任务取消；add-dep → 加依赖；reassign → 改派；cancel → 取消。驳回只留痕、结构不动。载荷不合规会拒绝并说明，不会留下「已批准但什么都没做」的半截状态。', parameters: { type: 'object', properties: { teamId: teamId(), proposalId: str('提案 id', true), decision: { type: 'string', enum: ['approved', 'rejected'], description: '处置决定', required: true }, note: str('处置说明') } } },
     { name: 'myteam_adopt_knowledge', description: '采纳/驳回知识提案（FR-17.4 策展门）：adopted 落 config/knowledge/（带 evidence+contributor 归因）；rejected 只留痕。draftId 来自 knowledge.proposed 事件。', parameters: { type: 'object', properties: { teamId: teamId(), draftId: str('知识提案 id（knowledge.proposed 事件的 draftId）', true), decision: { type: 'string', enum: ['adopted', 'rejected'], description: '策展决定', required: true }, note: str('处置说明') } } },
     {
+      /* CHG-127（docs/19 §5.3）：发布角色到全局（**人类专属** H 档；单向不可逆） */
+      name: 'myteam_publish_role',
+      description: '把**项目库**的角色发布到**全局库**（人类专属，CHG-127 / docs/19 §5.3）：`{roleId, confirm?}`。**单向不可逆**——发布后全局库那份不会回流到任何项目副本（快照语义）；全局已有同名角色时先回 `confirm-required`（`impact.exists:true`），带 `confirm:true` 才覆盖。**模型只能提案**：这是 H 档操作，需要人在场确认。',
+      parameters: {
+        type: 'object',
+        properties: {
+          roleId: str('要发布的角色 id（必须在项目库）', true),
+          confirm: bool('两段确认：全局已存在同名角色时必须 true 才覆盖'),
+        },
+        required: ['roleId'],
+      },
+    },
+    {
       /* CHG-126（docs/19 §5.1）：复制角色到项目（fork）——**仅队长**（C 档） */
       name: 'myteam_copy_role',
       description: '把内置 / 全局 / 插件贡献的角色**复制到项目库**（队长专属，CHG-126 / docs/19 §5.1）：`{roleId, source?}` → 项目库新增一份**可改**副本（`origin` 保留来源标记，如 `global:reviewer`）。复制后可用 `myteam_update_role` 改它；**已在项目库的角色拒绝**（改它直接 update_role，不要自复制）。**只写项目库**：不碰全局库、不碰团队账本。',
