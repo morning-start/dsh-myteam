@@ -47,6 +47,7 @@
 | [17-项目级存储架构](17-项目级存储架构.md) | **现行存储口径**：`.dsh-myteam/` 目录契约、上传纪律、`resolveProjectRoot` 唯一入口、面板作用域、迁移与验收 | 碰任何落盘路径、或疑惑「数据到底写哪了」 |
 | [18-配置Schema定稿](18-配置Schema定稿.md) | **配置唯一权威定义**：`team.config.json` 全字段（类型/默认/约束/影响面）、三层合并语义、角色 schema 扩展、模板组合面、版本迁移裁决、设置页写契约 | 要加/改配置字段、写设置页、或实现 `saveTeamConfig` |
 | [19-资源模型与能力矩阵](19-资源模型与能力矩阵.md) | **资源模型与权限唯一权威**：项目→团队→角色→绑定；资源四态（builtin/plugin/global/project）；档位（A/C/CM/H）×作用域×确认级；M0–M10 能力矩阵；复制语义（角色 fork/publish、**团队 copy/publish 待实现**）；不可越权 8 条；待补工具 P0/P1/P2 | 要加工具/端点、判权限、做「复制资源」、或问「这个能力工具化了吗」 |
+| [20-存储结构与资源路径](20-存储结构与资源路径.md) | **目录契约与数据结构唯一权威**（CHG-132 起）：两个根（`$DSH_HOME/myteam/` · `<workspace>/.dsh-myteam/`）；**全局团队库** `teams/<teamId>.json`；**技能归属 myteam 队长预设** `presets/myteam-captain/skills/<skillId>/SKILL.md`（不进全局 skills）；成员（子代理）/会话依附角色（`members/<memberId>/member.json`）；定义态 vs 运行态；迁移与工具→路径映射 | 新增存储分区、加技能/团队资产、或改路径解析 |
 | [agent-team-practices-checklist.md](agent-team-practices-checklist.md) | 六来源（NM/CX/LY/BA/TC/TF）的实践清单，按来源标注共识项 | PRD 的依据之一：某个做法是不是行业共识 |
 
 ## 按角色找（谁维护哪几份）

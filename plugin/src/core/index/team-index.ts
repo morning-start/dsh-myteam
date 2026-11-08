@@ -76,6 +76,29 @@ export function globalIndexPath(env: NodeJS.ProcessEnv = process.env): string {
   return join(resolveMyteamHome(env), 'workspaces.json')
 }
 
+/**
+ * CHG-132（docs/20 §3）：**全局根结构**（跨项目资源）——团队库 / 角色库 / 预设技能。
+ *
+ * 三条隔离铁律（docs/20 §1）：
+ *  - 写只能写 `$DSH_HOME/myteam/**` 与 `<workspace>/.dsh-myteam/**` 两个根；
+ *  - 技能归属 **myteam 队长预设**（`presets/<presetId>/skills/`），**不进** `$DSH_HOME/skills/`；
+ *  - 全局团队库只存**团队定义**（`teams/<teamId>.json`），不存运行态（账本/任务/会话）。
+ */
+export function globalStoreLayout(env: NodeJS.ProcessEnv = process.env) {
+  const root = resolveMyteamHome(env)
+  const presets = join(root, 'presets')
+  return {
+    root,
+    teams: join(root, 'teams'),
+    roles: join(root, 'roles'),
+    presets,
+    /** 预设技能目录（R2：技能只属于该预设，不污染其它预设） */
+    presetSkills: (presetId: string) => join(presets, presetId, 'skills'),
+    /** 全局团队定义文件（`teams/<teamId>.json`） */
+    teamFile: (teamId: string) => join(root, 'teams', `${teamId}.json`),
+  }
+}
+
 /* ── 归档投影 → 索引条目 ── */
 
 /** 从投影生成索引条目（纯函数；createdAt 由调用方给，缺省沿用旧值或 0） */

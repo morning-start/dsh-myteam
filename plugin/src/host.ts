@@ -70,7 +70,7 @@ import {
 import { recoveryAction, checkArchiveGate } from './core/scheduler/recovery.ts'
 /* CHG-124（docs/19 §M6）：任务依赖图谱纯函数（Kahn 分层 + 环检测） */
 import { buildTaskGraph } from './core/scheduler/task-graph.ts'
-import { entryFromProjection, scanWorkspaceIndex, readWorkspaceIndex, writeWorkspaceIndex, upsertTeamEntry, upsertGlobalWorkspace, resolveMyteamHome } from './core/index/team-index.ts'
+import { entryFromProjection, scanWorkspaceIndex, readWorkspaceIndex, writeWorkspaceIndex, upsertTeamEntry, upsertGlobalWorkspace, resolveMyteamHome, globalStoreLayout } from './core/index/team-index.ts'
 // CHG-91（插件团队贡献契约 v1）：装载第三方插件贡献的角色与团队模板
 import { loadContributions } from './core/contributions/parse.ts'
 import { contributionsRoot } from './core/contributions/discover.ts'
@@ -1245,6 +1245,9 @@ export class MyTeamHost {
             return this.roleError(e)
           }
         }
+        /* CHG-132（docs/20 §3/§5.1）：发布团队定义到全局团队库（人类专属） */
+        case 'myteam_publish_team':
+          return this.publishTeamTool(args)
         /* CHG-131（docs/19 §5.2）：复制团队定义 → 新草稿（仅队长） */
         case 'myteam_copy_team':
           return this.copyTeamTool(args)
@@ -2968,6 +2971,79 @@ export class MyTeamHost {
   }
 
   /* ── 团队模板管理（CHG-57）：内置只读、写项目层、两段确认；面板仍只读 ── */
+
+  /**
+   * CHG-132（docs/20 §3/§5.1）：**发布团队定义到全局团队库**——人类专属（H 档）。
+   *
+   * 语义（docs/20 §5.1 定案）：
+   *  - 只发布**定义**：名册（roleId + 实例名 + 成员级 skills）、名称、目标、团队层配置；
+   *  - **不发布**运行态：账本 / 任务 / attempt / 门禁结果 / 成员会话 id / token 计量；
+   *  - 全局已有同 `teamId` → 先回 `confirm-required`（`impact.exists:true`），`confirm:true` 才覆盖；
+   *  - **单向不可逆**（快照语义：已复制出去的团队不受影响）。
+   */
+  async publishTeamTool(args: Record<string, unknown> = {}): Promise<Record<string, unknown>> {
+    const teamId = String(args.teamId ?? '').trim()
+    if (!teamId) return { status: 'error', code: 'MT_VALIDATION', field: 'teamId', message: 'teamId is required' }
+    const dir = join(storeLayout(this.workspaceRoot).tasks, teamId)
+    if (!existsSync(dir)) {
+      return { status: 'error', code: 'MT_VALIDATION', field: 'teamId', message: `团队不存在：${teamId}（先用 myteam_list_teams 看有哪些）` }
+    }
+    const proj = this.service(teamId).projectionSnapshot as unknown as {
+      name?: string
+      goal?: string
+      members?: Record<string, { roleId?: string; instanceName?: string; skills?: unknown }>
+    }
+    const global = globalStoreLayout()
+    const filePath = global.teamFile(teamId)
+    const exists = existsSync(filePath)
+    if (exists && args.confirm !== true) {
+      return {
+        status: 'confirm-required',
+        teamId,
+        impact: { exists: true, path: filePath },
+        message: '全局团队库已有同 teamId 的定义：确认覆盖请带 confirm:true 重调（发布单向不可逆）',
+      }
+    }
+    /* 团队层配置（存在才带上；不存在就只发布名册——不造空配置） */
+    let config: unknown
+    const configPath = join(dir, 'team.config.json')
+    try {
+      if (existsSync(configPath)) config = JSON.parse(readFileSync(configPath, 'utf8')) as unknown
+    } catch {
+      config = undefined
+    }
+    const roster = Object.values(proj.members ?? {})
+      .map((member) => ({
+        roleId: String(member.roleId ?? ''),
+        instanceName: String(member.instanceName ?? ''),
+        ...(Array.isArray(member.skills) ? { skills: (member.skills as unknown[]).map((skill) => String(skill)) } : {}),
+      }))
+      .filter((entry) => entry.roleId.length > 0)
+    const definition = {
+      version: 1,
+      teamId,
+      name: String(proj.name ?? ''),
+      goal: String(proj.goal ?? ''),
+      roster,
+      ...(config === undefined ? {} : { config }),
+      origin: 'project-copy' as const,
+      updatedAt: Date.now(),
+    }
+    try {
+      mkdirSync(global.teams, { recursive: true })
+      writeFileSync(filePath, `${JSON.stringify(definition, null, 2)}\n`, 'utf8')
+    } catch (error) {
+      return { status: 'error', code: 'MT_INTERNAL', teamId, message: String((error as Error | undefined)?.message ?? error) }
+    }
+    return {
+      status: 'ok',
+      teamId,
+      filePath,
+      action: exists ? 'updated' : 'created',
+      rosterCount: roster.length,
+      note: '已发布团队定义到全局库（只含名册/配置/目标；账本/任务/会话不发布）',
+    }
+  }
 
   /**
    * CHG-131（docs/19 §5.2）：**复制团队定义 → 新草稿团队**——仅队长（C 档）。
