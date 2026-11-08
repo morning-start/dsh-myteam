@@ -156,12 +156,19 @@ export function readOfflineTokens(workspaceRoot: string, teamId: string): Tokens
     const parsed = JSON.parse(readFileSync(join(dirname(ledgerPath), 'tokens.json'), 'utf8')) as Partial<TokensFile>
     if (parsed?.version !== 1 || typeof parsed.totals !== 'object' || parsed.totals === null) return undefined
     if (typeof parsed.days !== 'object' || parsed.days === null) return undefined
+    /* CHG-158：白名单重建会**丢掉** `memberMeter`（成员级计量观测表），而覆盖率三态
+     * （`coverageOfFile`）靠它判「某成员本轮读不到 usage」。丢掉的后果不是报错而是**静默降级**：
+     * 离线读到的覆盖率会退回「桶级证据」单判据，把「读不到」说成 full——正是 P2-5 要防的
+     * 谎报方向。故按原样透传；字段不存在（旧 tokens.json）就保持不存在，不编空对象。 */
+    const memberMeter =
+      parsed.memberMeter && typeof parsed.memberMeter === 'object' ? parsed.memberMeter : undefined
     return {
       version: 1,
       teamId,
       updatedAt: Number(parsed.updatedAt ?? 0),
       days: parsed.days,
       totals: parsed.totals,
+      ...(memberMeter === undefined ? {} : { memberMeter }),
       note: String(parsed.note ?? ''),
     }
   } catch {

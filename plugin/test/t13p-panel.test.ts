@@ -3,7 +3,7 @@
  *
  * 覆盖（对应阶段四十九网关契约）：
  *  - namespace 绑定：typertRemote = { serviceKey:'myteamPanel', namespace:'myteam' }（客户端端点 myteam/* 不变）
- *  - marker：21 个方法全部 direct invocation（gateway srcClaims 来源；含 5 个离线只读 + getAudit/getConfig 审计与配置 + memberOp 成员管理 + CHG-69 项目聚合/角色详情）
+ *  - marker：58 个方法全部 direct invocation（gateway srcClaims 来源；含 5 个离线只读 + getAudit/getConfig 审计与配置 + memberOp 成员管理 + CHG-69 项目聚合/角色详情）
  *  - 方法签名：简单标识符（agent/query）——gateway methodParameterNames 用 Function.toString 读形参名，
  *    首参 `agent` 必须命中 dsh-agent lookup（wire=agentId）；离线视图方法无 agent 首参，只收 query
  *  - 委托：serviceFor(agent,'myteam') → 隔离服务方法透传 query

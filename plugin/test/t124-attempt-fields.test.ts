@@ -9,7 +9,9 @@
  *
  * 三条纪律：
  *  - 五态矩阵 + 优先级（谁压谁）必须穷举，且**顺序即契约**；
- *  - `recoveryAction` 增字段后**逐条不变**（把既有恢复表用例原样复制一份跑，防回归）；
+ *  - `recoveryAction` 对**既有 facts**（无新字段）逐条不变（把既有恢复表用例原样复制一份跑，防回归）；
+ *    CHG-158（报告 A5）接线后 `recoveryAction` 改为经 `attemptPhase` 判定，新字段参与决策——
+ *    这条用例锁的是「旧 facts 的结果不变」，t124-4 锁「新字段的映射」；
  *  - 新字段是**投影内存态**：不改账本（40 型不变）、不新增事件。`Map` 能 `structuredClone`
  *    但 `JSON.stringify` 恒为 `{}`（面板 RPC / 导出全走 JSON）——所以 `parkedAttempts` 用普通对象。
  */
@@ -58,7 +60,7 @@ test('t124-1: attemptPhase 五态矩阵 —— 每个字段「单独出现」时
 
 /* ── 2. 优先级（顺序即契约）──────────────────────────────────── */
 
-test('t124-2: 优先级 —— parked > reassigning > handoff > claimed > idle', () => {
+test('t124-2: 优先级 —— 当前停放 > reassigning > handoff > 陈旧停放 > claimed > idle', () => {
   // 四个字段同时为真时，最「不可自动推进」的那个说了算
   const all: TaskRuntimeFacts = {
     state: 'in_progress',
@@ -80,6 +82,10 @@ test('t124-2: 优先级 —— parked > reassigning > handoff > claimed > idle',
     attemptPhase({ ...all, parkedAttempts: { 'at-1': 'older stop' }, reassigning: false, handoffId: undefined }),
     'claimed',
   )
+  // A5 接线后：没有活跃 attempt、只有**历史**停放记录时，重派/交接优先于「已停」
+  // （停放记录是更早被撤下的 attempt 的历史，不是当前裁决；压过交接会让「重派中」不可达）
+  assert.equal(attemptPhase({ state: 'ready', reassigning: true, parkedAttempts: { 'at-1': 'older stop' } }), 'reassigning')
+  assert.equal(attemptPhase({ state: 'ready', handoffId: 'ho-1', parkedAttempts: { 'at-1': 'older stop' } }), 'handoff')
   // 全空 → idle
   assert.equal(attemptPhase({ state: 'done', memberLive: false }), 'idle')
 })
@@ -120,26 +126,26 @@ test('t124-3: recoveryAction 默认值下与旧行为逐条一致（t8 恢复表
   })
 })
 
-test('t124-4: 新字段不参与恢复决策 —— 同一 facts 加满四字段，动作逐条相同', () => {
-  const wired: TaskRuntimeFacts = {
-    attempt: 7,
-    handoffId: 'ho-7',
-    reassigning: true,
-    parkedAttempts: { a: 'parked', b: 'older' },
-  }
-  const states: Array<Pick<TaskRuntimeFacts, 'state' | 'attemptId' | 'assignee' | 'memberLive'>> = [
-    { state: 'in_progress', attemptId: 'a', assignee: 'm1', memberLive: true },
-    { state: 'in_progress', attemptId: 'a', assignee: 'm1', memberLive: false },
-    { state: 'in_progress', memberLive: false },
-    { state: 'ready', memberLive: false },
-    { state: 'gate:review', attemptId: 'a', memberLive: false },
-    { state: 'done', attemptId: 'a', memberLive: true },
-  ]
-  for (const facts of states) {
-    // 阶段可能变（parked/reassigning），但**恢复路径**必须一模一样：
-    // 恢复表回答「重启后走哪条路」，阶段回答「当前处于哪一步」，两者混用会让恢复依赖调度语义
-    assert.deepEqual(recoveryAction({ ...facts, ...wired }), recoveryAction(facts), `${facts.state} 的恢复路径不得随新字段变化`)
-  }
+test('t124-4: 恢复表按阶段判定（A5 接线后）—— 停放走人工、重派/交接换新 attempt', () => {
+  /* CHG-158（报告 A5）改写了这条断言，理由：
+   * 拆分当时四字段是「纯内存态」，`recoveryAction` 刻意不消费它们（旧断言 = 加满四字段动作不变）。
+   * A5 把「怎么算」改成 `attemptPhase` 优先、`memberLive` 兜底，于是**新字段参与判定**——
+   * 旧断言表达的正是「未接线」状态，接线之后必须换成新契约。
+   * 既有 facts（无新字段）的判定结果仍逐条不变（t124-3 锁着）。 */
+  const parked: TaskRuntimeFacts = { attemptId: 'a', assignee: 'm1', memberLive: true, parkedAttempts: { a: 'captain parked' } }
+  assert.deepEqual(recoveryAction({ state: 'in_progress', ...parked }), { kind: 'to-blocked' }, '已停放 = 有裁决的停止 → 引导人工')
+  assert.deepEqual(recoveryAction({ state: 'gate:review', ...parked }), { kind: 'to-blocked' }, '门禁态同样不得自动复活')
+  const reassigning: TaskRuntimeFacts = { attempt: 2, reassigning: true, handoffId: 'ho-7', memberLive: true }
+  assert.deepEqual(
+    recoveryAction({ state: 'in_progress', ...reassigning }),
+    { kind: 're-activate-new-attempt' },
+    '重派中：旧 attempt 已撤权，换新 attempt 接手',
+  )
+  const handoff: TaskRuntimeFacts = { handoffId: 'ho-7', memberLive: false }
+  assert.deepEqual(recoveryAction({ state: 'in_progress', ...handoff }), { kind: 're-activate-new-attempt' }, '待交接：新 attempt 还没开始')
+  // idle（四字段全空）→ 旧行为：成员活着原地重激活，否则引导人工
+  assert.deepEqual(recoveryAction({ state: 'in_progress', assignee: 'm1', memberLive: true }), { kind: 're-activate-in-place' })
+  assert.deepEqual(recoveryAction({ state: 'in_progress', memberLive: false }), { kind: 'to-blocked' })
 })
 
 /* ── 4. parkedAttempts 与 attemptId 并存 ───────────────────── */
@@ -203,9 +209,9 @@ test('t124-6: 新字段随投影 structuredClone 与 JSON 往返保真（Map 会
   assert.deepEqual(JSON.parse(JSON.stringify(new Map([['at-1', 'reason']]))), {})
 })
 
-/* ── 6. fold 写入路径确认（fold 只读）────────────────────────── */
+/* ── 6. fold 写入路径确认（fold 只读 payload）──────────────────────── */
 
-test('t124-7: fold 写入路径确认 —— 只有 attemptId 有事件来源，新四字段不被 fold 凭空生成', () => {
+test('t124-7: fold 只从 payload 读 —— 载荷没给的四字段，投影里就是缺省（不凭空生成）', () => {
   let seq = 0
   const ev = (type: string, payload: Record<string, unknown>): LedgerEvent => ({
     seq: seq++,
@@ -233,7 +239,7 @@ test('t124-7: fold 写入路径确认 —— 只有 attemptId 有事件来源，
     ev('task.claimed', { teamId: 't1', taskId: 'k1', memberId: 'm1', attemptId: 'at-1' }),
   ]
   const claimed = foldEvents('t1', base).tasks.k1
-  // claim 只写能力票据（旧行为）；新四字段没有任何事件来源（40 型不变，接线层负责）
+  // 载荷没给 attempt/handoffId/reassign → 投影就是缺省（fold 只从 payload 读，不凭空生成）
   assert.equal(claimed.attemptId, 'at-1', 'task.claimed 写 attemptId')
   assert.equal(claimed.attempt, undefined, 'fold 不生成世代号')
   assert.equal(claimed.handoffId, undefined, 'fold 不发明交接票据（生成随机 id 会破坏重放确定性）')
@@ -241,12 +247,13 @@ test('t124-7: fold 写入路径确认 —— 只有 attemptId 有事件来源，
   assert.equal(claimed.parkedAttempts, undefined)
   assert.equal(attemptPhase({ state: claimed.state, attemptId: claimed.attemptId, memberLive: true }), 'claimed')
 
-  // 撤权 → attemptId 清空（旧行为）；阶段回到 idle（handoffId 由接线层写，fold 不写）
+  // 撤权 → attemptId 清空（旧行为）；这次撤销进停放记录 → 阶段是 parked（等人工裁决）
   const revoked = foldEvents('t1', [
     ...base,
     ev('task.attempt.revoked', { teamId: 't1', taskId: 'k1', attemptId: 'at-1', reason: 'reassign' }),
   ]).tasks.k1
   assert.equal(revoked.attemptId, undefined, 'task.attempt.revoked 清 attemptId')
   assert.equal(revoked.state, 'ready', '撤权把 in_progress 复位到 ready 重新调度')
-  assert.equal(attemptPhase({ state: revoked.state, attemptId: revoked.attemptId, memberLive: false }), 'idle')
+  assert.deepEqual(revoked.parkedAttempts, { 'at-1': 'reassign' }, '非重派的撤销进停放记录')
+  assert.equal(attemptPhase({ state: revoked.state, attemptId: revoked.attemptId, parkedAttempts: revoked.parkedAttempts, memberLive: false }), 'parked')
 })

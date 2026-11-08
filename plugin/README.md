@@ -27,10 +27,10 @@ npx tsc -p tsconfig.json --noEmit
 
 | 路径 | 职责 |
 |---|---|
-| `src/` | TypeScript 源码真身：43 个 `.ts` + 1 个遗留转发 `host.js` |
-| `lib/` | 构建产物：43 个 `.mjs` + `build-manifest.json`；`main` 指向 `lib/host.mjs`，随包分发 |
+| `src/` | TypeScript 源码真身：54 个 `.ts` + 1 个遗留转发 `host.js` |
+| `lib/` | 构建产物：54 个 `.mjs` + `build-manifest.json`；`main` 指向 `lib/host.mjs`，随包分发 |
 | `client/` | `client.js` 面板浏览器产物——**不经 src 编译**，由 `exports["./client"]` 直载，指纹单独记 |
-| `test/` | 单测 73 个文件（`node --test`） |
+| `test/` | 单测 113 个文件（`node --test`） |
 | `schema/` | `team-config.schema.json`：配置的机器可读定稿（与 [docs/18](../docs/18-配置Schema定稿.md)、`src/core/config/team-config.ts` 三方同步，`t89` 守门） |
 | `scripts/` | `build-lib.mjs`：构建脚本（代码生成器，不是运行时） |
 | `locale/` | 面板文案 `zh.json` / `en.json` |
@@ -61,7 +61,7 @@ npx tsc -p tsconfig.json --noEmit
 | | `core/roles/captain-skills.ts` | 队长内置技能：create-role / modify-role / create-team / write-team-charter |
 | | `core/roles/session-defaults.ts` | 单角色调用（`/myteam+<id>`）的落盘与跨重启恢复 |
 | **D5 接口** | `tools/defs.ts` | `memberToolDefs()` / `leadToolDefs()` 的纯数据定义（见下文「工具面」） |
-| | `remote/service.ts` | `MyTeamRemote`：28 个 Remote 方法（手写 marker 等价装饰器 —— strip-only 环境无装饰器语法） |
+| | `remote/service.ts` | `MyTeamRemote`：40 个 Remote 方法（手写 marker 等价装饰器 —— strip-only 环境无装饰器语法） |
 | | `remote/views.ts` | 面板只读投影纯函数：看板 / 详情 / token / 审计 / 配置 |
 
 跨域模块：
@@ -85,24 +85,28 @@ npx tsc -p tsconfig.json --noEmit
 | 文件 | 职责 |
 |---|---|
 | `host.ts` | `apply(ctx, config)` + `inject`：目录初始化、TeamService 惰性创建与冷启动重放、Lead 工具注册、成员 spawn、唤醒管线 |
-| `panel.ts` | `MyTeamPanelFacade`：根级 typert remote 门面（43 个方法），经 `agentPresets.serviceFor(agent, 'myteam')` 读隔离服务 |
+| `panel.ts` | `MyTeamPanelFacade`：根级 typert remote 门面（58 个方法），经 `agentPresets.serviceFor(agent, 'myteam')` 读隔离服务 |
 | `host-workspace.ts` | 旧导出名兼容层（`ensureWorkplaceDirs` 等），实现已收口到 `core/workspace/layout.ts` |
 | `host.js` | 遗留 import 路径的薄转发（仅 `test/t1-workplace.test.js` 用），自身无逻辑 |
 
-## 工具面（44 个 `myteam_*`）
+## 工具面（62 个 `myteam_*`）
 
 定义在 `src/tools/defs.ts`，纯数据；写操作 execute 全部走 `TeamService.commit()`（单写者管线），读走投影。两层注册（ADR-003）：Lead 工具挂 **preset 层**（仅队长会话可见），成员工具挂**成员 setup 作用域**（仅成员会话可见）。下表省略 `myteam_` 前缀。
 
-| 分组 | 队长 35 个 | 成员 9 个 |
+| 分组 | 队长 53 个 | 成员 9 个 |
 |---|---|---|
 | 计划与团队 | `submit_plan` `approve_plan` `revise_plan` `discard_plan` `update_team` `disband` | — |
+| 团队库与快照 | `list_teams` `get_team` `copy_team` `publish_team` `export_team` `import_team` | — |
 | 任务 | `create_task` `create_tasks` `edit_task` `assign_task` `participate_task` `reassign_task` `revoke_attempt` `rescope_task` `cancel_task` `batch_task_op` | `get_task` `list_tasks` `claim_task` `update_task` |
 | 成员与消息 | `spawn_member` `release_member` `message` `interrupt` | `peer_message` `wait_for_change` |
 | 门禁与提案 | `review_task` `resolve_proposal` | `propose_task_change` `escalate_task` |
-| 角色与预设 | `create_role` `update_role` `delete_role` `set_project_role` `apply_roles` `list_presets` `save_preset` `copy_preset` `delete_preset` | — |
+| 角色与预设 | `list_roles` `create_role` `update_role` `delete_role` `copy_role` `publish_role` `set_project_role` `apply_roles` `list_presets` `save_preset` `copy_preset` `delete_preset` | — |
+| 技能与工具 | `list_skills` `create_skill` `create_tool` | — |
 | 知识 | `adopt_knowledge` | `read_knowledge` |
+| 图谱与观测 | `get_task_graph` `get_tokens` `get_audit` `read_session` | — |
+| 会话 | `handoff` | — |
 | 插件贡献 | `list_contributions` `reload_contributions` | — |
-| 配置 | `reset_team_config` | — |
+| 配置 | `save_team_config` `reset_team_config` | — |
 
 几条贯穿全表的口径：任务 / 团队 / 知识类写操作都要 `teamId`；角色与预设是**配置资产**，不带 `teamId`（它们不属于任何团队）。成员侧更新必须带 `attemptId`（陈旧即拒）；`done` 申报必须附证据块（`kind=commands` 或 `kind=na`）；两段确认型操作第一次不带 `confirm` 时只返回影响面，不落账。
 
@@ -153,7 +157,7 @@ node tools/check-drift.mjs    # 退出码 0 = MISMATCH: 0
 cd plugin && npm test
 ```
 
-- `test/` 下 95 个测试文件；**条数以 `npm test` 实际输出为准**（增删测试后不要抄旧数字）。
+- `test/` 下 113 个测试文件；**条数以 `npm test` 实际输出为准**（当前基线 800 条；增删测试后不要抄旧数字）。
 - 门禁型测试不是装饰：`t42`（src↔lib 指纹）、`t80`（构建三道闸）、`t81`（错误码双向锁死）、`t76`（贡献契约）都在「实现与声明分叉」时变红。
 - 需要真实宿主会话的探针（`core/members/smoke.ts`）不在 CI 内，按文件头注释在插件 dev profile 里跑。
 

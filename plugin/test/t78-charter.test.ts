@@ -252,7 +252,11 @@ test('t78-12 (M2-F): create-role 技能补「记忆与汇报机制」——FR-6.
   assert.ok(body.includes('Verification evidence'), '证据强制：无证据的记忆会被 memory.audit 记账')
   assert.ok(body.includes('什么值得记'), '要给出「记什么/不记什么」的判据（否则退化成第二份日志）')
   // 汇报机制（FR-5.0）
-  assert.ok(body.includes('myteam_submit_done'), 'done 申报必须带证据块')
+  // T127：`myteam_submit_done` 是全仓无定义的幽灵工具（done 申报的真实入口是
+  // `myteam_update_task` + `status:'done'`）——技能正文里引用了它，模型会照着调然后
+  // 拿到 unknown tool。断言改为真实工具名，并显式「反面断言」防回归。
+  assert.ok(body.includes('myteam_update_task'), 'done 申报必须带证据块（真实工具是 myteam_update_task）')
+  assert.ok(!body.includes('myteam_submit_done'), 'myteam_submit_done 是幽灵工具名，不得出现在技能正文里')
   assert.ok(body.includes('filesTouched'), '改了文件要带 filesTouched')
   assert.ok(body.includes('escalate'), 'escalate 时机要写清（不是遇到阻力就报）')
   assert.ok(body.includes('proposal'), '提案通道要提到（切分不合理时提 split/rescope）')

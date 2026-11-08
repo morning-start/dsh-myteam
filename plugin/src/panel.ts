@@ -950,7 +950,13 @@ export class MyTeamPanelFacade extends TypertRemoteService {
     return remote.getTaskDetail(query ?? {})
   }
 
-  /** token 侧车四桶 + 命中率 */
+  /**
+   * token 侧车四桶 + 命中率 + 上下文占比 + 计量覆盖率（FR-8.2/8.4，CHG-153 P2-5）。
+   *
+   * 透传纪律：新字段（`coverage` / `coverageText` / 每行的 `contextShare`）由
+   * `buildTokensView` 派生，本端点**只透传、不二次加工**——加工就会多出一份口径
+   * （分母 0 是 `undefined` 还是 0 只应有一处实现）。
+   */
   async getTokens(agent: AgentLike, query: Record<string, unknown>) {
     const remote = this.remoteFor(agent)
     if (!remote) return UNAVAILABLE

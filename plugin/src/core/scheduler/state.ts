@@ -62,6 +62,21 @@ export interface TaskProjection {
   id: string
   input: TaskInput
   state: TaskState
+  /* ── CHG-152 拆出、CHG-158（报告 A5）**接线**的 attempt 四字段 ──────────────
+   * 拆分时四字段是「纯内存态」：没有任何账本事件携带它们，`fold` 也不会写，于是
+   * `handoff` / `reassigning` / `parked` 三个阶段**永远到不了**（零写入方）。
+   * 现在的写入契约（**唯一**合法来源，fold 只读 payload、绝不生成）：
+   *  ① `attempt` ← `task.claimed` 的 `payload.attempt`（host 按「上一世代 + 1」算好）；
+   *  ② `handoffId` ← `task.assigned` / `task.attempt.revoked`（重派）的 `payload.handoffId`
+   *     （票据由写入方生成；fold 里 `randomUUID()` 会破坏「同一本账本两次重放得同一投影」）；
+   *  ③ `reassigning` ← `task.attempt.revoked` 且 `payload.reassign === true`；
+   *  ④ `parkedAttempts` ← **每次** `task.attempt.revoked` 都把 `{attemptId: reason}` 并入（含重派：
+   *     重派先撤权，那次 attempt 同样要留停放记录；阶段由 `reassigning` 表达，
+   *     见 `attemptPhase` ②/④ 的顺序）。
+   * 清除时机：`task.claimed` 清 `reassigning`（重派完成）与 `handoffId`（交接落地——票据只在
+   * 「等下一次 attempt」期间有效，保留会让阶段永远停在 handoff）；`task.assigned` 清
+   * `reassigning`（排空完成、闸门落下，阶段回落到 handoff）。
+   * 向后兼容：接线前的老账本没有这些字段 → 全部保持缺省（`undefined` / 空对象），重放结果逐字不变。 */
   /**
    * P2-2（docs/21 §6，来源 NM `src/types.ts:179-188`）：当前 attempt 的**能力票据**。
    * 成员每次 update 必须出示；陈旧即被拒（`MT_ATTEMPT_STALE`）。

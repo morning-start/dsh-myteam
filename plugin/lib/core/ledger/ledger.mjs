@@ -69,7 +69,17 @@ export const RULES_VERSION = 1
                                   
  
 
-/** 最小 payload 契约（字段存在性；详细校验在各域内做，账本只兜结构） */
+/**
+ * 最小 payload 契约（字段存在性；详细校验在各域内做，账本只兜结构）。
+ *
+ * CHG-158（报告 A5）：`task.claimed.attempt`、`task.assigned.handoffId`、
+ * `task.attempt.revoked.handoffId` / `.reassign` 是**故意不进这张表**的必填字段。理由：
+ *  ① 本表只服务**写入端**（`validateEvent`），重放（`openLedger`）不校验必填 —— 所以老账本
+ *     永远能重放，缺省语义是「未接线」：`attempt` 缺省 = 投影保持 `undefined`、
+ *     `reassign` 缺省 = `false`、`handoffId` 缺省 = 无交接票据；
+ *  ② 写成必填会让所有旧写入方（以及成百条既有测试的 `task.claimed` 载荷）立刻变成非法事件，
+ *     向后兼容的代价必须由「可选 + 缺省」承担，不能转嫁给历史账本。
+ */
 const PAYLOAD_REQUIRED                                       = {
   'team.created': ['teamId', 'name', 'goal'],
   'plan.clarify': ['teamId', 'questions', 'round'],

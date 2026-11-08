@@ -151,7 +151,10 @@ test('t66-1: 插槽契约——conversation.view 团队视图 + 4 个 myteam_* �
   assert.equal(typeof view.label, 'function', 'label 走 locale thunk')
   assert.equal(view.label(), '团队视图', 'label 文案')
   const toolKeys = registered.filter((item) => item.name === 'tool.call.toolview').map((item) => item.key)
-  assert.deepEqual([...toolKeys].sort(), ['myteam_apply_roles', 'myteam_approve_plan', 'myteam_peer_message', 'myteam_plan_tasks'])
+  /* CHG-158：`tool.call.toolview` 按 **wire 工具名**精确匹配 key，写错的 key 不报错、只是永不渲染
+   * （原 key 在 defs.ts 里不存在，这张卡从没显示过）。期望值必须与 defs.ts 一致——
+   * t127-7 的全仓扫描会兜住「client 里出现解析不到的工具名」这一类回归。 */
+  assert.deepEqual([...toolKeys].sort(), ['myteam_apply_roles', 'myteam_approve_plan', 'myteam_peer_message', 'myteam_submit_plan'])
   for (const item of registered.filter((entry) => entry.name === 'tool.call.toolview')) {
     assert.equal(typeof item.component, 'function', `${item.key} 有可渲染组件`)
     assert.equal(typeof item.inject, 'function', `${item.key} 的 inject 拿 sessionId`)

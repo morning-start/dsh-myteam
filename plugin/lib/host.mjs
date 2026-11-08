@@ -32,9 +32,11 @@ import { leadToolDefs, memberToolDefs,              } from './tools/defs.mjs'
 import { outputForTool } from './core/tools/output-contract.mjs'
 import { wakeDecisionsFor, changeSince,                   } from './core/scheduler/wake.mjs'
 import { validatePlan, TERMINAL_STATES, downstreamOf, GATE_REJECT_BUDGET,                     } from './core/scheduler/state.mjs'
+// CHG-159（报告 A6）：领取前的写范围闸门（纯函数；与 scope-audit/waves 同一套路径语义）
+import { claimScopeVerdict } from './core/scheduler/waves.mjs'
 import { diffTaskInput, structuralFieldsOf } from './core/tasks/diff.mjs'
 import { buildToolMask, memberPromptSection, memoryPromptSection, memberSessionId, HOST_TEAM_TOOLS_TO_HIDE,                     } from './core/members/member-setup.mjs'
-import { applyCapabilityGuard, capabilitySummary, resolveCapabilities } from './core/members/capability-guard.mjs'
+import { applyCapabilityGuard, buildCapabilityBoundaryText, capabilitySummary, resolveCapabilities } from './core/members/capability-guard.mjs'
 import { memoryDirFor, seedMemoryIfMissing, auditMemoryContent,                    } from './core/members/memory.mjs'
 import { copyToProject, listRoleCatalog, readGlobalRole, readProjectRole, resolveRuntimeRole, saveGlobalRole, writeProjectRole, assertValidRole, readProjectRoleCard, writeProjectRoleCard, clearProjectRoleCard, deleteProjectRoleSafe,                     } from './core/roles/role-store.mjs'
 // CHG-87（docs/04 §2 承诺的 roleOp 端点）：host 与面板共用同一份实现
@@ -44,7 +46,7 @@ import { CAPTAIN_SKILLS } from './core/roles/captain-skills.mjs'
 import { readPresetCatalog, readProjectPreset, writeProjectPreset, deleteProjectPreset, validatePresetDefinition, BUILTIN_PRESET_IDS,                    } from './core/presets/preset-store.mjs'
 import { configOverrideFromPreset, isStructurallyValidConfig, loadEffectiveConfig, readProjectConfigRaw, teamConfigPath, writeTeamConfigRaw } from './core/config/team-config.mjs'
 import { listKnowledge, renderIndexSection, readKnowledgeEntry, adoptDraft, reviseEntry, touchStale, candidatesForDraft, writeKnowledgeEntry, knowledgeDirOf, validateDraft,                     } from './core/knowledge/knowledge.mjs'
-import { zeroBuckets, dayKeyOf, accumulate, emptyTokensFile,                 } from './core/ledger/token-sidecar.mjs'
+import { zeroBuckets, dayKeyOf, accumulate, emptyTokensFile,                                        } from './core/ledger/token-sidecar.mjs'
 // CHG-86（P0-2）：归档落盘（disband 时写快照；面板归档视图读快照）
 import { buildArchiveSnapshot, writeArchive, readArchive, listArchives, archiveRootOf } from './core/archive/archive-store.mjs'
 // CHG-87（M2-C 剩余，FR-5.3/FR-5.4）：command 门禁 + scope 完成审计
@@ -1442,7 +1444,29 @@ export class MyTeamHost {
           const proj = svc.projectionSnapshot
           const task = proj.tasks[String(args.taskId)]
           const prevAttempt = task?.attemptId
-          const r1 = this.commitGuarded(teamId, args, { actor, type: 'task.attempt.revoked', payload: { teamId, taskId: args.taskId, attemptId: prevAttempt ?? 'none', reason: args.reason, prevAssignee: task?.assignee } })
+          // CHG-158（报告 A5）：撤权 vs 重派要分开表达——
+          //  - 重派（`myteam_reassign_task`）= **交接**：`reassign: true` + 交接票据（旧持有人排空、
+          //    新 attempt 接手），fold 置 `reassigning` 并记票据；
+          //  - 撤权（`myteam_revoke_attempt`）= **停放**：fold 把 `{attemptId: reason}` 并入
+          //    `parkedAttempts`（每次撤销都留痕，供恢复/看板回答「这个 attempt 为什么停」）。
+          // 票据由**写入方**生成（值随事件落账 → 重放读到同一个值，确定）：显式传就用调用方给的
+          // （会话移交返回的 ticket），否则发一个不透明票号。
+          const reassign = name === 'myteam_reassign_task'
+          const handoffId = typeof args.handoffId === 'string' && args.handoffId.trim().length > 0
+            ? args.handoffId.trim()
+            : `ho-${prevAttempt ?? 'none'}-${Date.now()}`
+          const r1 = this.commitGuarded(teamId, args, {
+            actor,
+            type: 'task.attempt.revoked',
+            payload: {
+              teamId,
+              taskId: args.taskId,
+              attemptId: prevAttempt ?? 'none',
+              reason: args.reason,
+              prevAssignee: task?.assignee,
+              ...(reassign ? { reassign: true, handoffId } : {}),
+            },
+          })
           if (!r1.ok) {
             return { status: 'error', code: r1.code, message: r1.message, ...(r1.currentRevision !== undefined ? { currentRevision: r1.currentRevision } : {}) }
           }
@@ -1520,7 +1544,11 @@ export class MyTeamHost {
             return {
               status: 'error',
               code: 'MT_ARCHIVE_FAILED',
-              message: `团队已解散但归档落盘失败：${String(e)}（账本仍完整，可用 myteam_list_archives 复查）`,
+              // A2：旧文案在这里引用了一个**全仓无定义**的归档列表工具（幽灵引用）。
+              // 归档的真实落点：`<STORE_DIR>/history/archive/<teamId>/`（MANIFEST.json 是完整性
+              // 判据，缺它即视为未归档）；真实可做的事：账本里 team.disbanded 已落，用
+              // myteam_get_audit 复核，用 myteam_list_teams 的 archived.ids 看目录是否被登记。
+              message: `团队已解散但归档落盘失败：${String(e)}（账本仍完整：team.disbanded 已落账，可用 myteam_get_audit 复核；归档目录 ${STORE_DIR}/history/archive/${teamId}/ 可能只有部分文件——MANIFEST.json 缺失即视为未归档，可用 myteam_list_teams 的 archived.ids 核对是否被登记）`,
               impact: { members: memberCount, tasks: taskCount },
             }
           }
@@ -3330,7 +3358,11 @@ export class MyTeamHost {
         //   allow → 去掉 own-layer 成员工具后按全局已知名收窄（全被去掉 = deny 全部全局）；
         //   deny  → 过滤未知名字（拼写错误只告警，不让整批拒绝）。
         const mask = buildToolMask(roleDef)
-        if (mask.mode !== 'none' && agentCtx.tools.restrict) {
+        if (mask.mode !== 'none' && typeof agentCtx.tools.restrict !== 'function') {
+          // A7：宿主没有 restrict API 时旧实现静默跳过——角色 toolPolicy 一个字都没生效，
+          // 日志里却看不出任何异常。降级必须留痕（成员卡/排查都以 warn 日志为准）。
+          this.log('warn', `member ${memberId} toolPolicy mask not enforced: host tools service has no restrict() API (mode=${mask.mode})`)
+        } else if (mask.mode !== 'none') {
           const known = new Set(
             ((agentCtx.tools.schemas?.(agent) ?? [])                             )
               .map((schema) => (typeof schema?.name === 'string' ? schema.name : ''))
@@ -3375,12 +3407,16 @@ export class MyTeamHost {
         // ⑦ 能力边界（CHG-54 声明 / CHG-58 硬隔离）：成员声明 > 角色声明；空 = 不启用隔离
         const caps = resolveCapabilities(roleDef, member)
         if (caps.skills.length > 0 || caps.mcpAllowlist.length > 0) {
+          // A7：**先执行隔离、再写提示词**——section 是给模型的事实陈述，必须描述已经发生的
+          // 事情。旧实现先无条件写「已硬隔离」再 await guard：宿主缺 restrict/registerProvider
+          // 时隔离根本没生效，那句「已硬隔离」就是假话（模型会据此假设 allowlist 之外不可用）。
+          // 两段都在 setup 内完成（setup resolve 前 section 必须注册好，不能拖到 then 里）。
+          const guard = await applyCapabilityGuard(agentCtx, agent, caps, { workspaceRoot: this.workspaceRoot })
           agentCtx.systemPrompt.section({
             name: `myteam:capabilities-${member.memberId}`,
             order: 104,
-            text: `能力边界（已硬隔离，只使用下列能力）：\n- 技能：${caps.skills.join('、') || '（无）'}\n- MCP：${caps.mcpAllowlist.join('、') || '（无）'}\nallowlist 之外的技能与 MCP 在运行时不可用；需要额外能力时先向队长申报，不要尝试绕过。`,
+            text: buildCapabilityBoundaryText(caps, guard),
           })
-          const guard = await applyCapabilityGuard(agentCtx, agent, caps, { workspaceRoot: this.workspaceRoot })
           if (guard.warnings.length > 0) this.log('warn', `member ${memberId} capability guard: ${guard.warnings.join('; ')}`)
           else if (guard.mcpDenied.length > 0 || guard.skillsShadowed.length > 0) this.log('info', `member ${memberId} capabilities enforced: ${capabilitySummary(guard)}`)
         }
@@ -3855,7 +3891,39 @@ export class MyTeamHost {
           return { status: 'ok', tasks: rows, returnedCount: rows.length, note: `返回 ${rows.length} 行 ≠ 已读全部内容（NFR-7.6）` }
         }
         case 'myteam_claim_task': {
-          const r = this.commit(teamId, { actor, type: 'task.claimed', payload: { teamId, taskId: args.taskId, memberId: member.memberId, attemptId: `at-${Date.now()}` } })
+          const claimTaskId = String(args.taskId)
+          const claimProj = svc.projectionSnapshot
+          const claimTarget = claimProj.tasks[claimTaskId]
+          // CHG-159（报告 A6）：**领取前的写范围闸门**——两个任务 writeScopes 有交集时必须串行。
+          // 为什么必须在这里拦：claim 抢占只解决「同一任务被两个人领」，解决不了「两个不同任务
+          // 改同一批文件」；scope-audit 只在完成时事后留痕，不拦截，于是后写静默覆盖先写。
+          // 职责边界：依赖「上游未完成」不归这里管（service 层 canClaim 已判），这里只判写范围。
+          // 放行条件：任一方未声明 writeScopes（未声明 = 不参与串行，否则存量团队全部死锁）。
+          if (claimTarget) {
+            const scopeVerdict = claimScopeVerdict(claimProj, claimTaskId)
+            if (!scopeVerdict.ok) return { status: 'error', code: scopeVerdict.code, message: scopeVerdict.message }
+          }
+          // CHG-158（报告 A5）：世代号由 **host** 按「上一世代 + 1」算好塞进 payload——fold 只赋值，
+          // 绝不自增/生成（同一本账本两次重放必须得出同一投影）。
+          const previousGeneration = Number.isInteger(claimTarget?.attempt) ? Number(claimTarget?.attempt) : 0
+          // 交接票据：由**会话移交**写入方给（`myteam_handoff` 按设计不写团队账本——见 handoffTeam
+          // 的纪律 ②，所以票据只能由承接方在 claim 时带进来）。缺省不带：只有真的做过移交才落账。
+          // 注意 payload 与投影的区别：账本里的 `handoffId` 是「这次 claim 承接了哪次移交」的
+          // **审计留痕**；投影的 `handoffId` 是「待落地」槽位（`attemptPhase` ③ 的 handoff 态），
+          // 由 claim 本身清除——保留会让正在执行的任务永远显示「交接中」。
+          const handoffTicket = typeof args.handoffId === 'string' && args.handoffId.trim().length > 0 ? args.handoffId.trim() : undefined
+          const r = this.commit(teamId, {
+            actor,
+            type: 'task.claimed',
+            payload: {
+              teamId,
+              taskId: args.taskId,
+              memberId: member.memberId,
+              attemptId: `at-${Date.now()}`,
+              attempt: previousGeneration + 1,
+              ...(handoffTicket ? { handoffId: handoffTicket } : {}),
+            },
+          })
           if (!r.ok) return { status: 'error', code: r.code, message: r.message }
           const t = svc.projectionSnapshot.tasks[String(args.taskId)]
           // P1-1 接线：claim 成功 = 任务进入 in_progress = **阶段起点**，在这里拍产物基线。
@@ -5548,6 +5616,13 @@ export class MyTeamHost {
    *  ② 本次累计 − 基线 = 增量 → 记到**当天**桶，基线跟进（session 重建导致累计量
    *     回退时只重置基线，不写负数）；
    *  ③ 写盘幂等：同一时刻重复调用不改变结果，`days` 会自然长出多天。
+   *
+   * P2-5 计量覆盖率接线（口径见 `token-sidecar.ts` 的 `MemberMeterState`）：
+   *  ④ 每轮对每个成员**观测一次**「此刻能不能读到累计 usage」，结果写进 `memberMeter`；
+   *  ⑤ 读得到 → 本轮 delta 的调用数记进 `meteredCalls`（每一条被计数的调用都有 usage 背书）；
+   *     读不到 / 抛错 → 该成员记 `unreadable`，**覆盖率必须降级 partial**，绝不谎报 full；
+   *  ⑥ 读失败时**不推进基线**（保持既有行为）——下一轮 delta 会把漏掉的调用一起补进来，
+   *     因此恢复可读后覆盖率可以回到 full（观测是「当下」的，不是历史污点）。
    */
   syncTokens(teamId        )             {
     const svc = this.service(teamId)
@@ -5573,15 +5648,26 @@ export class MyTeamHost {
     const projections = this.svc('sessionProjections')
     const dayKey = dayKeyOf(Date.now())
     let observed = 0
+    // ④ 成员级观测表：每轮**重写**，但保留已离开投影的成员的最后状态（成员移除不降级历史）。
+    //    单位是「成员」，不是「调用」——调用计数只有 meteredCalls。
+    const memberMeter                                   = { ...(file.memberMeter ?? {}) }
     for (const member of Object.values(svc.projectionSnapshot.members)) {
       const agent = this.agentOf(this.memberHandles.get(member.id))
-      if (!agent) continue
+      // 没有活跃 agent 会话：没有观测对象（不是漏数，也不产生调用）
+      if (!agent) {
+        memberMeter[member.id] = 'no-session'
+        continue
+      }
       try {
         // session-projection 契约：stateOf(session, key) 读宿主态（README §Register and read）。
         // 旧实现 .read() 不存在——真实注册的 'tokenUsage' 投影只能经 stateOf 读。
         const usage = projections?.stateOf?.((agent                         ).session, 'tokenUsage') ?? undefined
         const totals = usage?.totals ?? usage
-        if (!totals || typeof totals !== 'object') continue
+        // ⑤ 有会话却读不到累计量：本轮四桶可能漏数 → 记 unreadable，覆盖率降级（不谎报 full）
+        if (!totals || typeof totals !== 'object') {
+          memberMeter[member.id] = 'unreadable'
+          continue
+        }
         const current = {
           uncachedInput: Number(totals.uncachedInputTokens ?? 0),
           cacheRead: Number(totals.cacheReadTokens ?? 0),
@@ -5598,12 +5684,20 @@ export class MyTeamHost {
           output: Math.max(0, current.output - baseline.output),
           calls: Math.max(0, current.calls - baseline.calls),
         }
+        // ⑥ 读失败不推进基线：留到下一轮把漏掉的增量一起补进来（既有行为，不要动）
         baselines.set(member.id, current)
         if (delta.uncachedInput + delta.cacheRead + delta.cacheWrite + delta.output + delta.calls > 0) {
-          file = accumulate(file, member.id, dayKey, delta)
+          // ⑤ 每一条被计数的调用都来自宿主累计量（有 usage 背书）→ meteredCalls = delta.calls。
+          //    delta.calls === 0 时**不写**该字段：编 0 会被 coverageOf 读成「全部未计量」，
+          //    把「没记录」说成「确定没计量」——方向相反的谎报。
+          file = accumulate(file, member.id, dayKey, delta.calls > 0 ? { ...delta, meteredCalls: delta.calls } : delta)
           observed += 1
         }
+        // 本轮确实读到了（哪怕增量为 0）→ 该成员的样本是可覆盖的
+        memberMeter[member.id] = 'metered'
       } catch (e) {
+        // 抛错 = 本轮观测不到（成员级，不是调用级）→ 覆盖率必须降级
+        memberMeter[member.id] = 'unreadable'
         this.log('warn', `token read for ${member.id} failed: ${String(e)}`)
       }
     }
@@ -5615,6 +5709,8 @@ export class MyTeamHost {
         file = accumulate(file, member.id, dayKey, zeroBuckets())
       }
     }
+    // ④ 观测表与四桶一起落盘（覆盖率是派生读数，观测才需要持久化）
+    file = { ...file, memberMeter }
     if (!existsSync(dir)) mkdirSync(dir, { recursive: true })
     writeFileSync(filePath, `${JSON.stringify(file, null, 2)}\n`, 'utf8')
     this.tokensFiles.set(teamId, file)

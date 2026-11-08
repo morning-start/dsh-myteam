@@ -118,7 +118,7 @@ myteam_create_role({
 
 ### 汇报机制（FR-5.0）
 
-- **done 申报必须带证据块**：\`myteam_submit_done\` 的 \`evidence.commands[]\`
+- **done 申报必须带证据块**：\`myteam_update_task\`（申报时 \`status='done'\`）的 \`evidence.commands[]\`
   每条至少 \`{ cmd, exitCode }\`，改了文件就带 \`filesTouched\`。
   **禁止**「没有出现拒绝词就认为通过」——审查先看证据块再读正文。
 - **escalate 时机**：不是"遇到阻力就报"，是"**信息不足且无法用默认值兜底**"
@@ -155,7 +155,7 @@ const MODIFY_ROLE_CONTENT = `# 修改角色（modify-role）
 
 ## 正确用法
 
-1. 先 \`myteam_get_roles\`（或面板角色页）确认 roleId 与来源。
+1. 先 \`myteam_list_roles\`（或面板角色页）确认 roleId 与来源。
 2. 只提交要改的字段（patch），不要整份重写；systemPrompt 改动要给用户看要点。
 3. 调用后把 \`copiedFrom\` / \`version\` 回报给用户。
 
@@ -247,7 +247,7 @@ const CREATE_TEAM_CONTENT = `# 创建项目级团队（create-team）
 ### 第 1 步：先看模板
 
 \`myteam_list_presets\` 拿内置 + 项目模板。有贴的就用 \`presetId\` 起步；
-没有就手工列名册（每个 roleId 必须**已在项目角色库**，见 \`myteam_get_roles\`）。
+没有就手工列名册（每个 roleId 必须**已在项目角色库**，见 \`myteam_list_roles\`）。
 
 ### 第 2 步：定名册
 

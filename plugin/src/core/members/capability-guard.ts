@@ -16,6 +16,8 @@
  *  - allowlist 为空/未声明 = 不启用隔离（继承宿主能力，保持既有团队行为）；
  *  - 取成员自身声明优先，否则回退角色声明（与 spawn 的继承语义一致）；
  *  - 任何一步失败只告警，绝不阻断成员上岗（能力收窄失败 ≠ 成员不可用）；
+ *  - 宿主**缺 API**（没有 `restrict` / `registerProvider`）同样算降级，必须写 warning——
+ *    静默跳过会让调用方以为隔离生效了（A7：允许降级，不允许把降级描述成没发生）；
  *  - 隔离在 setup 内一次完成，随后 agent 的每轮读到的都是收窄后的视图。
  */
 
@@ -111,40 +113,53 @@ export async function applyCapabilityGuard(
   }
 
   // ① MCP：可见性 deny + 执行期 guard 兜底（晚连接的 server 也能挡住）
-  if (caps.mcpAllowlist.length > 0 && typeof toolsSvc?.restrict === 'function') {
-    try {
-      const applyDeny = (): string[] => {
-        const names = ((toolsSvc.schemas?.() ?? []) as Array<{ name?: unknown }>)
-          .map((schema: { name?: unknown }) => (typeof schema?.name === 'string' ? schema.name : ''))
-          .filter((name: string) => name.length > 0)
-        const denied = mcpToolsToDeny(names, caps.mcpAllowlist)
-        if (denied.length > 0) toolsSvc.restrict({ deny: denied })
-        return denied
+  if (caps.mcpAllowlist.length > 0) {
+    // A7：宿主没有 restrict API 时旧实现在这里**整块静默跳过**——allowlist 一个字都没生效，
+    // 调用方（成员卡 / 提示词 / 日志）却看不到任何异常。降级必须被说出来，才算「不假装成功」。
+    if (typeof toolsSvc?.restrict !== 'function') {
+      result.warnings.push(
+        `mcp allowlist not enforced: host tools service has no restrict() API (allowlist: ${caps.mcpAllowlist.join(', ')})`,
+      )
+    } else {
+      try {
+        const applyDeny = (): string[] => {
+          const names = ((toolsSvc.schemas?.() ?? []) as Array<{ name?: unknown }>)
+            .map((schema: { name?: unknown }) => (typeof schema?.name === 'string' ? schema.name : ''))
+            .filter((name: string) => name.length > 0)
+          const denied = mcpToolsToDeny(names, caps.mcpAllowlist)
+          if (denied.length > 0) toolsSvc.restrict({ deny: denied })
+          return denied
+        }
+        result.mcpDenied = applyDeny()
+        // 动态兜底：restrict 只能 deny 调用时已存在的工具，guard 按名字实时判定
+        if (typeof toolsSvc.guard === 'function') {
+          toolsSvc.guard((exec: any) => {
+            const name = typeof exec?.name === 'string' ? exec.name : ''
+            if (!name.startsWith('mcp__') || allowedOf(name)) return undefined
+            return `MCP tool "${name}" is outside this member's mcpAllowlist (${caps.mcpAllowlist.join(', ')})`
+          })
+        }
+        if (typeof ctx?.on === 'function') {
+          ctx.on('tools/change', () => {
+            try {
+              const more = applyDeny().filter((name) => !result.mcpDenied.includes(name))
+              result.mcpDenied.push(...more)
+            } catch { /* 静默：动态补刀失败不影响已生效的收窄 */ }
+          })
+        }
+      } catch (e) {
+        result.warnings.push(`mcp allowlist not enforced: ${String((e as { message?: string }).message ?? e)}`)
       }
-      result.mcpDenied = applyDeny()
-      // 动态兜底：restrict 只能 deny 调用时已存在的工具，guard 按名字实时判定
-      if (typeof toolsSvc.guard === 'function') {
-        toolsSvc.guard((exec: any) => {
-          const name = typeof exec?.name === 'string' ? exec.name : ''
-          if (!name.startsWith('mcp__') || allowedOf(name)) return undefined
-          return `MCP tool "${name}" is outside this member's mcpAllowlist (${caps.mcpAllowlist.join(', ')})`
-        })
-      }
-      if (typeof ctx?.on === 'function') {
-        ctx.on('tools/change', () => {
-          try {
-            const more = applyDeny().filter((name) => !result.mcpDenied.includes(name))
-            result.mcpDenied.push(...more)
-          } catch { /* 静默：动态补刀失败不影响已生效的收窄 */ }
-        })
-      }
-    } catch (e) {
-      result.warnings.push(`mcp allowlist not enforced: ${String((e as { message?: string }).message ?? e)}`)
     }
   }
 
   // ② 技能：deny-by-shadow（异步枚举当前可见技能，再按作用域注册占位 provider）
-  if (caps.skills.length > 0 && typeof skillsSvc?.registerProvider === 'function') {
+  if (caps.skills.length > 0 && typeof skillsSvc?.registerProvider !== 'function') {
+    // A7：同 ①——宿主缺 registerProvider 时旧实现静默跳过，技能 allowlist 完全没生效。
+    result.warnings.push(
+      `skill allowlist not enforced: host skills service has no registerProvider() API (allowlist: ${caps.skills.join(', ')})`,
+    )
+  } else if (caps.skills.length > 0) {
     try {
       const allowed = new Set(caps.skills)
       const blocked = new Set<string>()
@@ -198,4 +213,40 @@ export function capabilitySummary(result: CapabilityGuardResult): string {
   if (result.skillsShadowed.length > 0) parts.push(`skills shadowed ${result.skillsShadowed.length}`)
   for (const warning of result.warnings) parts.push(`warn: ${warning}`)
   return parts.join('; ')
+}
+
+/**
+ * A7（CHG：能力隔离降级要诚实）：成员提示词里「能力边界」section 的文本。
+ *
+ * 为什么必须条件化：这段文本是给模型的**事实陈述**。宿主缺 `tools.restrict` /
+ * `skills.registerProvider` 时隔离根本没生效，旧实现却无条件写「已硬隔离」——
+ * 模型据此假设 allowlist 之外的能力不可用，是**说硬话**（违背
+ * `MT_UNAVAILABLE` 的「不假装成功」语义：降级可以发生，但不能描述成没发生）。
+ *
+ * 口径：
+ *  - `warnings` 为空 = 隔离真的生效 → 才允许出现「已硬隔离」这个断言；
+ *  - 有 warning = 至少一项降级 → 明确写「部分隔离未生效」，并逐条列出缺哪个宿主 API；
+ *  - 两种情况下 allowlist 本身都要照原样列出（成员得知道自己申请了什么）。
+ *
+ * 抽成纯函数是为了可单测（不需要起真实宿主就能断言文案不撒谎）。
+ */
+export function buildCapabilityBoundaryText(caps: CapabilityScope, guard: CapabilityGuardResult): string {
+  const skills = caps.skills.join('、') || '（无）'
+  const mcp = caps.mcpAllowlist.join('、') || '（无）'
+  if (guard.warnings.length === 0) {
+    return [
+      '能力边界（已硬隔离，只使用下列能力）：',
+      `- 技能：${skills}`,
+      `- MCP：${mcp}`,
+      'allowlist 之外的技能与 MCP 在运行时不可用；需要额外能力时先向队长申报，不要尝试绕过。',
+    ].join('\n')
+  }
+  return [
+    '能力边界（allowlist 已声明，但**部分隔离未生效**——下面列出没生效的项）：',
+    `- 技能：${skills}`,
+    `- MCP：${mcp}`,
+    '未生效项：',
+    ...guard.warnings.map((warning) => `- ${warning}`),
+    '需要额外能力时先向队长申报；同时**不要假设** allowlist 之外的能力一定不可用（隔离未生效，只能靠你自觉遵守）。',
+  ].join('\n')
 }

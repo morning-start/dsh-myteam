@@ -201,6 +201,18 @@ export function applyEvent(proj                , event             )       {
       transition(t, 'in_progress', event.seq)
       t.attemptId = p.attemptId
       t.assignee = p.memberId
+      // ── CHG-158（报告 A5）：attempt 四字段接线（fold **只读 payload，不生成**）──
+      // ① 执行世代号由写入方算好（host 取「上一世代 + 1」）。为什么不能在 fold 里自增：
+      //    重放时若事件被裁剪/跳号，自增会与首次 fold 分叉；`randomUUID()` 更直接——同一本账本
+      //    两次重放会得出不同投影（t124 的纪律）。
+      // ② 老账本（接线前写的 task.claimed）没有 attempt 字段 → 保持 undefined，重放结果逐字不变。
+      // ③ 清除 `reassigning`（重派完成）与 `handoffId`（交接落地）：不清的话阶段永远停在
+      //    reassigning/handoff，调度器会把正在执行的任务当成「正在交接」而不敢派单。
+      const claimPayload = p                                      
+      const generation = Number(claimPayload.attempt)
+      if (Number.isFinite(generation) && generation > 0) t.attempt = generation
+      t.reassigning = undefined
+      t.handoffId = undefined
       if (proj.members[p.memberId]) proj.members[p.memberId].currentTaskId = p.taskId
       break
     }
@@ -209,6 +221,14 @@ export function applyEvent(proj                , event             )       {
       const ids = Array.isArray(p.memberIds) ? (p.memberIds             ).map(String) : []
       t.assignee = p.memberId
       t.assignees = ids.length > 0 ? ids : [String(p.memberId)]
+      // CHG-158（报告 A5）：交接票据只从 payload 赋值（fold 不发明）。`task.assigned` = 新持有人
+      // 已接手 ⇒ 旧持有人的排空结束，「重派中」这道闸门落下（阶段从 reassigning 回落到 handoff，
+      // 见 `attemptPhase` ③）；票据本身保留到下一次 claim 才失效。
+      const assignedPayload = p                                      
+      if (typeof assignedPayload.handoffId === 'string' && assignedPayload.handoffId.length > 0) {
+        t.handoffId = assignedPayload.handoffId
+      }
+      t.reassigning = undefined
       break
     }
     /* CHG-69（FR-21）：任务 × 团队参与边（主责 1 / 协作 N） */
@@ -241,6 +261,23 @@ export function applyEvent(proj                , event             )       {
     }
     case 'task.attempt.revoked': {
       const t = requireTask(proj, p.taskId, event.seq)
+      // ── CHG-158（报告 A5）：停放记录 + 重派标记（都只读 payload）──
+      // ① 每次撤销（含重派）都把「哪个 attempt 为什么停下」并入停放记录（累积，不覆盖历史）。
+      //    为什么是普通对象不是 Map：Map 能 `structuredClone`，但 `JSON.stringify(new Map())` 恒为 `{}`
+      //    ——面板 RPC / 导出 / 日志都会把停放记录静默丢光（t124 已把这点钉成断言）。
+      // ② 重派（`reassign === true`）额外置 `reassigning`：它是交接（旧持有人排空、新 attempt 接手），
+      //    阶段由 `reassigning` 表达；停放记录只记「这个 attempt 被撤下了」这段历史，
+      //    不再压过交接（`attemptPhase` ②/④ 的顺序即为此而调）。
+      // ③ 交接票据由写入方生成塞进 payload；fold 只赋值（生成随机 id 破坏重放确定性）。
+      const revokePayload = p                                      
+      const revokedAttemptId = typeof revokePayload.attemptId === 'string' && revokePayload.attemptId.length > 0 ? revokePayload.attemptId : 'none'
+      t.parkedAttempts = { ...(t.parkedAttempts ?? {}), [revokedAttemptId]: String(p.reason ?? '') }
+      if (revokePayload.reassign === true) {
+        t.reassigning = true
+        if (typeof revokePayload.handoffId === 'string' && revokePayload.handoffId.length > 0) {
+          t.handoffId = revokePayload.handoffId
+        }
+      }
       if (t.attemptId === p.attemptId) {
         t.attemptId = undefined
         // 撤 attempt = 放弃本次执行：in_progress 与门禁态都复位到 ready 重新调度

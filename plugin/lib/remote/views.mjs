@@ -8,6 +8,7 @@
                                                                                 
 import { TERMINAL_STATES } from '../core/scheduler/state.mjs'
                                                                  
+import { coverageOfFile, describeCoverage } from '../core/ledger/token-sidecar.mjs'
                                                                
 import { buildConfigPayload } from '../core/config/config-view.mjs'
 import { buildTaskGraph,                } from '../core/tasks/graph.mjs'
@@ -518,12 +519,25 @@ function buildTaskDetailViewUncached(proj                , taskId        , event
   }
 }
 
-/** tokens 侧车视图（含命中率派生，REV-5） */
+/**
+ * tokens 侧车视图（含命中率派生，REV-5；FR-8.4 上下文占比 + P2-5 计量覆盖率）。
+ *
+ * 为什么派生量在视图层算而不是面板各 tab 自己算：口径只能有一处实现（分母 0 → `undefined`
+ * 而不是 0、三态文案来自 `describeCoverage`）。散落实现必然漂移——CHG-153 的教训就是
+ * 「覆盖率函数零调用点 = 死代码」，所以这里接线的同时把文案也一并带出。
+ */
 export function buildTokensView(file            )                          {
   const hitRate = (b                                                                  ) => {
     const denom = b.uncachedInput + b.cacheRead + b.cacheWrite
     return denom === 0 ? null : b.cacheRead / denom
   }
+  /** FR-8.4 上下文占比 = 未缓存输入 / 上下文总输入（uncached + read + write）；分母 0 → undefined（面板显示「—」） */
+  const contextShare = (b                                                                  ) => {
+    const denom = b.uncachedInput + b.cacheRead + b.cacheWrite
+    return denom === 0 ? undefined : b.uncachedInput / denom
+  }
+  // P2-5：覆盖率是**派生读数**（现算，不落盘）——落盘会出现第二个真相来源
+  const coverage = coverageOfFile(file)
   return {
     version: file.version,
     teamId: file.teamId,
@@ -536,8 +550,12 @@ export function buildTokensView(file            )                          {
     nonBillable: true,
     days: file.days,
     totals: Object.fromEntries(
-      Object.entries(file.totals).map(([memberId, b]) => [memberId, { ...b, hitRate: hitRate(b) }]),
+      Object.entries(file.totals).map(([memberId, b]) => [memberId, { ...b, hitRate: hitRate(b), contextShare: contextShare(b) }]),
     ),
+    /** 计量覆盖率三态（full | partial | none；旧宿主不返回 → 面板显示「—」，不编 0） */
+    coverage,
+    /** 覆盖率中文口径文案（与三态同源，避免各消费点自造措辞） */
+    coverageText: describeCoverage(coverage),
   }
 }
 

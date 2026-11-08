@@ -38,10 +38,10 @@ export type TaskRuntimeFacts = {
   /** 该 attempt 的成员会话是否仍存活（host 侧 agents.get 结果） */
   memberLive: boolean
   /* ── P2-2（docs/21 §6）：attempt 四字段拆分 ──
-   * 恢复表**不消费**这些字段（增字段后行为与拆分前逐条一致，见 t124）；它们只喂 `attemptPhase`。
-   * 为什么分开：`recoveryAction` 回答「选哪条恢复路径」，`attemptPhase` 回答「当前处于哪个阶段」。
-   * 把阶段混进恢复表，会让恢复决策依赖调度语义——以后改阶段定义就要动恢复表，而恢复表是
-   * 崩溃恢复的唯一顺序保证（FR-4.6），不该被阶段语义的演进牵连。 */
+   * CHG-158（报告 A5）接线后，恢复表**经 `attemptPhase` 消费**这四个字段：阶段优先、`memberLive`
+   * 只作兜底（它回答「持有人的会话还在不在」，回答不了「这个 attempt 是不是已经停放了」）。
+   * 为什么不能拿 `memberLive` 猜：它会把「已停放（有裁决的停止）」误判成「成员不在 → 换新
+   * attempt 重试」，人工停下的任务被自动重跑。既有 facts（无新字段）的判定结果逐条不变。 */
   /** 执行世代号（单调递增；缺省 = 旧账本 / 未接线） */
   attempt?: number
   /** 撤权/交接世代票据（交接已发出、下一次 attempt 未开始） */
@@ -63,19 +63,30 @@ export type RecoveryAction =
  * 恢复决策表（FR-4.6：按有序表选一条路径，不并行多策）。
  * 顺序：完成转移 > 原地重激活 > 新 attempt 重试 > blocked > noop。
  *
- * P2-2：只认 `state` / `attemptId` / `assignee` / `memberLive` 四项——新拆出的
- * `attempt` / `handoffId` / `reassigning` / `parkedAttempts` **不参与**判定
- * （增字段后行为逐条不变，见 `t124`）。阶段判断请用 `attemptPhase`。
+ * CHG-158（报告 A5）：**先用 `attemptPhase` 算阶段，再按阶段选路径**，`memberLive` 只作兜底。
+ * 映射（旧 facts 逐条不变，`t8-t10-t16` / `t124-3` 锁着）：
+ *  - `parked`      → `to-blocked`：已停放 = 已有裁决的停止（人工/重试），恢复不得自动复活；
+ *  - `reassigning` → `re-activate-new-attempt`：排空被重启打断，换新 attempt 接手；
+ *  - `handoff`     → `re-activate-new-attempt`：票据已发、新 attempt 还没开始；
+ *  - `claimed`     → 成员活着原地重激活，否则新 attempt；
+ *  - `idle`        → 成员活着原地重激活，否则引导人工。
+ * 为什么 `parked` 要压过「成员不在」：否则人工停下的任务会被当成崩溃残留自动重跑
+ * （恢复表是崩溃恢复的唯一顺序保证，不能靠 `memberLive` 猜阶段）。
  */
 export function recoveryAction(facts: TaskRuntimeFacts): RecoveryAction {
+  const phase = attemptPhase(facts)
+  const liveMember = facts.memberLive && Boolean(facts.assignee)
   if (facts.state === 'in_progress') {
-    if (facts.memberLive && facts.assignee) return { kind: 're-activate-in-place' }
-    if (facts.attemptId) return { kind: 're-activate-new-attempt' }
-    return { kind: 'to-blocked' }
+    if (phase === 'parked') return { kind: 'to-blocked' }
+    if (phase === 'reassigning' || phase === 'handoff') return { kind: 're-activate-new-attempt' }
+    if (phase === 'claimed') return liveMember ? { kind: 're-activate-in-place' } : { kind: 're-activate-new-attempt' }
+    return liveMember ? { kind: 're-activate-in-place' } : { kind: 'to-blocked' }
   }
   if (facts.state === 'ready' || facts.state === 'backlog') return { kind: 'noop' } // 调度层自然接管
   if (facts.state === 're-scoping') return { kind: 'noop' } // 等队长裁决（Inbox 已有提醒）
   if (facts.state === 'gate:review' || facts.state === 'gate:verify' || facts.state === 'gate:archive') {
+    if (phase === 'parked') return { kind: 'to-blocked' }
+    // 门禁态只看「成员会话还在不在」：没有 assignee 也可能是队长在跑裁决，旧表就是这么定的
     return facts.memberLive ? { kind: 're-activate-in-place' } : { kind: 're-activate-new-attempt' }
   }
   return { kind: 'noop' } // 终态不恢复
@@ -95,7 +106,7 @@ export type AttemptPhase = 'claimed' | 'handoff' | 'reassigning' | 'parked' | 'i
  * 这里把顺序和判据都固定下来，调用方只读结果。
  *
  * 判定顺序（**从左到右，先中先返回**）：
- *   ① `parked`      —— 当前 attempt 在 `parkedAttempts` 里；或没有活跃 attempt 但停放记录还在。
+ *   ① `parked`      —— **当前** attempt 在 `parkedAttempts` 里。
  *                      停放 = **已有裁决的停止**（等人工/重试），必须压过一切过渡态：
  *                      排在后面，调度器就会把「已停」的任务当成「正在换人/正在跑」继续推进。
  *   ② `reassigning` —— 交接正在排空旧持有人（`reassigning`）。交接期间它和 `handoffId` 同时为真，
@@ -104,8 +115,15 @@ export type AttemptPhase = 'claimed' | 'handoff' | 'reassigning' | 'parked' | 'i
  *   ③ `handoff`     —— 有交接票据、下一次 attempt 还没开始（等交接落地）。
  *                      排在 `claimed` 前：撤权后旧 `attemptId` 可能还留着（旧持有人尚未 drain 完），
  *                      此时任务属于**交接**，不属于旧 attempt。
- *   ④ `claimed`     —— 有当前能力票据（正在执行）。
- *   ⑤ `idle`        —— 四字段都空（可调度 / 终态）。
+ *   ④ `parked`（无活跃 attempt 的陈旧停放记录）—— 没有票据、没有交接，但停放记录还在：
+ *                      任务停在某次裁决上（等人工/重试）。排在「重派/交接」之后而不是之前：
+ *                      重派会先撤权（旧 attempt 进停放记录）再交接，停放记录此时是**历史**；
+ *                      让它压过交接，就等于「重派中的任务永远显示已停」——调度器会把它当人工
+ *                      停下的任务不再派单（A5 要修的就是这个「态永远到不了」）。
+ *                      接线前这个组合不可达（`parkedAttempts` 零写入方），所以顺序调整不改变
+ *                      任何既有投影的判定结果。
+ *   ⑤ `claimed`     —— 有当前能力票据（正在执行）。
+ *   ⑥ `idle`        —— 四字段都空（可调度 / 终态）。
  *
  * 注意：`claimed` 只表示**票据还在**。`gate:*` 与已 done 的任务也保留票据（它是证据归属的锚点），
  * 判断「能不能派单」必须再叠 `state`，不要拿阶段当调度结论。
@@ -116,9 +134,10 @@ export function attemptPhase(facts: TaskRuntimeFacts): AttemptPhase {
   const handoffId = typeof facts.handoffId === 'string' ? facts.handoffId : ''
   // 用 hasOwnProperty 而不是 `in`：attemptId 来自账本载荷，`__proto__` 之类的键不能当「已停放」
   const currentParked = attemptId.length > 0 && Object.prototype.hasOwnProperty.call(parked, attemptId)
-  if (currentParked || (attemptId.length === 0 && Object.keys(parked).length > 0)) return 'parked'
+  if (currentParked) return 'parked'
   if (facts.reassigning === true) return 'reassigning'
   if (handoffId.length > 0) return 'handoff'
+  if (attemptId.length === 0 && Object.keys(parked).length > 0) return 'parked'
   if (attemptId.length > 0) return 'claimed'
   return 'idle'
 }

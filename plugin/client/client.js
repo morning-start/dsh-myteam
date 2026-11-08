@@ -469,6 +469,17 @@ window.__ModuleLoader__.load({
       'cost.updated': '更新 {time}',
       'cost.empty': '暂无用量记录（队员尚未产生调用）。',
       'cost.offlineEmpty': '离线快照中没有 tokens.json（团队还没有队员调用记录）。',
+      /* CHG-153（FR-8.4 / P2-5）：计量覆盖率三态 + 上下文占比。
+         口径文案（hint.*）与 sidecar 的 describeCoverage 同源——面板不另造措辞 */
+      'cost.coverage': '计量覆盖率',
+      'cost.coverage.full': '全量',
+      'cost.coverage.partial': '部分',
+      'cost.coverage.none': '无计量',
+      'cost.coverage.hint.full': '全量计量（每次调用都拿到 provider usage）',
+      'cost.coverage.hint.partial': '部分计量（有成员/调用未拿到 provider usage，总量只覆盖已计量部分）',
+      'cost.coverage.hint.none': '无计量（没有拿到任何 provider usage）',
+      'cost.coverage.unknownHint': '覆盖率未知（旧宿主未返回该字段）——不显示为全量',
+      'cost.contextShare': '上下文占比',
       'detail.priority': '优先级',
       'detail.ac': '验收标准',
       'detail.assignee': '负责人',
@@ -1699,6 +1710,15 @@ window.__ModuleLoader__.load({
       'cost.updated': 'updated {time}',
       'cost.empty': 'No usage recorded yet (member calls have not run).',
       'cost.offlineEmpty': 'No tokens.json in this offline snapshot (no member calls recorded yet).',
+      'cost.coverage': 'Metering coverage',
+      'cost.coverage.full': 'Full',
+      'cost.coverage.partial': 'Partial',
+      'cost.coverage.none': 'None',
+      'cost.coverage.hint.full': 'Full metering (every call reported provider usage)',
+      'cost.coverage.hint.partial': 'Partial metering (some members/calls reported no provider usage; totals cover metered calls only)',
+      'cost.coverage.hint.none': 'No metering (no provider usage at all)',
+      'cost.coverage.unknownHint': 'Coverage unknown (old host did not return it) — never rendered as full',
+      'cost.contextShare': 'Context share',
       'detail.priority': 'Priority',
       'detail.ac': 'Acceptance criteria',
       'detail.assignee': 'Assignee',
@@ -3596,6 +3616,22 @@ window.__ModuleLoader__.load({
       '.mt-cost-table td{text-align:right;padding:5px 8px;border-bottom:.5px solid var(--dsw-alias-border-l2);white-space:nowrap}',
       '.mt-cost-sum td{font-weight:600;color:var(--dsw-alias-label-primary)}',
       '.mt-cost-note{margin-top:8px}',
+      /* CHG-153（FR-8.4/P2-5）：上下文占比 · 命中率段条 + 计量覆盖率徽标。
+         颜色只走 --dsw-alias-* 语义 token（与 .mt-ovbar / .mt-segbar 同一纪律，不硬编码色值） */
+      '.mt-cost-rings{display:flex;gap:16px;flex-wrap:wrap;margin:0 0 10px}',
+      '.mt-ctx{flex:1 1 180px;min-width:150px}',
+      '.mt-ctx-head{display:flex;align-items:baseline;justify-content:space-between;gap:8px;font-size:11px;color:var(--dsw-alias-label-tertiary)}',
+      '.mt-ctx-head strong{font-size:13px;font-weight:600;color:var(--dsw-alias-label-primary);font-variant-numeric:tabular-nums}',
+      '.mt-segbar.mt-ctxbar{height:8px;margin-top:4px;gap:1px}',
+      '.mt-segbar i.mt-seg-uncached{background:var(--dsw-alias-state-warning-primary)}',
+      '.mt-segbar i.mt-seg-read{background:var(--dsw-alias-state-ok-primary)}',
+      '.mt-segbar i.mt-seg-write{background:var(--dsw-alias-state-info-primary)}',
+      '.mt-segbar i.mt-seg-empty{background:var(--dsw-alias-border-l2)}',
+      '.mt-cov{display:inline-flex;align-items:center;gap:6px;padding:1px 8px;border-radius:999px;border:.5px solid var(--dsw-alias-border-l2);font-size:11px;line-height:1.6;color:var(--dsw-alias-label-secondary);white-space:nowrap}',
+      '.mt-cov-full{border-color:var(--dsw-alias-state-ok-primary);color:var(--dsw-alias-state-ok-primary)}',
+      '.mt-cov-partial{border-color:var(--dsw-alias-state-warning-primary);color:var(--dsw-alias-state-warning-primary)}',
+      '.mt-cov-none{border-color:var(--dsw-alias-state-error-primary);color:var(--dsw-alias-state-error-primary)}',
+      '.mt-cov-unknown{color:var(--dsw-alias-label-tertiary)}',
       '.mt-timeline li{display:flex;gap:8px;font-size:11px;padding:2px 0;color:var(--dsw-alias-label-secondary)}',
       '.mt-seq{color:var(--dsw-alias-label-tertiary);font-variant-numeric:tabular-nums}',
       '.mt-actor{color:var(--dsw-alias-label-tertiary)}',
@@ -6296,6 +6332,8 @@ window.__ModuleLoader__.load({
     }
 
     /* ── 成本 tab（FR-8.2/8.4，CHG-47）：四桶 + 命中率；在线读侧车，离线读 tokens.json ── */
+    /* CHG-153（P2-5 / FR-8.4）：计量覆盖率徽标（三态三色 + 口径文案 title）+ 上下文占比 /
+       命中率段条（复用 .mt-segbar 写法；颜色只走 --dsw-alias-* 语义 token，不硬编码色值） */
     function TokensTab({ t, tokens, members, emptyText }) {
       if (tokens === undefined) return j('div', { className: 'mt-empty', children: t('state.loading') })
       if (!tokens) return j('div', { className: 'mt-empty', children: emptyText ?? t('cost.empty') })
@@ -6308,17 +6346,53 @@ window.__ModuleLoader__.load({
       for (const id of ids) for (const key of Object.keys(sum)) sum[key] += Number(totals[id]?.[key] ?? 0)
       const denom = sum.uncachedInput + sum.cacheRead + sum.cacheWrite
       const sumHit = denom === 0 ? null : sum.cacheRead / denom
+      /* FR-8.4：上下文占比与命中率是同一分母（uncached + read + write）的两个派生，
+         分母 0 一律「—」——不显示 0（0% 会被读成「全都是未命中」，是谎报） */
+      const sumCtx = denom === 0 ? null : sum.uncachedInput / denom
       const rows = [...ids].sort((a, b) => Number(totals[b]?.calls ?? 0) - Number(totals[a]?.calls ?? 0))
       const cell = (value, key) => j('td', { key, children: value })
+      /* P2-5 覆盖率徽标：三态三色 + 口径文案作 title。
+         旧宿主不带 coverage → 显示「—」（「不知道」既不等于 full 也不等于 none，不许编 0）。 */
+      const COVERAGES = ['full', 'partial', 'none']
+      const coverage = COVERAGES.includes(tokens.coverage) ? tokens.coverage : null
+      const coverageBadge = coverage
+        ? j('span', {
+            className: `mt-cov mt-cov-${coverage}`,
+            title: `${t(`cost.coverage.hint.${coverage}`)}${tokens.coverageText ? ` · ${tokens.coverageText}` : ''}`,
+            children: `${t('cost.coverage')} · ${t(`cost.coverage.${coverage}`)}`,
+          })
+        : j('span', { className: 'mt-cov mt-cov-unknown', title: t('cost.coverage.unknownHint'), children: `${t('cost.coverage')} · —` })
+      /* 段条：复用 .mt-segbar（与看板 .mt-ovbar / 归档回放同一写法）；段宽 = 占比 ×1000 且至少 1，
+         保证极小的非零段也可看见（否则「写缓存 0.1%」会整段消失，读者以为没写） */
+      const seg = (key, cls, ratio) => j('i', { key, className: cls, style: { flex: Math.max(1, Math.round(ratio * 1000)) } })
+      const shareBar = denom === 0
+        ? [j('i', { key: 'empty', className: 'mt-seg-empty', style: { flex: 1 } })]
+        : [
+            seg('uncached', 'mt-seg-uncached', sum.uncachedInput / denom),
+            seg('read', 'mt-seg-read', sum.cacheRead / denom),
+            seg('write', 'mt-seg-write', sum.cacheWrite / denom),
+          ]
+      const hitBar = sumHit === null
+        ? [j('i', { key: 'empty', className: 'mt-seg-empty', style: { flex: 1 } })]
+        : [seg('hit', 'mt-seg-read', sumHit), seg('miss', 'mt-seg-uncached', 1 - sumHit)]
+      const ring = (label, value, parts) => js('div', { className: 'mt-ctx', children: [
+        js('div', { className: 'mt-ctx-head', children: [j('span', { children: label }), j('strong', { children: value })] }),
+        js('div', { className: 'mt-segbar mt-ctxbar', role: 'img', 'aria-label': `${label} ${value}`, children: parts }),
+      ] })
       return js('div', { className: 'mt-cost', children: [
         js('div', { className: 'mt-cost-head', children: [
           j('h3', { children: t('cost.total') }),
+          coverageBadge,
           tokens.updatedAt ? j('span', { className: 'mt-hint', children: t('cost.updated').replace('{time}', relTime(tokens.updatedAt, t)) }) : null,
           j('span', { className: 'mt-hint', children: `${t('cost.calls')} ${fmt(sum.calls)} · ${t('cost.output')} ${fmt(sum.output)}` }),
         ] }),
+        js('div', { className: 'mt-cost-rings', children: [
+          ring(t('cost.contextShare'), pct(sumCtx), shareBar),
+          ring(t('cost.hit'), pct(sumHit), hitBar),
+        ] }),
         js('div', { className: 'mt-cost-scroll', children: [
           js('table', { className: 'mt-cost-table', children: [
-            j('thead', { children: j('tr', { children: [t('cost.member'), t('cost.calls'), t('cost.uncached'), t('cost.cacheRead'), t('cost.cacheWrite'), t('cost.output'), t('cost.hit')].map((h, i) => j('th', { key: `${i}`, children: h })) }) }),
+            j('thead', { children: j('tr', { children: [t('cost.member'), t('cost.calls'), t('cost.uncached'), t('cost.cacheRead'), t('cost.cacheWrite'), t('cost.output'), t('cost.contextShare'), t('cost.hit')].map((h, i) => j('th', { key: `${i}`, children: h })) }) }),
             j('tbody', { children: [
               ...rows.map((id) => js('tr', { children: [
                 cell(nameOf(id), 'name'),
@@ -6327,6 +6401,7 @@ window.__ModuleLoader__.load({
                 cell(fmt(totals[id]?.cacheRead), 'cacheRead'),
                 cell(fmt(totals[id]?.cacheWrite), 'cacheWrite'),
                 cell(fmt(totals[id]?.output), 'output'),
+                cell(pct(totals[id]?.contextShare), 'contextShare'),
                 cell(pct(totals[id]?.hitRate), 'hit'),
               ] }, id)),
               js('tr', { className: 'mt-cost-sum', children: [
@@ -6336,6 +6411,7 @@ window.__ModuleLoader__.load({
                 cell(fmt(sum.cacheRead), 'cacheRead'),
                 cell(fmt(sum.cacheWrite), 'cacheWrite'),
                 cell(fmt(sum.output), 'output'),
+                cell(pct(sumCtx), 'contextShare'),
                 cell(pct(sumHit), 'hit'),
               ] }, '__total'),
             ] }),
@@ -12763,7 +12839,7 @@ window.__ModuleLoader__.load({
     }
     /** 计数渲染：0 条任务不等于「无数据」时照样显示 0；缺数据（未加载）显示 — 占位 */
     const convCount = (value, loaded) => (loaded ? String(Number(value) || 0) : '—')
-    /** myteam_plan_tasks 工具卡：迷你任务列表（摘要 + 两个出口） */
+    /** myteam_submit_plan 工具卡（摘要 + 两个出口）；key 必须与 defs.ts 的 wire 名逐字相同 */
     function TeamPlanTasksCard({ t, tasks, stat, onOpenPanel, onOpenTask, loaded = true }) {
       const list = (tasks ?? []).slice(0, 4)
       const rest = Math.max(0, (tasks ?? []).length - list.length)
@@ -12809,7 +12885,10 @@ window.__ModuleLoader__.load({
           j('span', { className: 'mt-tt mt-toolcard-more', children: t('g6.conv.moreTasks').replace('{n}', loaded ? String(rest) : '—') }),
         ] }) : null,
       ]
-      return j(ToolCardShell, { t, icon: '⌘', name: 'myteam_plan_tasks', stat, children: body, foot })
+      /* CHG-158：卡名必须是**真实 wire 工具名**。此处原名在 defs.ts 里不存在（全仓无此工具），
+       * 而 tool.call.toolview 按 key 精确匹配 wire 名 —— 注册的 key 也错，这张卡永远不会被渲染。
+       * 对应的真实工具是 `myteam_submit_plan`（提交草稿 → 返回任务清单 + 名册 + 门禁计数）。 */
+      return j(ToolCardShell, { t, icon: '⌘', name: 'myteam_submit_plan', stat, children: body, foot })
     }
     /** 折叠工具卡（myteam_approve_plan / myteam_peer_message）：只给一行摘要，不展开看板 */
     function TeamCollapsedCard({ icon, name, stat }) {
@@ -13062,7 +13141,7 @@ window.__ModuleLoader__.load({
     }
 
     /** 四个 myteam_* 工具卡（tool.call.toolview 的 keyed 组件，按 wire 工具名精确注册） */
-    /** myteam_plan_tasks 工具卡（R34 / P0-5）：真实看板数据源，默认不再展示演示任务 */
+    /** myteam_submit_plan 工具卡（R34 / P0-5）：真实看板数据源，默认不再展示演示任务 */
     function MyTeamPlanTasksToolView(props) {
       const t = props?.t ?? ((k) => zh[k] ?? k)
       const board = useConvBoard(props?.connection, props?.sessionId)
@@ -13298,7 +13377,9 @@ window.__ModuleLoader__.load({
           inject: (sessionId) => ({ ctx, connection: ctx.connection, sessionId }),
         }, withRenderBoundary(MyTeamConversationView)))
         const TOOL_VIEWS = [
-          ['myteam_plan_tasks', MyTeamPlanTasksToolView],
+          /* CHG-158：key = **wire 工具名**（官方按 key 精确匹配）。原 key 在 defs.ts 里不存在，
+           * 这张卡从来没渲染过；真实计划工具是 myteam_submit_plan。 */
+          ['myteam_submit_plan', MyTeamPlanTasksToolView],
           ['myteam_approve_plan', MyTeamApprovePlanToolView],
           ['myteam_peer_message', MyTeamPeerMessageToolView],
           ['myteam_apply_roles', MyTeamApplyRolesToolView],

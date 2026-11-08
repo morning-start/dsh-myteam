@@ -38,11 +38,17 @@ import { normalizeScopePath } from '../gates/scope-audit.mjs'
  * 「依赖成环（含自指…）」），入参不合法用跨域通用的 `MT_VALIDATION`。
  * 注解成 `MtCode` 让「写了个不存在的码」在编译期就红，不用等门禁。
  */
-export const WAVE_CODES                                                                 = {
+export const WAVE_CODES                                                                                                  = {
   /** 任务依赖成环：波次无法给出，必须先断环 */
   TASK_CYCLE: 'MT_TASK_CYCLE',
   /** 同一个 taskId 出现两次：入参不合法，无法为它给出两个波次位置 */
   TASK_INVALID: 'MT_VALIDATION',
+  /**
+   * 领取前的写范围闸门命中：与正在执行的任务写范围重叠（CHG-159 / 报告 A6）。
+   * 语义 = 既有 `MT_NOT_CLAIMABLE`（「此刻不能领」），**不新增码**——新增码要重生成 `docs/04`
+   * 并改 `t81` 对账断言，而这里没有新的失败语义可表达。
+   */
+  TASK_IN_FLIGHT: 'MT_NOT_CLAIMABLE',
 }
 
                                                                    
@@ -430,6 +436,101 @@ export function mergeSharedFileTasks(tasks                          )           
   const plan = planDevWaves(groupTasks)
   if (!plan.ok) return { ok: false, code: plan.code, reason: plan.reason, cycles: plan.cycles }
   return { ok: true, groups, waves: plan.waves, groupOf }
+}
+
+/* ── 领取前的写范围闸门（CHG-159 / 报告 A6）────────────────────────── */
+
+/**
+ * 写范围闸门需要的最小任务面（**结构化类型**：`TeamProjection` 直接可传，不必先 map 一份）。
+ *
+ * 为什么只收三个字段：闸门只回答「两批文件会不会撞」，不关心任务标题/证据/门禁；
+ * 收窄到最小面之后，单测不需要造完整账本就能穷举冲突矩阵。
+ */
+                                       
+                                                                                                  
+ 
+
+                                    
+          
+                                   
+                     
+ 
+
+                                    
+           
+     
+                                                                    
+                                               
+                                     
+     
+              
+                                                      
+                 
+                                            
+                           
+ 
+
+                                                                     
+
+/**
+ * 参与闸门的任务状态：只有**正在执行**的任务此刻可能正在写文件。
+ * 为什么不含 `gate:*`：门禁态 = 实现已完成、等裁决（产出物已交付），此时改的是同一批
+ * 已完成的文件，再串行只是把交付拖慢；而 `ready`/`backlog` 还没开始写，不构成并发。
+ */
+const CLAIM_SCOPE_IN_FLIGHT                      = new Set(['in_progress', 're-scoping'])
+
+/**
+ * 领取前的写范围闸门（纯函数）：本任务的可写范围是否与**同团队正在执行**的任务重叠。
+ *
+ * 为什么需要（问题本身）：`claim` 抢占只解决「同一任务被两个人领」，解决不了「两个不同任务
+ * 写同一批文件」——它们仍会被同时派出去，最后写入者赢、前一个的改动被静默覆盖。
+ * `scope-audit` 只在完成时事后留痕，**不拦截**；这里补上「领之前」那道闸。
+ *
+ * 判定口径（与 `scopesOverlap` 同源，**不另写一套**）：
+ *  ① 只跟同团队、状态为 `in_progress` / `re-scoping` 的任务比（`ClaimScopeProjection` 就是
+ *     单个团队的投影，跨团队的比较不在本函数职责内）；
+ *  ② 任一方的 `writeScopes` 为空/未声明 → **不拦**（未声明 = 不参与串行。否则存量团队
+ *     全部死锁：没有声明范围不等于「哪里都能写」）；
+ *  ③ 同一个任务自己 → 不拦；
+ *  ④ 依赖「上游未完成」不属于本函数职责（那是 `canClaim` 在 service 层的活）；
+ *  ⑤ 阻塞清单按 taskId 字典序稳定输出（同输入必得同结果，日志/面板不会每次顺序不同）。
+ *
+ * @param projection 本团队投影（只读）
+ * @param taskId 准备 claim 的任务 id
+ * @returns 放行 `{ok:true}`；冲突 `{ok:false, code:'MT_NOT_CLAIMABLE', message, blockingTaskIds}`
+ *
+ * @example
+ *   claimScopeVerdict(proj, 'b')  // a 正在跑且 writeScopes 都是 ['src/']
+ *   // → { ok: false, code: 'MT_NOT_CLAIMABLE', blockingTaskIds: ['a'], message: '…' }
+ */
+export function claimScopeVerdict(projection                      , taskId        )                    {
+  const target = projection?.tasks?.[taskId]
+  const own = normalizeScopeList(target?.input?.writeScopes)
+  // ② 未声明（或任务还不在投影里）→ 不做写范围串行：闸门只拦「能证明会撞」的情况
+  if (!target || own.length === 0) return { ok: true, blockingTaskIds: [] }
+  const conflicts                                                        = []
+  for (const task of Object.values(projection.tasks)) {
+    if (!task || task.id === taskId) continue // ③ 自己
+    if (!CLAIM_SCOPE_IN_FLIGHT.has(task.state)) continue // ① 只比在飞任务
+    const other = normalizeScopeList(task.input?.writeScopes)
+    // ② 对方未声明 → 不构成冲突（scopesOverlap 已按此口径实现，这里只是省一次调用）
+    if (other.length === 0 || !scopesOverlap(own, other)) continue
+    conflicts.push({ taskId: task.id, state: task.state, scopes: other })
+  }
+  if (conflicts.length === 0) return { ok: true, blockingTaskIds: [] }
+  conflicts.sort((a, b) => compareIds(a.taskId, b.taskId))
+  const blockingTaskIds = conflicts.map((conflict) => conflict.taskId)
+  const detail = conflicts.map((conflict) => `「${conflict.taskId}」（${conflict.state}，范围 ${conflict.scopes.join('、')}）`).join('、')
+  return {
+    ok: false,
+    code: WAVE_CODES.TASK_IN_FLIGHT,
+    message:
+      `任务「${taskId}」的可写范围（${own.join('、')}）与正在执行的任务 ${detail} 重叠：` +
+      '两者会改同一批文件，同时执行会后写覆盖先写，必须串行。' +
+      `请等 ${blockingTaskIds.join('、')} 完成（或撤权/结束）后再 claim；` +
+      '需要并行请先调整任务的 writeScopes 让范围不重叠（写范围是契约，不是提示）。',
+    blockingTaskIds,
+  }
 }
 
 /* ── 人读说明 ───────────────────────────────────────────────────────── */

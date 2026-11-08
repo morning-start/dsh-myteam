@@ -42,6 +42,30 @@ export interface TokenBuckets {
 /** 计量覆盖率三态（TC 口径：与 token 总量正交） */
 export type TokenCoverage = 'full' | 'partial' | 'none'
 
+/**
+ * 成员级计量观测状态（P2-5 口径①：这是**观测**，不是**调用**）。
+ *
+ * 为什么需要这一层（宿主能力边界，必须写清）：`calls` 是宿主投影 `tokenUsage.totals.calls`
+ * 的**累计调用数**，`syncTokens` 只能看到累计量的差值，宿主**没有 per-call 钩子**——
+ * 「哪一次调用拿到了 provider usage」在插件侧根本不可知。所以「meteredCalls = 拿到 usage
+ * 的调用数」这句口径无法**逐调用**实现；诚实的替代是：每个 sync 轮次对每个成员**观测一次**
+ * 「此刻能不能读到它的累计 usage」，把结果落成这张成员表，再由 `coverageOfFile` 派生三态。
+ *
+ *  - `metered`：本轮读到了该成员的累计 usage —— 因此本轮累加进四桶的调用都有 usage 背书；
+ *  - `unreadable`：该成员有活跃 agent 会话，但 `stateOf` 抛错 / 返回空 —— 本轮四桶**可能漏数**
+ *    （这是唯一会让覆盖率降级的形态）；
+ *  - `no-session`：没有活跃 agent 会话（无观测对象，**不计**为漏数）。
+ *
+ * 边界（不写清就会被当成调用级计数，单位就错了）：
+ *  ① 这是**成员 × 轮次**的观测状态，单位是「成员」，不是「调用」；调用计数只有
+ *     `TokenBuckets.meteredCalls`；
+ *  ② 每轮**重写**（不是累加）：失败轮的增量会在下一轮读数追平时补进来（读失败时基线不推进，
+ *     下一次 delta = 当前累计 − 旧基线），所以恢复可读后覆盖率可以回到 `full`；
+ *  ③ 已离开投影的成员**保留**最后一次状态（它的历史调用是在可读时计入四桶的），
+ *     不因为成员被移除就把历史覆盖率打成 partial。
+ */
+export type MemberMeterState = 'metered' | 'unreadable' | 'no-session'
+
 export interface TokensFile {
   version: 1
   teamId: string
@@ -51,6 +75,11 @@ export interface TokensFile {
   totals: Record<string, TokenBuckets>
   /** 独立说明字段：heuristic 估算成分提示（非账单） */
   note: string
+  /**
+   * 成员级计量观测（P2-5 口径①/②）。缺省 = 旧文件或从未观测过 → 覆盖率保守 `partial`
+   * （「没记录」不能被读成「都计量了」）。
+   */
+  memberMeter?: Record<string, MemberMeterState>
 }
 
 export function zeroBuckets(): TokenBuckets {
@@ -104,6 +133,51 @@ export function coverageOf(buckets: TokenBuckets | undefined | null): TokenCover
   const unmetered = countOrZero(buckets.unmeteredCalls)
   if (metered === calls && unmetered === 0) return 'full'
   return 'partial'
+}
+
+/**
+ * 文件级覆盖率派生（P2-5 的「该数的都数到了吗」；与桶级 `coverageOf` 是两个问题）。
+ *
+ * 为什么桶级不够：桶里的 `call`s 只来自**读到的**累计量，按构造每一次被计数的调用都带 usage
+ * 背书（所以桶级几乎恒为 `full`），它回答不了「采样是否完整」。真正的漏数发生在**某个成员的
+ * usage 读不到**时——那些调用根本进不了四桶，总量看起来对但样本不全。
+ *
+ * 判据（两个证据都要成立才判 `full`，任一不成立就保守降级）：
+ *  ① **桶级证据**：每个有调用的成员，`coverageOf(bucket) === 'full'`
+ *     （`meteredCalls === calls` 且无未计量）——证明「已计数的调用都有 usage 背书」；
+ *  ② **成员级证据**：该成员本轮观测不是 `unreadable`（读不到 = 可能有整段调用根本没进四桶）。
+ *
+ * 三态：
+ *  - `none`：没有任何已计数调用（没有可覆盖的样本）；
+ *  - `partial`：有桶的计量计数缺失（旧 `tokens.json`，无法证明）/ 计数与 `calls` 不符 /
+ *    有成员 `unreadable`；
+ *  - `full`：上面两条证据对**每个**有调用的成员都成立。
+ *
+ * 为什么允许「观测表整体缺失但有桶级证据」判 full：`meteredCalls === calls` 本身就是完整性的
+ * 证明（离线快照会重建 `TokensFile` 丢掉观测表，若因此一律 partial 就变成「离线永远不可信」，
+ * 同样是失真——只是方向相反）。反过来，有观测表缺某一项时以桶级证据为准。
+ *
+ * 保守优先：任何一处「无法证明」都落 `partial` —— 宁可少一个徽章，绝不谎报 `full`
+ * （项目纪律：成本数字被误信的代价远大于少一个标注）。
+ * 只读：不修改入参（与 `coverageOf` 一样是纯派生）。
+ */
+export function coverageOfFile(file: TokensFile | undefined | null): TokenCoverage {
+  if (!file || typeof file !== 'object') return 'none'
+  const totals = (file.totals ?? {}) as Record<string, TokenBuckets | undefined>
+  const memberIds = Object.keys(totals)
+  if (memberIds.length === 0) return 'none'
+  // 只有「有调用的成员」才需要被覆盖；零调用成员不构成样本缺口
+  const withCalls = memberIds.filter((id) => countOrZero(totals[id]?.calls) > 0)
+  if (withCalls.length === 0) return 'none'
+  const meter = file.memberMeter
+  const hasMeter = !!meter && typeof meter === 'object'
+  for (const id of withCalls) {
+    // ① 桶级证据：该成员的已计数调用必须全部有 usage 背书（旧文件缺计数 → partial）
+    if (coverageOf(totals[id]) !== 'full') return 'partial'
+    // ② 成员级证据：本轮读不到 usage 的成员可能整段漏数 → 样本不全
+    if (hasMeter && meter?.[id] === 'unreadable') return 'partial'
+  }
+  return 'full'
 }
 
 /**
