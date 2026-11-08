@@ -76,7 +76,7 @@
 | 宿主插槽 | 我们的东西 | 屏 |
 |---|---|---|
 | `main`（key `myteam`） | 完整工作台：信息条 + 五域 tab + 内容 + 成本栏 | 全部 22 屏 |
-| `sidebar.panellist`（order 20） | 图标 + 未读 badge，点击进 `main` | `board.html` 左侧图标轨第 2 项 |
+| `sidebar.panellist`（order 20） | 图标（**未读不在侧栏入口**：CHG-121 裁决——全局入口 = 全局库，未读是团队/会话级注意力，由 `composer.dock` 的 DockChip 在会话内承载），点击进 `main` | `board.html` 左侧图标轨第 2 项 |
 | `conversation.composer.dock`（order 30） | 状态 chip「3 名成员在跑 · 2 条待你裁决」，点击跳面板；`live=0 && unread=0` 时不渲染 | `conversation.html` 输入框上方 |
 | `conversation.view` | 会话页内的团队视图切换（同一份组件，换挂载点） | `conversation.html` 会话头 seg |
 | `tool.call.toolview`（`myteam_*`） | 工具调用卡片展开成迷你任务卡（任务号 + 状态 + 一行标题 + 「在面板打开」） | `conversation.html` 三张 `.toolcard` |
