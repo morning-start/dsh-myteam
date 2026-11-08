@@ -11,6 +11,9 @@
  * parameterSchemaSpecToJsonSchema 编译，否则 schema 缺 type: object 被提供方拒绝）。
  */
 
+import { jsonOutput } from '../core/tools/output-contract.ts'
+import type { ToolOutput } from '../core/tools/output-contract.ts'
+
 export type ParamSpec = Record<string, unknown>
 
 const str = (description: string, required = false) => ({ type: 'string', description, ...(required ? { required: true } : {}) })
@@ -68,32 +71,39 @@ export interface ToolDef {
   parameters: ParamSpec
 }
 
-/** 宿主 ctx.tools.register 的 output 契约（T0 实证 tools.register 校验器）：
- *  output 缺失 / render 非函数 / presentationMeta 非函数 → TypeError
- *  `tool "X" must declare output { schema, render, presentationMeta? }`；
- *  且 execute 返回值会经 output.schema 校验（createSuccessResult →
- *  validateJsonSchemaValue，违规抛 ToolOutputError）。全部 myteam 工具的
- *  execute 都返回 { status: string, ... } 对象 → 共享这一个声明即精确匹配。 */
-export interface ToolOutput {
-  schema: ParamSpec
-  render: (args: Record<string, unknown>, value: unknown) => Array<{ type: string; [key: string]: unknown }>
-}
+/**
+ * P1-6（docs/21 §6）：**工具输出契约**——从「只声明 status」升级为**完整结果契约**。
+ *
+ * 宿主 `ctx.tools.register` 的校验器（T0 实证）要求 `output { schema, render }`：
+ *  output 缺失 / render 非函数 → TypeError；execute 返回值会经 `output.schema` 校验
+ *  （createSuccessResult → validateJsonSchemaValue，违规抛 ToolOutputError）。
+ *  旧实现只声明 `{ status: string }` —— 结果契约只声明了一个字段，
+ *  校验等于没做，面板/模型也不知道「这个工具能拿到什么」。
+ *
+ * 现在契约的唯一来源是 `core/tools/output-contract.ts`（完整 schema + 紧凑 render +
+ * 运行时 `assertToolResult`，为什么这么设计见该文件头顶）。本文件只做**再导出**，
+ * 让 62 个工具的定义与它们的输出契约仍然在同一个 import 面上。
+ */
+export {
+  assertToolResult,
+  describeContract,
+  jsonOutput,
+  outputForTool,
+  RESULT_STATUSES,
+  TOOL_CONTRACT_CODE,
+  TOOL_OUTPUT_FIELDS,
+  TOOL_RESULT_SCHEMA,
+} from '../core/tools/output-contract.ts'
+export type { JsonSchemaSpec, ToolContractEntry, ToolOutput, ToolResultCheck } from '../core/tools/output-contract.ts'
 
-export function toolOutput(): ToolOutput {
-  return {
-    schema: {
-      type: 'object',
-      properties: {
-        status: { type: 'string', description: '结果状态：成功路径（ok/staged/approved/claimed/sent/...）或 error/confirm-required/timeout 等' },
-      },
-      required: ['status'],
-    },
-    render(_args, value) {
-      // 内容块数组（isContentBlockShape：plain object + string type）；text 块是文档保证的最小形态
-      return [{ type: 'text', text: JSON.stringify(value, null, 2) }]
-    },
-  }
-}
+/**
+ * @deprecated 用 `jsonOutput()`（等价）。
+ *
+ * 为什么还留着这个名字：`host.ts` 的两个注册点（lead / member 各一处）写的是
+ * `output: toolOutput()`，本批纪律是**只改 output 声明、不动 host.ts**——
+ * 别名让那两处零改动就吃到新契约。等 host 侧接 `outputForTool(def.name)` 后删掉它。
+ */
+export const toolOutput = jsonOutput
 
 /* ── 成员工具（9 个，v2.5 +read_knowledge）────────────────────────────────────── */
 

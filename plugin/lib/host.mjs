@@ -19,7 +19,7 @@
  * 零依赖边界（PRD §2/§9）：绝不 import/调用 agentTeams 服务与内置团队工具；
  * 宿主服务白名单见 PRD §9（agents/subagents/tools/typert/tokenMeter/sessionProjections）。
  */
-import { join, isAbsolute, sep } from 'node:path'
+import { dirname, join, isAbsolute, sep } from 'node:path'
 import { randomUUID, createHash } from 'node:crypto'
 import { existsSync, mkdirSync, writeFileSync, readFileSync, readdirSync, statSync, unlinkSync } from 'node:fs'
 import { ensureWorkplaceDirs, ensureGitignoreManagedBlock } from './host-workspace.mjs'
@@ -27,7 +27,9 @@ import { resolveProjectRoot, storeLayout, teamLedgerPath as teamLedgerPathOf, sc
 // CHG-103：作用域契约（全局 vs 项目级）——角色两级都可用，任务/历史/状态只能项目级
 import { normalizeScope } from './core/workspace/scope.mjs'
 import { TeamService, bootstrapTeam,                  } from './core/service.mjs'
-import { leadToolDefs, memberToolDefs, toolOutput,              } from './tools/defs.mjs'
+import { leadToolDefs, memberToolDefs,              } from './tools/defs.mjs'
+// CHG-148（P1-6）：按工具名取完整结果契约（jsonOutput 双声明），不再用统一空 schema
+import { outputForTool } from './core/tools/output-contract.mjs'
 import { wakeDecisionsFor, changeSince,                   } from './core/scheduler/wake.mjs'
 import { validatePlan, TERMINAL_STATES, downstreamOf, GATE_REJECT_BUDGET,                     } from './core/scheduler/state.mjs'
 import { diffTaskInput, structuralFieldsOf } from './core/tasks/diff.mjs'
@@ -68,6 +70,18 @@ import {
                          
 } from './core/host/session-archaeology.mjs'
 import { recoveryAction, checkArchiveGate, reconcileProvisioning,                                                                                    } from './core/scheduler/recovery.mjs'
+/* P1-1/P1-2 接线（docs/21 §6，CHG-144 的纯函数模块）：产物新鲜度指纹 + 交付判定三级信号 */
+import { artifactBaseline, artifactIsStale, mergeBaseline,                                          } from './core/gates/artifact-freshness.mjs'
+import { extractEvidenceBlock, judgeDeliverable,                        } from './core/gates/delivery-verdict.mjs'
+/* P1-4（docs/21 §6）：dispose 有界结算（准入截止 + allSettled + 超时 + 预期取消识别） */
+import {
+  createAdmissionGate,
+  isCancellation,
+  settleWithin,
+  DEFAULT_DISPOSAL_TIMEOUT_MS,
+                     
+                          
+} from './core/lifecycle.mjs'
 /* CHG-135（docs/20 §5.2）：成员卡（子代理 / 会话依附角色的落盘事实） */
 import { writeMemberCard } from './core/members/member-card.mjs'
 /* CHG-137/138（docs/19 §3）：工具权限档位（单一事实源 + 运行时门禁） */
@@ -192,6 +206,14 @@ function sessionCwdOf(rt         )                     {
      
                                  
                                    
+     
+                                                      
+    
+                                                            
+                                                     
+                                                    
+     
+                            
  
 
 /* ── 纯函数域（无 ctx 依赖，便于单测 J1）────────────────────────── */
@@ -263,6 +285,115 @@ export function readLedgerEvents(ledgerPath        )                            
     }
   })
   return { events, warnings }
+}
+
+/* ── P1-1 / P1-2 接线（docs/21 §6）：产物基线 + 交付判定 ───────────────── */
+
+/**
+ * P1-2 交付判定的正文长度下限（按任务类型）。
+ *
+ * 为什么按类型分档：实现类（dev）的产出主要在文件里，正文只需要简短汇报；
+ * 需求 / 验收类（prd/qa）的交付物**就是文字结论**，短正文必然信息不足。
+ * 为什么导出常量：面板、提示词、文档要引用同一组数字——各写一份必然漂移。
+ */
+export const DELIVERABLE_MIN_LENGTH                                                 = {
+  dev: 60,
+  qa: 250,
+  prd: 400,
+}
+
+/**
+ * 任务类型 → 正文长度下限。未知类型按 `dev`（实现类最常见、下限最宽松）：
+ * 挡住「空话冒充交付」靠的是下限本身，不是分档的精度。
+ */
+export function deliverableMinLength(taskType         )         {
+  const type = String(taskType ?? '').trim().toLowerCase()
+  if (type.length === 0) return DELIVERABLE_MIN_LENGTH.dev
+  if (type.includes('qa') || type.includes('test') || type.includes('accept')) return DELIVERABLE_MIN_LENGTH.qa
+  if (type.includes('prd') || type.includes('req') || type.includes('design') || type.includes('doc')) return DELIVERABLE_MIN_LENGTH.prd
+  return DELIVERABLE_MIN_LENGTH.dev
+}
+
+/**
+ * 拍基线时文件**还不存在**的哨兵指纹。
+ *
+ * 为什么需要它：产物通常由成员在本阶段**创建**，阶段起点上它并不存在。若按
+ * `artifactBaseline` 的「读不到就不写键」处理，`artifactIsStale` 会把「本阶段新建的文件」
+ * 判成陈旧（缺键 = 不可判 = 不认交付）——正常交付反而全被拒。
+ * 哨兵与任何真实指纹（`size:mtimeMs`）都不相等，于是：后来出现 = 指纹变了 = 新鲜；
+ * 一直没出现 = 当前读不到 = 陈旧。两种情形都判对。
+ */
+export const ABSENT_PATH_FINGERPRINT = 'absent'
+
+/**
+ * 产物内容读取上限（字符）：交付判定只需要「非空 + 够长」，不需要把整个大文件读进内存
+ * （产物可能是几 MB 的构建日志；判定在 gate 路径上，不该因为读文件拖慢卸载 / 裁决）。
+ */
+const ARTIFACT_TEXT_READ_LIMIT = 512 * 1024
+
+/** 产物基线落盘结构（`.dsh-myteam/state/artifacts/<teamId>/<taskId>.json`） */
+                                         
+            
+                
+                
+                                           
+                    
+                                                            
+                            
+ 
+
+/** 读产物基线记录（缺失 / 坏 JSON → undefined：调用方据此判「这个任务没拍过基线」） */
+export function readArtifactBaselineRecord(filePath        )                                     {
+  if (!existsSync(filePath)) return undefined
+  try {
+    const parsed = JSON.parse(readFileSync(filePath, 'utf8'))                                          
+    if (!parsed || typeof parsed !== 'object' || !parsed.baseline || typeof parsed.baseline !== 'object') return undefined
+    return {
+      version: 1,
+      teamId: String(parsed.teamId ?? ''),
+      taskId: String(parsed.taskId ?? ''),
+      capturedAt: typeof parsed.capturedAt === 'string' ? parsed.capturedAt : new Date(0).toISOString(),
+      baseline: parsed.baseline                    ,
+    }
+  } catch {
+    // 坏记录当「没拍过」：宁可走兼容分支（有告警留痕），也不因为一条坏 JSON 让 archive 门炸掉
+    return undefined
+  }
+}
+
+/** 写产物基线记录（父目录自动创建；返回落盘路径） */
+export function writeArtifactBaselineRecord(filePath        , record                        )         {
+  mkdirSync(dirname(filePath), { recursive: true })
+  writeFileSync(filePath, `${JSON.stringify(record, null, 2)}\n`, 'utf8')
+  return filePath
+}
+
+/**
+ * 从 `deliverableSpec` 抽取候选产物路径：`path` + `candidates`（若存在）+ 调用方追加的申报路径。
+ *
+ * `candidates` 两种形态都收（字符串数组 / `{path}` 数组）：任务定义由模型产出，
+ * 形态不总是规范——一条路径解析失败不该让整条交付判定失效。
+ */
+export function deliverablePathsOf(spec         , extra                    = [])           {
+  const out           = []
+  const push = (value         )       => {
+    if (typeof value === 'string') {
+      const trimmed = value.trim()
+      if (trimmed.length > 0) out.push(trimmed)
+      return
+    }
+    if (value && typeof value === 'object') {
+      const candidate = (value                      ).path
+      if (typeof candidate === 'string' && candidate.trim().length > 0) out.push(candidate.trim())
+    }
+  }
+  if (spec && typeof spec === 'object') {
+    push((spec                      ).path)
+    const candidates = (spec                            ).candidates
+    if (Array.isArray(candidates)) for (const candidate of candidates) push(candidate)
+  }
+  for (const value of extra) push(value)
+  return [...new Set(out)]
 }
 
 /** 从账本统计 plan.clarify 事件数（FR-1.6 硬终止计数，T7 防统计盲区） */
@@ -386,6 +517,12 @@ export class MyTeamHost {
           rt             
           services = new Map                     ()
           memberHandles = new Map             () // memberId → AgentHandle
+  /**
+   * P1-4（docs/21 §6）：运行时准入闸门——`dispose()` 关闸后，新起的成员操作立即被拒，
+   * 在飞操作在 `disposalTimeoutMs` 内有界结算（非预期失败聚合成一条 warn）。
+   * 在 constructor 里用行 config 构造（字段初始化早于 constructor body，拿不到 this.config）。
+   */
+                   disposalGate               
   /** CHG-71 派单唤醒节流：team 级（合并突发事件）与 member 级（防重复打扰） */
           lastDispatchAt = new Map                ()
           lastDispatchWakeAt = new Map                ()
@@ -457,6 +594,8 @@ export class MyTeamHost {
   constructor(rt             , config               = {}) {
     this.rt = rt
     this.config = { hideBuiltinTeamTools: true, ...config }
+    // P1-4：准入闸门的超时来自行 config（缺省 5s；非法值回落默认）
+    this.disposalGate = createAdmissionGate({ disposalTimeoutMs: this.disposalTimeoutMs() })
     // configOverride 优先级：行 config 显式 > rt 自有属性（t11/t21 测试注入路径）。
     // 真实宿主 rt 是 Cordis Context 代理，且宿主 asar 全文无 configOverride（0 命中）
     // → 真实环境恒 undefined，TeamService 走 loadEffectiveConfig 默认值。
@@ -610,13 +749,78 @@ export class MyTeamHost {
     }
   }
 
-  /** 卸载清理（apply 返回的 disposer 调用）：dispose 全部成员会话 */
+  /**
+   * 卸载清理（apply 返回的 disposer 调用）：**有界**排空全部成员会话（P1-4，docs/21 §6）。
+   *
+   * 顺序即协议（不要调换）：
+   *  ① **关准入**（`disposalGate.close()`）——此后新起的成员操作 / spawn 结算一律立即拒绝，
+   *     不再往正在拆的运行时里写账本；
+   *  ② **收集在飞**——成员会话的 `dispose()` 包装成 operation（同步抛错也包成 rejected
+   *     Promise，否则一条成员崩掉会中断整批排空）；
+   *  ③ **有界结算**（`settleWithin`）——`allSettled` + `disposalTimeoutMs`（默认 5s）；
+   *  ④ **非预期失败聚合成一条 warn**（AggregateError 语义），**预期取消不告警**
+   *     （卸载期间成员会话被取消是正常结果；把取消当失败报会让真失败被假告警淹没）。
+   *
+   * 为什么保持**同步返回**：宿主 effect disposer 不 await 返回值（`apply()` 里
+   * `ctx.effect(() => () => host.dispose())`），签名一旦改成 async，宿主会拿到一个
+   * 没人 await 的 Promise —— 卸载仍然不等，但错误变得不可观测。所以排空放后台，
+   * 但**必须有界**（超时留痕）且**必须留日志**（「消失了」与「排空了」要可区分）。
+   *
+   * 幂等：effect 与 `myteam_disband` 可能各调一次，第二次直接返回（不重复排空）。
+   */
   dispose()       {
-    for (const handle of this.memberHandles.values()) {
-      try { void handle?.dispose?.() } catch { /* 排空尽力而为 */ }
+    if (this.disposalGate.disposed) return
+    const operations                       = []
+    for (const [memberId, handle] of this.memberHandles) {
+      // 同步抛错 → rejected Promise（统一走结算段，两条路径不分叉）
+      operations.push({ name: `member:${memberId}`, promise: Promise.resolve().then(() => handle?.dispose?.()) })
     }
+    // ① 关闸（在收集之后、结算之前）：闸门只关心「已准入的」，这批 operation 正是
+    this.disposalGate.close('myteam host dispose()')
+    // ② 已在飞的运行时操作（spawn 结算段等）也要收进来——它们同样在写账本
+    operations.push(...this.disposalGate.pending())
     this.memberHandles.clear()
     this.services.clear()
+    void this.settleDisposal(operations)
+  }
+
+  /**
+   * P1-4 的排空段（异步；`dispose()` 只负责 fire-and-forget）。
+   *
+   * 为什么把非预期失败**聚合成一条**：一次卸载里 3 个成员都炸了，应该看到 1 条
+   * 「3 个失败」而不是 3 条互不相关的告警（日志被截断时后者还会丢）。
+   * 为什么超时也算一条 warn：超时 = 没排空，必须让人知道（不是「已经收干净」）。
+   */
+          async settleDisposal(operations                               )                {
+    const timeoutMs = this.disposalTimeoutMs()
+    try {
+      const outcome = await settleWithin(operations, timeoutMs)
+      const unexpected = outcome.failures.filter((failure) => !isCancellation(failure.reason))
+      if (unexpected.length > 0) {
+        const detail = unexpected
+          .map((failure) => `${failure.name}: ${String((failure.reason                     )?.message ?? failure.reason)}`)
+          .join('; ')
+        this.log('warn', `dispose settled with ${unexpected.length} unexpected failure(s) (AggregateError semantics): ${detail}`)
+      }
+      if (outcome.timedOut.length > 0) {
+        this.log(
+          'warn',
+          `dispose timeout after ${timeoutMs}ms: ${outcome.timedOut.length} member session(s) still pending (${outcome.timedOut.join(', ')}); 已放后台，宿主退出前不再等待`,
+        )
+      }
+      if (unexpected.length === 0 && outcome.timedOut.length === 0) {
+        this.log('info', `dispose settled ${outcome.settled} member session(s)`)
+      }
+    } catch (e) {
+      // 排空段自身异常（不该发生）：卸载路径上没有上家，只能留日志
+      this.log('warn', `dispose settlement failed: ${String(e)}`)
+    }
+  }
+
+  /** P1-4 的有界结算超时（行 config 缺省 / 非法 → `DEFAULT_DISPOSAL_TIMEOUT_MS`） */
+          disposalTimeoutMs()         {
+    const value = this.config?.disposalTimeoutMs
+    return typeof value === 'number' && Number.isFinite(value) && value > 0 ? value : DEFAULT_DISPOSAL_TIMEOUT_MS
   }
 
   /** T13：MyTeamRemote 挂载。TypertRemoteService 构造即完成 Cordis provide + typertRemote
@@ -816,7 +1020,7 @@ export class MyTeamHost {
       this.rt.tools.register({
         ...compiled,
         // 宿主 output 契约（tools.register 校验器强制）：schema 会被用于 execute 返回值校验
-        output: toolOutput(),
+        output: outputForTool(def.name),
         execute: (args                         , exec                 ) => {
           const out = this.executeLeadTool(def.name, args, exec)
           // myteam_wait_for_change 走异步长轮询；其余工具保持同步返回
@@ -1454,6 +1658,9 @@ export class MyTeamHost {
       return { status: 'error', code: r.code, message: r.message, ...(r.currentRevision !== undefined ? { currentRevision: r.currentRevision } : {}) }
     }
     const after = this.service(teamId).projectionSnapshot.tasks[taskId]
+    // P1-1 接线：重规划 = 新阶段（续跑）——补拍基线（只补缺失键，既有基线仍是首次快照）。
+    // 新声明的产物路径在这里落哨兵，重规划之后写出来的才算「本阶段写的」。
+    this.captureArtifactBaseline(teamId, taskId)
     const memberIds = Array.isArray(args.memberIds)
       ? (args.memberIds             ).filter((id)               => typeof id === 'string' && id.length > 0)
       : []
@@ -1571,10 +1778,20 @@ export class MyTeamHost {
       }
     }
     const scopeAudit = this.scopeAuditFor(teamId, taskId)
+    // P1-2 接线（review 门）：交付判定**只留痕不否决** —— review 门是人 / 队长的显式裁决
+    // （FR-5.1 强制交叉审查），交付判定的否决权在 archive 门（host 事实面）。
+    // 记进同一份 `task.gate.result` 载荷，账本里能看出「这次裁决时交付信号是什么」。
+    const delivery = this.deliveryJudgementFor(teamId, taskId).payload
     const r = this.commit(teamId, {
       actor,
       type: 'task.gate.result',
-      payload: { teamId, taskId, gate, verdict, ...(reason ? { reason } : {}), reviewerMemberId: reviewer, ...(scopeAudit ? { scopeAudit } : {}) },
+      payload: {
+        teamId, taskId, gate, verdict,
+        ...(reason ? { reason } : {}),
+        reviewerMemberId: reviewer,
+        ...(scopeAudit ? { scopeAudit } : {}),
+        delivery,
+      },
       ...(this.expectedRevisionOf(args) !== undefined ? { expectedRevision: this.expectedRevisionOf(args) } : {}),
     })
     if (!r.ok) return { status: 'error', code: r.code, message: r.message, ...(r.currentRevision !== undefined ? { currentRevision: r.currentRevision } : {}) }
@@ -1585,6 +1802,7 @@ export class MyTeamHost {
         gate,
         taskState: task.state,
         rejectCount: rejectCount + 1,
+        delivery,
         note: `已打回（第 ${rejectCount + 1} 轮）；任务留在 ${task.state}，实现者修复后重新提交 done 再复验`,
       }
     }
@@ -1594,6 +1812,7 @@ export class MyTeamHost {
       status: 'gate-pass',
       gate,
       taskState: this.service(teamId).projectionSnapshot.tasks[taskId]?.state ?? 'done',
+      delivery,
       ...(auto.note ? { note: auto.note } : {}),
     }
   }
@@ -1780,11 +1999,202 @@ export class MyTeamHost {
     }
   }
 
+  /* ── P1-1 / P1-2 接线：产物基线 + 交付判定 ───────────────────────── */
+
+  /** 产物基线落点：`.dsh-myteam/state/artifacts/<teamId>/<taskId>.json` */
+          artifactBaselinePath(teamId        , taskId        )         {
+    // 为什么落在 `state/` 而不是 `tasks/`：基线是**可由文件事实重建**的派生数据
+    // （删掉只会退化成「没拍过基线」的兼容分支），按布局契约属于 `state/`；
+    // 放进入库目录会让每次 claim 都产生 git 噪音，且基线本身不该被 review/共享。
+    return join(storeLayout(this.workspaceRoot).state, 'artifacts', String(teamId), `${String(taskId)}.json`)
+  }
+
+  /** 产物路径 → 绝对路径（相对工作区；绝对路径原样） */
+          resolveArtifactPath(path        )         {
+    return isAbsolute(path) ? path : join(this.workspaceRoot, path)
+  }
+
+  /** 读产物指纹（读不到 → undefined：**不要把异常抛进判定**） */
+          statArtifact(path        )                           {
+    try {
+      const stat = statSync(this.resolveArtifactPath(path))
+      return { size: stat.size, mtimeMs: stat.mtimeMs }
+    } catch {
+      return undefined
+    }
+  }
+
+  /**
+   * P1-1 接线：任务进入 `in_progress`（claim 成功 / 申报 in_progress / 重规划）时拍产物基线。
+   *
+   * 为什么必须在**阶段开始**拍：基线语义是「本阶段开始时这些文件长什么样」，
+   * 只有它固定在阶段起点，「指纹变了」才等于「本阶段真的写过它」。
+   *
+   * 为什么给「拍基线时不存在」的路径写哨兵：见 `ABSENT_PATH_FINGERPRINT`。
+   *
+   * 续跑 / 重试只补缺失键（`mergeBaseline`）：重拍若能覆盖，「第一轮写了、第二轮没写」
+   * 会把第一轮的写入洗成基线，第二轮反而凭第一轮的文件被判新鲜 —— 正是要防的假绿。
+   */
+          captureArtifactBaseline(teamId        , taskId        )                   {
+    try {
+      const task = this.service(teamId).projectionSnapshot.tasks[taskId]
+      if (!task) return {}
+      const paths = deliverablePathsOf(task.input.deliverableSpec)
+      if (paths.length === 0) return {}
+      const filePath = this.artifactBaselinePath(teamId, taskId)
+      const previous = readArtifactBaselineRecord(filePath)
+      const next = artifactBaseline(paths, (path) => this.statArtifact(path))
+      for (const path of paths) {
+        if (!Object.prototype.hasOwnProperty.call(next, path)) next[path] = ABSENT_PATH_FINGERPRINT
+      }
+      const baseline = previous ? mergeBaseline(previous.baseline, next) : next
+      writeArtifactBaselineRecord(filePath, {
+        version: 1,
+        teamId: String(teamId),
+        taskId: String(taskId),
+        capturedAt: previous?.capturedAt ?? new Date().toISOString(),
+        baseline,
+      })
+      return baseline
+    } catch (e) {
+      // 基线是「判交付的客观凭据」：拍不下来只告警（archive 门会按「没拍过基线」兼容放行）
+      this.log('warn', `artifact baseline capture failed (${teamId}/${taskId}): ${String(e)}`)
+      return {}
+    }
+  }
+
+  /**
+   * P1-1：产物新鲜度过滤（**stale 的当不存在**）。
+   *
+   * 兼容口径（旧账本 / 未领取过的任务）：**没有基线记录** → 不过滤（全部当新鲜）。
+   * 理由：接线之前入库的任务从没拍过基线，按「缺键 = 陈旧」判会把历史任务全拒掉；
+   * 而假绿的防线仍在 —— 这类任务拿不到「空收尾用产物内容顶替」的交付兜底
+   * （见 `deliveryJudgementFor` 的 docText），且归档结果里会带 `freshness: 'baseline-missing'`
+   * 供审计区分「真的新鲜」与「没拍过基线」。
+   *
+   * `enforced` 只是为了留痕：判定本身已经把 stale 的路径从新鲜集合里剔除了。
+   */
+          artifactFreshnessFor(
+    teamId        ,
+    taskId        ,
+    declaredPaths                    = [],
+  )                                                          {
+    const task = this.service(teamId).projectionSnapshot.tasks[taskId]
+    const paths = deliverablePathsOf(task?.input.deliverableSpec, declaredPaths)
+    const record = readArtifactBaselineRecord(this.artifactBaselinePath(teamId, taskId))
+    if (!record) return { fresh: [...paths], stale: [], enforced: false }
+    const fresh           = []
+    const stale           = []
+    for (const path of paths) {
+      // 定义变更（rescope 加的新产物）在基线上没有这个键 —— 那不是「本阶段没写」，
+      // 而是「拍基线时还没这条要求」：放行并留痕，不当陈旧（否则重规划后永远过不了门）。
+      if (!Object.prototype.hasOwnProperty.call(record.baseline, path)) {
+        fresh.push(path)
+        continue
+      }
+      if (artifactIsStale(record.baseline, path, this.statArtifact(path))) stale.push(path)
+      else fresh.push(path)
+    }
+    return { fresh, stale, enforced: true }
+  }
+
+  /**
+   * 读产物内容（P1-2 空收尾兜底用的 `docText`）：**只读新鲜产物**，空文件不贡献内容。
+   *
+   * 为什么空文件要单独跳过（而不是让空串参与长度比较）：`docText` 会喂给
+   * `judgeDeliverable` 的「空文件不算交付」判据，一个 0 字节文件在这里留下空块，
+   * 只会让「产物存在」和「产物为空」在判定里长得一样。跳过 = 空文件等价于不存在。
+   */
+          artifactTextOf(paths                   )         {
+    const chunks           = []
+    for (const path of paths) {
+      try {
+        const text = readFileSync(this.resolveArtifactPath(path), 'utf8')
+        const trimmed = text.trim()
+        if (trimmed.length === 0) continue
+        chunks.push(trimmed.slice(0, ARTIFACT_TEXT_READ_LIMIT))
+      } catch {
+        // 读不到 = 没有内容可顶替（陈旧判定已在 artifactFreshnessFor 里做过）
+      }
+    }
+    return chunks.join('\n')
+  }
+
+  /**
+   * 取「申报 done 时的回复正文」（P1-2 的 `text` / `stopReason` 来源）。
+   *
+   * 为什么从账本取而不是再存一份：`task.completed` 的 `summary` 就是成员的回复正文，
+   * 账本已经持久化它；再存一份必然两份漂移（而且重启后只剩账本）。
+   * 找不到 completed 事件 → **不传** stopReason：空收尾分支只在真正确认过正常收尾时才该生效，
+   * 凭空造 `completed` 会让「短正文 + 产物凑长度」被误判成交付。
+   */
+          completionReplyOf(teamId        , taskId        )                                        {
+    try {
+      const events = readLedgerEvents(this.service(teamId).ledgerPath).events
+      for (let i = events.length - 1; i >= 0; i -= 1) {
+        const event = events[i]
+        if (event?.type !== 'task.completed') continue
+        if (String(event.payload?.taskId ?? '') !== String(taskId)) continue
+        return { text: typeof event.payload?.summary === 'string' ? event.payload.summary : '', stopReason: 'completed' }
+      }
+      return { text: '' }
+    } catch {
+      return { text: '' }
+    }
+  }
+
+  /**
+   * P1-2 交付判定（review 门留痕 / archive 门否决共用同一口径）。
+   *
+   * `hasEvidence` 取**客观事实**：账本里有 `task.evidence` 事件（FR-5.0 的要求：
+   * 申报 done 前必须有同 attempt 的证据事件），或回复正文里带 `[Verification evidence]` 块。
+   * 为什么结构化证据也算：成员的证据是 `myteam_update_task` 的结构化参数、落的是
+   * `task.evidence` 事件 —— 它比「正文里有没有那行标记」更硬（正文可能被摘要截断）。
+   *
+   * `docText` 只取**新鲜**产物的内容：陈旧文件是上游写的，不能当本阶段的交付顶替。
+   */
+          deliveryJudgementFor(teamId        , taskId        )                                                                     {
+    const task = this.service(teamId).projectionSnapshot.tasks[taskId]
+    const reply = this.completionReplyOf(teamId, taskId)
+    const freshness = this.artifactFreshnessFor(teamId, taskId)
+    const hasEvidence = extractEvidenceBlock(reply.text) !== undefined || (task?.evidenceRefs?.length ?? 0) > 0
+    const minLength = deliverableMinLength(task?.input.taskType)
+    const docText = this.artifactTextOf(freshness.fresh)
+    const judgement = judgeDeliverable({
+      ...(reply.stopReason ? { stopReason: reply.stopReason } : {}),
+      text: reply.text,
+      minLength,
+      docText,
+      hasEvidence,
+    })
+    return {
+      judgement,
+      payload: {
+        verdict: judgement.verdict,
+        signal: judgement.signal,
+        reason: judgement.reason,
+        minLength,
+        hasEvidence,
+        docLength: docText.trim().length,
+        freshArtifacts: freshness.fresh,
+        staleArtifacts: freshness.stale,
+        // 区分「真的新鲜」与「没拍过基线」：兼容分支不该看起来像一次成功的新鲜度校验
+        ...(freshness.enforced ? {} : { freshness: 'baseline-missing' }),
+      },
+    }
+  }
+
   /**
    * archive 门落位校验（FR-10.4）：按 `deliverableSpec` 约定路径检查产物是否真实存在。
    * pass → 补写 `task.deliverable`（实存路径）再落 `task.gate.result` pass（fold 推进 done）；
    * fail → 落 `task.gate.result` fail 留档（repair 流转 M2），调用方从返回 note 可见。
    * 抽取自 FIX-10 的成员 `update_task` 分支：CHG-86 起队长工具 / 面板 / 成员三处共用同一判定。
+   *
+   * P1-1/P1-2 接线后（docs/21 §6）：两道判据**同时**成立才算 pass——
+   *  ① **落位**：新鲜产物里至少有一个真实存在（stale 的不算数）；
+   *  ② **交付判定**：`judgeDeliverable` 判 delivered（空文件 / 无证据 + 无正文 / 有拒绝词 = 不算交付）。
+   * 判定结论（verdict / signal / 新鲜与陈旧清单）随 `task.gate.result` 载荷落账本，
+   * **不新增事件型**（保持 40 型）。这样「产物在但没人写过它」这类假绿在账本里可查。
    */
           evaluateArchiveGate(
     teamId        ,
@@ -1797,29 +2207,41 @@ export class MyTeamHost {
       return { pass: false, note: '', reason: `task "${taskId}" is not at gate:archive` }
     }
     const existsUnderWorkspace = (p        ) => (isAbsolute(p) ? existsSync(p) : existsSync(join(this.workspaceRoot, p)))
-    const verdict = checkArchiveGate(
+    // ① P1-1：只把**新鲜**产物交给落位校验（stale 的当不存在）
+    const freshness = this.artifactFreshnessFor(teamId, taskId, declaredPaths)
+    const placement = checkArchiveGate(
       task.input.deliverableSpec                                ,
-      declaredPaths.map((p) => ({ path: p })),
+      freshness.fresh.map((path) => ({ path })),
       existsUnderWorkspace,
     )
-    if (verdict.pass) {
-      for (const c of verdict.checks) {
+    // ② P1-2：交付判定（产物陈旧 / 空文件 / 无证据 / 命中拒绝词 都不算交付）
+    const { judgement, payload } = this.deliveryJudgementFor(teamId, taskId)
+    const delivered = placement.pass && judgement.verdict === 'delivered'
+    if (delivered) {
+      for (const c of placement.checks) {
         if (c.exists) this.commit(teamId, { actor, type: 'task.deliverable', payload: { teamId, taskId, path: c.path } })
       }
-      const gr = this.commit(teamId, { actor, type: 'task.gate.result', payload: { teamId, taskId, gate: 'archive', verdict: 'pass' } })
+      const gr = this.commit(teamId, {
+        actor,
+        type: 'task.gate.result',
+        payload: { teamId, taskId, gate: 'archive', verdict: 'pass', delivery: payload },
+      })
       return gr.ok
-        ? { pass: true, note: 'archive gate pass（落位校验通过），任务已归档' }
+        ? { pass: true, note: `archive gate pass（落位校验通过 + 交付判定 ${judgement.verdict}），任务已归档` }
         : { pass: false, note: '', reason: gr.message ?? 'gate.result commit failed' }
     }
+    const reason = placement.pass
+      ? `交付判定未通过（${judgement.signal}）：${judgement.reason}`
+      : (placement.reason ?? 'deliverable 未落位')
     this.commit(teamId, {
       actor,
       type: 'task.gate.result',
-      payload: { teamId, taskId, gate: 'archive', verdict: 'fail', reason: verdict.reason },
+      payload: { teamId, taskId, gate: 'archive', verdict: 'fail', reason, delivery: payload },
     })
     return {
       pass: false,
-      note: `archive gate fail：${verdict.reason ?? 'deliverable 未落位'}（repair 流转 M2；请补交付物后 escalate 或联系队长）`,
-      reason: verdict.reason,
+      note: `archive gate fail：${reason}（repair 流转 M2；请补交付物后 escalate 或联系队长）`,
+      reason,
     }
   }
 
@@ -2628,6 +3050,10 @@ export class MyTeamHost {
    */
   spawnMember(teamId        , roleId        , instanceName         , overrides                                                 = {})                          {
     if (!this.rt.agents) return { status: 'error', code: 'MT_NO_AGENTS_SERVICE', message: 'ctx.agents unavailable' }
+    // P1-4 准入截止：卸载已开始 → 新成员一律拒绝（不往正在拆的运行时里写 provisioning 账）
+    if (this.disposalGate.disposed) {
+      return { status: 'error', code: 'MT_UNAVAILABLE', message: 'host is disposing: member admission closed（卸载已开始，不再接新成员）' }
+    }
     const svc = this.service(teamId)
     // 运行时只认项目库（FR-10.2）；内置/全局/项目自身角色自动复制进项目库（引用即复制）
     if (!resolveRuntimeRole(this.rolePaths, roleId)) {
@@ -2675,7 +3101,7 @@ export class MyTeamHost {
           const compiled = compileParameters(def)
           agentCtx.tools.register({
             ...compiled,
-            output: toolOutput(),
+            output: outputForTool(def.name),
             execute: (toolArgs                         ) => this.executeMemberTool(member, def.name, toolArgs),
           })
         }
@@ -2759,13 +3185,16 @@ export class MyTeamHost {
     // 再结算，否则「create 已返回」会被误当成「child 已起来」。
     // 同步返回值走同步结算（投影立刻是 active，单测无需等 microtask）；Promise 走 then 结算。
     if (isThenable(created)) {
-      void Promise.resolve(created).then(
+      const settlement = Promise.resolve(created).then(
         (handle         ) => this.settleSpawnActive(teamId, member, handle),
         (error         ) => { this.settleSpawnFailure(teamId, member, error) },
       ).catch((e         ) => {
         // 结算段自身异常（不该发生）：已建成的 child 留在 provisioning，交给下次启动对账
         this.log('warn', `member ${memberId} settle failed: ${String(e)}`)
       })
+      // P1-4：在飞结算登记进准入闸门——`dispose()` 会**有界地**等它落完（不再「消失」）。
+      // 关闸后 track 返回已拒绝的 Promise（这里必须消费掉，否则卸载期间冒 unhandled rejection）。
+      void this.disposalGate.track(settlement, `spawn:${memberId}`).catch(() => {})
     } else {
       this.settleSpawnActive(teamId, member, created)
     }
@@ -3115,6 +3544,9 @@ export class MyTeamHost {
           const r = this.commit(teamId, { actor, type: 'task.claimed', payload: { teamId, taskId: args.taskId, memberId: member.memberId, attemptId: `at-${Date.now()}` } })
           if (!r.ok) return { status: 'error', code: r.code, message: r.message }
           const t = svc.projectionSnapshot.tasks[String(args.taskId)]
+          // P1-1 接线：claim 成功 = 任务进入 in_progress = **阶段起点**，在这里拍产物基线。
+          // 拍完之后「产物指纹变了」才等于「本阶段真的写过它」（否则上游越界写的文件会被当交付）。
+          this.captureArtifactBaseline(teamId, String(args.taskId))
           return { status: 'claimed', attemptId: t.attemptId, task: { id: t.id, title: t.input.title, acceptanceCriteria: t.input.acceptanceCriteria, deliverableSpec: t.input.deliverableSpec } }
         }
         case 'myteam_update_task': {
@@ -3141,6 +3573,9 @@ export class MyTeamHost {
           }
           const r = this.commit(teamId, { actor, type: eventType                       , payload })
           if (!r.ok) return { status: 'error', code: r.code, message: r.message }
+          // P1-1 接线：`in_progress` 申报 = 阶段仍在进行，补拍基线（只补缺失键——
+          // 首次基线固定，见 captureArtifactBaseline 的注释）。
+          if (status === 'in_progress') this.captureArtifactBaseline(teamId, taskId)
           // FIX-10（KI-2 实弹）+ CHG-86：archive gate 落位校验接线。
           // 修复前的断链：这里只判 `state === 'gate:archive'`，而默认门禁链是
           // `['review','archive']` —— 任务 done 后进的是 `gate:review`，条件永不成立；

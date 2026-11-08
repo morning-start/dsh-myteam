@@ -223,8 +223,130 @@ export function editsOf(
   return out.reverse().slice(0, 20)
 }
 
-/** 看板视图：投影 × config 列归并（纯投影，UI 不建第二事实源） */
-export function buildBoardView(service                  , columnMapping                          , columns          )            {  const proj = service.projectionSnapshot
+/* ── P1-3（docs/21 §6，来源官方 `types/projection.js:274-317`）：投影视图两级 WeakMap 缓存 ── */
+
+/** 缓存计数快照（只读；测试断言命中/未命中次数，面板也可用于诊断） */
+                                 
+              
+                
+ 
+
+/**
+ * 看板视图的缓存条目（`members` → `tasks` 两级 WeakMap 的值）。
+ *
+ * 为什么用**引用**做键：`fold.ts` 的 `copyTouchedCollections` 只复制被触及的集合，
+ * 所以「只来了一条消息」时 `members` / `tasks` 引用都不变 → 命中 → 返回**同一个视图对象**
+ * → 客户端拿到相同引用，不产生白 frame（整块重渲染）。
+ * 用 WeakMap 而不是 Map：投影被回收时条目一起消失，不会把整份投影钉在内存里。
+ *
+ * 为什么命中后还要回填 `revision` / `inboxCount` / `proposalCount`：
+ * 这三项**不是** members/tasks 的派生量（消息事件只改 `inbox` 与 `revision`）。
+ * 把它们算进缓存键的话，每来一条消息都必然失效——恰好是本任务要消除的那类重渲染。
+ * 原地回填让「引用不变」与「字段最新」同时成立（`revision` 是乐观锁版本，本来就该取当前值）。
+ */
+                           
+                                    
+                    
+                
+                          
+                                
+                          
+                                                         
+                                                  
+                 
+ 
+
+let boardCache = new WeakMap                                                                              ()
+
+/**
+ * 任务详情视图缓存：内层再按「任务 + 账本事件签名」分桶。
+ * 详情页的时间线 / 消息 / 改动记录直接从账本事件派生，所以事件变了必须重建
+ * （`revision` = 已应用事件数，含消息事件，足以区分事件流）。
+ */
+let detailCache = new WeakMap                                                                                          ()
+
+let cacheHits = 0
+let cacheMisses = 0
+
+/** P1-3：缓存计数快照（只读；测试断言命中/未命中次数） */
+export function viewCacheStats()                 {
+  return { hits: cacheHits, misses: cacheMisses }
+}
+
+/** P1-3：清空缓存与计数（测试用：清空后下一次构建必定是一次真正的重算） */
+export function __clearViewCache()       {
+  boardCache = new WeakMap()
+  detailCache = new WeakMap()
+  cacheHits = 0
+  cacheMisses = 0
+}
+
+/**
+ * P1-3：失败态视图**绕过缓存**、每次重建。
+ *
+ * 官方 `state.failure` 是失败瞬间的定格（面板据此展示错误现场）；缓存命中会让这份
+ * 「现场」被后续事件悄悄改写。本插件投影暂无该字段，这里按前向兼容处理——
+ * 宿主/后续版本注入 `failure` 时同样不缓存（宁可多算一次，不可展示错误的失败现场）。
+ */
+function hasFailureMarker(proj                )          {
+  const raw = proj                                                     
+  if (raw.failure) return true
+  const state = raw.state
+  return typeof state === 'object' && state !== null && Boolean((state                         ).failure)
+}
+
+/** 只有对象才能当 WeakMap 的键（手工构造的投影可能缺集合，缺就退化成不缓存） */
+function isCacheKey(value         )                  {
+  return typeof value === 'object' && value !== null
+}
+
+/** 看板视图：投影 × config 列归并（纯投影，UI 不建第二事实源）；P1-3 起走两级 WeakMap 缓存 */
+export function buildBoardView(service                  , columnMapping                          , columns          )            {
+  const proj = service.projectionSnapshot
+  const columnsKey = JSON.stringify([columnMapping, columns])
+  const cacheable = !hasFailureMarker(proj) && isCacheKey(proj.members) && isCacheKey(proj.tasks)
+  if (cacheable) {
+    const entry = boardCache.get(proj.members)?.get(proj.tasks)
+    if (
+      entry &&
+      entry.columnsKey === columnsKey &&
+      entry.teamId === proj.teamId &&
+      entry.name === proj.name &&
+      entry.state === proj.state &&
+      entry.goal === proj.goal &&
+      entry.participations === proj.participations
+    ) {
+      cacheHits += 1
+      // 版本类字段每次取当前值（见 BoardCacheEntry 注释）
+      entry.view.revision = proj.revision
+      entry.view.inboxCount = proj.inbox?.length ?? 0
+      entry.view.proposalCount = Object.values(proj.proposals ?? {}).filter((p) => p.status === 'proposed').length
+      return entry.view
+    }
+  }
+  cacheMisses += 1
+  const view = buildBoardViewUncached(proj, columnMapping, columns)
+  if (cacheable) {
+    let byTasks = boardCache.get(proj.members)
+    if (!byTasks) {
+      byTasks = new WeakMap()
+      boardCache.set(proj.members, byTasks)
+    }
+    byTasks.set(proj.tasks, {
+      columnsKey,
+      teamId: proj.teamId,
+      name: proj.name,
+      state: proj.state,
+      goal: proj.goal,
+      participations: proj.participations,
+      view,
+    })
+  }
+  return view
+}
+
+/** 看板视图的实际构建（无缓存；缓存包装见 `buildBoardView`） */
+function buildBoardViewUncached(proj                , columnMapping                          , columns          )            {
   const stateToColumn = new Map                ()
   for (const [col, states] of Object.entries(columnMapping)) {
     for (const s of states) stateToColumn.set(s, col)
@@ -279,9 +401,45 @@ export function buildBoardView(service                  , columnMapping         
   }
 }
 
-/** 任务详情：时间线（账本事件）+ 沟通消息流 + 证据块（FR-8.1/12.2） */
+/** 任务详情：时间线（账本事件）+ 沟通消息流 + 证据块（FR-8.1/12.2）；P1-3 起按「任务 + 事件签名」走两级 WeakMap 缓存 */
 export function buildTaskDetailView(service                  , taskId        , events                                                                                              )                             {
   const proj = service.projectionSnapshot
+  const cacheable = !hasFailureMarker(proj) && isCacheKey(proj.members) && isCacheKey(proj.tasks)
+  // 事件签名：详情页的时间线/消息/改动记录都从账本事件派生——事件流一变就必须重建。
+  // 用「全部 seq 的滚动指纹 + 条数 + revision（= 已应用事件数）」三段：
+  // 首尾 seq 不够（[1,2,5] 与 [1,3,5] 首尾相同、内容不同），滚动指纹把中间也纳入。
+  // 之所以用指纹而不是数组引用：面板每次 getTaskDetail 都从账本文件重新解析出一个新数组，
+  // 引用恒不同——用引用做键 = 永远是未命中，缓存等于没有。
+  let eventsHash = 0
+  for (const event of events) eventsHash = (Math.imul(eventsHash, 31) + event.seq) | 0
+  const eventsKey = `${taskId}|${proj.revision}|${events.length}|${eventsHash}`
+  if (cacheable) {
+    const cached = detailCache.get(proj.members)?.get(proj.tasks)?.get(eventsKey)
+    if (cached) {
+      cacheHits += 1
+      return cached
+    }
+  }
+  cacheMisses += 1
+  const view = buildTaskDetailViewUncached(proj, taskId, events)
+  if (view && cacheable) {
+    let byTasks = detailCache.get(proj.members)
+    if (!byTasks) {
+      byTasks = new WeakMap()
+      detailCache.set(proj.members, byTasks)
+    }
+    let byEvents = byTasks.get(proj.tasks)
+    if (!byEvents) {
+      byEvents = new Map()
+      byTasks.set(proj.tasks, byEvents)
+    }
+    byEvents.set(eventsKey, view)
+  }
+  return view
+}
+
+/** 任务详情的实际构建（无缓存；缓存包装见 `buildTaskDetailView`） */
+function buildTaskDetailViewUncached(proj                , taskId        , events                                                                                              )                             {
   const t = proj.tasks[taskId]
   if (!t) return undefined
   // seq → 事件映射：账本截断/轮转后 seq 不再等于数组下标（离线视图可能拿到过滤后的切片）

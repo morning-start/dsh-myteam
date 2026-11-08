@@ -29,6 +29,9 @@ export const MT_CODES = [
   'MT_UNAVAILABLE',
   'MT_UNKNOWN_TOOL',
   'MT_EXTERNAL_FAILURE',
+  /* P1-6（docs/21 §6）：工具返回值违反结果契约（缺 status / 状态不在词表 / 字段类型不符）。
+   * 由 `core/tools/output-contract.ts` 的 `assertToolResult` 产出（**返回**而不是抛）。 */
+  'MT_TOOL_CONTRACT',
 
   // ── 账本（append-only JSONL）────────────────────────────────
   'MT_LEDGER_BAD_ACTOR',
@@ -141,6 +144,7 @@ export const MT_CODE_DOCS: Record<MtCode, string> = {
   MT_UNAVAILABLE: '依赖的宿主服务（subprocess / agents / tokenMeter 等）在当前 profile 未注册。**不猜、不静默降级**。',
   MT_UNKNOWN_TOOL: '调用了未注册的 `myteam_*` 工具名（拼写错、或被 `toolPolicy` 收窄掉了）。',
   MT_EXTERNAL_FAILURE: '门禁里跑的外部命令自身失败（非零退出、被信号杀），不是门禁判定为 fail。',
+  MT_TOOL_CONTRACT: '工具返回值违反结果契约（缺 `status` / `status` 不在结果状态词表 / `code`·`message` 类型不符）。**返回**而不是抛出，调用方决定记日志还是阻断。',
 
   // 账本
   MT_LEDGER_BAD_ACTOR: '事件 `actor` 不是 `member:<id>` / `lead` / `system` 之一。',

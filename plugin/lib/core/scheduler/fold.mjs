@@ -27,6 +27,56 @@ export class FoldError extends Error {
 const MESSAGE_TYPES = new Set(['message.sent', 'message.consumed'])
 
 /**
+ * P1-3（docs/21 §6，来源官方 `types/projection.js:274-317`）：**只复制被触及的集合**。
+ *
+ * 为什么按事件类型分类，而不是「改完之后再比较」：JS 里的原地写不留痕迹，
+ * 「这个集合变没变」在事后无法廉价判断。分类是唯一 O(1) 且有证明的做法——
+ * 宁可多复制（缓存少命中一次，只是性能），不可少复制（缓存拿着**没变**的集合引用
+ * 返回**已经变了**的视图，是正确性事故）。
+ *
+ * 复制是浅拷贝：只换集合本身的引用，不复制元素（元素由各自的字段写入负责）。
+ * 视图缓存（`remote/views.ts`）正是拿 `members` / `tasks` 的引用当键——
+ * 集合引用不变 ⇔ 该视图依赖的输入没变 ⇒ 可以直接复用上一次的视图对象。
+ */
+const MEMBER_TOUCHING_EVENTS = new Set([
+  'member.spawned',
+  'member.released',
+  'member.archived',
+  'member.restored',
+  // 这些任务事件会改成员（claim 占用 currentTaskId / 终态释放成员）
+  'task.claimed',
+  'task.completed',
+  'task.failed',
+  'task.escalated',
+  'task.cancelled',
+  'task.attempt.revoked',
+])
+
+/** 参与边集合（participantsOf 的数据来源；变了下游视图必须重建） */
+const PARTICIPATION_TOUCHING_EVENTS = new Set(['task.created', 'task.participate', 'task.participation.released'])
+
+const PROPOSAL_TOUCHING_EVENTS = new Set(['task.proposal', 'task.proposal.resolved'])
+
+const PER_TASK_MESSAGE_TOUCHING_EVENTS = new Set(['message.sent'])
+
+const INBOX_TOUCHING_EVENTS = new Set(['task.escalated', 'message.sent'])
+
+/**
+ * 按事件类型复制**可能被写**的顶层集合（浅拷贝，见上方说明）。
+ *
+ * `task.*` 用前缀判定而不是逐个列举：新增任务事件时自动获得「复制」语义，
+ * 漏写一个的代价是返回过期视图——把安全性押在「以后每次加事件都记得改一行」上不值得。
+ */
+function copyTouchedCollections(proj                , type        )       {
+  if (type.startsWith('task.')) proj.tasks = { ...proj.tasks }
+  if (MEMBER_TOUCHING_EVENTS.has(type)) proj.members = { ...proj.members }
+  if (PARTICIPATION_TOUCHING_EVENTS.has(type)) proj.participations = { ...proj.participations }
+  if (PROPOSAL_TOUCHING_EVENTS.has(type)) proj.proposals = { ...proj.proposals }
+  if (PER_TASK_MESSAGE_TOUCHING_EVENTS.has(type)) proj.perTaskMessages = { ...proj.perTaskMessages }
+  if (INBOX_TOUCHING_EVENTS.has(type)) proj.inbox = [...proj.inbox]
+}
+
+/**
  * 全量折叠：events 顺序应用。
  * 非法状态转移在此抛 FoldError（账本写入端已校验，此处是重放防线）。
  * 未识别 type 跳过（前向兼容：新版事件在旧 reader 上不致崩溃，ignorable 思想）。
@@ -42,6 +92,8 @@ export function foldEvents(teamId        , events               )               
 export function applyEvent(proj                , event             )       {
   const { type, payload } = event
   const p = payload                                                             
+  // P1-3：先换掉被触及集合的引用（未触及的保持原引用），再原地写元素
+  copyTouchedCollections(proj, type)
   switch (type) {
     case 'team.created': {
       proj.name = String(p.name)
