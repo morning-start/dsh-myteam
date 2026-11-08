@@ -1245,6 +1245,9 @@ export class MyTeamHost {
             return this.roleError(e)
           }
         }
+        /* CHG-125（docs/19 §M2）：写团队配置（仅队长；校验先于写 + 两段确认） */
+        case 'myteam_save_team_config':
+          return this.saveTeamConfigTool(args)
         /* CHG-124（docs/19 §M6）：任务依赖图谱只读查询（全员可读） */
         case 'myteam_get_task_graph':
           return this.getTaskGraphTool(args)
@@ -2943,6 +2946,18 @@ export class MyTeamHost {
   }
 
   /* ── 团队模板管理（CHG-57）：内置只读、写项目层、两段确认；面板仍只读 ── */
+
+  /**
+   * CHG-125（docs/19 §M2）：**写团队配置**——仅队长（C 档）。
+   *
+   * 薄封装：写路径全在 `saveTeamConfig(teamId, args)`（CHG-117：校验先于写 → 影响面 →
+   * 原子写 → 重建 TeamService → 返回生效配置；未知键保留）。这一条只是把「缺省 teamId」
+   * 补上并暴露给模型——设置页与工具必须**同一条写路径**，否则两处校验会分叉。
+   */
+  saveTeamConfigTool(args                          = {})                          {
+    const teamId = String(args.teamId ?? this.defaultTeamId())
+    return this.saveTeamConfig(teamId, args)
+  }
 
   /**
    * CHG-124（docs/19 §M6）：**任务依赖图谱只读查询**——全员可读（A 档）。

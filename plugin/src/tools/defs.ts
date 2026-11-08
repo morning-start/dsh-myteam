@@ -526,6 +526,20 @@ export function leadToolDefs(): ToolDef[] {
     { name: 'myteam_resolve_proposal', description: '处置成员结构提案（FR-11.4）：approved/rejected。**批准即执行对应变更**（CHG-88）：split → 落子任务 + 原任务取消；add-dep → 加依赖；reassign → 改派；cancel → 取消。驳回只留痕、结构不动。载荷不合规会拒绝并说明，不会留下「已批准但什么都没做」的半截状态。', parameters: { type: 'object', properties: { teamId: teamId(), proposalId: str('提案 id', true), decision: { type: 'string', enum: ['approved', 'rejected'], description: '处置决定', required: true }, note: str('处置说明') } } },
     { name: 'myteam_adopt_knowledge', description: '采纳/驳回知识提案（FR-17.4 策展门）：adopted 落 config/knowledge/（带 evidence+contributor 归因）；rejected 只留痕。draftId 来自 knowledge.proposed 事件。', parameters: { type: 'object', properties: { teamId: teamId(), draftId: str('知识提案 id（knowledge.proposed 事件的 draftId）', true), decision: { type: 'string', enum: ['adopted', 'rejected'], description: '策展决定', required: true }, note: str('处置说明') } } },
     {
+      /* CHG-125（docs/19 §M2）：写团队配置——**仅队长**（C 档），配置变更影响面二次确认 */
+      name: 'myteam_save_team_config',
+      description: '写团队配置（队长专属，CHG-125 / docs/19 §M2）：`{teamId?, config, confirm?}` → **校验先于写**（结构非法 → `MT_VALIDATION` 带 `field`/`reason`）→ 有影响面（门禁链 / 上限变化 / 有在跑任务）时先回 `confirm-required`，带 `confirm:true` 重调才落盘（**原子写** tmp+rename）→ 返回生效配置。**未知键原样保留**（源视图 → 表单 → 保存不丢手写内容）。与 `myteam_reset_team_config` 对称。',
+      parameters: {
+        type: 'object',
+        properties: {
+          teamId: teamId(),
+          config: { type: 'object', description: '完整团队配置（按 docs/18 字段；缺省段落取默认值）' },
+          confirm: bool('影响面二次确认：先回 confirm-required，再带 true 重调'),
+        },
+        required: ['config'],
+      },
+    },
+    {
       /* CHG-124（docs/19 §M6）：任务依赖图谱只读查询——**全员可读**（A 档） */
       name: 'myteam_get_task_graph',
       description: '读任务依赖图谱（全员可读，CHG-124 / docs/19 §M6）：返回 `{status, teamId, nodes:[{id,title,state,priority,requiredRole}], edges:[{from,to}], layers:[[id]], order:[id], cycles:[[id]], hasCycle}`。`layers` = 拓扑层级（同层可并行），`order` = 拓扑序，`cycles` = 环（有环时 `layers` 只含无环部分）。**只读**：不写账本；建/改依赖用 myteam_create_task / myteam_edit_task / myteam_rescope_task。',
