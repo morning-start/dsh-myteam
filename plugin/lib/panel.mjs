@@ -54,7 +54,7 @@ function rootLevelMethods()           {
 const DESCRIPTOR_KEY = '@deepseek-ai/dsh-typert-protocol/remote-methods'
 const PANEL_PROTOCOL_VERSION = 1
 import { readGlobalIndex } from './core/index/team-index.mjs'
-import { buildOfflineAudit, buildOfflineBoard, buildOfflinePresets, buildOfflineProject, buildOfflineTaskDetail, buildOfflineTokens, isSafeTeamId, projectRolePaths, roleUsage } from './core/index/offline-view.mjs'
+import { buildOfflineAudit, buildOfflineBoard, buildOfflinePresets, buildOfflineProject, buildOfflineTaskDetail, buildOfflineTokens, isSafeTeamId, projectRolePaths, readOfflineTeam, roleUsage } from './core/index/offline-view.mjs'
 import { buildProjectView, buildRoleDetailView,                       } from './remote/views.mjs'
 import { assertValidRole, deleteProjectRoleSafe, listRoleCatalog, readProjectRole, saveProjectRole } from './core/roles/role-store.mjs'
 // CHG-87（docs/04 §2 承诺的 roleOp 端点）：与 host 侧共用同一份角色库写实现
@@ -1031,6 +1031,55 @@ export class MyTeamPanelFacade extends TypertRemoteService {
   }
 
   /**
+   * CHG-113：**长轮询追平**（治「没有流式」）。
+   *
+   * 为什么不是 SSE：插件只拿到 `connection.rpc.call`（请求/响应），**没有**流式 API
+   * （探测结论：`rpc.subscribe` / `rpc.stream` 在宿主里都不存在；`text/event-stream`
+   * 只出现在 ACP 协议的服务端测试桩里）。硬做 SSE = 依赖未公开实现，宿主升级即碎。
+   *
+   * 长轮询是「请求/响应模型内的实时解」：`sinceSeq` 之后有新事件**立刻返回**，
+   * 否则最多挂 `timeoutMs`（封顶 25s）后返回 `changed:false`，客户端重开。
+   * 实时性毫秒级，零新增传输依赖，还能进 `batch`（watch 是根级方法）。
+   *
+   * 纪律：**只读**（不写账本、不推进任何游标）；坏行容错沿用 `readOfflineTeam`。
+   */
+  async watch(query                         ) {
+    const target = offlineTarget(query)
+    if (!target) return OFFLINE_INVALID
+    const { workspaceRoot, teamId } = target
+    const sinceSeq = Number(query?.sinceSeq ?? 0)
+    if (!Number.isFinite(sinceSeq) || sinceSeq < 0) {
+      return { status: 'error', code: 'MT_VALIDATION', message: 'sinceSeq must be a non-negative number' }
+    }
+    const rawTimeout = Number(query?.timeoutMs ?? 20000)
+    const timeoutMs = Math.min(Math.max(Number.isFinite(rawTimeout) && rawTimeout > 0 ? rawTimeout : 20000, 200), 25000)
+    const deadline = Date.now() + timeoutMs
+    for (;;) {
+      const current = readOfflineTeam(workspaceRoot, teamId)
+      if (!current) {
+        return { status: 'empty', readOnly: true, teamId, workspaceRoot, seq: sinceSeq, changed: false, events: [] }
+      }
+      const fresh = current.events.filter((event) => Number(event.seq ?? 0) > sinceSeq)
+      if (fresh.length > 0) {
+        return {
+          status: 'ok',
+          readOnly: true,
+          teamId,
+          workspaceRoot,
+          seq: current.meta.lastSeq,
+          changed: true,
+          /* 单次最多回 50 条：追平用，不做分页（分页走 getOfflineAudit） */
+          events: fresh.slice(-50),
+        }
+      }
+      if (Date.now() >= deadline) {
+        return { status: 'ok', readOnly: true, teamId, workspaceRoot, seq: current.meta.lastSeq, changed: false, events: [] }
+      }
+      await new Promise((resolve) => setTimeout(resolve, 120))
+    }
+  }
+
+  /**
    * CHG-112：**批量调用**——首屏一次往返拿完（治「43 条路由没有批量」）。
    *
    * 语义：
@@ -1095,7 +1144,7 @@ export class MyTeamPanelFacade extends TypertRemoteService {
 }
 
 // 手动 Remote 标记：gateway 按 method 名发现端点（namespace=myteam，direct invocation）
-markRemoteMethods(MyTeamPanelFacade.prototype, ['batch', 'describe', 'listTeams', 'getStoreState', 'initStore', 'getProject', 'getRoleDetail', 'saveRole', 'deleteRole', 'getCapabilityCatalog', 'getOfflineBoard', 'getOfflineTaskDetail', 'getOfflineTokens', 'getOfflineAudit', 'getOfflinePresets', 'getBoard', 'getTaskDetail', 'getTokens', 'getInbox', 'getAudit', 'getConfig', 'getPresets', 'getRoles', 'getKnowledge', 'planAction', 'postComment', 'memberOp', 'disband', 'createTask', 'createTasks', 'updateTask', 'assignTask', 'participateTask', 'rescopeTask', 'cancelTask', 'batchTaskOp',
+markRemoteMethods(MyTeamPanelFacade.prototype, ['batch', 'describe', 'watch', 'listTeams', 'getStoreState', 'initStore', 'getProject', 'getRoleDetail', 'saveRole', 'deleteRole', 'getCapabilityCatalog', 'getOfflineBoard', 'getOfflineTaskDetail', 'getOfflineTokens', 'getOfflineAudit', 'getOfflinePresets', 'getBoard', 'getTaskDetail', 'getTokens', 'getInbox', 'getAudit', 'getConfig', 'getPresets', 'getRoles', 'getKnowledge', 'planAction', 'postComment', 'memberOp', 'disband', 'createTask', 'createTasks', 'updateTask', 'assignTask', 'participateTask', 'rescopeTask', 'cancelTask', 'batchTaskOp',
   // CHG-86：门禁裁决 / 归档快照 / 知识提案策展
   'reviewTask', 'getArchive', 'getArchives', 'adoptKnowledge',
   // CHG-87（FR-13.1/FR-16.1）：角色库统一写入口 + 单角色调用
