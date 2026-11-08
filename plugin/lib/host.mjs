@@ -68,6 +68,8 @@ import {
                          
 } from './core/host/session-archaeology.mjs'
 import { recoveryAction, checkArchiveGate } from './core/scheduler/recovery.mjs'
+/* CHG-135（docs/20 §5.2）：成员卡（子代理 / 会话依附角色的落盘事实） */
+import { writeMemberCard } from './core/members/member-card.mjs'
 /* CHG-124（docs/19 §M6）：任务依赖图谱纯函数（Kahn 分层 + 环检测） */
 import { buildTaskGraph } from './core/scheduler/task-graph.mjs'
 import { entryFromProjection, scanWorkspaceIndex, readWorkspaceIndex, writeWorkspaceIndex, upsertTeamEntry, upsertGlobalWorkspace, resolveMyteamHome, globalStoreLayout } from './core/index/team-index.mjs'
@@ -2595,6 +2597,29 @@ export class MyTeamHost {
       },
     })
     if (!spawnEvent.ok) return { status: 'error', code: spawnEvent.code, message: spawnEvent.message }
+
+    /*
+     * CHG-135（docs/20 §5.2）：**成员卡落盘**——`sessionId` 只写在
+     * `state/teams/<teamId>/members/<memberId>/member.json`（不散落全局）。
+     * 写失败只告警不阻断（账本才是权威；卡片是「重启后可查」的便利事实）。
+     */
+    try {
+      writeMemberCard(join(storeLayout(this.workspaceRoot).tasks, String(teamId)), {
+        version: 1,
+        memberId: String(memberId),
+        teamId: String(teamId),
+        roleId: String(roleId),
+        instanceName: String(member.instanceName ?? ''),
+        ...(sessionId ? { sessionId: String(sessionId) } : {}),
+        ...(member.skills ? { skills: member.skills.map((skill) => String(skill)) } : {}),
+        ...(member.mcpAllowlist ? { mcpAllowlist: member.mcpAllowlist.map((item) => String(item)) } : {}),
+        status: 'active',
+        createdAt: Date.now(),
+        updatedAt: Date.now(),
+      })
+    } catch (error) {
+      this.log('warn', `member card write failed (${String(memberId)}): ${String((error                     )?.message ?? error)}`)
+    }
 
     const created = this.rt.agents.create({
       sessionId,
