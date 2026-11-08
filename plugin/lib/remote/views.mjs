@@ -112,6 +112,8 @@ export function taskActionsOf(task                )              {
                                                                                                                                                      
                                                      
                     
+                                                               
+                      
                        
                   
                                                   
@@ -300,6 +302,24 @@ function isCacheKey(value         )                  {
   return typeof value === 'object' && value !== null
 }
 
+/**
+ * CHG-157：团队消息事件总数——`message.sent` 会落到 `perTaskMessages`（带 taskId）与
+ * `inbox`（to=inbox）两处，同一条消息可能两处都记（to=inbox 且带 taskId），
+ * 所以按事件 seq 去重后计数。
+ * 已知边界：taskId 指向不存在任务的 message.sent 两处都不落（fold.ts 只在任务存在时记），
+ * 这类消息不计入总数——宁可少记，不编数。
+ */
+function messageCountOf(proj                )         {
+  const seqs = new Set        ()
+  for (const list of Object.values(proj.perTaskMessages ?? {})) {
+    for (const seq of list) seqs.add(seq)
+  }
+  for (const entry of proj.inbox ?? []) {
+    if (entry.kind === 'message') seqs.add(entry.seq)
+  }
+  return seqs.size
+}
+
 /** 看板视图：投影 × config 列归并（纯投影，UI 不建第二事实源）；P1-3 起走两级 WeakMap 缓存 */
 export function buildBoardView(service                  , columnMapping                          , columns          )            {
   const proj = service.projectionSnapshot
@@ -320,6 +340,7 @@ export function buildBoardView(service                  , columnMapping         
       // 版本类字段每次取当前值（见 BoardCacheEntry 注释）
       entry.view.revision = proj.revision
       entry.view.inboxCount = proj.inbox?.length ?? 0
+      entry.view.messageCount = messageCountOf(proj)
       entry.view.proposalCount = Object.values(proj.proposals ?? {}).filter((p) => p.status === 'proposed').length
       return entry.view
     }
@@ -395,6 +416,7 @@ function buildBoardViewUncached(proj                , columnMapping             
     })),
     columns: columns.map((name) => ({ name, tasks: columnTasks.get(name) ?? [] })),
     inboxCount: proj.inbox.length,
+    messageCount: messageCountOf(proj),
     proposalCount: Object.values(proj.proposals).filter((p) => p.status === 'proposed').length,
     revision: proj.revision,
     graph: buildTaskGraph(Object.values(proj.tasks).map((t) => ({ id: t.id, deps: t.input.deps }))),

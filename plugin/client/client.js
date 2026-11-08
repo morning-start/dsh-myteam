@@ -2718,6 +2718,26 @@ window.__ModuleLoader__.load({
       'errors.renderTitle': '面板渲染失败',
       'errors.renderRetry': '重试',
       'errors.renderWhere': '出错组件',
+      /* CHG-157：团队总览卡 */
+      'ov.members': '{n} 名成员',
+      'ov.doneScore': '已交付 {x}/{y}',
+      'ov.messages': '{n} 条消息',
+      'ov.progress': '总进度',
+      'ov.lead': '已派发 {n} 项任务给 {m} 名成员 · {k} 人执行中',
+      'ov.leadEmpty': '尚未派发任务',
+      'ov.legend.done': '已交付',
+      'ov.legend.run': '进行中',
+      'ov.legend.assigned': '已认领',
+      'ov.legend.waiting': '等待依赖',
+      'ov.legend.stuck': '未完成',
+      'ov.legend.idle': '未认领',
+      'ov.waiting': '{codes} 等待前置',
+      'ov.waitingMore': '{codes} 等 {n} 项等待前置',
+      'ov.waitingTailRun': '，其余已开工',
+      'ov.waitingTailIdle': '，{n} 项待认领',
+      'ov.allRunning': '全部已开工',
+      'ov.allDone': '全部已交付',
+      'ov.idleNote': '全部可开工 · {n} 项待认领',
       /* 知识库（团队内「知识」tab，design/knowledge.html） */
       'kb3.title': '团队知识库',
       'kb3.desc': '团队记忆分三层：AGENTS.md 是共识层，config/knowledge/ 是共享知识库，实例私有 memory.md 只属于本人。常驻的只有 40 行以内的索引，正文按需读取。',
@@ -2896,6 +2916,26 @@ window.__ModuleLoader__.load({
       'errors.renderTitle': 'Panel failed to render',
       'errors.renderRetry': 'Retry',
       'errors.renderWhere': 'Failed at',
+      /* CHG-157: team overview card */
+      'ov.members': '{n} members',
+      'ov.doneScore': '{x}/{y} delivered',
+      'ov.messages': '{n} messages',
+      'ov.progress': 'Overall progress',
+      'ov.lead': 'Dispatched {n} tasks to {m} members · {k} running',
+      'ov.leadEmpty': 'No tasks dispatched yet',
+      'ov.legend.done': 'Delivered',
+      'ov.legend.run': 'Running',
+      'ov.legend.assigned': 'Assigned',
+      'ov.legend.waiting': 'Waiting on deps',
+      'ov.legend.stuck': 'Stuck',
+      'ov.legend.idle': 'Unclaimed',
+      'ov.waiting': '{codes} waiting on upstream',
+      'ov.waitingMore': '{codes} and {n} more waiting on upstream',
+      'ov.waitingTailRun': ', rest started',
+      'ov.waitingTailIdle': ', {n} unclaimed',
+      'ov.allRunning': 'All started',
+      'ov.allDone': 'All delivered',
+      'ov.idleNote': 'All ready · {n} unclaimed',
       /* Knowledge (team Knowledge tab) */
       'kb3.title': 'Team knowledge base',
       'kb3.desc': 'Team memory has three layers: AGENTS.md is the consensus layer, config/knowledge/ is the shared library, and each instance private memory.md belongs to that instance alone. Only a 40-line index is resident; bodies are read on demand.',
@@ -4562,6 +4602,29 @@ window.__ModuleLoader__.load({
       '.mt-team-mark{width:26px;height:26px;border-radius:8px;display:inline-flex;place-items:center;background:var(--dsw-alias-bg-layer-2);color:var(--dsw-alias-label-emphasis, var(--dsw-alias-label-primary));flex:none;align-items:center;justify-content:center;border:.5px solid var(--dsw-alias-border-l2);font-size:12px}',
       /* CHG-107：会话页团队视图的真实数据面（概览计数 / 空态 / 成员名册 / 命令提示） */
       '.mt-conv-stats{display:flex;flex-wrap:wrap;gap:8px;padding:12px 0}',
+      /* CHG-157：团队总览卡（对齐 AgentTeams 样例）——卡片容器 + 元信息/队长汇总/分段条/图例/叙述行 */
+      '.mt-ov{display:flex;flex-direction:column;gap:7px;padding:10px 12px;border:1px solid var(--dsw-alias-line-soft);border-radius:10px;background:var(--dsw-alias-bg-layer-2)}',
+      '.mt-ov-meta{font-size:11px;color:var(--dsw-alias-label-secondary)}',
+      '.mt-ov-lead{font-size:12px;font-weight:600;color:var(--dsw-alias-label-primary)}',
+      '.mt-ov-progress{display:flex;align-items:center;gap:8px}',
+      '.mt-ov-label{font-size:11px;color:var(--dsw-alias-label-tertiary);flex:none}',
+      '.mt-ovbar{flex:1;margin-top:0}',
+      '.mt-ovbar i.mt-ov-seg-done{background:var(--dsw-alias-state-ok-primary)}',
+      '.mt-ovbar i.mt-ov-seg-run{background:var(--dsw-alias-state-info-primary)}',
+      '.mt-ovbar i.mt-ov-seg-assigned{background:var(--dsw-alias-state-done-primary)}',
+      '.mt-ovbar i.mt-ov-seg-waiting{background:var(--dsw-alias-state-warning-primary)}',
+      '.mt-ovbar i.mt-ov-seg-stuck{background:var(--dsw-alias-state-error-primary)}',
+      '.mt-ovbar i.mt-ov-seg-idle{background:var(--dsw-alias-border-l3)}',
+      '.mt-ov-legend{display:flex;flex-wrap:wrap;gap:10px;font-size:11px;color:var(--dsw-alias-label-secondary)}',
+      '.mt-ov-legend-item{display:inline-flex;align-items:center;gap:4px}',
+      '.mt-ov-dot{width:8px;height:8px;border-radius:2px;display:inline-block}',
+      '.mt-ov-dot-done{background:var(--dsw-alias-state-ok-primary)}',
+      '.mt-ov-dot-run{background:var(--dsw-alias-state-info-primary)}',
+      '.mt-ov-dot-assigned{background:var(--dsw-alias-state-done-primary)}',
+      '.mt-ov-dot-waiting{background:var(--dsw-alias-state-warning-primary)}',
+      '.mt-ov-dot-stuck{background:var(--dsw-alias-state-error-primary)}',
+      '.mt-ov-dot-idle{background:var(--dsw-alias-border-l3)}',
+      '.mt-ov-note{font-size:11px;color:var(--dsw-alias-label-tertiary)}',
       '.mt-conv-stat{display:flex;flex-direction:column;gap:2px;min-width:68px;padding:6px 10px;border:1px solid var(--dsw-alias-line-soft);border-radius:8px;background:var(--dsw-alias-bg-layer-2)}',
       '.mt-conv-stat b{font-size:16px;font-weight:600;font-variant-numeric:tabular-nums;color:var(--dsw-alias-label-primary)}',
       '.mt-conv-stat span{font-size:11px;color:var(--dsw-alias-label-tertiary)}',
@@ -12595,7 +12658,7 @@ window.__ModuleLoader__.load({
      * 于是团队视图里会冒出没发生过的任务。现在没有演示分支：没有数据就是空态。
      */
     function useConvBoard(connection, sessionId) {
-      const [state, setState] = react.useState(() => ({ tasks: [], rawTasks: [], live: 0, gates: 0, roles: 0, members: [], team: undefined, loaded: false }))
+      const [state, setState] = react.useState(() => ({ tasks: [], rawTasks: [], live: 0, gates: 0, roles: 0, members: [], team: undefined, loaded: false, messageCount: null }))
       /* CHG-113：`tick` 由 watch 循环推进——账本有新事件就重拉看板（替代轮询刷新） */
       const [tick, setTick] = react.useState(0)
       react.useEffect(() => {
@@ -12638,6 +12701,8 @@ window.__ModuleLoader__.load({
             roles: new Set(members.map((member) => member.roleId).filter(Boolean)).size,
             members,
             team,
+            /* CHG-157：团队消息事件总数（旧宿主没有该字段 → null，总览卡显示 —） */
+            messageCount: typeof data?.board?.messageCount === 'number' ? data.board.messageCount : null,
             loaded: Boolean(data || teamsData),
           })
         }).catch(() => { if (alive) setState((prev) => ({ ...prev, loaded: true })) })
@@ -12757,6 +12822,98 @@ window.__ModuleLoader__.load({
         j('span', { className: 'mt-toolcard-chev', 'aria-hidden': true, children: '›' }),
       ] }) })
     }
+
+    /* ── CHG-157：团队总览卡（对齐 AgentTeams 样例：成员/完成/消息 + 队长汇总 + 总进度分段条 + 等待前置叙述）──
+     * 挂在会话视图（conversation.view）头部；数据全部来自 getBoard（members/currentTaskId/tasks/deps/messageCount），
+     * 不新增服务端读取；「一眼看全局」而不用在三处拼数字。 */
+    const OV_BUCKET_ORDER = ['done', 'run', 'assigned', 'waiting', 'stuck', 'idle']
+    /** 单任务 → 六桶之一（纯函数）。waiting 优先于 assigned：有未完成上游就是等前置，认领了也在等。 */
+    const ovBucketOf = (task, doneIds) => {
+      const state = String(task?.state ?? '')
+      if (state === 'done') return 'done'
+      if (state === 'in_progress' || state === 're-scoping' || state === 'running' || state.startsWith('gate')) return 'run'
+      if (state === 'failed' || state === 'blocked' || state === 'cancelled') return 'stuck'
+      const deps = Array.isArray(task?.deps) ? task.deps : []
+      if (deps.some((dep) => !doneIds.has(dep))) return 'waiting'
+      if ((task?.assignees ?? []).length > 0) return 'assigned'
+      return 'idle'
+    }
+    /** 任务 + 成员 + 消息数 → 总览数据（纯函数；「已认领」= 有指派且依赖已就绪、还没开工） */
+    const teamOverviewOf = (tasks, members, messageCount) => {
+      const list = Array.isArray(tasks) ? tasks : []
+      const doneIds = new Set(list.filter((task) => task.state === 'done').map((task) => task.id))
+      const buckets = { done: [], run: [], assigned: [], waiting: [], stuck: [], idle: [] }
+      for (const task of list) buckets[ovBucketOf(task, doneIds)].push(task)
+      const memberList = Array.isArray(members) ? members : []
+      /* 在跑人数：名册带 currentTaskId 就按人数；离线名册没这个字段 → 退回「进行中任务数」
+       *（如实的近似——没有成员在岗数据时不编「0 人在跑」，也不编人名） */
+      const liveCount = memberList.length > 0
+        ? memberList.filter((member) => member?.currentTaskId).length
+        : buckets.run.length
+      return {
+        total: list.length,
+        memberCount: memberList.length,
+        liveCount,
+        doneCount: buckets.done.length,
+        idleCount: buckets.idle.length,
+        buckets,
+        messageCount: typeof messageCount === 'number' ? messageCount : null,
+      }
+    }
+    /** 总进度叙述行（纯函数）：等待前置点名列前三；全交付 / 待认领 / 全开工各有口径，不写死 */
+    const ovNarrativeText = (overview, t) => {
+      if (!overview || overview.total === 0) return null
+      const waiting = overview.buckets.waiting
+      if (waiting.length > 0) {
+        const codes = waiting.slice(0, 3).map((task) => String(task.code ?? task.id))
+        const head = waiting.length > 3
+          ? t('ov.waitingMore').replace('{codes}', codes.join('、')).replace('{n}', String(waiting.length))
+          : t('ov.waiting').replace('{codes}', codes.join('、'))
+        return head + (overview.idleCount > 0
+          ? t('ov.waitingTailIdle').replace('{n}', String(overview.idleCount))
+          : t('ov.waitingTailRun'))
+      }
+      if (overview.doneCount === overview.total) return t('ov.allDone')
+      if (overview.idleCount > 0) return t('ov.idleNote').replace('{n}', String(overview.idleCount))
+      return t('ov.allRunning')
+    }
+    /** 总览卡：元信息行（成员/已交付分数/消息）+ 队长汇总行 + 分段条 + 图例 + 叙述行 */
+    function TeamOverviewCard({ t, tasks, members, messageCount, loaded }) {
+      if (!loaded) return null
+      const list = Array.isArray(tasks) ? tasks : []
+      const overview = teamOverviewOf(list, members, messageCount)
+      const doneIds = new Set(list.filter((task) => task.state === 'done').map((task) => task.id))
+      const messages = overview.messageCount === null
+        ? '—'
+        : t('ov.messages').replace('{n}', String(overview.messageCount))
+      const meta = [
+        t('ov.members').replace('{n}', String(overview.memberCount)),
+        t('ov.doneScore').replace('{x}', String(overview.doneCount)).replace('{y}', String(overview.total)),
+        messages,
+      ].join(' · ')
+      const legend = OV_BUCKET_ORDER.map((key) => js('span', { key, className: 'mt-ov-legend-item', children: [
+        j('i', { className: `mt-ov-dot mt-ov-dot-${key}`, 'aria-hidden': true }),
+        j('span', { children: `${t(`ov.legend.${key}`)} ${overview.buckets[key].length}` }),
+      ] }))
+      return js('div', { className: 'mt-ov', children: [
+        j('div', { className: 'mt-ov-meta', children: meta }),
+        j('div', { className: 'mt-ov-lead', children: overview.total === 0
+          ? t('ov.leadEmpty')
+          : t('ov.lead').replace('{n}', String(overview.total)).replace('{m}', String(overview.memberCount)).replace('{k}', String(overview.liveCount)) }),
+        js('div', { className: 'mt-ov-progress', children: [
+          j('span', { className: 'mt-ov-label', children: t('ov.progress') }),
+          js('div', { className: 'mt-segbar mt-ovbar', role: 'img', 'aria-label': t('ov.progress'), children: list.length === 0
+            ? [j('i', { key: 'empty', className: 'mt-ov-seg-idle' })]
+            : list.map((task) => j('i', {
+              key: String(task.key ?? task.id),
+              className: `mt-ov-seg-${ovBucketOf(task, doneIds)}`,
+              title: `${String(task.code ?? task.id)} · ${stateLabel(task.state)}`,
+            })) }),
+        ] }),
+        js('div', { className: 'mt-ov-legend', children: legend }),
+        ovNarrativeText(overview, t) ? j('div', { className: 'mt-ov-note', children: ovNarrativeText(overview, t) }) : null,
+      ] })
+    }
     /**
      * 会话页团队视图（conversation.view 落点）——**只渲染真实账本数据**。
      *
@@ -12834,6 +12991,8 @@ window.__ModuleLoader__.load({
           stat(t('conv.stat.gates'), board.gates),
           stat(t('conv.stat.roles'), board.roles),
         ] }),
+        /* CHG-157：团队总览卡——成员/已交付分数/消息 + 队长汇总 + 总进度分段条 + 等待前置叙述（未加载不渲染） */
+        j(TeamOverviewCard, { t, tasks: board.rawTasks, members: board.members, messageCount: board.messageCount, loaded: board.loaded }),
         /* 任务：**同源三视图**（CHG-115）——看板 / 流程 / 依赖图，只读；点卡开同一个任务详情抽屉 */
         js('div', { className: 'mt-conv-section', children: [
           j('h4', { className: 'mt-conv-section-title', children: t('conv.section.tasks') }),
@@ -13173,6 +13332,8 @@ window.__ModuleLoader__.load({
       BoardView,
       MyTeamPlanTasksToolView, MyTeamApprovePlanToolView, MyTeamPeerMessageToolView, MyTeamApplyRolesToolView,
       TeamPlanTasksCard, TeamCollapsedCard, DockChip,
+      /* CHG-157：团队总览卡（组件 + 纯函数，mock loader 下可断言分桶/叙述） */
+      TeamOverviewCard, teamOverviewOf, ovBucketOf, ovNarrativeText,
     }
 
     /* 测试专用出口（t75-chg89-gaps）：CHG-89 三个新入口所在组件的纯渲染面。
