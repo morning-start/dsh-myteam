@@ -3055,6 +3055,9 @@ window.__ModuleLoader__.load({
         getPlanFeedback: (query) => call('getPlanFeedback', query),
         /* CHG-120（M2-D ② / FR-16.4②）：会话考古（按 session:<id> 只读读一页历史） */
         readSessionHistory: (query) => call('readSessionHistory', query),
+        /* CHG-139a（docs/19 §M6/§M3）：依赖图谱 / 可复用技能清单（只读） */
+        getTaskGraph: (query) => call('getTaskGraph', query),
+        listSkills: (query) => call('listSkills', query),
         getPresets: (query) => call('getPresets', query),
         memberOp: (query) => call('memberOp', query),
         planAction: (query) => call('planAction', query),

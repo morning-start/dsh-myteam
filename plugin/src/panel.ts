@@ -151,6 +151,9 @@ type RemoteLike = {
    * CHG-88（M2-E / FR-16.3）：会话移交（摘要 → 新团队预设会话；不写团队账本）。
    */
   handoff?(args: Record<string, unknown>): Promise<unknown>
+  /** CHG-139a（docs/19 §M6/§M3）：依赖图谱 / 可复用技能清单（只读） */
+  getTaskGraph?(args: Record<string, unknown>): Promise<unknown>
+  listSkills?(args: Record<string, unknown>): Promise<unknown>
 }
 
 /** 非队长会话的统一降级值（客户端据此显示友好态；不让 RPC 变成错误信封） */
@@ -669,6 +672,32 @@ export class MyTeamPanelFacade extends TypertRemoteService {
       return { status: 'error', code: 'MT_UNAVAILABLE', message: '会话移交需要活动队长会话（离线团队没有会话可移交）' }
     }
     return remote.handoff(query ?? {})
+  }
+
+  /**
+   * CHG-139a（docs/19 §M6）：**依赖图谱只读端点**（面板「依赖图」视图）。
+   *
+   * 只读：不写账本、不改任务；离线团队 → `MT_UNAVAILABLE`（图谱要投影，离线不 fold）。
+   */
+  async getTaskGraph(agent: AgentLike, query: Record<string, unknown>) {
+    const remote = this.remoteFor(agent)
+    if (!remote || typeof remote.getTaskGraph !== 'function') {
+      return { status: 'error', code: 'MT_UNAVAILABLE', message: '依赖图谱需要活动队长会话（离线团队不 fold 投影）' }
+    }
+    return remote.getTaskGraph(query ?? {})
+  }
+
+  /**
+   * CHG-139a（docs/19 §M3）：**可复用技能清单只读端点**（面板「技能」视图）。
+   *
+   * 只读：`declared`（角色已绑定）+ `host`（宿主技能服务；拿不到如实标不可用，不伪造）。
+   */
+  async listSkills(agent: AgentLike, query: Record<string, unknown>) {
+    const remote = this.remoteFor(agent)
+    if (!remote || typeof remote.listSkills !== 'function') {
+      return { status: 'error', code: 'MT_UNAVAILABLE', message: '技能清单需要活动队长会话' }
+    }
+    return remote.listSkills(query ?? {})
   }
 
   /**
@@ -1201,7 +1230,9 @@ markRemoteMethods(MyTeamPanelFacade.prototype, ['batch', 'describe', 'watch', 'l
   // CHG-119（FR-11.6）：计划质量反馈（只读观测）
   'getPlanFeedback',
   // CHG-120（M2-D ② / FR-16.4②）：会话考古（按 session:<id> 只读读一页历史）
-  'readSessionHistory'])
+  'readSessionHistory',
+  // CHG-139a（docs/19 §M6/§M3）：依赖图谱 / 可复用技能清单（只读）
+  'getTaskGraph', 'listSkills'])
 
 /**
  * 顶层装载行 apply（cordis.patch.yml myteam-panel 行）：

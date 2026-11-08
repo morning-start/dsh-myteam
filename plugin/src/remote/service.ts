@@ -205,6 +205,16 @@ export class MyTeamRemote extends TypertRemoteService {
     }
   }
 
+  /** CHG-139a（docs/19 §M6）：依赖图谱只读端点（面板「依赖图」视图） */
+  async getTaskGraph(args: { teamId?: string } = {}) {
+    return this.host.getTaskGraphTool(args as Record<string, unknown>)
+  }
+
+  /** CHG-139a（docs/19 §M3）：可复用技能清单只读端点（面板「技能」视图） */
+  async listSkills(args: Record<string, unknown> = {}) {
+    return this.host.listSkillsTool(args)
+  }
+
   /**
    * 会话考古（CHG-120 / M2-D ② / FR-16.4②）：按 `session:<id>` 只读读一页历史。
    * 缺 `sessionController.page` 能力 → `MT_UNAVAILABLE`（不假装读到）。
@@ -515,7 +525,7 @@ export class MyTeamRemote extends TypertRemoteService {
 }
 
 // 手动 Remote 标记（strip-only 环境等价装饰器）：gateway 按 method 名发现端点
-markRemoteMethods(MyTeamRemote.prototype, ['getBoard', 'getTaskDetail', 'getTokens', 'getInbox', 'getAudit', 'getConfig', 'saveTeamConfig', 'resetTeamConfig', 'getPlanFeedback', 'readSessionHistory', 'getPresets', 'planAction', 'postComment', 'memberOp', 'disband', 'createTask', 'createTasks', 'updateTask', 'assignTask', 'participateTask', 'rescopeTask', 'cancelTask', 'batchTaskOp',
+markRemoteMethods(MyTeamRemote.prototype, ['getBoard', 'getTaskDetail', 'getTokens', 'getInbox', 'getAudit', 'getConfig', 'saveTeamConfig', 'resetTeamConfig', 'getPlanFeedback', 'getTaskGraph', 'listSkills', 'readSessionHistory', 'getPresets', 'planAction', 'postComment', 'memberOp', 'disband', 'createTask', 'createTasks', 'updateTask', 'assignTask', 'participateTask', 'rescopeTask', 'cancelTask', 'batchTaskOp',
   // CHG-86：门禁裁决 / 归档快照 / 知识提案策展
   'reviewTask', 'getArchive', 'getArchives', 'adoptKnowledge',
   // CHG-87（FR-13.1/FR-16.1）：角色库统一写入口 + 单角色调用
