@@ -119,6 +119,8 @@ type RemoteLike = {
   /** CHG-117（FR-14.3 / docs/18 §7）：设置页保存 / 恢复默认配置（校验先于写 + 两段确认） */
   saveTeamConfig?(args: Record<string, unknown>): Promise<unknown>
   resetTeamConfig?(args: Record<string, unknown>): Promise<unknown>
+  /** CHG-119（FR-11.6）：计划质量反馈（只读观测：任务数 / 粒度 / 角色负载 / estimate vs 实际） */
+  getPlanFeedback?(args: Record<string, unknown>): Promise<unknown>
   getPresets(args: Record<string, unknown>): Promise<unknown>
   /** CHG-72：面板新建/编辑任务（受限写端点，actor=human） */
   createTask?(args: Record<string, unknown>): Promise<unknown>
@@ -1045,6 +1047,13 @@ export class MyTeamPanelFacade extends TypertRemoteService {
     return remote.resetTeamConfig(query ?? {})
   }
 
+  /** CHG-119（FR-11.6）：计划质量反馈——只读观测（任务数 / 粒度 / 角色负载 / estimate vs 实际） */
+  async getPlanFeedback(agent: AgentLike, query: Record<string, unknown>) {
+    const remote = this.remoteFor(agent)
+    if (!remote?.getPlanFeedback) return UNAVAILABLE
+    return remote.getPlanFeedback(query ?? {})
+  }
+
   /** 预设库（CHG-50）：三层只读目录（builtin/global/project） */
   async getPresets(agent: AgentLike, query: Record<string, unknown>) {
     const remote = this.remoteFor(agent)
@@ -1176,7 +1185,9 @@ markRemoteMethods(MyTeamPanelFacade.prototype, ['batch', 'describe', 'watch', 'l
   // CHG-91（插件团队贡献契约 v1）：插件贡献的只读视图 + 显式重载
   'getContributions', 'reloadContributions',
   // CHG-117（FR-14.3 / docs/18 §7）：设置页配置写路径
-  'saveTeamConfig', 'resetTeamConfig'])
+  'saveTeamConfig', 'resetTeamConfig',
+  // CHG-119（FR-11.6）：计划质量反馈（只读观测）
+  'getPlanFeedback'])
 
 /**
  * 顶层装载行 apply（cordis.patch.yml myteam-panel 行）：

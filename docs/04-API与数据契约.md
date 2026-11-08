@@ -331,6 +331,7 @@ interface HandoffSessionRef {
 | `saveTeamConfig(teamId, config, confirm?)` | **设置页保存（CHG-117 / docs/18 §7）**：校验先于写（结构 + 终态覆盖，失败 `MT_VALIDATION` 带 `field/reason`，**零写入**）→ 影响面（`{members, runningTasks, gateChainsChanged, limitsChanged}`）非空先回 `confirm-required` → 原子写（tmp + rename）→ 重建服务 → 返回**生效配置**（与 `getConfig` 同形）；未知键**保留**（不拒绝，`warnings` 回显） | 写（团队级配置） |
 | `resetTeamConfig(teamId, confirm)` | **恢复默认配置（CHG-57 工具面 / CHG-117 面板面）**：`confirm!==true` → `confirm-required`；删除团队级 `team.config.json` 并重建服务，返回 `{status:'reset'\|'noop', teamId, configSource}` | 写（删团队级配置） |
 | `getInbox(teamId)` | 人工待办（审批横幅/escalate 提醒/提案队列 badge） | 读 |
+| `getPlanFeedback(teamId)` | **计划质量反馈（FR-11.6，CHG-119）**：`{tasks:{total,terminal,open,byState}, granularity:{S,M,L,unset}, roleLoad:[{roleId,planned,open,members}], deviations:[{id,title,state,estimate,actualMs,running,actualBucket,overrun}], overrun:{over,comparable}, caliber:'heuristic', notes}`——**只读观测，不写账本、不自动改计划**；actual = 账本时间差（终态 = 终态事件 ts − created，未终态 = now − created） | 读（账本） |
 | `postComment(teamId, taskId, content)` | 人留言（写账本 actor=human，FR-12.2） | 写→账本 |
 | `planAction(teamId, action:'approve'\|'revise'\|'discard')` | 人审三动作（写账本） | 写→账本 |
 | `memberOp(teamId, memberId, op:'suspend'\|'archive'\|'remove'\|'restore', confirm?)` | 成员管理（FR-14.2，**CHG-48 已实装**）：写 `member.released`/`member.archived`/`member.restored`（actor=human）；`remove` 两段确认（confirm:false → `confirm-required`）；`restore` 仅允许 suspended/archived；成员仍有在跑任务 → `MT_DRAIN_PENDING`；已处于目标态/未知 op → `MT_VALIDATION` | 写→账本 |

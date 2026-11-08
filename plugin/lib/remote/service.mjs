@@ -192,6 +192,19 @@ export class MyTeamRemote extends TypertRemoteService {
     return this.host.resetTeamConfig(teamId, args                           )
   }
 
+  /**
+   * 计划质量反馈（CHG-119 / FR-11.6）：**只读观测**——任务数 / 粒度分布 / 角色负载 /
+   * estimate vs 实际。不写账本、不改计划、不自动重排。
+   */
+  async getPlanFeedback(args                      = {}) {
+    const { teamId, events } = this.resolveTeam(args?.teamId)
+    const svc = this.host.service(teamId)
+    return {
+      status: 'ok',
+      feedback: buildPlanFeedback(svc.projectionSnapshot, events()                                                                                ),
+    }
+  }
+
   /** 预设库（CHG-50）：三层只读目录（builtin/global/project），团队模板不在此创建 */
   async getPresets() {
     return { status: 'ok', ...this.host.presetCatalogView() }
@@ -494,7 +507,7 @@ export class MyTeamRemote extends TypertRemoteService {
 }
 
 // 手动 Remote 标记（strip-only 环境等价装饰器）：gateway 按 method 名发现端点
-markRemoteMethods(MyTeamRemote.prototype, ['getBoard', 'getTaskDetail', 'getTokens', 'getInbox', 'getAudit', 'getConfig', 'saveTeamConfig', 'resetTeamConfig', 'getPresets', 'planAction', 'postComment', 'memberOp', 'disband', 'createTask', 'createTasks', 'updateTask', 'assignTask', 'participateTask', 'rescopeTask', 'cancelTask', 'batchTaskOp',
+markRemoteMethods(MyTeamRemote.prototype, ['getBoard', 'getTaskDetail', 'getTokens', 'getInbox', 'getAudit', 'getConfig', 'saveTeamConfig', 'resetTeamConfig', 'getPlanFeedback', 'getPresets', 'planAction', 'postComment', 'memberOp', 'disband', 'createTask', 'createTasks', 'updateTask', 'assignTask', 'participateTask', 'rescopeTask', 'cancelTask', 'batchTaskOp',
   // CHG-86：门禁裁决 / 归档快照 / 知识提案策展
   'reviewTask', 'getArchive', 'getArchives', 'adoptKnowledge',
   // CHG-87（FR-13.1/FR-16.1）：角色库统一写入口 + 单角色调用
@@ -506,6 +519,8 @@ markRemoteMethods(MyTeamRemote.prototype, ['getBoard', 'getTaskDetail', 'getToke
 
 // views.ts 纯函数复用（buildDetail/buildBoard/buildTokens 薄转发，避免 client 打包拉入 service 类型）
 import { buildAuditView, buildBoardView, buildConfigView, buildTaskDetailView, buildTokensView } from './views.mjs'
+/* CHG-119（FR-11.6）：计划质量反馈投影（纯函数） */
+import { buildPlanFeedback } from './plan-feedback.mjs'
 function buildDetail(service                                   , events                           , taskId        ) {
   return buildTaskDetailView(service, taskId, events         )
 }

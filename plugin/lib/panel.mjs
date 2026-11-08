@@ -119,6 +119,8 @@ import { isStoreInitialized, readManifest, storeLayout, ensureStore, rejectProje
                                                                    
                                                                   
                                                                    
+                                                                       
+                                                                   
                                                              
                                             
                                                               
@@ -1045,6 +1047,13 @@ export class MyTeamPanelFacade extends TypertRemoteService {
     return remote.resetTeamConfig(query ?? {})
   }
 
+  /** CHG-119（FR-11.6）：计划质量反馈——只读观测（任务数 / 粒度 / 角色负载 / estimate vs 实际） */
+  async getPlanFeedback(agent           , query                         ) {
+    const remote = this.remoteFor(agent)
+    if (!remote?.getPlanFeedback) return UNAVAILABLE
+    return remote.getPlanFeedback(query ?? {})
+  }
+
   /** 预设库（CHG-50）：三层只读目录（builtin/global/project） */
   async getPresets(agent           , query                         ) {
     const remote = this.remoteFor(agent)
@@ -1176,7 +1185,9 @@ markRemoteMethods(MyTeamPanelFacade.prototype, ['batch', 'describe', 'watch', 'l
   // CHG-91（插件团队贡献契约 v1）：插件贡献的只读视图 + 显式重载
   'getContributions', 'reloadContributions',
   // CHG-117（FR-14.3 / docs/18 §7）：设置页配置写路径
-  'saveTeamConfig', 'resetTeamConfig'])
+  'saveTeamConfig', 'resetTeamConfig',
+  // CHG-119（FR-11.6）：计划质量反馈（只读观测）
+  'getPlanFeedback'])
 
 /**
  * 顶层装载行 apply（cordis.patch.yml myteam-panel 行）：

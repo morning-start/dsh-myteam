@@ -1,12 +1,12 @@
 {
   "schema": 1,
-  "builtAt": "2026-11-08T03:40:34.324Z",
+  "builtAt": "2026-11-08T03:46:18.498Z",
   "node": "v22.23.2",
   "entry": "./lib/host.mjs",
-  "modules": 43,
-  "sourceHash": "4ea90ad43aca9d10431e666eb75779c8631568b09c443f2453bb3f5f4530af45",
+  "modules": 44,
+  "sourceHash": "2c2fc99941dbc178fa870e9f32d6473cf682470d6802efea964a946d06952e0c",
   "clientFile": "client/client.js",
-  "clientHash": "bf17f859bd45d56029eeb1b3b834c3d2ad4734a41178574e307580f33771aad1",
+  "clientHash": "9cb8c84c6ae6e2dc4240c4209b22a053ca958cc3097100d4bf86533c9d885b34",
   "files": [
     "core/archive/archive-store.ts",
     "core/config/config-view.ts",
@@ -48,6 +48,7 @@
     "host-workspace.ts",
     "host.ts",
     "panel.ts",
+    "remote/plan-feedback.ts",
     "remote/service.ts",
     "remote/views.ts",
     "tools/defs.ts"

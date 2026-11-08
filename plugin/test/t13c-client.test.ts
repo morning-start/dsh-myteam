@@ -232,7 +232,7 @@ test('t13c-2g: 成员管理（CHG-48）——暂停/归档/恢复/移除两段�
 
 test('t13c-2h: 团队工作台（CHG-49/69）——五标签、审计/设置数据面、成本栏', () => {
   const source = readFileSync(clientPath, 'utf8')
-  assert.ok(source.includes("const tabs = ['members', 'participating', 'knowledge', 'audit', 'settings']"), '团队五标签')
+  assert.ok(source.includes("const tabs = ['members', 'participating', 'knowledge', 'audit', 'feedback', 'settings']"), '团队六标签（CHG-119 增「反馈」）')
   for (const key of ['tab.members', 'tab.knowledge', 'tab.audit', 'tab.settings', 'team.tab.participating']) {
     assert.ok(source.includes(`'${key}'`) || source.includes(key), `${key} 文案`)
   }
@@ -330,7 +330,7 @@ test('t13c-2j: 面板信息架构（CHG-69）——全局/项目双作用域 + �
   assert.ok(source.includes("scope === 'global'") && source.includes("scope === 'project'"), '作用域切换')
   assert.ok(source.includes("'scope.project'") && source.includes("'project.tabs.roles'") && source.includes("'project.tabs.teams'") && source.includes("'project.tabs.tasks'"), '全局/项目 + 项目三标签')
   // 团队页五标签：队员 / 参与任务 / 知识 / 审计 / 设置
-  assert.ok(source.includes("const tabs = ['members', 'participating', 'knowledge', 'audit', 'settings']"), '团队五标签')
+  assert.ok(source.includes("const tabs = ['members', 'participating', 'knowledge', 'audit', 'feedback', 'settings']"), '团队六标签（CHG-119 增「反馈」）')
   // 任务四视图 + 依赖图横竖方向
   assert.ok(source.includes("'list', 'board', 'lanes', 'dag'") && source.includes("'view.dir.h'") && source.includes("'view.dir.v'"), '任务四视图 + 方向切换')
   // 参与关系三处：任务卡 chip / 详情参与团队区块 / 团队参与任务页

@@ -270,6 +270,32 @@ window.__ModuleLoader__.load({
       'tab.inbox': '收件箱',
       'tab.audit': '审计',
       'tab.settings': '设置',
+      /* CHG-119（FR-11.6）：计划质量反馈（只读观测，不自动改计划） */
+      'tab.feedback': '反馈',
+      'feedback.title': '计划质量',
+      'feedback.desc': '任务数 · 粒度分布 · 角色负载 · 估算 vs 实际（只读观测，不自动改计划）',
+      'feedback.caliber': '启发式口径',
+      'feedback.total': '任务',
+      'feedback.terminal': '已终态',
+      'feedback.open': '未终态',
+      'feedback.granularity': '粒度分布',
+      'feedback.granularityNote': 'estimate 是队长填的体量；未填单列，不并进 S',
+      'feedback.roleLoad': '角色负载预估',
+      'feedback.roleLoadNote': '计划中的任务数 vs 在册成员数；只剩计划没人能领的会标出来',
+      'feedback.role': '角色',
+      'feedback.planned': '计划',
+      'feedback.members': '在册',
+      'feedback.deviations': '估算 vs 实际',
+      'feedback.task': '任务',
+      'feedback.estimate': '估算',
+      'feedback.actual': '实际',
+      'feedback.overrun': '超时',
+      'feedback.running': '进行中',
+      'feedback.comparable': '可比较',
+      'feedback.overCount': '超时 {over} / 可比较 {comparable}',
+      'feedback.notes': '口径说明',
+      'feedback.empty': '账本里还没有任务——先提交计划，这里才有可观测的质量信号',
+      'feedback.noData': '还没有可比较的数据（任务需要填 estimate 才参与统计）',
       'view.label': '视图',
       'view.board': '看板',
       'view.lanes': '泳道',
@@ -1451,6 +1477,32 @@ window.__ModuleLoader__.load({
       'tab.inbox': 'Inbox',
       'tab.audit': 'Audit',
       'tab.settings': 'Settings',
+      /* CHG-119（FR-11.6）：plan quality feedback (read-only observation) */
+      'tab.feedback': 'Feedback',
+      'feedback.title': 'Plan quality',
+      'feedback.desc': 'Task count - granularity - role load - estimate vs actual (read-only; never auto-replans)',
+      'feedback.caliber': 'heuristic',
+      'feedback.total': 'Tasks',
+      'feedback.terminal': 'Terminal',
+      'feedback.open': 'Open',
+      'feedback.granularity': 'Granularity',
+      'feedback.granularityNote': 'estimate is the captain-declared size; unset is listed separately, not folded into S',
+      'feedback.roleLoad': 'Role load estimate',
+      'feedback.roleLoadNote': 'Planned tasks vs active members; roles with plans but no member are flagged',
+      'feedback.role': 'Role',
+      'feedback.planned': 'Planned',
+      'feedback.members': 'Members',
+      'feedback.deviations': 'Estimate vs actual',
+      'feedback.task': 'Task',
+      'feedback.estimate': 'Estimate',
+      'feedback.actual': 'Actual',
+      'feedback.overrun': 'Overrun',
+      'feedback.running': 'running',
+      'feedback.comparable': 'comparable',
+      'feedback.overCount': 'Overrun {over} / comparable {comparable}',
+      'feedback.notes': 'Caliber notes',
+      'feedback.empty': 'No tasks in the ledger yet - submit a plan to get quality signals',
+      'feedback.noData': 'Nothing comparable yet (tasks need an estimate to be counted)',
       'view.label': 'View',
       'view.board': 'Board',
       'view.lanes': 'Swimlanes',
@@ -2975,6 +3027,8 @@ window.__ModuleLoader__.load({
         /* CHG-117（FR-14.3 / docs/18 §7）：设置页配置写路径——校验先于写 + 原子写 + 两段确认 */
         saveTeamConfig: (query) => call('saveTeamConfig', query),
         resetTeamConfig: (query) => call('resetTeamConfig', query),
+        /* CHG-119（FR-11.6）：计划质量反馈（只读观测，不自动改计划） */
+        getPlanFeedback: (query) => call('getPlanFeedback', query),
         getPresets: (query) => call('getPresets', query),
         memberOp: (query) => call('memberOp', query),
         planAction: (query) => call('planAction', query),
@@ -7201,6 +7255,98 @@ window.__ModuleLoader__.load({
       children: (LAYER_ICONS[key] ?? []).map((d, index) => j('path', { key: index, d, stroke: 'currentColor', strokeWidth: 1.2, strokeLinecap: 'round', strokeLinejoin: 'round' })),
     })
 
+    /**
+     * CHG-119（FR-11.6）：**计划质量反馈**（只读观测）。
+     *
+     * 需求明确「先可观测不自动改」：这一屏只做三件事——把计划质量说清楚
+     * （任务数 / 粒度分布 / 角色负载）、把 estimate vs 实际摆出来、把口径写在明面上。
+     * **不提供**「自动重排 / 自动拆分」按钮：那是产品下一步的裁决，不是本轮实现。
+     */
+    function PlanFeedbackTab({ t, feedback }) {
+      if (feedback === undefined) return j('div', { className: 'mt-empty', children: t('state.loading') })
+      if (!feedback) return j('div', { className: 'mt-empty', children: t('feedback.empty') })
+      const tasks = feedback.tasks ?? { total: 0, terminal: 0, open: 0, byState: {} }
+      const granularity = feedback.granularity ?? { S: 0, M: 0, L: 0, unset: 0 }
+      const roleLoad = feedback.roleLoad ?? []
+      const deviations = feedback.deviations ?? []
+      const stat = (label, value) => js('div', { className: 'mt-tstat', children: [j('b', { children: String(value) }), j('span', { children: label })] })
+      const bucketRow = (key, label) => js('div', { key, className: 'mt-setrow', children: [
+        js('div', { className: 'mt-setrow-main', children: [
+          j('div', { className: 'mt-setrow-title', children: label }),
+          j('div', { className: 'mt-setrow-sub', children: t('feedback.granularityNote') }),
+        ] }),
+        js('div', { className: 'mt-setrow-act', children: j('b', { children: String(granularity[key] ?? 0) }) }),
+      ] })
+      const roleRow = (row) => js('div', { key: row.roleId, className: 'mt-setrow', children: [
+        js('div', { className: 'mt-setrow-main', children: [
+          j('div', { className: 'mt-setrow-title', children: roleLabel(row.roleId) || row.roleId }),
+          j('div', { className: 'mt-setrow-sub', children: `${t('feedback.planned')} ${row.planned} · ${t('feedback.members')} ${row.members}` }),
+        ] }),
+        js('div', { className: 'mt-setrow-act', children: row.members === 0 && row.open > 0
+          ? j('span', { className: 'mt-chip mt-chip-warn', children: `${t('feedback.open')} ${row.open}` })
+          : j('span', { className: 'mt-hint', children: `${t('feedback.open')} ${row.open}` }) }),
+      ] })
+      const deviationRow = (row) => js('div', { key: row.id, className: 'mt-setrow', children: [
+        js('div', { className: 'mt-setrow-main', children: [
+          j('div', { className: 'mt-setrow-title', children: row.title }),
+          j('div', { className: 'mt-setrow-sub', children: `${row.id} · ${t('feedback.estimate')} ${row.estimate ?? '—'} · ${t('feedback.actual')} ${Math.round(Number(row.actualMs ?? 0) / 60000)} min` }),
+        ] }),
+        js('div', { className: 'mt-setrow-act', children: [
+          row.running ? j('span', { className: 'mt-chip', children: t('feedback.running') }) : null,
+          row.overrun ? j('span', { className: 'mt-chip mt-chip-warn', children: t('feedback.overrun') }) : null,
+        ] }),
+      ] })
+      return js('div', { className: 'mt-page mt-page-narrow', children: [
+        js('div', { className: 'mt-page-head', children: [
+          js('div', { children: [
+            j('h2', { children: t('feedback.title') }),
+            j('p', { children: t('feedback.desc') }),
+          ] }),
+          j('span', { className: 'mt-chip', title: t('feedback.caliber'), children: t('feedback.caliber') }),
+        ] }),
+        /* 概览：只展示账本里真实存在的计数 */
+        js('div', { className: 'mt-teambar-stats', children: [
+          stat(t('feedback.total'), tasks.total),
+          stat(t('feedback.terminal'), tasks.terminal),
+          stat(t('feedback.open'), tasks.open),
+          stat(t('feedback.overrun'), t('feedback.overCount').replace('{over}', String(feedback.overrun?.over ?? 0)).replace('{comparable}', String(feedback.overrun?.comparable ?? 0))),
+        ] }),
+        js('section', { className: 'mt-ssection', children: [
+          js('div', { className: 'mt-dsec-head', children: [
+            j('h4', { children: t('feedback.granularity') }),
+            j('span', { className: 'mt-dsec-line', 'aria-hidden': true }),
+            j('span', { className: 'mt-dsec-n', children: t('feedback.granularityNote') }),
+          ] }),
+          js('div', { className: 'mt-setrows', children: [
+            bucketRow('S', 'S'), bucketRow('M', 'M'), bucketRow('L', 'L'), bucketRow('unset', '—'),
+          ] }),
+        ] }),
+        js('section', { className: 'mt-ssection', children: [
+          js('div', { className: 'mt-dsec-head', children: [
+            j('h4', { children: t('feedback.roleLoad') }),
+            j('span', { className: 'mt-dsec-line', 'aria-hidden': true }),
+            j('span', { className: 'mt-dsec-n', children: t('feedback.roleLoadNote') }),
+          ] }),
+          roleLoad.length === 0
+            ? j('div', { className: 'mt-empty', children: t('feedback.noData') })
+            : js('div', { className: 'mt-setrows', children: roleLoad.map(roleRow) }),
+        ] }),
+        js('section', { className: 'mt-ssection', children: [
+          js('div', { className: 'mt-dsec-head', children: [
+            j('h4', { children: t('feedback.deviations') }),
+            j('span', { className: 'mt-dsec-line', 'aria-hidden': true }),
+          ] }),
+          deviations.length === 0
+            ? j('div', { className: 'mt-empty', children: t('feedback.noData') })
+            : js('div', { className: 'mt-setrows', children: deviations.slice(0, 20).map(deviationRow) }),
+        ] }),
+        js('div', { className: 'mt-note-box mt-note-info', children: [
+          j('b', { children: t('feedback.notes') }),
+          ...(feedback.notes ?? []).map((note, index) => j('div', { key: index, children: String(note) })),
+        ] }),
+      ] })
+    }
+
     function SettingsTab({ t, config, offline, team, connection, onDisbanded, onSaved }) {
       const [impact, setImpact] = react.useState(null)
       const [busy, setBusy] = react.useState(false)
@@ -10207,6 +10353,8 @@ window.__ModuleLoader__.load({
       const [audit, setAudit] = react.useState(undefined)
       const [auditFilter, setAuditFilter] = react.useState('all')
       const [config, setConfig] = react.useState(undefined)
+      /* CHG-119（FR-11.6）：计划质量反馈（只读观测；undefined=未加载） */
+      const [feedback, setFeedback] = react.useState(undefined)
       const [tokens, setTokens] = react.useState(undefined)
       const [inbox, setInbox] = react.useState(null)
       const [presets, setPresets] = react.useState(undefined)
@@ -10487,8 +10635,18 @@ window.__ModuleLoader__.load({
             : discoveryApi.getOfflineBoard({ workspaceRoot: projectRoot, teamId: selectedTeamId }).then((r) => (r?.status === 'ok' && r.config ? { status: 'ok', ...r.config } : { status: 'unavailable' }))
           pending.then((r) => { if (alive) setConfig(r?.status === 'ok' ? r : null) }).catch(() => { if (alive) setConfig(null) })
         }
+        /* CHG-119（FR-11.6）：计划质量反馈——只读观测，离线团队走离线账本折叠 */
+        if (teamTab === 'feedback' && feedback === undefined) {
+          if (selectedTeam.online) {
+            api.getPlanFeedback?.({ teamId: selectedTeamId })
+              .then((r) => { if (alive) setFeedback(r?.status === 'ok' ? (r.feedback ?? null) : null) })
+              .catch(() => { if (alive) setFeedback(null) })
+          } else {
+            setFeedback(null)
+          }
+        }
         return () => { alive = false }
-      }, [teamTab, selectedTeam, selectedTeamId, projectRoot, api, discoveryApi, kb, audit, config])
+      }, [teamTab, selectedTeam, selectedTeamId, projectRoot, api, discoveryApi, kb, audit, config, feedback])
       // 成本：选中团队即加载（底部成本栏 + 抽屉共用）
       react.useEffect(() => {
         if (!selectedTeam || tokens !== undefined) return undefined
@@ -10907,7 +11065,8 @@ window.__ModuleLoader__.load({
           const teamTasksAll = (pv.tasks ?? []).filter((task) => (task.participants ?? []).some((p) => p.teamId === team.teamId))
           const members = team.members ?? []
           const taskTitle = (id) => (teamTasksAll.find((task) => task.id === id)?.title)
-          const tabs = ['members', 'participating', 'knowledge', 'audit', 'settings']
+          /* CHG-119：团队内 tab 增加「反馈」（FR-11.6 计划质量），排在审计后、设置前 */
+          const tabs = ['members', 'participating', 'knowledge', 'audit', 'feedback', 'settings']
           const tabLabel = (key) => {
             if (key === 'members') return `${t('tab.members')}（${members.length}）`
             if (key === 'participating') return `${t('team.tab.participating')}（${teamTasksAll.length}）`
@@ -11131,6 +11290,9 @@ window.__ModuleLoader__.load({
                 } catch (e) { setError(String(e?.message ?? e)) }
               },
             })
+          /* [G4 ledger · 反馈 tab] —— design 未单列屏；FR-11.6「先可观测不自动改」 */
+          } else if (teamTab === 'feedback') {
+            content = j(PlanFeedbackTab, { t, feedback })
           /* [G4 ledger · 设置 tab] —— design/settings.html */
           } else {
             content = j(SettingsTab, {
