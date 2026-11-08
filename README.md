@@ -5,10 +5,10 @@
 </div>
 
 ![license](https://img.shields.io/badge/license-MIT-blue)
-![tests](https://img.shields.io/badge/tests-590%20passing-brightgreen)
+![tests](https://img.shields.io/badge/tests-661%20passing-brightgreen)
 ![node](https://img.shields.io/badge/node-%E2%89%A522.18-informational)
 ![dsh](https://img.shields.io/badge/dsh-0.2.1--rc.0%20~%200.3.0-informational)
-![tools](https://img.shields.io/badge/tools-44%20%28Lead%2035%20%2B%20member%209%29-blueviolet)
+![tools](https://img.shields.io/badge/tools-62%20%28Lead%2053%20%2B%20member%209%29-blueviolet)
 
 ## 为什么还要一个团队运行时
 
@@ -22,7 +22,7 @@ DSH 内核已经内置了 `agentTeams` 服务与 `spawn_teammate` / `team_task_*
 
 在此之上再加三样内置没有的：**团队知识库**（带证据指针与归因）、**token 计量侧车**（四桶口径，永不进模型上下文）、**插件团队贡献契约**（第三方插件装进来就自带一套配好的团队）。
 
-它与官方 `@deepseek-ai/dsh-experimental-agent-team` 的 12 维逐条对照见 [docs/15-官方AgentTeam对照与借鉴.md](docs/15-官方AgentTeam对照与借鉴.md)。
+它与官方 `@deepseek-ai/dsh-experimental-agent-team` 的 12 维逐条对照见 [docs/15-官方AgentTeam对照与借鉴.md](docs/15-官方AgentTeam对照与借鉴.md)；**当前版本 vs 全部 6 个参考来源**的 15 维功能矩阵见 [docs/21-参考项目功能对照.md](docs/21-参考项目功能对照.md)。
 
 ## 核心概念
 
@@ -87,7 +87,7 @@ tools\boot-myteam.cmd
 | 位置 | 内容 |
 |---|---|
 | [`dsh-myteam-requirements.md`](dsh-myteam-requirements.md) | **PRD 正本**（v3.0）：需求 / 场景 / 验收 / 风险的权威来源 |
-| [`docs/`](docs/README.md) | 项目文档：需求池、调研、技术可行性、架构与 ADR、API 契约、任务板、风险、验收、变更记录（CHG-01~102）、数据模型、用户场景、官方对照、贡献契约、**17 项目级存储架构（现行口径）** |
+| [`docs/`](docs/README.md) | 项目文档：需求池、调研、技术可行性、架构与 ADR、API 契约、任务板、风险、验收、变更记录（CHG-01~141）、数据模型、用户场景、官方对照、贡献契约、**17 项目级存储架构（现行口径）**、18 配置 Schema、19 资源模型、20 存储结构、**21 参考项目功能对照（当前版本）** |
 | [`plugin/`](plugin/README.md) | **插件实现**（可装载单元）：`src/` 源码 → `lib/` 构建产物 · `client/` 面板客户端 · `test/` 单测 · `cordis.patch.yml` · `locale/` |
 | [`design/`](design/README.md) | 面板 UI 设计稿：27 屏 HTML 终稿 + tokens / app.css / icons.svg / dag.js |
 | [`skills/`](skills/README.md) | 对外 skill 包：[`myteam-plugin-team/`](skills/myteam-plugin-team/README.md)（契约 + 模板 + 可执行校验器） |
@@ -105,7 +105,7 @@ tools\boot-myteam.cmd
 
 ## 当前状态
 
-**机制层已收口**：单测 661 条全绿（95 个测试文件 / 49 个 src 模块），`check-drift` 报 `MISMATCH: 0`，62 个工具（队长 53 + 成员 9；**档位元数据 + 运行时门禁**：A 18 / C 36 / CM 2 / H 6）、40 个面板端点（含「团队资产」UI：技能清单 / 导出 / 复制 / 发布）、40 型账本事件、27 屏面板设计稿。全局/项目**不拆两个宿主表面**（CHG-114 裁决）：侧栏入口 = 全局库、团队视图 = 本团队看板；团队视图的看板/流程/依赖图与面板**同源换挂载点**（CHG-115）。配置字段的唯一定稿是 [docs/18](docs/18-配置Schema定稿.md)（CHG-116），写路径已闭环（CHG-117 端点 + CHG-118 设置页表单 / JSON 源视图 / 两段确认）；计划质量反馈只读观测（CHG-119），会话考古按 `session:<id>` 只读读历史（CHG-120）；资源模型与能力矩阵见 [docs/19](docs/19-资源模型与能力矩阵.md)（CHG-121），工具化缺口按 P0→P2 补齐（CHG-122 起）。
+**机制层已收口**：单测 661 条全绿（96 个测试文件 / 49 个 src 模块），`check-drift` 报 `MISMATCH: 0`，62 个工具（队长 53 + 成员 9；**档位元数据 + 运行时门禁**：A 18 / C 36 / CM 2 / H 6）、40 个面板端点（含「团队资产」UI：技能清单 / 导出 / 复制 / 发布）、40 型账本事件、27 屏面板设计稿。全局/项目**不拆两个宿主表面**（CHG-114 裁决）：侧栏入口 = 全局库、团队视图 = 本团队看板；团队视图的看板/流程/依赖图与面板**同源换挂载点**（CHG-115）。配置字段的唯一定稿是 [docs/18](docs/18-配置Schema定稿.md)（CHG-116），写路径已闭环（CHG-117 端点 + CHG-118 设置页表单 / JSON 源视图 / 两段确认）；计划质量反馈只读观测（CHG-119），会话考古按 `session:<id>` 只读读历史（CHG-120）；资源模型与能力矩阵见 [docs/19](docs/19-资源模型与能力矩阵.md)（CHG-121），工具化缺口按 P0→P2 补齐（CHG-122 起）。**当前版本 vs 全部参考项目**（6 个来源 / 15 维矩阵 / P0~P2 差距 14 条）见 [docs/21](docs/21-参考项目功能对照.md)（CHG-141）。
 
 **已经过真实宿主安装验证**（CHG-93/94）：两次安装各抓到单测永远发现不了的 P0（preset 作用域服务异步就绪导致队长技能静默不注入；团队章程未注入队长 system prompt），均已修复并留下断言。深色对比度 8.15:1、横向溢出 0、控制台无插件侧报错。
 
