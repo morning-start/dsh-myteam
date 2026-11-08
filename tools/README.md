@@ -9,6 +9,7 @@
 | 把插件真的跑起来看一眼 | `boot-myteam.cmd` / `boot-myteam-noopen.cmd` / `run-headless.cmd` |
 | 直接调网关 RPC 验证端点 | `rpc.mjs` / `rpc-diag.mjs` / `rpc-call.ps1` |
 | 走完整链路（建队 → 派任务 → 审批） | `ki2-drive.mjs` |
+| **狗粮：让本仓库自己组一次队**（B5） | `dogfood-live.mjs`（机制面 21 项）+ `dogfood-collab.mjs`（真队长会话自己组队） |
 | 用浏览器按真实渲染查 UI | `cdp-debug.mjs`（配合 `.debug/scenario-*.mjs`） |
 | 造一份能点的演示数据 | `seed-demo-project.mjs` / `seed-demo-team.mjs` / `seed-panel-check.mjs` |
 | 核对 src 与 lib 是否一致 | `check-drift.mjs` / `diff-one.mjs` |
@@ -24,6 +25,8 @@
 | `run-headless.cmd` | headless 模式启动（无 GUI，供脚本驱动） |
 | `rpc.mjs` / `rpc-diag.mjs` / `rpc-call.ps1` | 网关 RPC 调用器：cookie 鉴权 → `POST /api`（K 系列实弹用）。`rpc-diag` 逐步打印鉴权链，用来定位 cookie 问题 |
 | `ki2-drive.mjs` | KI-2 实弹驱动脚本（`session/create` → `prompt` → `planAction` → `approve` 全链路） |
+| `dogfood-live.mjs` | **B5 狗粮 · 机制面**（CHG-166）：在真实宿主里验「装载链 / 能力协商 / 批量 / 看板 / steer / 会话移交 / 账本零污染」21 项。先 `boot-myteam.cmd`，再 `node tools/dogfood-live.mjs`。日志是 **UTF-16LE**（cmd 重定向），脚本按 BOM 判编码 |
+| `dogfood-collab.mjs` | **B5 狗粮 · 协作面**（CHG-166）：把最小指令注入真队长会话，让**它自己**组队（`team.created` → `plan.staged` → `plan.approved` → `member.spawned` → `task.created`），只认账本证据、不认 LLM 自述；按「本次新增」而不是「账本里有没有」判成绩 |
 
 ## 面板 UI 调试
 
