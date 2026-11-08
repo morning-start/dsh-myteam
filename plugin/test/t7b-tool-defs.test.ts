@@ -3,9 +3,9 @@ import assert from 'node:assert/strict'
 import { leadToolDefs, memberToolDefs, toolRegistryPlan, toolOutput, EVIDENCE_PARAM } from '../src/tools/defs.ts'
 import { TEAM_MEMBER_TOOLS } from '../src/core/members/member-setup.ts'
 
-test('T7 tool defs: 35 lead tools + 9 member tools, names match contract (docs/04 §1 + CHG-17/19/53/57/69/73/76/86/87/91)', () => {
+test('T7 tool defs: 36 lead tools + 9 member tools, names match contract (docs/04 §1 + CHG-17/19/53/57/69/73/76/86/87/91/122)', () => {
   const plan = toolRegistryPlan()
-  assert.equal(plan.lead.length, 35)
+  assert.equal(plan.lead.length, 36)
   assert.equal(plan.member.length, 9)
   assert.deepEqual(plan.member, [...TEAM_MEMBER_TOOLS])
   // CHG-86（P0-4）：两个作用域不能有同名工具——旧实现队长侧与成员侧都叫
@@ -30,6 +30,8 @@ test('T7 tool defs: 35 lead tools + 9 member tools, names match contract (docs/0
     'myteam_apply_roles',
     // CHG-91（插件团队贡献契约 v1）：插件贡献只读视图 + 显式重载
     'myteam_list_contributions', 'myteam_reload_contributions',
+    // CHG-122（docs/19 §M1）：角色目录只读视图（全员可读）
+    'myteam_list_roles',
   ]) {
     assert.ok(plan.lead.includes(expected), `missing lead tool ${expected}`)
   }

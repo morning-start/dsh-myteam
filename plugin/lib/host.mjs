@@ -1243,6 +1243,9 @@ export class MyTeamHost {
             return this.roleError(e)
           }
         }
+        /* CHG-122（docs/19 §M1）：角色目录只读视图（全员可读） */
+        case 'myteam_list_roles':
+          return this.listRolesTool(args)
         case 'myteam_create_role':
           return this.createRole(args)
         case 'myteam_update_role':
@@ -2930,6 +2933,43 @@ export class MyTeamHost {
   }
 
   /* ── 团队模板管理（CHG-57）：内置只读、写项目层、两段确认；面板仍只读 ── */
+
+  /**
+   * CHG-122（docs/19 §M1）：**角色目录只读视图**——全员可读（A 档）。
+   *
+   * 为什么必须有：`myteam_create_role` / `spawn_member` 都要求填 `roleId`，
+   * 但此前**没有任何工具能列出有哪些角色**——模型只能猜 id 或靠用户贴。
+   * 这一条补上「先看得见，才谈聘任 / 复制 / 改」。
+   *
+   * 只读：不写库、不改任何角色定义、不产生账本事件。
+   */
+  listRolesTool(args                          = {})                          {
+    const scope = String(args.scope ?? 'all')
+    const includeSkills = args.includeSkills === true
+    let entries = this.roleCatalog()
+    if (scope !== 'all') entries = entries.filter((entry) => String(entry.origin) === scope)
+    const roles = entries.map((entry) => {
+      const definition = entry.definition                
+                   
+                     
+                            
+                           
+                         
+       
+      const origin = String(entry.origin)
+      return {
+        id: String(definition.id ?? ''),
+        name: String(definition.name ?? definition.id ?? ''),
+        description: String(definition.description ?? ''),
+        origin,
+        /* 内置与插件贡献只读（想改先复制到项目，docs/19 §5.1） */
+        readOnly: origin === 'builtin' || origin === 'plugin',
+        ...(definition.isCaptain ? { isCaptain: true } : {}),
+        ...(includeSkills && Array.isArray(definition.skills) ? { skills: definition.skills.map((skill) => String(skill)) } : {}),
+      }
+    })
+    return { status: 'ok', scope, total: roles.length, roles }
+  }
 
   /** 模板目录（队长选模板用；不写盘） */
   listPresetsTool()                          {

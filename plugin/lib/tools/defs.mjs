@@ -526,6 +526,18 @@ export function leadToolDefs()            {
     { name: 'myteam_resolve_proposal', description: '处置成员结构提案（FR-11.4）：approved/rejected。**批准即执行对应变更**（CHG-88）：split → 落子任务 + 原任务取消；add-dep → 加依赖；reassign → 改派；cancel → 取消。驳回只留痕、结构不动。载荷不合规会拒绝并说明，不会留下「已批准但什么都没做」的半截状态。', parameters: { type: 'object', properties: { teamId: teamId(), proposalId: str('提案 id', true), decision: { type: 'string', enum: ['approved', 'rejected'], description: '处置决定', required: true }, note: str('处置说明') } } },
     { name: 'myteam_adopt_knowledge', description: '采纳/驳回知识提案（FR-17.4 策展门）：adopted 落 config/knowledge/（带 evidence+contributor 归因）；rejected 只留痕。draftId 来自 knowledge.proposed 事件。', parameters: { type: 'object', properties: { teamId: teamId(), draftId: str('知识提案 id（knowledge.proposed 事件的 draftId）', true), decision: { type: 'string', enum: ['adopted', 'rejected'], description: '策展决定', required: true }, note: str('处置说明') } } },
     {
+      /* CHG-122（docs/19 §M1）：角色目录只读视图——**全员可读**（A 档） */
+      name: 'myteam_list_roles',
+      description: '列出角色目录（全员可读，CHG-122 / docs/19 §M1）：返回所有可聘任角色——内置（builtin，只读）/ 全局（global）/ 项目（project）/ 插件贡献（plugin），每条带 id / name / description / origin / readOnly。**只读**：不写库、不改角色；建/改角色用 myteam_create_role / myteam_update_role。',
+      parameters: {
+        type: 'object',
+        properties: {
+          scope: { type: 'string', enum: ['all', 'project', 'global', 'builtin', 'plugin'], description: '只列某一来源（缺省 all）' },
+          includeSkills: bool('是否带出每个角色绑定的技能名（缺省 false，省 token）'),
+        },
+      },
+    },
+    {
       name: 'myteam_create_role',
       description: '创建角色（队长专属，CHG-53 / CHG-103 作用域）：**缺省写项目级** `.dsh-myteam/config/roles/<roleId>.json`（只对本项目可见）。仅当用户**明确说「全局」/「所有项目共用」**时才传 `scope:"global"` + `confirmGlobal:true` 写全局库；指令不清晰时必须先弹窗确认，不要猜。角色是配置单元（职责/提示词/工具策略/技能/MCP）；内置角色只读，新建角色可在组队时引用。',
       parameters: {
