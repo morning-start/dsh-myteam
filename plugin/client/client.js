@@ -1154,6 +1154,17 @@ window.__ModuleLoader__.load({
       'history.failed': '读取失败：{msg}',
       'history.more': '更早一页',
       'history.chars': '本页 {n} 字符',
+      /* CHG-140（docs/19 §7）：团队资产——技能清单 / 导出 / 复制 / 发布 */
+      'assets.title': '团队资产',
+      'assets.desc': '技能清单 · 快照导出 · 复制团队 · 发布到全局库（只写 myteam 队长预设）',
+      'assets.skills': '技能清单',
+      'assets.export': '导出快照',
+      'assets.copy': '复制团队',
+      'assets.publish': '发布到全局',
+      'assets.noSkills': '角色还没有绑定任何技能（先用角色编辑绑定）',
+      'assets.done': '操作完成（已落到 myteam 目录，不污染其它预设）',
+      'assets.confirmPublish': '全局库已有同 teamId 的定义：确认覆盖请再点一次「发布到全局」（单向不可逆）',
+      'assets.isolation': '隔离：只写 $DSH_HOME/myteam/**，绝不写全局 skills 与其它预设',
       'costbar.total': '累计 token',
       'costbar.hitRate': '缓存命中率',
       'costbar.today': '今日未命中 / 输出',
@@ -2362,6 +2373,17 @@ window.__ModuleLoader__.load({
       'history.failed': 'Read failed: {msg}',
       'history.more': 'Earlier page',
       'history.chars': '{n} chars on this page',
+      /* CHG-140（docs/19 §7）：team assets — skills / export / copy / publish */
+      'assets.title': 'Team assets',
+      'assets.desc': 'Skills - snapshot export - copy team - publish to global (writes only the myteam captain preset)',
+      'assets.skills': 'Skills',
+      'assets.export': 'Export snapshot',
+      'assets.copy': 'Copy team',
+      'assets.publish': 'Publish to global',
+      'assets.noSkills': 'No skills bound to roles yet (bind them in the role editor)',
+      'assets.done': 'Done (written under the myteam directory; other presets untouched)',
+      'assets.confirmPublish': 'Global library already has this teamId: click "Publish to global" again to overwrite (one-way, irreversible)',
+      'assets.isolation': 'Isolation: writes only $DSH_HOME/myteam/** - never global skills or other presets',
       'costbar.total': 'Cumulative tokens',
       'costbar.hitRate': 'Cache hit rate',
       'costbar.today': 'Today uncached / output',
@@ -3061,6 +3083,12 @@ window.__ModuleLoader__.load({
         /* CHG-139b（docs/19 §5.2/§5.3）：复制团队 / 发布团队（发布 = H 档两段确认） */
         copyTeam: (query) => call('copyTeam', query),
         publishTeam: (query) => call('publishTeam', query),
+        /* CHG-139c（docs/20 §8）：导出 / 导入团队快照（导入 = 新 id，永不覆盖） */
+        exportTeam: (query) => call('exportTeam', query),
+        importTeam: (query) => call('importTeam', query),
+        /* CHG-139d（docs/20 §5.4）：创建技能 / 工具（只写 myteam 队长预设） */
+        createSkill: (query) => call('createSkill', query),
+        createTool: (query) => call('createTool', query),
         getPresets: (query) => call('getPresets', query),
         memberOp: (query) => call('memberOp', query),
         planAction: (query) => call('planAction', query),
@@ -7407,6 +7435,8 @@ window.__ModuleLoader__.load({
       const [resetAsk, setResetAsk] = react.useState(false)
       /* CHG-120（M2-D ②）：会话考古——当前打开的一页历史（null = 抽屉关闭） */
       const [history, setHistory] = react.useState(null)
+      /* CHG-140（docs/19 §7）：团队资产——技能清单 / 导出 / 复制 / 发布 */
+      const [assets, setAssets] = react.useState({ skills: null, note: null, err: null, busy: false })
       react.useEffect(() => {
         if (!config?.config) return
         const next = JSON.parse(JSON.stringify(config.config))
@@ -7488,8 +7518,7 @@ window.__ModuleLoader__.load({
        * 没有读取方它就是死链接。旧宿主没有 `page` 能力 → 明确提示（不假装读到）。
        * 翻页用 `beforeSeq`（本页最早一条 seq）往回读。
        */
-      const openHistory = async (sessionId, beforeSeq) => {
-        if (!team?.sessionId) return
+      const openHistory = async (sessionId, beforeSeq) => {        if (!team?.sessionId) return
         const request = { sessionId, ...(beforeSeq !== undefined ? { beforeSeq } : {}) }
         setHistory({ ...request, loading: true, data: null, err: null })
         try {
@@ -7506,6 +7535,42 @@ window.__ModuleLoader__.load({
           setHistory({ ...request, loading: false, data: r, err: null })
         } catch (e) {
           setHistory({ ...request, loading: false, data: null, err: t('history.failed').replace('{msg}', String(e?.message ?? e)) })
+        }
+      }
+
+      /**
+       * CHG-140（docs/19 §7 UI 缺口）：**团队资产操作**——技能清单 / 导出快照 / 复制团队 / 发布到全局。
+       *
+       * 两条纪律（与后端同源）：
+       *  - **两段确认透传**：`confirm-required` 不吞成成功，提示用户再点一次；
+       *  - **隔离提示上屏**：只写 `$DSH_HOME/myteam/**`（绝不写全局 skills 与其它预设）。
+       */
+      const runAsset = async (op) => {
+        if (!team?.sessionId) return
+        setAssets((prev) => ({ ...prev, busy: true, note: null, err: null }))
+        try {
+          const api = makeApi(connection, team.sessionId)
+          let result
+          if (op === 'skills') result = await api.listSkills({ teamId: team.teamId })
+          else if (op === 'export') result = await api.exportTeam({ teamId: team.teamId })
+          else if (op === 'copy') result = await api.copyTeam({ sourceTeamId: team.teamId })
+          else result = await api.publishTeam({ teamId: team.teamId, confirm: true })
+          if (result?.status === 'confirm-required') {
+            setAssets((prev) => ({ ...prev, busy: false, note: t('assets.confirmPublish') }))
+            return
+          }
+          if (result?.status !== 'ok') {
+            setAssets((prev) => ({ ...prev, busy: false, err: String(result?.message ?? result?.code ?? 'failed') }))
+            return
+          }
+          setAssets((prev) => ({
+            skills: op === 'skills' ? (result.declared ?? []) : prev.skills,
+            note: op === 'skills' ? null : (op === 'export' && result.filePath ? String(result.filePath) : t('assets.done')),
+            err: null,
+            busy: false,
+          }))
+        } catch (error) {
+          setAssets((prev) => ({ ...prev, busy: false, err: String(error?.message ?? error) }))
         }
       }
 
@@ -7792,6 +7857,31 @@ window.__ModuleLoader__.load({
             ] }),
           ] }) : null,
           handoffErr ? j('div', { className: 'mt-form-note mt-error-banner', role: 'alert', children: handoffErr }) : null,
+        ] }),
+        /* CHG-140（docs/19 §7）：团队资产——技能清单 / 导出 / 复制 / 发布（隔离提示上屏） */
+        js('section', { className: 'mt-ssection', children: [
+          js('div', { className: 'mt-dsec-head', children: [
+            j('h4', { children: t('assets.title') }),
+            j('span', { className: 'mt-dsec-line', 'aria-hidden': true }),
+            j('span', { className: 'mt-dsec-n', children: t('assets.desc') }),
+          ] }),
+          js('div', { className: 'mt-form-actions', children: [
+            j('button', { className: 'mt-btn', 'data-testid': 'assets-skills', disabled: assets.busy, onClick: () => runAsset('skills'), children: t('assets.skills') }),
+            j('button', { className: 'mt-btn', 'data-testid': 'assets-export', disabled: assets.busy, onClick: () => runAsset('export'), children: t('assets.export') }),
+            j('button', { className: 'mt-btn', 'data-testid': 'assets-copy', disabled: assets.busy, onClick: () => runAsset('copy'), children: t('assets.copy') }),
+            j('button', { className: 'mt-btn', 'data-testid': 'assets-publish', disabled: assets.busy, onClick: () => runAsset('publish'), children: t('assets.publish') }),
+          ] }),
+          j('div', { className: 'mt-hint', children: t('assets.isolation') }),
+          assets.skills === null ? null : (assets.skills ?? []).length === 0
+            ? j('div', { className: 'mt-empty', children: t('assets.noSkills') })
+            : js('div', { className: 'mt-setrows', 'data-testid': 'assets-skill-list', children: (assets.skills ?? []).map((item) => js('div', { key: String(item.name), className: 'mt-setrow', children: [
+                js('div', { className: 'mt-setrow-main', children: [
+                  j('div', { className: 'mt-setrow-title', children: String(item.name) }),
+                  j('div', { className: 'mt-setrow-sub', children: (item.boundBy ?? []).map((binding) => String(binding.roleId)).join(' · ') || '—' }),
+                ] }),
+              ] })) }),
+          assets.note ? j('div', { className: 'mt-note-box mt-note-info', 'data-testid': 'assets-note', children: assets.note }) : null,
+          assets.err ? j('div', { className: 'mt-form-note mt-error-banner', role: 'alert', children: assets.err }) : null,
         ] }),
         js('p', { className: 'mt-note-box', children: [j('b', { children: t('settings.footNote') }), j('span', { children: t('settings.footNoteSub') })] }),
         (config.warnings ?? []).length > 0 ? j('div', { className: 'mt-note-box mt-note-info', children: `${t('settings.warnings')}：${config.warnings.join('；')}` }) : null,

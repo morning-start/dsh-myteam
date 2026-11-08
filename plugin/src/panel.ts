@@ -157,6 +157,12 @@ type RemoteLike = {
   /** CHG-139b（docs/19 §5.2/§5.3）：复制团队 / 发布团队到全局（发布 = H 档人类专属） */
   copyTeam?(args: Record<string, unknown>): Promise<unknown>
   publishTeam?(args: Record<string, unknown>): Promise<unknown>
+  /** CHG-139c（docs/20 §8）：导出 / 导入团队快照（导入 = 新 id，永不覆盖） */
+  exportTeam?(args: Record<string, unknown>): Promise<unknown>
+  importTeam?(args: Record<string, unknown>): Promise<unknown>
+  /** CHG-139d（docs/20 §5.4）：创建技能 / 工具（**只写 myteam 队长预设**） */
+  createSkill?(args: Record<string, unknown>): Promise<unknown>
+  createTool?(args: Record<string, unknown>): Promise<unknown>
 }
 
 /** 非队长会话的统一降级值（客户端据此显示友好态；不让 RPC 变成错误信封） */
@@ -731,6 +737,55 @@ export class MyTeamPanelFacade extends TypertRemoteService {
   }
 
   /**
+   * CHG-139c（docs/20 §8）：**导出团队快照**（面板「导出」按钮）。
+   *
+   * 只读团队：不写账本、不改任务；产物落 `history/exports/`。
+   */
+  async exportTeam(agent: AgentLike, query: Record<string, unknown>) {
+    const remote = this.remoteFor(agent)
+    if (!remote || typeof remote.exportTeam !== 'function') {
+      return { status: 'error', code: 'MT_UNAVAILABLE', message: '导出团队需要活动队长会话' }
+    }
+    return remote.exportTeam(query ?? {})
+  }
+
+  /**
+   * CHG-139c（docs/20 §8）：**导入团队快照**（面板「导入」按钮）。
+   *
+   * **永不覆盖**：新团队 id 由系统生成，快照里的 teamId 只作 `sourceTeamId` 溯源。
+   */
+  async importTeam(agent: AgentLike, query: Record<string, unknown>) {
+    const remote = this.remoteFor(agent)
+    if (!remote || typeof remote.importTeam !== 'function') {
+      return { status: 'error', code: 'MT_UNAVAILABLE', message: '导入团队需要活动队长会话' }
+    }
+    return remote.importTeam(query ?? {})
+  }
+
+  /**
+   * CHG-139d（docs/20 §5.4）：**创建技能**（面板「新建技能」表单）。
+   *
+   * 隔离铁律：只写 `$DSH_HOME/myteam/presets/myteam-captain/skills/`，
+   * **绝不写** `$DSH_HOME/skills/`、不污染其它预设（UI 必须把这条提示上屏）。
+   */
+  async createSkill(agent: AgentLike, query: Record<string, unknown>) {
+    const remote = this.remoteFor(agent)
+    if (!remote || typeof remote.createSkill !== 'function') {
+      return { status: 'error', code: 'MT_UNAVAILABLE', message: '创建技能需要活动队长会话' }
+    }
+    return remote.createSkill(query ?? {})
+  }
+
+  /** CHG-139d（docs/20 §5.4）：**创建工具**（声明式；只声明能力与参数契约，不执行第三方代码） */
+  async createTool(agent: AgentLike, query: Record<string, unknown>) {
+    const remote = this.remoteFor(agent)
+    if (!remote || typeof remote.createTool !== 'function') {
+      return { status: 'error', code: 'MT_UNAVAILABLE', message: '创建工具需要活动队长会话' }
+    }
+    return remote.createTool(query ?? {})
+  }
+
+  /**
    * 角色表单的技能 / MCP 候选目录（CHG-73，FR-27）。
    * 这是**提示**不是白名单：技能来自宿主 skills 注册表 + 已有角色声明，MCP 由工具表里的
    * `mcp__<server>__*` 推导（与能力隔离同口径）。读不到就降级并如实带回 warnings。
@@ -1264,7 +1319,11 @@ markRemoteMethods(MyTeamPanelFacade.prototype, ['batch', 'describe', 'watch', 'l
   // CHG-139a（docs/19 §M6/§M3）：依赖图谱 / 可复用技能清单（只读）
   'getTaskGraph', 'listSkills',
   // CHG-139b（docs/19 §5.2/§5.3）：复制团队 / 发布团队（发布 = H 档人类专属）
-  'copyTeam', 'publishTeam'])
+  'copyTeam', 'publishTeam',
+  // CHG-139c（docs/20 §8）：导出 / 导入团队快照
+  'exportTeam', 'importTeam',
+  // CHG-139d（docs/20 §5.4）：创建技能 / 工具（只写 myteam 队长预设）
+  'createSkill', 'createTool'])
 
 /**
  * 顶层装载行 apply（cordis.patch.yml myteam-panel 行）：
