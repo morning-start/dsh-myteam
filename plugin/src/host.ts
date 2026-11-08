@@ -1245,6 +1245,9 @@ export class MyTeamHost {
             return this.roleError(e)
           }
         }
+        /* CHG-131（docs/19 §5.2）：复制团队定义 → 新草稿（仅队长） */
+        case 'myteam_copy_team':
+          return this.copyTeamTool(args)
         /* CHG-130（docs/19 §M9/§M10）：审计查询 + 会话面（移交 / 考古） */
         case 'myteam_get_audit':
           return this.getAuditTool(args)
@@ -2965,6 +2968,62 @@ export class MyTeamHost {
   }
 
   /* ── 团队模板管理（CHG-57）：内置只读、写项目层、两段确认；面板仍只读 ── */
+
+  /**
+   * CHG-131（docs/19 §5.2）：**复制团队定义 → 新草稿团队**——仅队长（C 档）。
+   *
+   * 语义（docs/19 §5.2 定案 B：只复制「团队定义」，不复制运行态）：
+   *  - **复制**：名册（roleId + 实例名）、名称、目标；
+   *  - **不复制**：账本事件（唯一权威，复制即分叉）、任务 / attempt / 门禁结果、
+   *    成员会话 id / 记忆 / token 计量、团队 id（新 id；旧 id 只作 `sourceTeamId` 溯源）；
+   *  - 产物是 **`draft` 团队**（staging）——走 `approve_plan` 人审才 active（FR-1.1）。
+   *
+   * 为什么走 `submit_plan` 而不是直接建目录：团队是「计划批准后才存在的实体」，
+   * 复制来的团队若直接 active 就等于绕过人审。
+   */
+  async copyTeamTool(args: Record<string, unknown> = {}): Promise<Record<string, unknown>> {
+    const sourceTeamId = String(args.sourceTeamId ?? '').trim()
+    if (!sourceTeamId) return { status: 'error', code: 'MT_VALIDATION', field: 'sourceTeamId', message: 'sourceTeamId is required' }
+    const dir = join(storeLayout(this.workspaceRoot).tasks, sourceTeamId)
+    if (!existsSync(dir)) {
+      return { status: 'error', code: 'MT_VALIDATION', field: 'sourceTeamId', message: `团队不存在：${sourceTeamId}（先用 myteam_list_teams 看有哪些）` }
+    }
+    const proj = this.service(sourceTeamId).projectionSnapshot as unknown as {
+      name?: string
+      goal?: string
+      members?: Record<string, { roleId?: string; instanceName?: string }>
+    }
+    const sourceName = String(proj.name ?? sourceTeamId)
+    const name = String(args.name ?? `${sourceName}（副本）`).trim()
+    const goal = String(args.goal ?? proj.goal ?? '')
+    const roster = Object.values(proj.members ?? {})
+      .map((member) => ({ roleId: String(member.roleId ?? ''), instanceName: String(member.instanceName ?? '') }))
+      .filter((entry) => entry.roleId.length > 0)
+    /* 名册必须恰好一个队长角色（submit_plan 硬校验 MT_ROSTER_NO_CAPTAIN）：源名册缺队长时补上 */
+    const captainRoleId = this.roleCatalog()
+      .map((entry) => entry.definition as unknown as { id?: string; isCaptain?: boolean })
+      .find((definition) => definition.isCaptain === true)?.id
+    if (captainRoleId && !roster.some((entry) => entry.roleId === String(captainRoleId))) {
+      roster.push({ roleId: String(captainRoleId), instanceName: 'captain' })
+    }
+    const staged = await this.executeLeadTool('myteam_submit_plan', { teamName: name, goal, roster, tasks: [] }, {}) as unknown as Record<string, unknown>
+    if (String(staged.status) !== 'staged') {
+      return {
+        status: 'error',
+        code: typeof staged.code === 'string' ? staged.code : 'MT_INTERNAL',
+        message: String(staged.message ?? '复制团队失败'),
+        sourceTeamId,
+      }
+    }
+    return {
+      status: 'ok',
+      teamId: String(staged.teamId ?? ''),
+      sourceTeamId,
+      name,
+      rosterCount: roster.length,
+      note: '已复制团队定义（名册 + 名称/目标）为新草稿；账本 / 任务 / 成员会话不复制（批准后由新队长重新规划）',
+    }
+  }
 
   /**
    * CHG-130（docs/19 §M10）：**审计事件流只读查询**——队长 + 显式授权成员（CM 档）。

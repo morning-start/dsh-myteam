@@ -526,6 +526,20 @@ export function leadToolDefs(): ToolDef[] {
     { name: 'myteam_resolve_proposal', description: '处置成员结构提案（FR-11.4）：approved/rejected。**批准即执行对应变更**（CHG-88）：split → 落子任务 + 原任务取消；add-dep → 加依赖；reassign → 改派；cancel → 取消。驳回只留痕、结构不动。载荷不合规会拒绝并说明，不会留下「已批准但什么都没做」的半截状态。', parameters: { type: 'object', properties: { teamId: teamId(), proposalId: str('提案 id', true), decision: { type: 'string', enum: ['approved', 'rejected'], description: '处置决定', required: true }, note: str('处置说明') } } },
     { name: 'myteam_adopt_knowledge', description: '采纳/驳回知识提案（FR-17.4 策展门）：adopted 落 config/knowledge/（带 evidence+contributor 归因）；rejected 只留痕。draftId 来自 knowledge.proposed 事件。', parameters: { type: 'object', properties: { teamId: teamId(), draftId: str('知识提案 id（knowledge.proposed 事件的 draftId）', true), decision: { type: 'string', enum: ['adopted', 'rejected'], description: '策展决定', required: true }, note: str('处置说明') } } },
     {
+      /* CHG-131（docs/19 §5.2）：复制团队定义 → 新草稿团队——**仅队长**（C 档） */
+      name: 'myteam_copy_team',
+      description: '复制团队（队长专属，CHG-131 / docs/19 §5.2）：`{sourceTeamId, name?, goal?}` → 读源团队的**定义**（名册 + 名称 / 目标）→ 建一个**新草稿团队**（`submit_plan` 落 staging，走人审 `approve_plan` 才 active）。**不复制**：账本事件、任务 / attempt / 门禁结果、成员会话 id / 记忆 / token 计量、团队 id（新 id，旧 id 只作 `sourceTeamId` 溯源）。',
+      parameters: {
+        type: 'object',
+        properties: {
+          sourceTeamId: str('要复制的源团队 id', true),
+          name: str('新团队名（缺省「源名（副本）」）'),
+          goal: str('新团队目标（缺省沿用源目标）'),
+        },
+        required: ['sourceTeamId'],
+      },
+    },
+    {
       /* CHG-130（docs/19 §M10）：审计事件流只读查询——**队长 + 显式授权成员**（CM 档） */
       name: 'myteam_get_audit',
       description: '读团队审计事件流（CM 档，CHG-130 / docs/19 §M10）：`{teamId?, limit?, beforeSeq?}` → `{status, teamId, total, count, events:[{seq,type,actor,ts}], nextBeforeSeq}`。**只读**：不写账本；按 `seq` 倒序取最近 N 条，`nextBeforeSeq` 用于往前翻页（不含）。成员默认只能看自己相关的事件（C5），队长看全团队。',
