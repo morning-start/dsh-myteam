@@ -526,6 +526,19 @@ export function leadToolDefs(): ToolDef[] {
     { name: 'myteam_resolve_proposal', description: '处置成员结构提案（FR-11.4）：approved/rejected。**批准即执行对应变更**（CHG-88）：split → 落子任务 + 原任务取消；add-dep → 加依赖；reassign → 改派；cancel → 取消。驳回只留痕、结构不动。载荷不合规会拒绝并说明，不会留下「已批准但什么都没做」的半截状态。', parameters: { type: 'object', properties: { teamId: teamId(), proposalId: str('提案 id', true), decision: { type: 'string', enum: ['approved', 'rejected'], description: '处置决定', required: true }, note: str('处置说明') } } },
     { name: 'myteam_adopt_knowledge', description: '采纳/驳回知识提案（FR-17.4 策展门）：adopted 落 config/knowledge/（带 evidence+contributor 归因）；rejected 只留痕。draftId 来自 knowledge.proposed 事件。', parameters: { type: 'object', properties: { teamId: teamId(), draftId: str('知识提案 id（knowledge.proposed 事件的 draftId）', true), decision: { type: 'string', enum: ['adopted', 'rejected'], description: '策展决定', required: true }, note: str('处置说明') } } },
     {
+      /* CHG-126（docs/19 §5.1）：复制角色到项目（fork）——**仅队长**（C 档） */
+      name: 'myteam_copy_role',
+      description: '把内置 / 全局 / 插件贡献的角色**复制到项目库**（队长专属，CHG-126 / docs/19 §5.1）：`{roleId, source?}` → 项目库新增一份**可改**副本（`origin` 保留来源标记，如 `global:reviewer`）。复制后可用 `myteam_update_role` 改它；**已在项目库的角色拒绝**（改它直接 update_role，不要自复制）。**只写项目库**：不碰全局库、不碰团队账本。',
+      parameters: {
+        type: 'object',
+        properties: {
+          roleId: str('要复制的角色 id', true),
+          source: { type: 'string', enum: ['builtin', 'global', 'plugin'], description: '来源（缺省按目录解析；显式给可消歧）' },
+        },
+        required: ['roleId'],
+      },
+    },
+    {
       /* CHG-125（docs/19 §M2）：写团队配置——**仅队长**（C 档），配置变更影响面二次确认 */
       name: 'myteam_save_team_config',
       description: '写团队配置（队长专属，CHG-125 / docs/19 §M2）：`{teamId?, config, confirm?}` → **校验先于写**（结构非法 → `MT_VALIDATION` 带 `field`/`reason`）→ 有影响面（门禁链 / 上限变化 / 有在跑任务）时先回 `confirm-required`，带 `confirm:true` 重调才落盘（**原子写** tmp+rename）→ 返回生效配置。**未知键原样保留**（源视图 → 表单 → 保存不丢手写内容）。与 `myteam_reset_team_config` 对称。',

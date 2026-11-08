@@ -3,9 +3,9 @@ import assert from 'node:assert/strict'
 import { leadToolDefs, memberToolDefs, toolRegistryPlan, toolOutput, EVIDENCE_PARAM } from '../src/tools/defs.ts'
 import { TEAM_MEMBER_TOOLS } from '../src/core/members/member-setup.ts'
 
-test('T7 tool defs: 40 lead tools + 9 member tools, names match contract (docs/04 §1 + CHG-17/19/53/57/69/73/76/86/87/91/122/123/124/125)', () => {
+test('T7 tool defs: 41 lead tools + 9 member tools, names match contract (docs/04 §1 + CHG-17/19/53/57/69/73/76/86/87/91/122/123/124/125/126)', () => {
   const plan = toolRegistryPlan()
-  assert.equal(plan.lead.length, 40)
+  assert.equal(plan.lead.length, 41)
   assert.equal(plan.member.length, 9)
   assert.deepEqual(plan.member, [...TEAM_MEMBER_TOOLS])
   // CHG-86（P0-4）：两个作用域不能有同名工具——旧实现队长侧与成员侧都叫
@@ -38,6 +38,8 @@ test('T7 tool defs: 40 lead tools + 9 member tools, names match contract (docs/0
     'myteam_get_task_graph',
     // CHG-125（docs/19 §M2）：写团队配置（仅队长；与 reset 对称）
     'myteam_save_team_config',
+    // CHG-126（docs/19 §5.1）：复制角色到项目（fork，仅队长）
+    'myteam_copy_role',
   ]) {
     assert.ok(plan.lead.includes(expected), `missing lead tool ${expected}`)
   }

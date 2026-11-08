@@ -1245,6 +1245,9 @@ export class MyTeamHost {
             return this.roleError(e)
           }
         }
+        /* CHG-126（docs/19 §5.1）：复制角色到项目（fork；仅队长） */
+        case 'myteam_copy_role':
+          return this.copyRoleTool(args)
         /* CHG-125（docs/19 §M2）：写团队配置（仅队长；校验先于写 + 两段确认） */
         case 'myteam_save_team_config':
           return this.saveTeamConfigTool(args)
@@ -2946,6 +2949,47 @@ export class MyTeamHost {
   }
 
   /* ── 团队模板管理（CHG-57）：内置只读、写项目层、两段确认；面板仍只读 ── */
+
+  /**
+   * CHG-126（docs/19 §5.1）：**复制角色到项目**（fork）——仅队长（C 档）。
+   *
+   * 语义（docs/19 §5.1 定案）：
+   *  - 复制 **定义**（prompt / 职责 / toolPolicy / skills / model），`origin` 保留来源标记；
+   *  - **不复制**在册成员（成员在团队里，不随角色走）；
+   *  - 产物是项目库一份**可改**副本（运行时只认项目库）。
+   *
+   * 只写项目库：不碰全局库、不写团队账本（角色是配置单元，不是团队事件）。
+   */
+  copyRoleTool(args: Record<string, unknown> = {}): Record<string, unknown> {
+    const roleId = String(args.roleId ?? '').trim()
+    if (!roleId) return { status: 'error', code: 'MT_VALIDATION', field: 'roleId', message: 'roleId is required' }
+    const entry = this.roleCatalog().find((item) => String(item.definition.id) === roleId)
+    if (!entry) {
+      return { status: 'error', code: 'MT_ROLE_NOT_FOUND', roleId, message: `角色不存在：${roleId}（先用 myteam_list_roles 看有哪些）` }
+    }
+    if (String(entry.origin) === 'project') {
+      return {
+        status: 'error',
+        code: 'MT_VALIDATION',
+        field: 'roleId',
+        roleId,
+        message: `${roleId} 已在项目库（可改）；改它请用 myteam_update_role，不要自复制`,
+      }
+    }
+    const source = String(args.source ?? entry.origin)
+    try {
+      const { filePath } = copyToProject(this.rolePaths, roleId, source as never, this.contributionCatalog.roles)
+      return { status: 'ok', roleId, source: String(entry.origin), filePath, note: '已复制到项目库（可改；origin 保留来源标记）' }
+    } catch (error) {
+      const code = (error as { code?: unknown } | undefined)?.code
+      return {
+        status: 'error',
+        code: typeof code === 'string' && code.length > 0 ? code : 'MT_INTERNAL',
+        roleId,
+        message: String((error as Error | undefined)?.message ?? error),
+      }
+    }
+  }
 
   /**
    * CHG-125（docs/19 §M2）：**写团队配置**——仅队长（C 档）。
