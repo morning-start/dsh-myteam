@@ -1,10 +1,10 @@
 {
   "schema": 1,
-  "builtAt": "2026-11-08T06:50:58.970Z",
+  "builtAt": "2026-11-08T06:57:17.550Z",
   "node": "v22.23.2",
   "entry": "./lib/host.mjs",
-  "modules": 47,
-  "sourceHash": "3a63a28a49fbdfde1e5e1967c027387fa91b1a59831943560cc913d443ca2868",
+  "modules": 48,
+  "sourceHash": "08f531294b8774f1388acaf5a4e2236fd178bdac1d34e0924f2944b8020ff7d3",
   "clientFile": "client/client.js",
   "clientHash": "5d2fd3d4abed301aeef8573f36671a2350cb69fa192f124514e9890c06c8fc55",
   "files": [
@@ -46,6 +46,7 @@
     "core/tasks/diff.ts",
     "core/tasks/graph.ts",
     "core/tasks/readiness.ts",
+    "core/tools/tool-tiers.ts",
     "core/workspace/layout.ts",
     "core/workspace/scope.ts",
     "host-workspace.ts",
