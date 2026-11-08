@@ -4319,6 +4319,11 @@ window.__ModuleLoader__.load({
       '.mt-conv-cmd{display:flex;align-items:center;gap:8px;flex-wrap:wrap}',
       '.mt-conv-cmd code{font-size:12px;padding:2px 8px;border-radius:6px;border:1px solid var(--dsw-alias-line-soft);background:var(--dsw-alias-bg-layer-2);color:var(--dsw-alias-label-primary)}',
       '.mt-conv-members{display:flex;flex-wrap:wrap;gap:6px}',
+      /* CHG-115：会话视图的任务三视图（看板 / 流程 / 依赖图）——固定高度、内部各自滚动 */
+      '.mt-conv-board{display:flex;flex-direction:column;gap:8px;height:min(56vh, 560px);min-height:320px}',
+      '.mt-conv-board > .mt-board{display:flex;flex-direction:column;flex:1;min-height:0;border-left:0;padding:0}',
+      '.mt-conv-board > .mt-lanes,.mt-conv-board > .mt-dagwrap{flex:1;min-height:0}',
+      '.mt-conv-board .mt-viewlinks{align-self:flex-start}',
       '.mt-conv-seg{display:inline-flex;align-items:center;gap:2px;margin-left:auto;padding:2px;border:.5px solid var(--dsw-alias-border-l2);border-radius:999px;background:var(--dsw-alias-bg-layer-1);flex:none}',
       '.mt-conv-seg button{border:0;background:none;padding:3px 10px;border-radius:999px;color:var(--dsw-alias-label-secondary);font:inherit;font-size:12px;cursor:pointer}',
       '.mt-conv-seg .mt-conv-seg-on{background:var(--dsw-alias-bg-layer-2);color:var(--dsw-alias-label-primary);font-weight:600}',
@@ -4850,6 +4855,89 @@ window.__ModuleLoader__.load({
     }
     const laneAvatarChar = (member) => String(roleLabel(member?.roleId) ?? member?.id ?? '?').trim().slice(0, 1) || '?'
     const assigneesOf = (task) => (task.assignees && task.assignees.length > 0 ? task.assignees : task.assignee ? [task.assignee] : [])
+
+    /**
+     * CHG-115：**看板同源换挂载点**（design-notes §五「会话页不重复造面板」）。
+     *
+     * 面板「任务」页与团队会话视图渲染的是**同一个** BoardView：
+     *  - 面板传 `drag` / `onAdd` → 可拖拽、可列内新建的完整看板；
+     *  - 会话视图不传 → **只读看板**（无拖拽、无列内新建）。
+     * 两处各写一份看板就是 CHG-107「假数据」的温床——视图只换挂载点，不造第二份实现。
+     */
+    function BoardView({
+      t,
+      tasks,
+      columns = PROJECT_COLUMNS,
+      columnOf = projectColumnOf,
+      memberName,
+      teamName,
+      showTeamName = false,
+      selectMode = false,
+      selected,
+      onToggle,
+      onOpen,
+      onAdd,
+      drag,
+    }) {
+      const selectedSet = selected ?? new Set()
+      const dragTask = drag?.task
+      const draggedTask = drag?.dragged
+      return js('div', { className: 'mt-board', children: [
+        drag?.liftCard ?? null,
+        js('div', { className: 'mt-columns', children: columns.map((col) => {
+          const list = tasks.filter((task) => columnOf(task.state) === col.name && task.key !== dragTask?.key)
+          const over = dragTask?.over === col.name
+          const legal = Boolean(over && draggedTask && drag?.canDrop?.(draggedTask, col.name))
+          const source = Boolean(dragTask) && dragTask.from === col.name
+          return js('div', {
+            key: col.name,
+            className: 'mt-col' + (col.done ? ' mt-col-done' : '') + (over ? (legal ? ' mt-col-drop' : ' mt-col-nodrop') : ''),
+            onDragOver: (event) => drag?.onDragOver?.(event, col.name),
+            onDrop: (event) => drag?.onDrop?.(event, col.name),
+            children: [
+              js('div', { className: 'mt-col-head', children: [
+                j('span', { className: 'mt-col-shape', 'aria-hidden': true }),
+                j('h4', { className: 'mt-col-name', children: col.name }),
+                j('span', { className: 'mt-count', children: list.length }),
+                /* design/board.html 的 .col-head .add：列内直达新建（只读视图不传 onAdd） */
+                onAdd ? j('button', {
+                  className: 'mt-col-add',
+                  title: t('board.addToCol').replace('{col}', col.name),
+                  onClick: () => onAdd(col.name),
+                  children: '＋',
+                }) : null,
+              ] }),
+              /* design/dragging.html 的 .dropzone：合法落点给「释放移入 · 进入后走 审查 → 命令验证 → 存档」 */
+              legal ? js('div', { className: 'mt-dropzone', children: [
+                j('svg', {
+                  width: 14, height: 14, viewBox: '0 0 16 16', fill: 'none', 'aria-hidden': true,
+                  children: j('path', { d: 'M3 8.4 6.4 11.8 13 5.2', stroke: 'currentColor', strokeWidth: 1.4, strokeLinecap: 'round', strokeLinejoin: 'round' }),
+                }),
+                j('span', { children: t('drag.dropzone') }),
+              ] }) : null,
+              js('div', { className: 'mt-col-body', children: [
+                ...list.map((task) => j(TaskCard, {
+                  key: task.key,
+                  task,
+                  t,
+                  teamName,
+                  memberName,
+                  showTeamName,
+                  onOpen: () => onOpen?.(task),
+                  selectable: selectMode,
+                  selected: selectedSet.has(task.key),
+                  onToggle,
+                  drag: drag ? drag.cardFor?.(task) : undefined,
+                })),
+                /* 源列留虚线幽灵占位「t6 正被拖动」 */
+                source ? j('div', { className: 'mt-task mt-task-ghost', children: t('drag.ghost').replace('{code}', dragTask.code) }) : null,
+                list.length === 0 && !source ? j('div', { className: 'mt-col-empty', children: t('board.emptyCol') }) : null,
+              ] }),
+            ],
+          })
+        }) }),
+      ] })
+    }
 
     function LanesView({ t, tasks, members, onOpen }) {
       const stageStates = LANE_STAGES.map((name) => ({ name, states: PROJECT_COLUMNS.find((col) => col.name === name)?.states ?? [] }))
@@ -11096,67 +11184,36 @@ window.__ModuleLoader__.load({
 
       let tasksContent
       if (taskView === 'board') {
-        tasksContent = js('div', { className: 'mt-board', children: [
-          liftCard,
-          js('div', { className: 'mt-columns', children: PROJECT_COLUMNS.map((col) => {
-            const list = shownTasks.filter((task) => projectColumnOf(task.state) === col.name && task.key !== dragTask?.key)
-            const over = dragTask?.over === col.name
-            const legal = Boolean(over && draggedTask && canDropOn(draggedTask, col.name))
-            const source = Boolean(dragTask) && dragTask.from === col.name
-            return js('div', {
-              key: col.name,
-              className: 'mt-col' + (col.done ? ' mt-col-done' : '') + (over ? (legal ? ' mt-col-drop' : ' mt-col-nodrop') : ''),
-              onDragOver: (event) => dragOverCol(event, col.name),
-              onDrop: (event) => dropOnCol(event, col.name),
-              children: [
-                js('div', { className: 'mt-col-head', children: [
-                  j('span', { className: 'mt-col-shape', 'aria-hidden': true }),
-                  j('h4', { className: 'mt-col-name', children: col.name }),
-                  j('span', { className: 'mt-count', children: list.length }),
-                  /* design/board.html 的 .col-head .add：列内直达新建 */
-                  j('button', {
-                    className: 'mt-col-add',
-                    title: t('board.addToCol').replace('{col}', col.name),
-                    onClick: () => {
-                      const teams = pv.teams ?? []
-                      const first = teams.find((team) => team.online && team.state === 'active' && (team.members ?? []).length > 0)
-                        ?? teams.find((team) => team.online && team.state === 'active')
-                        ?? teams.find((team) => team.online)
-                      openTaskEditor({ mode: 'create', defaultTeamId: first?.teamId ?? '' })
-                    },
-                    children: '＋',
-                  }),
-                ] }),
-                /* design/dragging.html 的 .dropzone：合法落点给「释放移入 · 进入后走 审查 → 命令验证 → 存档」 */
-                legal ? js('div', { className: 'mt-dropzone', children: [
-                  j('svg', {
-                    width: 14, height: 14, viewBox: '0 0 16 16', fill: 'none', 'aria-hidden': true,
-                    children: j('path', { d: 'M3 8.4 6.4 11.8 13 5.2', stroke: 'currentColor', strokeWidth: 1.4, strokeLinecap: 'round', strokeLinejoin: 'round' }),
-                  }),
-                  j('span', { children: t('drag.dropzone') }),
-                ] }) : null,
-                js('div', { className: 'mt-col-body', children: [
-                  ...list.map((task) => j(TaskCard, {
-                    key: task.key,
-                    task,
-                    t,
-                    teamName,
-                    memberName,
-                    showTeamName: new Set(shownTasks.map((item) => item.ownerTeamId)).size > 1,
-                    onOpen: () => openTaskOf(task),
-                    selectable: selectMode,
-                    selected: selected.has(task.key),
-                    onToggle: toggleSelected,
-                    drag: dragPropsOf(task),
-                  })),
-                  /* 源列留虚线幽灵占位「t6 正被拖动」 */
-                  source ? j('div', { className: 'mt-task mt-task-ghost', children: t('drag.ghost').replace('{code}', dragTask.code) }) : null,
-                  list.length === 0 && !source ? j('div', { className: 'mt-col-empty', children: t('board.emptyCol') }) : null,
-                ] }),
-              ],
-            })
-          }) }),
-        ] })
+        /* CHG-115：看板同源（会话视图复用同一个 BoardView，只读挂载） */
+        tasksContent = j(BoardView, {
+          t,
+          tasks: shownTasks,
+          memberName,
+          teamName,
+          showTeamName: new Set(shownTasks.map((item) => item.ownerTeamId)).size > 1,
+          selectMode,
+          selected,
+          onToggle: toggleSelected,
+          onOpen: openTaskOf,
+          onAdd: () => {
+            const teams = pv.teams ?? []
+            const first = teams.find((team) => team.online && team.state === 'active' && (team.members ?? []).length > 0)
+              ?? teams.find((team) => team.online && team.state === 'active')
+              ?? teams.find((team) => team.online)
+            openTaskEditor({ mode: 'create', defaultTeamId: first?.teamId ?? '' })
+          },
+          drag: {
+            task: dragTask,
+            dragged: draggedTask,
+            canDrop: canDropOn,
+            liftCard,
+            cardFor: dragPropsOf,
+            onDragStart: startDrag,
+            onDragEnd: endDrag,
+            onDragOver: dragOverCol,
+            onDrop: dropOnCol,
+          },
+        })
       } else if (taskView === 'list') {
         /* 项目级任务列表（design/tasks.html）：任务头 + 汇总条 + 按团队分组任务行 + 视图条 */
         /** design/tasks.html：每个团队组只列 6 行，其余收成「… 其余在看板」 */
@@ -11800,7 +11857,7 @@ window.__ModuleLoader__.load({
      * 于是团队视图里会冒出没发生过的任务。现在没有演示分支：没有数据就是空态。
      */
     function useConvBoard(connection, sessionId) {
-      const [state, setState] = react.useState(() => ({ tasks: [], live: 0, gates: 0, roles: 0, members: [], team: undefined, loaded: false }))
+      const [state, setState] = react.useState(() => ({ tasks: [], rawTasks: [], live: 0, gates: 0, roles: 0, members: [], team: undefined, loaded: false }))
       /* CHG-113：`tick` 由 watch 循环推进——账本有新事件就重拉看板（替代轮询刷新） */
       const [tick, setTick] = react.useState(0)
       react.useEffect(() => {
@@ -11812,6 +11869,8 @@ window.__ModuleLoader__.load({
           if (!alive) return
           const members = data?.board?.members ?? []
           const boardTasks = (data?.board?.columns ?? []).flatMap((column) => column.tasks ?? [])
+          const team = (teamsData?.teams ?? []).find((entry) => entry.sessionId === sessionId)
+          const teamId = String(team?.teamId ?? '')
           const mapped = boardTasks.map((task) => ({
             id: String(task.id),
             title: task.title,
@@ -11820,9 +11879,22 @@ window.__ModuleLoader__.load({
             /* CHG-109：真实时间戳（有就显示，绝不写死） */
             ...(typeof task.updatedAt === 'string' ? { ts: task.updatedAt } : typeof task.ts === 'string' ? { ts: task.ts } : {}),
           }))
-          const team = (teamsData?.teams ?? []).find((entry) => entry.sessionId === sessionId)
+          /**
+           * CHG-115：**看板 / 流程 / 依赖图三视图的共用输入**——保留投影原始任务，
+           * 只补视图需要的复合键（`teamId/taskId`，与面板任务页同构）与兜底数组。
+           * 这样会话视图的三视图与面板是同一套组件、同一份字段，不再各自映射一份。
+           */
+          const rawTasks = boardTasks.map((task) => ({
+            ...task,
+            key: `${teamId}/${String(task.id)}`,
+            code: String(task.id),
+            ownerTeamId: teamId,
+            assignees: Array.isArray(task.assignees) ? task.assignees : task.assignee ? [task.assignee] : [],
+            deps: Array.isArray(task.deps) ? task.deps : [],
+          }))
           setState({
             tasks: mapped,
+            rawTasks,
             live: members.filter((member) => member.status === 'active' && member.currentTaskId).length,
             gates: boardTasks.filter((task) => String(task.state).startsWith('gate') || task.state === 'gates').length,
             roles: new Set(members.map((member) => member.roleId).filter(Boolean)).size,
@@ -11945,6 +12017,10 @@ window.__ModuleLoader__.load({
       const themeAttr = { 'data-theme': dark ? 'dark' : 'light' }
       const board = useConvBoard(props?.connection, sessionId)
       const team = board.team
+      /* CHG-115：团队视图的三视图（看板 / 流程 / 依赖图）与任务详情抽屉——**只读**，写操作走面板 */
+      const [convView, setConvView] = react.useState('board')
+      const [openTaskId, setOpenTaskId] = react.useState(null)
+      const memberNameOf = (id) => (board.members ?? []).find((member) => String(member.id) === String(id))?.instanceName ?? String(id)
       /* CHG-114：入口带层级——从团队视图进工作台落在**本团队的看板**（不是回全局库）。
        * 修的是「打开面板 / 输入框 chip 点了没反应」：旧实现调 `uiWorkspace.openPanel`，
        * 宿主没有这个方法（面板选择是 `ctx.layout.selectPanel`）。 */
@@ -11979,10 +12055,6 @@ window.__ModuleLoader__.load({
         ] })
       }
 
-      const planStat = t('g6.conv.planStat')
-        .replace('{tasks}', String(board.tasks.length))
-        .replace('{roles}', String(board.roles))
-        .replace('{gates}', String(board.gates))
       return js('div', { className: 'mt-conv', ...themeAttr, children: [
         head(team.name || team.teamId, team.teamId + ' · ' + stateLabel(team.state) + ' · ' + board.members.length + ' 名成员'),
         /* 概览：四个真实计数（未加载时显示 —，不写死） */
@@ -11992,14 +12064,25 @@ window.__ModuleLoader__.load({
           stat(t('conv.stat.gates'), board.gates),
           stat(t('conv.stat.roles'), board.roles),
         ] }),
-        /* 任务：真实看板；没有就是空态 */
+        /* 任务：**同源三视图**（CHG-115）——看板 / 流程 / 依赖图，只读；点卡开同一个任务详情抽屉 */
         js('div', { className: 'mt-conv-section', children: [
           j('h4', { className: 'mt-conv-section-title', children: t('conv.section.tasks') }),
           !board.loaded
             ? j('div', { className: 'mt-hint', children: t('state.loading') })
-            : board.tasks.length === 0
+            : (board.rawTasks ?? []).length === 0
               ? j('div', { className: 'mt-empty', children: t('conv.noTasks') })
-              : j(TeamPlanTasksCard, { t, tasks: board.tasks, stat: planStat, onOpenPanel: openPanel, onOpenTask: openPanel, loaded: board.loaded }),
+              : js('div', { className: 'mt-conv-board', children: [
+                js('div', { className: 'mt-viewlinks', role: 'group', 'aria-label': t('scope.label'), children: [
+                  j('button', { className: convView === 'board' ? 'mt-seg mt-seg-active mt-vlink mt-vlink-on' : 'mt-seg mt-vlink', 'aria-pressed': convView === 'board', onClick: () => setConvView('board'), children: t('g6.tasks.viewBoard') }),
+                  j('button', { className: convView === 'lanes' ? 'mt-seg mt-seg-active mt-vlink mt-vlink-on' : 'mt-seg mt-vlink', 'aria-pressed': convView === 'lanes', onClick: () => setConvView('lanes'), children: t('g6.tasks.viewFlow') }),
+                  j('button', { className: convView === 'dag' ? 'mt-seg mt-seg-active mt-vlink mt-vlink-on' : 'mt-seg mt-vlink', 'aria-pressed': convView === 'dag', onClick: () => setConvView('dag'), children: t('g6.tasks.viewDag') }),
+                ] }),
+                convView === 'board'
+                  ? j(BoardView, { t, tasks: board.rawTasks, memberName: memberNameOf, teamName: () => team.name || team.teamId, onOpen: (task) => setOpenTaskId(String(task.id)) })
+                  : convView === 'lanes'
+                    ? j(LanesView, { t, tasks: board.rawTasks, members: board.members, onOpen: (task) => setOpenTaskId(String(task.id)) })
+                    : j(DagView, { t, tasks: board.rawTasks, onOpen: (task) => setOpenTaskId(String(task.id)), memberName: memberNameOf, teamName: () => team.name || team.teamId, dir: 'h' }),
+              ] }),
         ] }),
         /* 成员：真实上岗名册（角色 · 实例 · 状态） */
         js('div', { className: 'mt-conv-section', children: [
@@ -12033,6 +12116,19 @@ window.__ModuleLoader__.load({
           j('span', { children: ' ' }),
           j('button', { className: 'mt-mini-link', onClick: openPanel, children: t('g6.conv.hintLink') }),
         ] }),
+        /* CHG-115：点卡 → 同一个任务详情抽屉（只读；写操作走面板） */
+        openTaskId ? j(TaskDetail, {
+          api: makeApi(props?.connection, sessionId),
+          t,
+          teamId: team.teamId,
+          taskId: openTaskId,
+          readOnly: true,
+          memberName: memberNameOf,
+          teamName: () => team.name || team.teamId,
+          members: board.members,
+          refreshToken: 0,
+          onClose: () => setOpenTaskId(null),
+        }) : null,
       ] })
     }
 
@@ -12301,6 +12397,8 @@ window.__ModuleLoader__.load({
      * 生产路径不消费它（官方只认 apply / inject）。 */
     const __testG6 = {
       TeamCreateDrawer, MyTeamConversationView,
+      /* CHG-115：看板同源组件（面板任务页 + 团队会话视图共用） */
+      BoardView,
       MyTeamPlanTasksToolView, MyTeamApprovePlanToolView, MyTeamPeerMessageToolView, MyTeamApplyRolesToolView,
       TeamPlanTasksCard, TeamCollapsedCard, DockChip,
     }
