@@ -70,6 +70,8 @@ import {
 import { recoveryAction, checkArchiveGate } from './core/scheduler/recovery.ts'
 /* CHG-135（docs/20 §5.2）：成员卡（子代理 / 会话依附角色的落盘事实） */
 import { writeMemberCard } from './core/members/member-card.ts'
+/* CHG-137/138（docs/19 §3）：工具权限档位（单一事实源 + 运行时门禁） */
+import { canCall, tierOf, type ToolCaller } from './core/tools/tool-tiers.ts'
 /* CHG-124（docs/19 §M6）：任务依赖图谱纯函数（Kahn 分层 + 环检测） */
 import { buildTaskGraph } from './core/scheduler/task-graph.ts'
 import { entryFromProjection, scanWorkspaceIndex, readWorkspaceIndex, writeWorkspaceIndex, upsertTeamEntry, upsertGlobalWorkspace, resolveMyteamHome, globalStoreLayout } from './core/index/team-index.ts'
@@ -808,10 +810,29 @@ export class MyTeamHost {
   executeLeadTool(
     name: string,
     args: Record<string, unknown>,
-    exec: { agent?: any; actor?: 'lead' | 'human' } = {},
+    exec: { agent?: any; actor?: 'lead' | 'human'; enforceTier?: boolean } = {},
   ): Record<string, unknown> | Promise<Record<string, unknown>> {
     const teamId = String(args.teamId ?? this.defaultTeamId())
     const actor = exec.actor === 'human' ? 'human' : 'lead'
+    /*
+     * CHG-138（docs/19 §3 / CHG-137）：**运行时门禁**——按 `canCall` 判档位。
+     *
+     * 为什么默认 `enforceTier:false`：H 档（批准 / 退回 / 解散 / 发布）当前**由 lead 通道代言**
+     * （人审按钮 → lead 工具），宿主无法区分「人类点了按钮」与「模型自己调」——硬拦会打断审批流。
+     * 所以：**成员通道硬拦**（`executeMemberTool`），lead 通道**显式开启**才拦（给未来的
+     * human-intent 通道留位）。未登记工具**不改原有行为**（走 switch 默认分支）。
+     */
+    if (exec.enforceTier === true) {
+      const tier = tierOf(name)
+      const caller: ToolCaller = actor === 'human' ? 'human' : 'captain'
+      if (tier && !canCall(name, caller)) {
+        return {
+          status: 'error',
+          code: 'MT_UNAVAILABLE',
+          message: `工具「${name}」是 ${tier} 档（人类专属），当前调用者（${caller}）不可调`,
+        }
+      }
+    }
     try {
       switch (name) {
         case 'myteam_submit_plan': {
@@ -2814,6 +2835,15 @@ export class MyTeamHost {
   executeMemberTool(member: MemberInstance, name: string, args: Record<string, unknown>): Record<string, unknown> {
     const teamId = member.teamId
     const actor = `member:${member.memberId}`
+    /* CHG-138（docs/19 §3）：**成员通道硬拦**——成员只能调 A 档工具（C5 铁律的运行时保证） */
+    const tier = tierOf(name)
+    if (tier && !canCall(name, 'member')) {
+      return {
+        status: 'error',
+        code: 'MT_UNAVAILABLE',
+        message: `工具「${name}」是 ${tier} 档（仅队长可调），成员不可用`,
+      }
+    }
     try {
       const svc = this.service(teamId)
       switch (name) {
