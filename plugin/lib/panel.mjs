@@ -154,6 +154,9 @@ import { isStoreInitialized, readManifest, storeLayout, ensureStore, rejectProje
                                                      
                                                                 
                                                               
+                                                                 
+                                                            
+                                                               
  
 
 /** 非队长会话的统一降级值（客户端据此显示友好态；不让 RPC 变成错误信封） */
@@ -701,6 +704,33 @@ export class MyTeamPanelFacade extends TypertRemoteService {
   }
 
   /**
+   * CHG-139b（docs/19 §5.2）：**复制团队**（面板「复制团队」按钮）。
+   *
+   * 复制的是**团队定义**（名册 + 名称/目标）→ 新 `draft` 团队；账本 / 任务 / 会话不复制。
+   */
+  async copyTeam(agent           , query                         ) {
+    const remote = this.remoteFor(agent)
+    if (!remote || typeof remote.copyTeam !== 'function') {
+      return { status: 'error', code: 'MT_UNAVAILABLE', message: '复制团队需要活动队长会话' }
+    }
+    return remote.copyTeam(query ?? {})
+  }
+
+  /**
+   * CHG-139b（docs/19 §5.3）：**发布团队到全局库**（H 档人类专属；两段确认）。
+   *
+   * 面板是「人类动作」的唯一入口——所以它**必须**能拿到 `confirm-required` 并二次确认，
+   * 不能像模型侧那样被门禁挡住（`enforceTier` 只作用于工具通道）。
+   */
+  async publishTeam(agent           , query                         ) {
+    const remote = this.remoteFor(agent)
+    if (!remote || typeof remote.publishTeam !== 'function') {
+      return { status: 'error', code: 'MT_UNAVAILABLE', message: '发布团队需要活动队长会话' }
+    }
+    return remote.publishTeam(query ?? {})
+  }
+
+  /**
    * 角色表单的技能 / MCP 候选目录（CHG-73，FR-27）。
    * 这是**提示**不是白名单：技能来自宿主 skills 注册表 + 已有角色声明，MCP 由工具表里的
    * `mcp__<server>__*` 推导（与能力隔离同口径）。读不到就降级并如实带回 warnings。
@@ -1232,7 +1262,9 @@ markRemoteMethods(MyTeamPanelFacade.prototype, ['batch', 'describe', 'watch', 'l
   // CHG-120（M2-D ② / FR-16.4②）：会话考古（按 session:<id> 只读读一页历史）
   'readSessionHistory',
   // CHG-139a（docs/19 §M6/§M3）：依赖图谱 / 可复用技能清单（只读）
-  'getTaskGraph', 'listSkills'])
+  'getTaskGraph', 'listSkills',
+  // CHG-139b（docs/19 §5.2/§5.3）：复制团队 / 发布团队（发布 = H 档人类专属）
+  'copyTeam', 'publishTeam'])
 
 /**
  * 顶层装载行 apply（cordis.patch.yml myteam-panel 行）：

@@ -3058,6 +3058,9 @@ window.__ModuleLoader__.load({
         /* CHG-139a（docs/19 §M6/§M3）：依赖图谱 / 可复用技能清单（只读） */
         getTaskGraph: (query) => call('getTaskGraph', query),
         listSkills: (query) => call('listSkills', query),
+        /* CHG-139b（docs/19 §5.2/§5.3）：复制团队 / 发布团队（发布 = H 档两段确认） */
+        copyTeam: (query) => call('copyTeam', query),
+        publishTeam: (query) => call('publishTeam', query),
         getPresets: (query) => call('getPresets', query),
         memberOp: (query) => call('memberOp', query),
         planAction: (query) => call('planAction', query),
