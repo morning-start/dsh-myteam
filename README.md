@@ -5,7 +5,7 @@
 </div>
 
 ![license](https://img.shields.io/badge/license-MIT-blue)
-![tests](https://img.shields.io/badge/tests-565%20passing-brightgreen)
+![tests](https://img.shields.io/badge/tests-572%20passing-brightgreen)
 ![node](https://img.shields.io/badge/node-%E2%89%A522.18-informational)
 ![dsh](https://img.shields.io/badge/dsh-0.2.1--rc.0%20~%200.3.0-informational)
 ![tools](https://img.shields.io/badge/tools-44%20%28Lead%2035%20%2B%20member%209%29-blueviolet)
@@ -105,7 +105,7 @@ tools\boot-myteam.cmd
 
 ## 当前状态
 
-**机制层已收口**：单测 565 条全绿（73 个测试文件 / 43 个 src 模块），`check-drift` 报 `MISMATCH: 0`，44 个工具（队长 35 + 成员 9）、40 型账本事件、27 屏面板设计稿。全局/项目**不拆两个宿主表面**（CHG-114 裁决）：侧栏入口 = 全局库、团队视图 = 本团队看板；团队视图的看板/流程/依赖图与面板**同源换挂载点**（CHG-115）。配置字段的唯一定稿是 [docs/18](docs/18-配置Schema定稿.md)（CHG-116：`team.config.json` + 角色 schema + 模板组合面，`t89` 锁文档/代码/schema 三方同步）。
+**机制层已收口**：单测 572 条全绿（74 个测试文件 / 43 个 src 模块），`check-drift` 报 `MISMATCH: 0`，44 个工具（队长 35 + 成员 9）、40 型账本事件、27 屏面板设计稿。全局/项目**不拆两个宿主表面**（CHG-114 裁决）：侧栏入口 = 全局库、团队视图 = 本团队看板；团队视图的看板/流程/依赖图与面板**同源换挂载点**（CHG-115）。配置字段的唯一定稿是 [docs/18](docs/18-配置Schema定稿.md)（CHG-116），写路径端点已通（CHG-117：校验先于写 + 原子写 + 两段确认）。
 
 **已经过真实宿主安装验证**（CHG-93/94）：两次安装各抓到单测永远发现不了的 P0（preset 作用域服务异步就绪导致队长技能静默不注入；团队章程未注入队长 system prompt），均已修复并留下断言。深色对比度 8.15:1、横向溢出 0、控制台无插件侧报错。
 

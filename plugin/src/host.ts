@@ -40,7 +40,7 @@ import { roleOp as roleOpImpl } from './core/roles/role-ops.ts'
 import { presetTeamRoster, type RoleDefinition } from './core/roles/builtin-roles.ts'
 import { CAPTAIN_SKILLS } from './core/roles/captain-skills.ts'
 import { readPresetCatalog, readProjectPreset, writeProjectPreset, deleteProjectPreset, validatePresetDefinition, BUILTIN_PRESET_IDS, type PresetCatalog } from './core/presets/preset-store.ts'
-import { configOverrideFromPreset, teamConfigPath, writeTeamConfigRaw } from './core/config/team-config.ts'
+import { configOverrideFromPreset, isStructurallyValidConfig, loadEffectiveConfig, readProjectConfigRaw, teamConfigPath, writeTeamConfigRaw } from './core/config/team-config.ts'
 import { listKnowledge, renderIndexSection, readKnowledgeEntry, adoptDraft, reviseEntry, touchStale, candidatesForDraft, writeKnowledgeEntry, knowledgeDirOf, validateDraft, type KnowledgeDraft } from './core/knowledge/knowledge.ts'
 import { zeroBuckets, dayKeyOf, accumulate, emptyTokensFile, type TokensFile } from './core/ledger/token-sidecar.ts'
 // CHG-86（P0-2）：归档落盘（disband 时写快照；面板归档视图读快照）
@@ -3038,6 +3038,87 @@ export class MyTeamHost {
       teamId,
       configSource: svc.configSource,
       note: '团队级配置已删除；按「项目层 < 插件默认」重新加载（账本/成员未动）',
+    }
+  }
+
+  /**
+   * CHG-117（FR-14.3 / docs/18 §7）：设置页保存团队级配置。
+   *
+   * 四条纪律（契约见 docs/18 §7，实现不得偏离）：
+   *  1. **校验先于写**：结构校验 + 终态覆盖，失败 `MT_VALIDATION`（带 `field` / `reason`），**零写入**；
+   *  2. **原子写**：`writeTeamConfigRaw`（tmp + rename），写后**重建 TeamService**（配置在构造时读取）；
+   *  3. **两段确认**：门禁链 / 规模上限变化，或有在跑任务 → 先回 `confirm-required` + 影响面；
+   *  4. **未知键保留**：不因未知键拒绝（原样写入，`warnings` 回显），否则「JSON 源视图 → 表单 → 保存」会丢用户手写内容；
+   *  5. 返回**生效配置**（重读的 `effectiveConfig`），不是回显入参。
+   */
+  saveTeamConfig(teamId: string, args: Record<string, unknown>): Record<string, unknown> {
+    const id = String(teamId ?? '').trim()
+    if (!id) return { status: 'error', code: 'MT_VALIDATION', field: 'teamId', message: 'teamId is required' }
+    const next = args?.config
+    if (next === undefined || next === null) {
+      return {
+        status: 'error',
+        code: 'MT_VALIDATION',
+        field: 'config',
+        reason: 'missing',
+        message: 'config is required（要恢复默认请用 resetTeamConfig，两段确认）',
+      }
+    }
+    if (!isStructurallyValidConfig(next)) {
+      return {
+        status: 'error',
+        code: 'MT_VALIDATION',
+        field: 'config',
+        reason: 'structural-invalid',
+        message: '配置结构非法：已知段落必须是对象、board.columns 必须是字符串数组（docs/18 §2 第 5 条）',
+      }
+    }
+    /* 终态覆盖与合并告警：与运行时同一条管线；运行时是「忽略该层」，保存时必须升级为「拒绝写入」 */
+    const probe = loadEffectiveConfig(readProjectConfigRaw(this.workspaceRoot), next)
+    if (!probe.applied.team) {
+      return {
+        status: 'error',
+        code: 'MT_VALIDATION',
+        field: 'board.columnMapping',
+        reason: 'terminal-state-not-covered',
+        message: probe.warnings.join('; ') || '配置非法：看板列没有覆盖全部终态（done/failed/blocked/cancelled）',
+      }
+    }
+    /* 影响面：只统计「这次保存会改变的可见后果」 */
+    const currentSvc = this.service(id)
+    const proj = currentSvc.projectionSnapshot
+    const current = currentSvc.effectiveConfig
+    const runningTasks = Object.values(proj.tasks ?? {}).filter((task) => {
+      const state = String(task.state ?? '')
+      return state === 'in_progress' || state === 're-scoping' || state.startsWith('gate:')
+    }).length
+    const impact = {
+      members: Object.values(proj.members ?? {}).filter((member) => {
+        const status = String(member.status ?? '')
+        return status === 'active' || status === 'suspended'
+      }).length,
+      runningTasks,
+      gateChainsChanged: JSON.stringify(current.taskTypes) !== JSON.stringify(probe.config.taskTypes),
+      limitsChanged: JSON.stringify(current.limits) !== JSON.stringify(probe.config.limits),
+    }
+    if ((impact.gateChainsChanged || impact.limitsChanged || runningTasks > 0) && args?.confirm !== true) {
+      return {
+        status: 'confirm-required',
+        impact,
+        message: '保存会改变门禁链 / 规模上限，或团队有在跑任务——请确认后带 confirm=true 重调（两段确认，docs/18 §7）',
+      }
+    }
+    const filePath = writeTeamConfigRaw(this.workspaceRoot, id, next)
+    /* 配置在 TeamService 构造时读取：写完必须丢掉旧实例，否则 getConfig/看板还是旧值 */
+    this.services.delete(id)
+    const nextSvc = this.service(id)
+    return {
+      status: 'ok',
+      teamId: id,
+      filePath,
+      impact,
+      warnings: nextSvc.configWarnings,
+      note: '已原子写入团队级 team.config.json；生效配置见 config / source',
     }
   }
 

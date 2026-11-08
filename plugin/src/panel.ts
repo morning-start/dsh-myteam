@@ -116,6 +116,9 @@ type RemoteLike = {
   getKnowledge(args: Record<string, unknown>): Promise<unknown>
   getAudit(args: Record<string, unknown>): Promise<unknown>
   getConfig(args: Record<string, unknown>): Promise<unknown>
+  /** CHG-117（FR-14.3 / docs/18 §7）：设置页保存 / 恢复默认配置（校验先于写 + 两段确认） */
+  saveTeamConfig?(args: Record<string, unknown>): Promise<unknown>
+  resetTeamConfig?(args: Record<string, unknown>): Promise<unknown>
   getPresets(args: Record<string, unknown>): Promise<unknown>
   /** CHG-72：面板新建/编辑任务（受限写端点，actor=human） */
   createTask?(args: Record<string, unknown>): Promise<unknown>
@@ -1023,6 +1026,25 @@ export class MyTeamPanelFacade extends TypertRemoteService {
     return remote.getConfig(query ?? {})
   }
 
+  /**
+   * CHG-117（FR-14.3 / docs/18 §7）：设置页保存团队级配置。
+   *
+   * 旧宿主（lib 未升级）没有这个方法 → `MT_UNAVAILABLE`，设置页降级为只读
+   * （与 CHG-104 同一纪律：**缺能力就降级，不假装成功**）。
+   */
+  async saveTeamConfig(agent: AgentLike, query: Record<string, unknown>) {
+    const remote = this.remoteFor(agent)
+    if (!remote?.saveTeamConfig) return UNAVAILABLE
+    return remote.saveTeamConfig(query ?? {})
+  }
+
+  /** CHG-117：恢复团队默认配置（删团队层文件；两段确认与 `myteam_reset_team_config` 同源） */
+  async resetTeamConfig(agent: AgentLike, query: Record<string, unknown>) {
+    const remote = this.remoteFor(agent)
+    if (!remote?.resetTeamConfig) return UNAVAILABLE
+    return remote.resetTeamConfig(query ?? {})
+  }
+
   /** 预设库（CHG-50）：三层只读目录（builtin/global/project） */
   async getPresets(agent: AgentLike, query: Record<string, unknown>) {
     const remote = this.remoteFor(agent)
@@ -1152,7 +1174,9 @@ markRemoteMethods(MyTeamPanelFacade.prototype, ['batch', 'describe', 'watch', 'l
   // CHG-88（M2-E / FR-16.3）：会话移交
   'handoff',
   // CHG-91（插件团队贡献契约 v1）：插件贡献的只读视图 + 显式重载
-  'getContributions', 'reloadContributions'])
+  'getContributions', 'reloadContributions',
+  // CHG-117（FR-14.3 / docs/18 §7）：设置页配置写路径
+  'saveTeamConfig', 'resetTeamConfig'])
 
 /**
  * 顶层装载行 apply（cordis.patch.yml myteam-panel 行）：

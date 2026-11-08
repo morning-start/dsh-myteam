@@ -328,6 +328,8 @@ interface HandoffSessionRef {
 | `getTokens(teamId)` | 侧车四桶 + 命中率 + **来源标注**（`source:'tokenMeter'`/`caliber:'heuristic'`/`nonBillable:true`，REV-5） | 读 |
 | `getAudit(teamId?, limit?, beforeSeq?)` | **审计页（FR-12.5，CHG-49）**：账本事件流新→旧分页（`buildAuditView` 纯函数）；`limit` 1~500（默认 100），`beforeSeq` 为上一页 `nextBeforeSeq`；返回 `{status:'ok', total, events, nextBeforeSeq}` | 读（账本） |
 | `getConfig(teamId?)` | **设置页（FR-14.3，CHG-49/55/56）**：生效配置（看板/流水线/视图/限制/门禁/任务类型/澄清/记忆）+ `source:'default'\|'project'\|'team'` + 合并链 `default ‹ project ‹ team` + `warnings`；`project` = 项目级 `.dsh-myteam/config/team.config.json`，`team` = 建团模板落盘的团队级配置 | 读（服务配置） |
+| `saveTeamConfig(teamId, config, confirm?)` | **设置页保存（CHG-117 / docs/18 §7）**：校验先于写（结构 + 终态覆盖，失败 `MT_VALIDATION` 带 `field/reason`，**零写入**）→ 影响面（`{members, runningTasks, gateChainsChanged, limitsChanged}`）非空先回 `confirm-required` → 原子写（tmp + rename）→ 重建服务 → 返回**生效配置**（与 `getConfig` 同形）；未知键**保留**（不拒绝，`warnings` 回显） | 写（团队级配置） |
+| `resetTeamConfig(teamId, confirm)` | **恢复默认配置（CHG-57 工具面 / CHG-117 面板面）**：`confirm!==true` → `confirm-required`；删除团队级 `team.config.json` 并重建服务，返回 `{status:'reset'\|'noop', teamId, configSource}` | 写（删团队级配置） |
 | `getInbox(teamId)` | 人工待办（审批横幅/escalate 提醒/提案队列 badge） | 读 |
 | `postComment(teamId, taskId, content)` | 人留言（写账本 actor=human，FR-12.2） | 写→账本 |
 | `planAction(teamId, action:'approve'\|'revise'\|'discard')` | 人审三动作（写账本） | 写→账本 |

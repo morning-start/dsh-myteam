@@ -2932,6 +2932,9 @@ window.__ModuleLoader__.load({
         getKnowledge: (query) => call('getKnowledge', query),
         getAudit: (query) => call('getAudit', query),
         getConfig: (query) => call('getConfig', query),
+        /* CHG-117（FR-14.3 / docs/18 §7）：设置页配置写路径——校验先于写 + 原子写 + 两段确认 */
+        saveTeamConfig: (query) => call('saveTeamConfig', query),
+        resetTeamConfig: (query) => call('resetTeamConfig', query),
         getPresets: (query) => call('getPresets', query),
         memberOp: (query) => call('memberOp', query),
         planAction: (query) => call('planAction', query),

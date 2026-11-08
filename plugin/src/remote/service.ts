@@ -172,6 +172,26 @@ export class MyTeamRemote extends TypertRemoteService {
     return buildConfigView(svc, svc.configSource)
   }
 
+  /**
+   * 设置页保存配置（CHG-117 / docs/18 §7）：校验先于写 + 原子写 + 两段确认。
+   *
+   * `ok` 时把**生效配置**一并回显（与 `getConfig` 同形），客户端不需要再拉一次。
+   */
+  async saveTeamConfig(args: { teamId?: string; config?: unknown; confirm?: boolean } = {}) {
+    const { teamId } = this.resolveTeam(args?.teamId)
+    const result = this.host.saveTeamConfig(teamId, args as Record<string, unknown>)
+    if ((result as { status?: string })?.status !== 'ok') return result
+    const svc = this.host.service(teamId)
+    /* 生效视图放前面（source/config/warnings 与 getConfig 同形），保存回执放后面 */
+    return { ...buildConfigView(svc, svc.configSource), ...result, status: 'ok' }
+  }
+
+  /** 恢复团队默认配置（CHG-57 工具面 / CHG-117 面板面）：删团队层文件并重建缓存 */
+  async resetTeamConfig(args: { teamId?: string; confirm?: boolean } = {}) {
+    const { teamId } = this.resolveTeam(args?.teamId)
+    return this.host.resetTeamConfig(teamId, args as Record<string, unknown>)
+  }
+
   /** 预设库（CHG-50）：三层只读目录（builtin/global/project），团队模板不在此创建 */
   async getPresets() {
     return { status: 'ok', ...this.host.presetCatalogView() }
@@ -474,7 +494,7 @@ export class MyTeamRemote extends TypertRemoteService {
 }
 
 // 手动 Remote 标记（strip-only 环境等价装饰器）：gateway 按 method 名发现端点
-markRemoteMethods(MyTeamRemote.prototype, ['getBoard', 'getTaskDetail', 'getTokens', 'getInbox', 'getAudit', 'getConfig', 'getPresets', 'planAction', 'postComment', 'memberOp', 'disband', 'createTask', 'createTasks', 'updateTask', 'assignTask', 'participateTask', 'rescopeTask', 'cancelTask', 'batchTaskOp',
+markRemoteMethods(MyTeamRemote.prototype, ['getBoard', 'getTaskDetail', 'getTokens', 'getInbox', 'getAudit', 'getConfig', 'saveTeamConfig', 'resetTeamConfig', 'getPresets', 'planAction', 'postComment', 'memberOp', 'disband', 'createTask', 'createTasks', 'updateTask', 'assignTask', 'participateTask', 'rescopeTask', 'cancelTask', 'batchTaskOp',
   // CHG-86：门禁裁决 / 归档快照 / 知识提案策展
   'reviewTask', 'getArchive', 'getArchives', 'adoptKnowledge',
   // CHG-87（FR-13.1/FR-16.1）：角色库统一写入口 + 单角色调用

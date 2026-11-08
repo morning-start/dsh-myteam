@@ -84,6 +84,12 @@ export const PATCH_CEILINGS = {
 const isPlainObject = (v         )                               =>
   typeof v === 'object' && v !== null && !Array.isArray(v)
 
+/** 字符串数组（结构校验用；空数组合法——空看板列会被覆盖校验兜住） */
+const isStringList = (v         )          => Array.isArray(v) && v.every((item) => typeof item === 'string')
+/** 枚举值（结构校验用；只查类型与取值，不查业务范围） */
+const oneOf = (v         , values                   )          => typeof v === 'string' && values.includes(v)
+const isFiniteNumber = (v         )          => typeof v === 'number' && Number.isFinite(v)
+
 /** 数组整条替换的对象浅合并（仅一层 config 深度，键集以 overrides 为准） */
 export function mergeConfig(base            , overrides         , warnings          )             {
   if (!isPlainObject(overrides)) return base
@@ -142,23 +148,40 @@ export function applyCeilings(config            , warnings          )           
 }
 
 /** 结构快检（拒绝式但只拒"类型明显错误"）：段落缺失合法（merge 补默认）；
- * 已知段落若存在但类型错误 → 非法（防 garbage JSON 拖垮面板）。 */
+ * 已知段落若存在但类型错误 → 非法（防 garbage JSON 拖垮面板，也防设置页把坏值写进去）。
+ *
+ * CHG-117：从「只查段落是对象」收紧到**每个字段的类型/枚举**（与
+ * `plugin/schema/team-config.schema.json` 同形）。只查类型与取值，**不查业务范围**
+ * （`limits` 越界由 `applyCeilings` 钳制，不在这里拒绝）。 */
 export function isStructurallyValidConfig(value         )          {
   if (!isPlainObject(value)) return false
-  const sections                                          = {
-    board: (v) => isPlainObject(v) && (v.columns === undefined || (Array.isArray(v.columns) && v.columns.every((c) => typeof c === 'string'))),
-    pipeline: isPlainObject,
-    dag: isPlainObject,
-    views: isPlainObject,
-    limits: isPlainObject,
-    gates: isPlainObject,
-    taskTypes: isPlainObject,
-    clarify: isPlainObject,
-    memory: isPlainObject,
-    audit: isPlainObject,
+  const sections                                                          = {
+    board: (v) => (v.columns === undefined || isStringList(v.columns))
+      && (v.columnMapping === undefined || (isPlainObject(v.columnMapping) && Object.values(v.columnMapping).every(isStringList)))
+      && (v.cardFields === undefined || isStringList(v.cardFields))
+      && (v.dragRules === undefined || v.dragRules === 'state-machine'),
+    pipeline: (v) => (v.swimlaneBy === undefined || oneOf(v.swimlaneBy, ['stage', 'member', 'priority']))
+      && (v.stages === undefined || isStringList(v.stages))
+      && (v.layout === undefined || oneOf(v.layout, ['serpentine', 'linear'])),
+    dag: (v) => (v.showModel === undefined || typeof v.showModel === 'boolean')
+      && (v.collapseGroups === undefined || typeof v.collapseGroups === 'boolean')
+      && (v.direction === undefined || oneOf(v.direction, ['LR', 'TB'])),
+    views: (v) => (v.default === undefined || oneOf(v.default, ['board', 'swimlane', 'dag', 'roster']))
+      && (v.tabs === undefined || isStringList(v.tabs)),
+    limits: (v) => (v.maxMembers === undefined || isFiniteNumber(v.maxMembers))
+      && (v.memberMaxDepth === undefined || isFiniteNumber(v.memberMaxDepth))
+      && (v.maxTasks === undefined || isFiniteNumber(v.maxTasks)),
+    gates: (v) => (v.enabled === undefined || typeof v.enabled === 'boolean')
+      && (v.commandTimeoutMs === undefined || isFiniteNumber(v.commandTimeoutMs)),
+    taskTypes: (v) => Object.values(v).every((entry) => isPlainObject(entry) && (entry.gateChain === undefined || isStringList(entry.gateChain))),
+    clarify: (v) => v.maxRounds === undefined || isFiniteNumber(v.maxRounds),
+    memory: (v) => v.evidenceRequired === undefined || typeof v.evidenceRequired === 'boolean',
+    audit: (v) => v.writeScopes === undefined || typeof v.writeScopes === 'boolean',
   }
   for (const [section, check] of Object.entries(sections)) {
-    if (section in value && !check(value[section])) return false
+    if (!(section in value)) continue
+    const sectionValue = value[section]
+    if (!isPlainObject(sectionValue) || !check(sectionValue)) return false
   }
   return true
 }
