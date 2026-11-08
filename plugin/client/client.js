@@ -1096,6 +1096,26 @@ window.__ModuleLoader__.load({
       'settings.footNoteSub': '新值只影响后续派发；正在跑的门禁仍按启动时的超时值执行。',
       'settings.readonlyTip': '只读：离线团队的配置来自账本折叠，启动团队模式会话后可编辑。',
       'settings.failed': '操作失败：{msg}',
+      /* CHG-118（FR-14.3 / docs/18 §7）：配置编辑——表单 + JSON 源视图 + 两段确认 */
+      'settings.editHint': '改动只影响本团队（团队级 team.config.json）；保存前不写盘。',
+      'settings.formTitle': '可编辑配置',
+      'settings.formNote': '表单只覆盖常用四项；其余字段用 JSON 源视图改。',
+      'settings.save': '保存配置',
+      'settings.saved': '已保存 · 生效配置已刷新',
+      'settings.saveFailed': '保存失败：{msg}',
+      'settings.jsonApply': '应用源视图',
+      'settings.jsonInvalid': 'JSON 解析失败：{msg}',
+      'settings.jsonNote': '源视图编辑后「应用」进表单再保存；未知键会原样保留（不丢你手写的内容）。',
+      'settings.dirty': '有未保存改动',
+      'settings.confirmSave': '确认保存',
+      'settings.confirmSaveBody': '这次保存会改变门禁链 / 规模上限，或团队有在跑任务（成员 {members} · 在跑 {tasks}）。确认后生效。',
+      'settings.impactMembers': '成员',
+      'settings.impactTasks': '在跑任务',
+      'settings.resetBtn': '恢复默认',
+      'settings.resetConfirm': '确认恢复默认配置？',
+      'settings.resetConfirmBody': '会删掉团队级 team.config.json（账本 / 成员不动），回到项目层或插件默认。',
+      'settings.resetDone': '已恢复默认配置',
+      'settings.unavailable': '宿主 lib 版本过旧：没有 saveTeamConfig 端点（升级插件后可用）。',
       'costbar.total': '累计 token',
       'costbar.hitRate': '缓存命中率',
       'costbar.today': '今日未命中 / 输出',
@@ -2246,6 +2266,26 @@ window.__ModuleLoader__.load({
       'settings.footNoteSub': 'New values only affect later dispatch; gates already running keep the timeout they started with.',
       'settings.readonlyTip': 'Read-only: an offline team derives config from its folded ledger; start a team-mode session to edit.',
       'settings.failed': 'Action failed: {msg}',
+      /* CHG-118（FR-14.3 / docs/18 §7）：config editing — form + JSON source view + two-stage confirm */
+      'settings.editHint': 'Changes affect this team only (team-level team.config.json); nothing is written until you save.',
+      'settings.formTitle': 'Editable config',
+      'settings.formNote': 'The form covers the four common fields; edit the rest through the JSON source view.',
+      'settings.save': 'Save config',
+      'settings.saved': 'Saved - effective config refreshed',
+      'settings.saveFailed': 'Save failed: {msg}',
+      'settings.jsonApply': 'Apply source view',
+      'settings.jsonInvalid': 'Invalid JSON: {msg}',
+      'settings.jsonNote': 'Edit the source view, Apply it into the form, then save; unknown keys are preserved verbatim.',
+      'settings.dirty': 'Unsaved changes',
+      'settings.confirmSave': 'Confirm save',
+      'settings.confirmSaveBody': 'This save changes gate chains / limits, or the team has running tasks (members {members} - running {tasks}). Confirm to apply.',
+      'settings.impactMembers': 'members',
+      'settings.impactTasks': 'running tasks',
+      'settings.resetBtn': 'Reset to defaults',
+      'settings.resetConfirm': 'Reset team config to defaults?',
+      'settings.resetConfirmBody': 'Deletes the team-level team.config.json (ledger/members untouched) and falls back to project/plugin defaults.',
+      'settings.resetDone': 'Team config reset to defaults',
+      'settings.unavailable': 'Host lib is too old: no saveTeamConfig endpoint (upgrade the plugin).',
       'costbar.total': 'Cumulative tokens',
       'costbar.hitRate': 'Cache hit rate',
       'costbar.today': 'Today uncached / output',
@@ -4025,6 +4065,8 @@ window.__ModuleLoader__.load({
       '.mt-note-box b{color:var(--dsw-alias-label-secondary);font-weight:600}',
       '.mt-note-box.mt-note-info{background:color-mix(in srgb, var(--dsw-alias-label-emphasis, var(--dsw-alias-label-primary)) 8%, transparent);border-color:color-mix(in srgb, var(--dsw-alias-label-emphasis, var(--dsw-alias-label-primary)) 30%, transparent);color:var(--dsw-alias-label-emphasis, var(--dsw-alias-label-primary))}',
       '.mt-json{margin-top:8px;max-height:260px;overflow:auto;font-size:11px;line-height:1.5;background:var(--dsw-alias-bg-layer-2);border:.5px solid var(--dsw-alias-border-l2);border-radius:6px;padding:8px;white-space:pre-wrap;color:var(--dsw-alias-label-secondary)}',
+      /* CHG-118：源视图改为可编辑 textarea（min-height 撑开、可纵向拉伸；字体沿用宿主 token，不写 font-family） */
+      'textarea.mt-json{min-height:280px;max-height:520px;resize:vertical;box-sizing:border-box;width:100%}',
       '.mt-impact-box{border:.5px solid var(--dsw-alias-state-error-primary);border-radius:8px;padding:8px 12px;font-size:12px;color:var(--dsw-alias-label-secondary);display:flex;flex-direction:column;gap:4px}',
       '.mt-impact-box strong{color:var(--dsw-alias-state-error-primary);font-weight:600}',
       '.mt-danger-ink{color:var(--dsw-alias-state-error-primary)}',
@@ -7159,7 +7201,7 @@ window.__ModuleLoader__.load({
       children: (LAYER_ICONS[key] ?? []).map((d, index) => j('path', { key: index, d, stroke: 'currentColor', strokeWidth: 1.2, strokeLinecap: 'round', strokeLinejoin: 'round' })),
     })
 
-    function SettingsTab({ t, config, offline, team, connection, onDisbanded }) {
+    function SettingsTab({ t, config, offline, team, connection, onDisbanded, onSaved }) {
       const [impact, setImpact] = react.useState(null)
       const [busy, setBusy] = react.useState(false)
       const [err, setErr] = react.useState(null)
@@ -7169,11 +7211,114 @@ window.__ModuleLoader__.load({
       const [handoffBusy, setHandoffBusy] = react.useState(false)
       const [handoffErr, setHandoffErr] = react.useState(null)
       const [handoffResult, setHandoffResult] = react.useState(null)
+      /* CHG-118（FR-14.3 / docs/18 §7）：配置编辑——**单一真相是 `draft`**，
+       * 表单与 JSON 源视图都改它；只有「保存」才走 `saveTeamConfig`（校验先于写）。 */
+      const [draft, setDraft] = react.useState(null)
+      const [jsonText, setJsonText] = react.useState('')
+      const [jsonErr, setJsonErr] = react.useState(null)
+      const [saveErr, setSaveErr] = react.useState(null)
+      const [savedNote, setSavedNote] = react.useState(null)
+      const [saving, setSaving] = react.useState(false)
+      /* 两段确认：第一次保存回 `confirm-required` 时存下影响面 */
+      const [pendingSave, setPendingSave] = react.useState(null)
+      const [resetAsk, setResetAsk] = react.useState(false)
+      react.useEffect(() => {
+        if (!config?.config) return
+        const next = JSON.parse(JSON.stringify(config.config))
+        setDraft(next)
+        setJsonText(JSON.stringify(next, null, 2))
+        setPendingSave(null)
+        setJsonErr(null)
+      }, [config])
       if (config === undefined) return j('div', { className: 'mt-empty', children: t('state.loading') })
       if (!config) return j('div', { className: 'mt-empty', children: offline ? t('settings.offline') : t('settings.notWired') })
       const c = config.config ?? {}
-      const limits = c.limits ?? {}
-      const gates = c.gates ?? {}
+      /* 编辑中的值 = draft（未编辑过就回落生效配置） */
+      const cfg = draft ?? c
+      const limits = cfg.limits ?? {}
+      const gates = cfg.gates ?? {}
+      const editable = team?.online === true
+      const dirty = Boolean(draft) && JSON.stringify(draft) !== JSON.stringify(c)
+      /** 段落内浅合并（表单只改子键；数组整条替换由源视图负责） */
+      const setSection = (section, patch) => setDraft((prev) => {
+        const base = prev ?? JSON.parse(JSON.stringify(c))
+        return { ...base, [section]: { ...(base[section] ?? {}), ...patch } }
+      })
+      const syncJson = (next) => setJsonText(JSON.stringify(next, null, 2))
+      const editSection = (section, patch) => {
+        setSaveErr(null)
+        setSavedNote(null)
+        setDraft((prev) => {
+          const base = prev ?? JSON.parse(JSON.stringify(c))
+          const next = { ...base, [section]: { ...(base[section] ?? {}), ...patch } }
+          syncJson(next)
+          return next
+        })
+      }
+      /** 源视图 → 表单：解析失败**不写**（错误就地显示，草稿不动） */
+      const applyJson = () => {
+        setJsonErr(null)
+        setSaveErr(null)
+        setSavedNote(null)
+        try {
+          const parsed = JSON.parse(jsonText)
+          if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) throw new Error('config must be a JSON object')
+          setDraft(parsed)
+        } catch (e) {
+          setJsonErr(t('settings.jsonInvalid').replace('{msg}', String(e?.message ?? e)))
+        }
+      }
+      /**
+       * 保存（CHG-118）：第一次不带 confirm——服务端若判定影响面非空会回 `confirm-required`，
+       * 这里把影响面展示出来，用户点「确认保存」才带 `confirm:true` 重调。
+       * 旧宿主没有 `saveTeamConfig` 端点 → 明确提示（不假装成功）。
+       */
+      const save = async (confirm) => {
+        if (!editable || !team?.sessionId || saving || !draft) return
+        setSaveErr(null)
+        setSavedNote(null)
+        setSaving(true)
+        try {
+          const api = makeApi(connection, team.sessionId)
+          if (typeof api.saveTeamConfig !== 'function') { setSaveErr(t('settings.unavailable')); return }
+          const r = await api.saveTeamConfig({ teamId: team.teamId, config: draft, ...(confirm ? { confirm: true } : {}) })
+          if (r?.status === 'confirm-required') { setPendingSave({ impact: r.impact ?? {}, message: r.message }); return }
+          if (r?.status !== 'ok') { setSaveErr(String(r?.message ?? r?.code ?? t('settings.saveFailed').replace('{msg}', ''))); return }
+          setPendingSave(null)
+          const next = JSON.parse(JSON.stringify(r.config ?? draft))
+          setDraft(next)
+          setJsonText(JSON.stringify(next, null, 2))
+          setSavedNote(t('settings.saved'))
+          onSaved?.(r)
+        } catch (e) {
+          setSaveErr(t('settings.saveFailed').replace('{msg}', String(e?.message ?? e)))
+        } finally {
+          setSaving(false)
+        }
+      }
+      /** 恢复默认（两段确认）：删团队层文件 → 重新拉生效配置 */
+      const doReset = async () => {
+        if (!editable || !team?.sessionId || saving) return
+        setSaveErr(null)
+        setSaving(true)
+        try {
+          const api = makeApi(connection, team.sessionId)
+          if (typeof api.resetTeamConfig !== 'function') { setSaveErr(t('settings.unavailable')); return }
+          const r = await api.resetTeamConfig({ teamId: team.teamId, confirm: true })
+          if (r?.status !== 'reset' && r?.status !== 'noop') {
+            setSaveErr(String(r?.message ?? r?.code ?? t('settings.saveFailed').replace('{msg}', '')))
+            return
+          }
+          setResetAsk(false)
+          setSavedNote(t('settings.resetDone'))
+          const view = await api.getConfig({ teamId: team.teamId })
+          onSaved?.(view?.status === 'ok' ? view : null)
+        } catch (e) {
+          setSaveErr(t('settings.saveFailed').replace('{msg}', String(e?.message ?? e)))
+        } finally {
+          setSaving(false)
+        }
+      }
       const sections = Object.keys(c).length
       const activeLayer = (key) => (config.chain ?? []).some((item) => item.layer === key && item.active === true) || config.source === key
       const pending = Math.max(0, Number(team?.counts?.tasks ?? 0) - Number(team?.counts?.done ?? 0))
@@ -7246,8 +7391,31 @@ window.__ModuleLoader__.load({
         ] }),
         js('div', { className: 'mt-setrow-act', children: act }),
       ] })
-      const numInput = (value, label) => j('input', { className: 'mt-input-num', value: String(value ?? ''), readOnly: true, tabIndex: -1, 'aria-label': label })
-      const toggle = (checked, label) => j('button', { className: 'mt-toggle', role: 'switch', 'aria-checked': Boolean(checked), 'aria-label': label, disabled: true })
+      /** CHG-118：可编辑数字——空值写 `undefined`（由服务端合并回默认），非数字不写 */
+      const numInput = (value, label, onChange, range = {}) => j('input', {
+        className: 'mt-input-num',
+        value: value === undefined || value === null ? '' : String(value),
+        inputMode: 'numeric',
+        'aria-label': label,
+        disabled: !editable,
+        ...(range.min !== undefined ? { min: range.min } : {}),
+        ...(range.max !== undefined ? { max: range.max } : {}),
+        onChange: (event) => {
+          const raw = String(event?.target?.value ?? '').trim()
+          if (raw === '') { onChange?.(undefined); return }
+          const parsed = Number(raw)
+          if (!Number.isFinite(parsed)) return
+          onChange?.(parsed)
+        },
+      })
+      const toggle = (checked, label, onChange) => j('button', {
+        className: 'mt-toggle',
+        role: 'switch',
+        'aria-checked': Boolean(checked),
+        'aria-label': label,
+        disabled: !editable || !onChange,
+        onClick: () => onChange?.(!checked),
+      })
       const ceiling = (value) => j('span', { className: 'mt-readonly-val', children: t('settings.ceiling').replace('{v}', String(value)) })
       return js('div', { className: 'mt-page mt-page-narrow', children: [
         js('div', { className: 'mt-page-head', children: [
@@ -7259,7 +7427,27 @@ window.__ModuleLoader__.load({
             j('button', { className: 'mt-btn', 'aria-pressed': showJson, onClick: () => setShowJson(!showJson), children: t('settings.jsonView') }),
           ] }),
         ] }),
-        showJson ? j('pre', { className: 'mt-json', children: JSON.stringify(c, null, 2) }) : null,
+        /* CHG-118：JSON 源视图（可编辑）——「应用」解析进表单，解析失败草稿不动 */
+        showJson ? js('section', { className: 'mt-ssection', children: [
+          js('div', { className: 'mt-dsec-head', children: [
+            j('h4', { children: t('settings.jsonView') }),
+            j('span', { className: 'mt-dsec-line', 'aria-hidden': true }),
+            j('span', { className: 'mt-dsec-n', children: t('settings.jsonNote') }),
+          ] }),
+          j('textarea', {
+            className: 'mt-json',
+            rows: 18,
+            spellCheck: false,
+            'aria-label': t('settings.jsonView'),
+            value: jsonText,
+            disabled: !editable,
+            onChange: (event) => { setJsonErr(null); setJsonText(String(event?.target?.value ?? '')) },
+          }),
+          jsonErr ? j('div', { className: 'mt-form-note mt-error-banner', role: 'alert', children: jsonErr }) : null,
+          js('div', { className: 'mt-form-actions', children: [
+            j('button', { className: 'mt-btn', disabled: !editable, onClick: applyJson, children: t('settings.jsonApply') }),
+          ] }),
+        ] }) : null,
         js('section', { className: 'mt-ssection', children: [
           js('div', { className: 'mt-dsec-head', children: [
             j('h4', { children: t('settings.sourceTitle') }),
@@ -7287,13 +7475,42 @@ window.__ModuleLoader__.load({
             j('span', { className: 'mt-dsec-n', children: t('settings.behaviorNote') }),
           ] }),
           js('div', { className: 'mt-setrows', children: [
-            row('teamSize', t('settings.teamSize'), t('settings.teamSizeSub'), [ceiling(CONFIG_CEILINGS.maxMembers), numInput(limits.maxMembers, t('settings.teamSize'))]),
-            row('depth', t('settings.delegateDepth'), t('settings.delegateDepthSub'), [ceiling(CONFIG_CEILINGS.memberMaxDepth), numInput(limits.memberMaxDepth, t('settings.delegateDepth'))]),
-            row('gates', t('settings.gates'), t('settings.gatesSub'), [toggle(gates.enabled, t('settings.gates'))]),
-            row('timeout', t('settings.gateTimeoutLabel'), t('settings.gateTimeoutSub'), [ceiling(CONFIG_CEILINGS.commandTimeoutMs / 1000), numInput(Number(gates.commandTimeoutMs ?? 0) / 1000, t('settings.gateTimeoutLabel')), j('span', { className: 'mt-hint', children: t('settings.seconds') })]),
+            row('teamSize', t('settings.teamSize'), t('settings.teamSizeSub'), [ceiling(CONFIG_CEILINGS.maxMembers), numInput(limits.maxMembers, t('settings.teamSize'), (v) => editSection('limits', { maxMembers: v }), { min: 1, max: CONFIG_CEILINGS.maxMembers })]),
+            row('depth', t('settings.delegateDepth'), t('settings.delegateDepthSub'), [ceiling(CONFIG_CEILINGS.memberMaxDepth), numInput(limits.memberMaxDepth, t('settings.delegateDepth'), (v) => editSection('limits', { memberMaxDepth: v }), { min: 0, max: CONFIG_CEILINGS.memberMaxDepth })]),
+            row('gates', t('settings.gates'), t('settings.gatesSub'), [toggle(gates.enabled !== false, t('settings.gates'), (v) => editSection('gates', { enabled: v }))]),
+            row('timeout', t('settings.gateTimeoutLabel'), t('settings.gateTimeoutSub'), [ceiling(CONFIG_CEILINGS.commandTimeoutMs / 1000), numInput(Math.round(Number(gates.commandTimeoutMs ?? 0) / 1000), t('settings.gateTimeoutLabel'), (v) => editSection('gates', { commandTimeoutMs: v === undefined ? undefined : Math.round(Number(v) * 1000) }), { min: 1, max: CONFIG_CEILINGS.commandTimeoutMs / 1000 }), j('span', { className: 'mt-hint', children: t('settings.seconds') })]),
             row('hideTools', t('settings.hideTools'), t('settings.hideToolsSub'), [toggle(false, t('settings.hideTools'))]),
-            row('evidence', t('settings.evidenceLabel'), t('settings.evidenceSub'), [toggle(c.memory?.evidenceRequired, t('settings.evidenceLabel'))]),
+            row('evidence', t('settings.evidenceLabel'), t('settings.evidenceSub'), [toggle(cfg.memory?.evidenceRequired !== false, t('settings.evidenceLabel'), (v) => editSection('memory', { evidenceRequired: v }))]),
           ] }),
+        ] }),
+        /* CHG-118（FR-14.3 / docs/18 §7）：保存 / 恢复默认——两段确认 + 影响面 + 失败不静默 */
+        js('section', { className: 'mt-ssection', children: [
+          js('div', { className: 'mt-dsec-head', children: [
+            j('h4', { children: t('settings.formTitle') }),
+            j('span', { className: 'mt-dsec-line', 'aria-hidden': true }),
+            j('span', { className: 'mt-dsec-n', children: dirty ? t('settings.dirty') : t('settings.formNote') }),
+          ] }),
+          js('div', { className: 'mt-inline-note', children: j('span', { className: 'mt-hint', children: t('settings.editHint') }) }),
+          js('div', { className: 'mt-form-actions', children: [
+            j('button', { className: 'mt-btn mt-btn-primary', 'data-testid': 'settings-save', disabled: !editable || !dirty || saving, onClick: () => save(false), children: saving ? t('state.loading') : t('settings.save') }),
+            j('button', { className: 'mt-btn', 'data-testid': 'settings-reset', disabled: !editable || saving, onClick: () => setResetAsk(true), children: t('settings.resetBtn') }),
+          ] }),
+          savedNote ? j('div', { className: 'mt-note-box mt-note-info', role: 'status', children: savedNote }) : null,
+          saveErr ? j('div', { className: 'mt-form-note mt-error-banner', role: 'alert', children: saveErr }) : null,
+          pendingSave ? js('div', { className: 'mt-impact-box', children: [
+            j('strong', { children: t('settings.confirmSaveBody').replace('{members}', impactCountText(pendingSave.impact?.members)).replace('{tasks}', impactCountText(pendingSave.impact?.runningTasks)) }),
+            js('div', { className: 'mt-form-actions', children: [
+              j('button', { className: 'mt-btn mt-btn-primary', 'data-testid': 'settings-confirm-save', disabled: saving, onClick: () => save(true), children: saving ? t('state.loading') : t('settings.confirmSave') }),
+              j('button', { className: 'mt-btn', onClick: () => setPendingSave(null), children: t('action.cancel') }),
+            ] }),
+          ] }) : null,
+          resetAsk ? js('div', { className: 'mt-impact-box', children: [
+            j('strong', { children: t('settings.resetConfirmBody') }),
+            js('div', { className: 'mt-form-actions', children: [
+              j('button', { className: 'mt-btn mt-btn-danger', 'data-testid': 'settings-confirm-reset', disabled: saving, onClick: doReset, children: saving ? t('state.loading') : t('settings.resetBtn') }),
+              j('button', { className: 'mt-btn', onClick: () => setResetAsk(false), children: t('action.cancel') }),
+            ] }),
+          ] }) : null,
         ] }),
         js('section', { className: 'mt-ssection', children: [
           js('div', { className: 'mt-dsec-head', children: [
@@ -10923,6 +11140,12 @@ window.__ModuleLoader__.load({
               team,
               connection,
               onDisbanded: () => { closeTeam(); loadProject(projectRoot) },
+              /* CHG-118：保存 / 恢复默认后刷新生效配置与团队看板（配置在服务端重建过服务） */
+              onSaved: (view) => {
+                if (view?.status === 'ok') setConfig(view)
+                else setConfig(undefined)
+                setBoard(undefined)
+              },
             })
           }
           const askDisband = async () => {

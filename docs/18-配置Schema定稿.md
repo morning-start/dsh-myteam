@@ -211,7 +211,7 @@
 |---|---|---|---|
 | `getConfig` | `{ teamId? }` | `{ status, config, source, mergeChain, warnings, patchCeilings }` | ✅ 已实现（CHG-49/55/56） |
 | `resetTeamConfig` | `{ teamId, confirm: true }` | `{ status: 'reset'\|'noop', teamId, configSource }` | ✅ 已实现（CHG-57 工具面 / **CHG-117 面板端点**） |
-| `saveTeamConfig` | `{ teamId, config, confirm? }` | 同 `getConfig` + 影响面回执 | ✅ 已实现（**CHG-117**） |
+| `saveTeamConfig` | `{ teamId, config, confirm? }` | 同 `getConfig` + 影响面回执 | ✅ 已实现（**CHG-117** 端点 + **CHG-118** 设置页表单 / JSON 源视图 / 两段确认） |
 
 `saveTeamConfig` 的约束（M2-3 实现时必须遵守）：
 
