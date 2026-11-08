@@ -208,8 +208,13 @@ test('t85-10: 面板与团队视图都用 watch 自动追平（5s 轮询降级�
     '团队视图：无 watch 时保持一次性加载',
   )
   assert.ok(
-    /if \(r\?\.changed\) setTick\(\(value\) => value \+ 1\)/.test(clientSource),
+    /* CHG-155：变化分支 push 完 tick 直接 continue；未变化时必须退避（MIN_POLL_MS） */
+    /if \(r\?\.changed\) \{ setTick\(\(value\) => value \+ 1\); continue \}/.test(clientSource),
     '团队视图：changed 推进 tick 重拉',
+  )
+  assert.ok(
+    /if \(elapsed < MIN_POLL_MS\) await sleep\(MIN_POLL_MS - elapsed\)/.test(clientSource),
+    '团队视图：未变化时至少隔 MIN_POLL_MS（CHG-155 紧循环回归锁）',
   )
   // ④ 两处都要在后台暂停（不请求网关）
   const hiddenCount = (clientSource.match(/if \(isHidden\(\)\) \{ await sleep\(1000\); continue \}/g) ?? []).length

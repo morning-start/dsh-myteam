@@ -32,6 +32,80 @@ window.__ModuleLoader__.load({
     const react = require('react')
 
     const PANEL_KEY = 'myteam'
+
+    /**
+     * CHG-155（P1）：**渲染错误边界**——插槽里任何组件抛错，宿主只看到一块空白
+     * （深色主题下就是「黑屏」），用户拿不到任何可读信息，也没法自己恢复。
+     *
+     * 兜底口径：**渲染异常 ≠ 面板消失**。
+     *  - 显示「渲染失败 + 错误摘要 + 重试」，重试只清 error（不重载页面）；
+     *  - 异常照常 `console.error`（保留堆栈，便于定位真因）；
+     *  - 边界自身绝不抛错（locale/console 都不可用时降级成中文常量）。
+     *
+     * 注意：类组件是这里的有意选择——React 的 `getDerivedStateFromError` 只有类有。
+     * 宿主/测试的 react shim 不一定导出 `Component`（mock loader 只给 hooks），
+     * 所以取不到实体时退回一个最小基类：边界在任何 shim 下都能构造。
+     */
+    const RenderBoundaryBase = react.Component ?? class { constructor(props) { this.props = props } }
+    class MyTeamRenderBoundary extends RenderBoundaryBase {
+      constructor(props) {
+        super(props)
+        this.state = { error: null, info: null }
+        this.retry = () => this.setState({ error: null, info: null })
+      }
+
+      static getDerivedStateFromError(error) {
+        return { error }
+      }
+
+      componentDidCatch(error, info) {
+        /* 组件栈是定位「谁在循环」的唯一线索（#185 尤其如此）：存进 state 直接显示出来 */
+        this.setState({ info: info ?? null })
+        try {
+          console.error('[myteam] 渲染异常（已兜住，未黑屏）：', error, info?.componentStack)
+        } catch {
+          /* 控制台不可用也不影响兜底 */
+        }
+      }
+
+      render() {
+        const { t, children } = this.props ?? {}
+        if (!this.state.error) return children
+        const label = (key, fallback) => {
+          try {
+            const value = typeof t === 'function' ? t(key) : undefined
+            return value && value !== key ? value : fallback
+          } catch {
+            return fallback
+          }
+        }
+        const detail = String(this.state.error?.message ?? this.state.error ?? '')
+        /* 组件栈只取前 3 帧（再长也没人看），一行内用 ← 串起来 */
+        const frames = String(this.state.info?.componentStack ?? '')
+          .split('\n')
+          .map((line) => line.trim().replace(/^at\s+/, ''))
+          .filter(Boolean)
+          .slice(0, 3)
+        return j('div', { className: 'mt-empty', role: 'alert', children: [
+          j('b', { children: label('errors.renderTitle', '面板渲染失败') }),
+          j('p', { className: 'mt-hint', children: detail.slice(0, 400) }),
+          frames.length > 0
+            ? j('p', { className: 'mt-hint', children: `${label('errors.renderWhere', '出错组件')}：${frames.join(' ← ')}` })
+            : null,
+          j('button', { className: 'mt-btn mt-btn-sm', onClick: this.retry, children: label('errors.renderRetry', '重试') }),
+        ] })
+      }
+    }
+
+    /**
+     * 给插槽组件套一层边界（登记处调用；props 原样透传，`t` 单独取出给兜底 UI 用）。
+     * 每次登记新建一个包装组件：插槽是单例登记，不存在重复挂载的开销。
+     */
+    const withRenderBoundary = (Component) => {
+      const Guarded = (props) => j(MyTeamRenderBoundary, { t: props?.t, children: j(Component, props) })
+      Guarded.displayName = `MyTeamBoundary(${Component?.name || 'Component'})`
+      return Guarded
+    }
     /**
      * CHG-114：**入口 → 工作台的上下文交接**。
      *
@@ -2640,6 +2714,10 @@ window.__ModuleLoader__.load({
      * 用 Object.assign 追加而不是改写 zh/en 字面量：六组的落点在同一行，
      * 逐组往字面量里插行会互相踩（并发写协议 §三-2「少而大」）。 */
     Object.assign(zh, {
+      /* CHG-155：渲染错误边界的兜底文案（面板渲染异常时显示，替代黑屏） */
+      'errors.renderTitle': '面板渲染失败',
+      'errors.renderRetry': '重试',
+      'errors.renderWhere': '出错组件',
       /* 知识库（团队内「知识」tab，design/knowledge.html） */
       'kb3.title': '团队知识库',
       'kb3.desc': '团队记忆分三层：AGENTS.md 是共识层，config/knowledge/ 是共享知识库，实例私有 memory.md 只属于本人。常驻的只有 40 行以内的索引，正文按需读取。',
@@ -2814,6 +2892,10 @@ window.__ModuleLoader__.load({
       'skill3.tabSkills': '技能',
     })
     Object.assign(en, {
+      /* CHG-155: render error boundary fallback copy (shown instead of a black screen) */
+      'errors.renderTitle': 'Panel failed to render',
+      'errors.renderRetry': 'Retry',
+      'errors.renderWhere': 'Failed at',
       /* Knowledge (team Knowledge tab) */
       'kb3.title': 'Team knowledge base',
       'kb3.desc': 'Team memory has three layers: AGENTS.md is the consensus layer, config/knowledge/ is the shared library, and each instance private memory.md belongs to that instance alone. Only a 40-line index is resident; bodies are read on demand.',
@@ -4468,7 +4550,11 @@ window.__ModuleLoader__.load({
       '.mt-vlink-on{color:var(--dsw-alias-label-primary);background:var(--dsw-alias-bg-layer-2);font-weight:600}',
       '.mt-viewbar-hint{font-size:11px;color:var(--dsw-alias-label-tertiary)}',
       /* [G6 flow · 会话页 conversation.html / 单角色调用 guest.html] */
-      '.mt-conv{display:flex;flex-direction:column;height:100%;min-height:0;overflow-y:auto;padding:14px 16px;box-sizing:border-box;color:var(--dsw-alias-label-primary)}',
+      /* CHG-156：团队视图 = **对话式居中阅读列**。原来是满宽面板（左右各 16px 贴边，宽屏下一行 2000px 没人读），
+       * 现在与「对话」tab 的消息列对齐：正文最多 720px 居中，窄屏退回 28px 边距。
+       * 纪律：用 `padding-inline` 居中，**不用** `max-width + margin-inline:auto`——后者会让滚动条贴到内容上，
+       * 与宿主的对话列不是同一种居中方式。 */
+      '.mt-conv{display:flex;flex-direction:column;height:100%;min-height:0;overflow-y:auto;padding-block:20px 40px;padding-inline:max(28px,calc((100% - 720px) / 2));box-sizing:border-box;color:var(--dsw-alias-label-primary)}',
       '.mt-conv-head{display:flex;align-items:center;gap:12px;flex-wrap:wrap;padding-bottom:12px;border-bottom:.5px solid var(--dsw-alias-border-l2);flex:none}',
       '.mt-conv-title{display:inline-flex;align-items:center;gap:8px;min-width:0}',
       '.mt-conv-title b{font-size:13px;font-weight:600}',
@@ -4540,7 +4626,8 @@ window.__ModuleLoader__.load({
       '.mt-dockchip .mt-vline{flex:none;width:1px;height:11px;background:var(--dsw-alias-border-l3)}',
       '.mt-dockchip .mt-go{color:var(--dsw-alias-state-warning-primary)}',
       '.mt-dockrow .mt-spacer{flex:1}',
-      '.mt-conv-section{display:flex;flex-direction:column;gap:8px;width:100%;max-width:764px;margin:0 auto;padding-top:14px;border-top:.5px solid var(--dsw-alias-border-l2)}',
+      /* CHG-156：居中交给 `.mt-conv` 的 padding-inline，区块不再各自居中（两处居中 = 边距漂移） */
+      '.mt-conv-section{display:flex;flex-direction:column;gap:8px;width:100%;max-width:none;margin:0;padding-top:14px;border-top:.5px solid var(--dsw-alias-border-l2)}',
       '.mt-conv-section-title{margin:0;font-size:12px;font-weight:600;color:var(--dsw-alias-label-secondary)}',
       /* CHG-84 复检：建团向导加载态（骨架）· 预设读取失败提示 · 参与关系 chip 实心/虚线 */
       '.mt-skeleton{display:flex;flex-direction:column;gap:6px}',
@@ -6866,6 +6953,8 @@ window.__ModuleLoader__.load({
     const DAG_PAD = 16
     const DAG_FALLBACK_H = 78
     const DAG_NODE_W_H = 176
+    /** CHG-155：同一布局签名下最多重排几次（防「测量 → setState → 再测量」自激成 #185） */
+    const DAG_MAX_LAYOUT_PASSES = 8
     const DAG_MODEL_RE = /^(sonnet|gpt-|claude|opus|qwen|gemini|deepseek|llama|mistral|glm)/i
     /** 任务状态 → 节点色带（H4：文字 + 形状为主，色带只作第三顺位） */
     const dagChipOf = (state) => {
@@ -6896,21 +6985,52 @@ window.__ModuleLoader__.load({
       const nodeRefs = (react.useRef ?? ((init) => ({ current: init })))(new Map())
       const useLayoutEffect = react.useLayoutEffect ?? react.useEffect ?? (() => {})
       const ready = Boolean(tasks && tasks.length > 0)
+      /**
+       * CHG-155（P1）：**测量-重排不能自激**（React #185 的根因）。
+       *
+       * 依赖图要「先量容器、再算坐标」：`clientWidth/Height` → 画布尺寸 → 可能反过来改容器尺寸
+       * （滚动条出现/消失、换行数变化）。旧实现的 effect 依赖里同时有 `heights` 和 `avail`，
+       * 等于**把自己的输出当输入** → 测量 → setState → 再测量 → 同步更新环 → React 抛
+       * #185（Maximum update depth exceeded）→ 整块面板卸载（深色主题下就是黑屏）。
+       *
+       * 三条锁（缺一不可）：
+       *  ① 依赖只留 `[tasks, dir, ready]`——不再把自己的输出当输入；
+       *  ② 值没变就**不 setState**（对比本次渲染的 `avail` / `heights`）→ React 不用重排；
+       *  ③ **同一布局签名最多重排 `DAG_MAX_LAYOUT_PASSES` 次**（熔断）——即使测量真的抖，
+       *     也只抖有限次；一旦稳定立刻把计数清零，后续尺寸变化还能再测。
+       */
+      const layoutSigRef = (react.useRef ?? ((init) => ({ current: init })))('')
+      const layoutPassRef = (react.useRef ?? ((init) => ({ current: init })))(0)
       useLayoutEffect(() => {
         if (!ready) return
+        /* 布局签名（方向 + 任务集合）：换了布局才重新给熔断计数清零 */
+        const sig = `${dir}|${tasks.length}|${tasks.map((task) => String(task.id)).join(',')}`
+        if (sig !== layoutSigRef.current) {
+          layoutSigRef.current = sig
+          layoutPassRef.current = 0
+        }
         const wrap = wrapRef.current
         const w = Math.max((wrap && wrap.clientWidth) || 0, 320)
         const h = Math.max((wrap && wrap.clientHeight) || 0, 320)
-        if (w !== avail.w || h !== avail.h) setAvail({ w, h })
-        let changed = false
         const next = {}
         for (const task of tasks) {
           const el = nodeRefs.current?.get?.(task.id)
           const measured = el ? el.offsetHeight : 0
-          if (measured > 0) { next[task.id] = measured; if (heights[task.id] !== measured) changed = true }
+          if (measured > 0) next[task.id] = measured
         }
-        if (changed) setHeights(next)
-      }, [tasks, dir, heights, avail.w, avail.h, ready])
+        const sizeChanged = w !== avail.w || h !== avail.h
+        const nextKeys = Object.keys(next)
+        const heightsChanged = nextKeys.length !== Object.keys(heights).length || nextKeys.some((key) => heights[key] !== next[key])
+        if (!sizeChanged && !heightsChanged) {
+          /* ②③：已经稳定 —— 不 setState，并把熔断计数归零（尺寸再变化时还能测） */
+          layoutPassRef.current = 0
+          return
+        }
+        if (layoutPassRef.current >= DAG_MAX_LAYOUT_PASSES) return
+        layoutPassRef.current += 1
+        if (sizeChanged) setAvail({ w, h })
+        if (heightsChanged) setHeights(next)
+      }, [tasks, dir, ready])
       if (!ready) return j('div', { className: 'mt-empty', children: t('dag.empty') })
       const byId = new Map(tasks.map((task) => [task.id, task]))
       // 层级 = 最长路径（与后端 core/tasks/graph.ts 同算法；环按 0 截断）
@@ -12530,6 +12650,7 @@ window.__ModuleLoader__.load({
        * 旧宿主没有 `watch` → 直接返回，保持「打开时拉一次」的旧行为。
        */
       const teamId = state.team?.teamId
+      const workspaceRoot = String(state.team?.workspaceRoot ?? '')
       react.useEffect(() => {
         if (!teamId || !connection) return undefined
         const api = makeApi(connection, sessionId)
@@ -12537,14 +12658,34 @@ window.__ModuleLoader__.load({
         let alive = true
         let since = 0
         const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms))
+        /**
+         * CHG-155（P1 紧循环 → 整屏卡死/黑屏）：`watch` **必须带 `workspaceRoot`**。
+         * 服务端 `offlineTarget` 只认绝对路径，缺了就直接返回 `MT_VALIDATION` **错误信封**
+         * （不是抛异常）；旧实现只在 `catch` 里 `sleep`，错误信封走的是成功分支 →
+         * `while (alive)` 无间隔重发 → 每秒上千次 RPC → 渲染进程被占满（黑屏）。
+         *
+         * 两道锁，缺一不可：
+         *  ① 请求带真实 `workspaceRoot`（参数合法，服务端才可能进入长轮询）；
+         *  ② **只要这一轮没有 `changed`，就至少隔 `MIN_POLL_MS` 再问**——与响应快慢无关，
+         *     即使服务端立刻回错误/空态也不会紧循环（这是「以后不再黑屏」的那道锁）。
+         */
+        const MIN_POLL_MS = 1000
         const loop = async () => {
           while (alive) {
             if (isHidden()) { await sleep(1000); continue }
+            const startedAt = Date.now()
             try {
-              const r = await api.watch({ teamId, sinceSeq: since, timeoutMs: 20000 })
+              const r = await api.watch({
+                teamId,
+                ...(workspaceRoot ? { workspaceRoot } : {}),
+                sinceSeq: since,
+                timeoutMs: 20000,
+              })
               if (!alive) return
               if (typeof r?.seq === 'number') since = r.seq
-              if (r?.changed) setTick((value) => value + 1)
+              if (r?.changed) { setTick((value) => value + 1); continue }
+              const elapsed = Date.now() - startedAt
+              if (elapsed < MIN_POLL_MS) await sleep(MIN_POLL_MS - elapsed)
             } catch {
               await sleep(3000)
             }
@@ -12552,7 +12693,7 @@ window.__ModuleLoader__.load({
         }
         void loop()
         return () => { alive = false }
-      }, [teamId, connection, sessionId])
+      }, [teamId, workspaceRoot, connection, sessionId])
       return state
     }
     /** 计数渲染：0 条任务不等于「无数据」时照样显示 0；缺数据（未加载）显示 — 占位 */
@@ -12643,6 +12784,17 @@ window.__ModuleLoader__.load({
        * 修的是「打开面板 / 输入框 chip 点了没反应」：旧实现调 `uiWorkspace.openPanel`，
        * 宿主没有这个方法（面板选择是 `ctx.layout.selectPanel`）。 */
       const openPanel = () => { openWorkbench(ctx, entryNavForTeam(team)) }
+      /**
+       * CHG-155（P2）：会话视图三视图的 `onOpen` 契约不一致——`BoardView` / `LanesView` 传**任务对象**，
+       * 而 `DagView` 传的是**id 字符串**（`onOpen(task.id)`）。旧实现一律 `String(task.id)`，
+       * 于是团队视图里双击依赖图卡片得到 `"undefined"`，打开一个不存在的任务详情。
+       * 统一归一：两种入参都收；空 id 直接忽略（不制造假任务）。
+       */
+      const openConvTask = (target) => {
+        const id = target && typeof target === 'object' ? target.id : target
+        if (id === undefined || id === null || id === '') return
+        setOpenTaskId(String(id))
+      }
       const stat = (label, value) => js('div', { key: label, className: 'mt-conv-stat', children: [
         j('b', { children: board.loaded ? String(value) : '—' }),
         j('span', { children: label }),
@@ -12696,10 +12848,10 @@ window.__ModuleLoader__.load({
                   j('button', { className: convView === 'dag' ? 'mt-seg mt-seg-active mt-vlink mt-vlink-on' : 'mt-seg mt-vlink', 'aria-pressed': convView === 'dag', onClick: () => setConvView('dag'), children: t('g6.tasks.viewDag') }),
                 ] }),
                 convView === 'board'
-                  ? j(BoardView, { t, tasks: board.rawTasks, memberName: memberNameOf, teamName: () => team.name || team.teamId, onOpen: (task) => setOpenTaskId(String(task.id)) })
+                  ? j(BoardView, { t, tasks: board.rawTasks, memberName: memberNameOf, teamName: () => team.name || team.teamId, onOpen: openConvTask })
                   : convView === 'lanes'
-                    ? j(LanesView, { t, tasks: board.rawTasks, members: board.members, onOpen: (task) => setOpenTaskId(String(task.id)) })
-                    : j(DagView, { t, tasks: board.rawTasks, onOpen: (task) => setOpenTaskId(String(task.id)), memberName: memberNameOf, teamName: () => team.name || team.teamId, dir: 'h' }),
+                    ? j(LanesView, { t, tasks: board.rawTasks, members: board.members, onOpen: openConvTask })
+                    : j(DagView, { t, tasks: board.rawTasks, onOpen: openConvTask, memberName: memberNameOf, teamName: () => team.name || team.teamId, dir: 'h' }),
               ] }),
         ] }),
         /* 成员：真实上岗名册（角色 · 实例 · 状态） */
@@ -12949,13 +13101,15 @@ window.__ModuleLoader__.load({
       }
       // ③ 插槽注册：slot inject 回调首参 = binding.key = sessionId
       //    （dsh-client-ui-renderer runInject：session 槽有 binding，root 'main' 槽没有）
+      /* CHG-155（P1）：三个可见表面都套渲染错误边界 —— 插槽里抛错不再让整块面板变成黑屏，
+       * 而是渲染「渲染失败 + 摘要 + 重试」的可读兜底。 */
       ctx.slots.inject('main', () => ctx.slots.register({
         name: 'main',
         key: PANEL_KEY,
         locale: NS,
         // root 槽无 sessionId → Panel 先 listTeams 发现队长会话（M2 门面）
         inject: () => ({ ctx, connection: ctx.connection }),
-      }, Panel))
+      }, withRenderBoundary(Panel)))
       ctx.slots.inject('sidebar.panellist', () => ctx.slots.register({
         name: 'sidebar.panellist',
         id: PANEL_KEY,
@@ -12970,7 +13124,7 @@ window.__ModuleLoader__.load({
         locale: NS,
         // 会话槽：首参 sessionId → DockChip 只在队长会话轮询出数据（非队长 → unavailable → 不亮）
         inject: (sessionId) => ({ ctx, connection: ctx.connection, sessionId }),
-      }, DockChip))
+      }, withRenderBoundary(DockChip)))
       /* ④ CHG-82 G6：会话页团队视图（conversation.view）+ myteam_* 工具卡（tool.call.toolview）。
        * 官方契约：conversation.view 用 id + order + label（按会话绑定）；tool.call.toolview 用 key
        * （按 wire 工具名精确注册，见 dsh-client-ui-tool 的 ask_user_question 参考实现）。
@@ -12983,7 +13137,7 @@ window.__ModuleLoader__.load({
           locale: NS,
           label: () => zh['g6.conv.view'] ?? 'myteam',
           inject: (sessionId) => ({ ctx, connection: ctx.connection, sessionId }),
-        }, MyTeamConversationView))
+        }, withRenderBoundary(MyTeamConversationView)))
         const TOOL_VIEWS = [
           ['myteam_plan_tasks', MyTeamPlanTasksToolView],
           ['myteam_approve_plan', MyTeamApprovePlanToolView],
@@ -13031,6 +13185,11 @@ window.__ModuleLoader__.load({
      * 能在 mock loader 下断言，而不是只 grep 源码字符串。 */
     const __testEntry = { PANEL_KEY, entryNavForTeam, openWorkbench, takePendingNav, resolveNavForSession }
 
-    return { apply, inject, __test, __testG4, __testG6, __testG89, __testEntry }
+    /* 测试专用出口（t100-chg155）：**不再黑屏**的两块兜底——渲染错误边界 + 包装器。
+     * 生产路径只看 apply/inject；导出它们是为了让「异常到底有没有兜住」「三个表面有没有套上」
+     * 能在 mock loader 下真断言，而不是只 grep 源码字符串。 */
+    const __testResilience = { MyTeamRenderBoundary, withRenderBoundary }
+
+    return { apply, inject, __test, __testG4, __testG6, __testG89, __testEntry, __testResilience }
   },
 })
