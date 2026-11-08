@@ -19,6 +19,8 @@ const js = (type, props, ...children) => j(type, props, ...children)
 const reactShim = {
   useState: (init) => [typeof init === 'function' ? init() : init, () => {}],
   useEffect: () => {},
+  /* CHG-114：Panel 用 useRef 持有「入口交接只消费一次」的哨兵 */
+  useRef: (init) => ({ current: init }),
   useCallback: (fn) => fn,
   useMemo: (fn) => fn(),
 }

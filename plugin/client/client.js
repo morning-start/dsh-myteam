@@ -32,6 +32,64 @@ window.__ModuleLoader__.load({
     const react = require('react')
 
     const PANEL_KEY = 'myteam'
+    /**
+     * CHG-114：**入口 → 工作台的上下文交接**。
+     *
+     * 全局/项目不拆成两个宿主表面，但**入口必须带层级**：从团队会话的「团队视图」
+     * 点进来时，用户期望落在**这个团队的看板**，而不是回到全局库。
+     *
+     * 宿主选择面板的 API 是 `ctx.layout.selectPanel(id)`（ui-layout 服务）。
+     * CHG-114 之前这里调的是 `ctx.get('uiWorkspace')?.openPanel?.(PANEL_KEY)`——
+     * `uiWorkspace` 上没有 `openPanel`，可选链把 TypeError 吞成 undefined，
+     * 于是「打开面板」和 composer chip **点了都没反应**，团队视图成了死端。
+     *
+     * 交接用模块级一次性变量：打开前写 `pendingNav`，Panel 挂载时 `takePendingNav()` 消费。
+     * 只在事件回调里赋值（不在渲染期），并发打开也只会落在最后一次。
+     */
+    let pendingNav = null
+    /** 团队摘要 → 工作台入口上下文（纯函数，测试直接断言） */
+    function entryNavForTeam(team) {
+      if (!team || !team.teamId) return { scope: 'global' }
+      return {
+        scope: 'project',
+        workspaceRoot: String(team.workspaceRoot ?? ''),
+        teamId: String(team.teamId),
+        projectTab: 'teams',
+        teamTab: 'members',
+      }
+    }
+    /** 打开工作台并交接上下文；返回是否真的调到了宿主 API（测试可断言） */
+    function openWorkbench(ctx, nav) {
+      const next = nav && typeof nav === 'object' ? nav : null
+      try {
+        const layout = typeof ctx?.get === 'function' ? ctx.get('layout') : undefined
+        if (!layout || typeof layout.selectPanel !== 'function') return false
+        pendingNav = next
+        layout.selectPanel(PANEL_KEY)
+        return true
+      } catch (e) {
+        pendingNav = null
+        /* 插件跑在用户真实桌面里：任一入口失败都不能让面板消失，只 warn 降级 */
+        console.warn('[myteam] 打开面板失败：', e)
+        return false
+      }
+    }
+    /** 消费一次性入口上下文（Panel 挂载时调用一次） */
+    function takePendingNav() {
+      const nav = pendingNav
+      pendingNav = null
+      return nav
+    }
+    /** 会话 → 入口上下文：能解析出团队就落团队页，解析不到回全局库（不空转） */
+    async function resolveNavForSession(connection, sessionId) {
+      if (!connection || !sessionId) return { scope: 'global' }
+      try {
+        const teams = await makeApi(connection, sessionId).listTeams()
+        return entryNavForTeam((teams?.teams ?? []).find((entry) => entry.sessionId === sessionId))
+      } catch {
+        return { scope: 'global' }
+      }
+    }
     const NS = 'myteam.panel'
     /**
      * 轮询间隔（R34 / design-notes §十：面板 5s 轮询）。
@@ -9801,9 +9859,14 @@ window.__ModuleLoader__.load({
       const dark = useDarkTheme()
       const themeAttr = { 'data-theme': dark ? 'dark' : 'light' }
       const discoveryApi = react.useMemo(() => makeApi(connection), [connection])
-      const [scope, setScope] = react.useState('global')          // 全局 | 项目
-      const [projectTab, setProjectTab] = react.useState('tasks') // 角色 | 团队 | 任务
-      const [projectRoot, setProjectRoot] = react.useState('')
+      /* CHG-114：入口交接（每次挂载只消费一次）——从团队视图进来时直接落在项目作用域的团队页，
+       * 侧栏入口没有交接（pendingNav=null）→ 仍按 CHG-42 的默认落在全局库。 */
+      const entryNavRef = react.useRef(null)
+      if (entryNavRef.current === null) entryNavRef.current = { nav: takePendingNav() }
+      const entryNav = entryNavRef.current.nav
+      const [scope, setScope] = react.useState(entryNav?.scope === 'project' ? 'project' : 'global')          // 全局 | 项目
+      const [projectTab, setProjectTab] = react.useState(entryNav?.projectTab ?? 'tasks') // 角色 | 团队 | 任务
+      const [projectRoot, setProjectRoot] = react.useState(entryNav?.workspaceRoot ?? '')
       /**
        * CHG-102：项目级存储状态（`.dsh-myteam/` 是否已初始化）。
        *
@@ -9815,8 +9878,8 @@ window.__ModuleLoader__.load({
       const [teams, setTeams] = react.useState(null)
       const [project, setProject] = react.useState(null)
       const [error, setError] = react.useState(null)
-      const [selectedTeamId, setSelectedTeamId] = react.useState(null)
-      const [teamTab, setTeamTab] = react.useState('members')     // 队员 | 参与任务 | 知识 | 审计 | 设置
+      const [selectedTeamId, setSelectedTeamId] = react.useState(entryNav?.teamId ?? null)
+      const [teamTab, setTeamTab] = react.useState(entryNav?.teamTab ?? 'members')     // 队员 | 参与任务 | 知识 | 审计 | 设置
       /* design/team-tasks.html：本队角色筛选（全部 / 主责 / 协作） */
       const [teamTaskFilter, setTeamTaskFilter] = react.useState('all')
       const [taskView, setTaskView] = react.useState('board')     // 列表 | 看板 | 流程 | 依赖图
@@ -11882,12 +11945,10 @@ window.__ModuleLoader__.load({
       const themeAttr = { 'data-theme': dark ? 'dark' : 'light' }
       const board = useConvBoard(props?.connection, sessionId)
       const team = board.team
-      const openPanel = () => {
-        try {
-          const workspace = typeof ctx?.get === 'function' ? ctx.get('uiWorkspace') : undefined
-          workspace?.openPanel?.(PANEL_KEY)
-        } catch { /* 降级：无 openPanel 时静默 */ }
-      }
+      /* CHG-114：入口带层级——从团队视图进工作台落在**本团队的看板**（不是回全局库）。
+       * 修的是「打开面板 / 输入框 chip 点了没反应」：旧实现调 `uiWorkspace.openPanel`，
+       * 宿主没有这个方法（面板选择是 `ctx.layout.selectPanel`）。 */
+      const openPanel = () => { openWorkbench(ctx, entryNavForTeam(team)) }
       const stat = (label, value) => js('div', { key: label, className: 'mt-conv-stat', children: [
         j('b', { children: board.loaded ? String(value) : '—' }),
         j('span', { children: label }),
@@ -12077,6 +12138,14 @@ window.__ModuleLoader__.load({
       const themeAttr = { 'data-theme': dark ? 'dark' : 'light' }
       const [unread, setUnread] = react.useState(0)
       const [live, setLive] = react.useState(0)
+      /* CHG-114：入口上下文一次解析（会话 → 团队）；解析不到就回全局库，点击不空转 */
+      const [entryNav, setEntryNav] = react.useState(null)
+      react.useEffect(() => {
+        if (sessionId === undefined || !connection) return undefined
+        let alive = true
+        resolveNavForSession(connection, sessionId).then((nav) => { if (alive) setEntryNav(nav) })
+        return () => { alive = false }
+      }, [sessionId, connection])
       react.useEffect(() => {
         if (sessionId === undefined || !connection) return
         let alive = true
@@ -12110,10 +12179,10 @@ window.__ModuleLoader__.load({
           className: 'mt-dockchip',
           title: t('chip.title'),
           onClick: () => {
-            try {
-              const workspace = typeof ctx?.get === 'function' ? ctx.get('uiWorkspace') : undefined
-              workspace?.openPanel?.(PANEL_KEY)
-            } catch { /* 降级：无 openPanel 时静默 */ }
+            /* CHG-114：走宿主真实 API `ctx.layout.selectPanel`（旧 `uiWorkspace.openPanel` 不存在）。
+             * 交接解析还没回来就再解析一次——点击永远带团队上下文，不落到全局库。 */
+            if (entryNav) openWorkbench(ctx, entryNav)
+            else resolveNavForSession(connection, sessionId).then((nav) => openWorkbench(ctx, nav))
           },
           children: [
             j('span', { className: 'mt-dot', 'aria-hidden': true }),
@@ -12241,6 +12310,11 @@ window.__ModuleLoader__.load({
      * 能在 mock loader 下断言，而不是只 grep 源码字符串。 */
     const __testG89 = { RoleDetailDrawer, TaskFormDrawer, SettingsTab, DiagFix, RescopeDialog, ContributionsSection, contributionsBody }
 
-    return { apply, inject, __test, __testG4, __testG6, __testG89 }
+    /* 测试专用出口（t87-entry-nav）：入口 → 工作台的纯函数面。
+     * 生产路径不消费它——存在只为让「打开面板到底调了哪个宿主 API、交接了什么上下文」
+     * 能在 mock loader 下断言，而不是只 grep 源码字符串。 */
+    const __testEntry = { PANEL_KEY, entryNavForTeam, openWorkbench, takePendingNav, resolveNavForSession }
+
+    return { apply, inject, __test, __testG4, __testG6, __testG89, __testEntry }
   },
 })
