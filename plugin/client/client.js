@@ -5030,7 +5030,7 @@ window.__ModuleLoader__.load({
      */
     function BoardView({
       t,
-      tasks,
+      tasks: rawTasks,
       columns = PROJECT_COLUMNS,
       columnOf = projectColumnOf,
       memberName,
@@ -5043,6 +5043,9 @@ window.__ModuleLoader__.load({
       onAdd,
       drag,
     }) {
+      /* CHG-141（**判空**）：数据未到达时 `tasks` 是 `undefined`（load 中 / 离线团队 / 刚建团队），
+       * 旧实现直接 `tasks.filter(...)` → **整屏白**。入口归一成空数组，下游按空态渲染。 */
+      const tasks = Array.isArray(rawTasks) ? rawTasks : []
       const selectedSet = selected ?? new Set()
       const dragTask = drag?.task
       const draggedTask = drag?.dragged
@@ -5103,7 +5106,14 @@ window.__ModuleLoader__.load({
       ] })
     }
 
-    function LanesView({ t, tasks, members, onOpen }) {
+    function LanesView({ t, tasks: rawTasks, members, onOpen }) {
+      /*
+       * CHG-141（**判空**）：泳道/依赖视图在「看板数据未到达」时 `tasks` 是 `undefined`
+       * （`BoardView` 的 `rawTasks` 还在 load / 团队刚建好 / 离线团队），旧实现直接
+       * `tasks.filter(...)` → **整屏白**（这是用户报的「任务依赖视图渲染有问题」的根因）。
+       * 统一在入口归一成数组：下游全部按「空数组」渲染空态，不再崩。
+       */
+      const tasks = Array.isArray(rawTasks) ? rawTasks : []
       const stageStates = LANE_STAGES.map((name) => ({ name, states: PROJECT_COLUMNS.find((col) => col.name === name)?.states ?? [] }))
       const memberIds = new Set((members ?? []).map((member) => String(member.id ?? member.instanceName ?? '')))
       /** 在册实例 id —— 指派不到任何在册实例的任务 = 未认领（不丢任务、也不假造分配） */

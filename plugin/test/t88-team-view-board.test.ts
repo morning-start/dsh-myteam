@@ -161,6 +161,13 @@ test('t88-3: 会话视图源码 —— 三视图同源 + 只读详情抽屉 + ra
   assert.ok(source.includes('j(DagView, { t, tasks: board.rawTasks'), '依赖图复用 DagView')
   assert.ok(source.includes("t('g6.tasks.viewBoard')") && source.includes("t('g6.tasks.viewFlow')") && source.includes("t('g6.tasks.viewDag')"), '三视图切换条')
   assert.ok(source.includes('readOnly: true'), '任务详情在会话视图只读')
+  /*
+   * CHG-141（**判空回归锁**）：`rawTasks` 在数据未到达时是 `undefined`，
+   * 旧实现直接 `tasks.filter(...)` → 整屏白（用户报的「依赖视图渲染有问题」根因）。
+   * 两个视图（看板 / 泳道）都必须在入口归一成数组。
+   */
+  assert.ok(source.includes('const tasks = Array.isArray(rawTasks) ? rawTasks : []'), '看板/泳道必须判空 tasks（归一成数组）')
+  assert.equal(source.split('const tasks = Array.isArray(rawTasks) ? rawTasks : []').length - 1, 2, 'BoardView 与 LanesView 都必须判空')
   assert.ok(source.includes("onClose: () => setOpenTaskId(null)"), '详情抽屉可关闭')
   /* 只读挂载：不传 drag / onAdd */
   assert.ok(!source.includes('j(BoardView, { t, tasks: board.rawTasks, memberName: memberNameOf, teamName: () => team.name || team.teamId, onOpen: (task) => setOpenTaskId(String(task.id)), drag:'), '会话视图不得传拖拽')
