@@ -1245,6 +1245,11 @@ export class MyTeamHost {
             return this.roleError(e)
           }
         }
+        /* CHG-134（docs/20 §5.4）：技能 / 工具资产（只写 myteam 队长预设） */
+        case 'myteam_create_skill':
+          return this.createSkillTool(args)
+        case 'myteam_create_tool':
+          return this.createToolTool(args)
         /* CHG-133（docs/20 §8）：导出 / 导入团队快照（仅队长） */
         case 'myteam_export_team':
           return this.exportTeamTool(args)
@@ -2976,6 +2981,108 @@ export class MyTeamHost {
   }
 
   /* ── 团队模板管理（CHG-57）：内置只读、写项目层、两段确认；面板仍只读 ── */
+
+  /**
+   * CHG-134（docs/20 §5.4）：**创建技能**——全员可用（A 档），**只写 myteam 队长预设**。
+   *
+   * 隔离铁律（docs/20 §1 R2）：
+   *  - 只写 `$DSH_HOME/myteam/presets/myteam-captain/skills/<skillId>/SKILL.md`；
+   *  - **绝不写** `$DSH_HOME/skills/`（全局技能目录）、**绝不**污染其它预设；
+   *  - 同名已存在 → 拒绝（不覆盖；改技能请先删）。
+   */
+  createSkillTool(args                          = {})                          {
+    const skillId = String(args.skillId ?? '').trim()
+    if (!/^[a-z0-9][a-z0-9-]{1,63}$/.test(skillId)) {
+      return { status: 'error', code: 'MT_VALIDATION', field: 'skillId', message: 'skillId 必须是小写字母/数字/连字符（2~64 位）' }
+    }
+    const name = String(args.name ?? '').trim()
+    const description = String(args.description ?? '').trim()
+    if (!name || !description) {
+      return { status: 'error', code: 'MT_VALIDATION', field: name ? 'description' : 'name', message: 'name / description 都必填' }
+    }
+    const skillsRoot = globalStoreLayout().presetSkills(TEAM_AGENT_PRESET_ID)
+    const dir = join(skillsRoot, skillId)
+    if (existsSync(dir)) {
+      return { status: 'error', code: 'MT_ROLE_EXISTS', skillId, message: `技能「${skillId}」已存在于 myteam 队长预设（不覆盖；改技能请先删）` }
+    }
+    const tools = Array.isArray(args.tools) ? (args.tools             ).map((tool) => String(tool)).filter((tool) => tool.length > 0) : []
+    const mcp = Array.isArray(args.mcp) ? (args.mcp             ).map((item) => String(item)).filter((item) => item.length > 0) : []
+    const body = String(args.body ?? `# ${name}\n\n${description}\n`).trim()
+    const frontmatter = [
+      '---',
+      `name: ${skillId}`,
+      `description: ${JSON.stringify(description)}`,
+      'version: 1',
+      ...(tools.length > 0 ? [`tools: ${JSON.stringify(tools)}`] : []),
+      ...(mcp.length > 0 ? [`mcp: ${JSON.stringify(mcp)}`] : []),
+      '---',
+      '',
+      body,
+      '',
+    ].join('\n')
+    const filePath = join(dir, 'SKILL.md')
+    try {
+      mkdirSync(dir, { recursive: true })
+      writeFileSync(filePath, frontmatter, 'utf8')
+    } catch (error) {
+      return { status: 'error', code: 'MT_INTERNAL', skillId, message: String((error                     )?.message ?? error) }
+    }
+    return {
+      status: 'ok',
+      skillId,
+      name,
+      filePath,
+      presetId: TEAM_AGENT_PRESET_ID,
+      note: '已写入 myteam 队长预设（仅在装载该预设的会话可见；不污染其它预设）',
+    }
+  }
+
+  /**
+   * CHG-134（docs/20 §5.4）：**创建工具**——全员可用（A 档），**声明式**。
+   *
+   * 只声明「能力 + 参数契约」，**不执行第三方代码**（docs/16 安全边界）；
+   * 落点同样是 myteam 队长预设，不碰全局 `tools/`。
+   */
+  createToolTool(args                          = {})                          {
+    const toolId = String(args.toolId ?? '').trim()
+    if (!/^[a-z0-9][a-z0-9_]{1,63}$/.test(toolId)) {
+      return { status: 'error', code: 'MT_VALIDATION', field: 'toolId', message: 'toolId 必须是小写字母/数字/下划线（2~64 位）' }
+    }
+    const name = String(args.name ?? '').trim()
+    const description = String(args.description ?? '').trim()
+    if (!name || !description) {
+      return { status: 'error', code: 'MT_VALIDATION', field: name ? 'description' : 'name', message: 'name / description 都必填' }
+    }
+    const toolsRoot = join(globalStoreLayout().presets, TEAM_AGENT_PRESET_ID, 'tools')
+    const filePath = join(toolsRoot, `${toolId}.json`)
+    if (existsSync(filePath)) {
+      return { status: 'error', code: 'MT_ROLE_EXISTS', toolId, message: `工具「${toolId}」已存在于 myteam 队长预设（不覆盖）` }
+    }
+    const definition = {
+      version: 1,
+      toolId,
+      name,
+      description,
+      parameters: (args.parameters                                       ) ?? { type: 'object', properties: {} },
+      declarative: true,
+      note: '声明式工具：只声明能力与参数契约，不执行第三方代码',
+      createdAt: Date.now(),
+    }
+    try {
+      mkdirSync(toolsRoot, { recursive: true })
+      writeFileSync(filePath, `${JSON.stringify(definition, null, 2)}\n`, 'utf8')
+    } catch (error) {
+      return { status: 'error', code: 'MT_INTERNAL', toolId, message: String((error                     )?.message ?? error) }
+    }
+    return {
+      status: 'ok',
+      toolId,
+      name,
+      filePath,
+      presetId: TEAM_AGENT_PRESET_ID,
+      note: '已写入 myteam 队长预设（声明式；不执行第三方代码）',
+    }
+  }
 
   /**
    * CHG-133（docs/20 §8）：**导出团队快照**——仅队长（C 档只读）。

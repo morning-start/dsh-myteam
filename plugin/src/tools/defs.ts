@@ -526,6 +526,38 @@ export function leadToolDefs(): ToolDef[] {
     { name: 'myteam_resolve_proposal', description: '处置成员结构提案（FR-11.4）：approved/rejected。**批准即执行对应变更**（CHG-88）：split → 落子任务 + 原任务取消；add-dep → 加依赖；reassign → 改派；cancel → 取消。驳回只留痕、结构不动。载荷不合规会拒绝并说明，不会留下「已批准但什么都没做」的半截状态。', parameters: { type: 'object', properties: { teamId: teamId(), proposalId: str('提案 id', true), decision: { type: 'string', enum: ['approved', 'rejected'], description: '处置决定', required: true }, note: str('处置说明') } } },
     { name: 'myteam_adopt_knowledge', description: '采纳/驳回知识提案（FR-17.4 策展门）：adopted 落 config/knowledge/（带 evidence+contributor 归因）；rejected 只留痕。draftId 来自 knowledge.proposed 事件。', parameters: { type: 'object', properties: { teamId: teamId(), draftId: str('知识提案 id（knowledge.proposed 事件的 draftId）', true), decision: { type: 'string', enum: ['adopted', 'rejected'], description: '策展决定', required: true }, note: str('处置说明') } } },
     {
+      /* CHG-134（docs/20 §5.4）：创建技能（只写 myteam 队长预设）——**全员可用**（A 档，项目级封顶） */
+      name: 'myteam_create_skill',
+      description: '创建技能（全员可用，CHG-134 / docs/20 §5.4）：`{skillId, name, description, body?, tools?, mcp?}` → 写 `$DSH_HOME/myteam/presets/myteam-captain/skills/<skillId>/SKILL.md`（YAML frontmatter + 正文）。**隔离铁律**：只写 myteam 队长预设，**绝不写** `$DSH_HOME/skills/`、**绝不**污染其它预设；同名已存在 → `MT_ROLE_EXISTS`（不覆盖，改技能请删后重建）。绑定到角色用 `myteam_create_role` / `myteam_update_role` 的 `skills`。',
+      parameters: {
+        type: 'object',
+        properties: {
+          skillId: str('技能 id（小写字母/数字/连字符，2~64 位）', true),
+          name: str('技能名（展示用）', true),
+          description: str('一句话说明（何时该用）', true),
+          body: str('技能正文（Markdown；缺省自动生成骨架）'),
+          tools: arr({ type: 'string' }, '该技能需要的工具名（只声明，不扩权）'),
+          mcp: arr({ type: 'string' }, '该技能用到的 MCP 名'),
+        },
+        required: ['skillId', 'name', 'description'],
+      },
+    },
+    {
+      /* CHG-134（docs/20 §5.4）：创建工具（声明式，不执行第三方代码）——**全员可用**（A 档） */
+      name: 'myteam_create_tool',
+      description: '创建工具（全员可用，CHG-134 / docs/20 §5.4）：`{toolId, name, description, parameters?}` → 写 `$DSH_HOME/myteam/presets/myteam-captain/tools/<toolId>.json`（**声明式**：只声明能力与参数契约，**不执行第三方代码**）。隔离铁律同 `create_skill`：只写 myteam 队长预设，不碰全局 `tools/`、不污染其它预设；同名已存在 → `MT_ROLE_EXISTS`。',
+      parameters: {
+        type: 'object',
+        properties: {
+          toolId: str('工具 id（小写字母/数字/下划线，2~64 位）', true),
+          name: str('工具名（展示用）', true),
+          description: str('一句话说明（做什么、边界在哪）', true),
+          parameters: { type: 'object', description: 'JSON Schema 参数契约（只声明，不执行）' },
+        },
+        required: ['toolId', 'name', 'description'],
+      },
+    },
+    {
       /* CHG-133（docs/20 §8）：导出团队快照——**仅队长**（C 档只读） */
       name: 'myteam_export_team',
       description: '导出团队快照（队长专属，CHG-133 / docs/20 §8）：`{teamId, label?}` → 写 `history/exports/<teamId>-<ts>.json`（`{version, teamId, name, goal, roster, config?, eventCount, exportedAt}`）并返回 `{status, teamId, filePath, bytes, counts}`。**只读团队**：不写账本、不改任务；快照**不含**成员会话 id / 记忆 / token 明细（只留计数）。',
