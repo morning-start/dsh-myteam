@@ -137,3 +137,47 @@ test("t85-8: batch 批量调用——逐条返回、未知方法只坏一条、a
   assert.equal(empty.code, "MT_VALIDATION")
   assert.ok(clientApiMethods().includes("batch"), "客户端 makeApi 必须暴露 batch")
 })
+
+test('t85-9: watch 长轮询——新事件立刻返回 / 无事件超时空返回 / 非法参数拒绝（CHG-113）', async () => {
+  const { mkdtempSync, mkdirSync, writeFileSync: wf } = await import('node:fs')
+  const { tmpdir } = await import('node:os')
+  const { join } = await import('node:path')
+  const root = mkdtempSync(join(tmpdir(), 'mt85watch-'))
+  const ledgerDir = join(root, '.dsh-myteam', 'tasks', 't-watch')
+  mkdirSync(ledgerDir, { recursive: true })
+  const ledger = join(ledgerDir, 'ledger.jsonl')
+  wf(ledger, [
+    JSON.stringify({ seq: 1, ts: 1, type: 'team.created', payload: { teamId: 't-watch' } }),
+    JSON.stringify({ seq: 2, ts: 2, type: 'task.created', payload: { taskId: 'a' } }),
+    '',
+  ].join('\n'), 'utf8')
+
+  const facade = new MyTeamPanelFacade({ agents: { list: () => [] }, logger: { info() {}, warn() {} } })
+
+  // ① sinceSeq=0 → 立刻返回全部事件（changed:true）
+  const fresh = await facade.watch({ workspaceRoot: root, teamId: 't-watch', sinceSeq: 0, timeoutMs: 500 })
+  assert.equal(fresh.status, 'ok')
+  assert.equal(fresh.changed, true, '有新事件立刻返回')
+  assert.equal(fresh.events.length, 2, '两条事件都带回')
+  assert.ok(fresh.seq >= 2, 'seq 单调到最新')
+
+  // ② 追平后 → 挂到超时再返回 changed:false（空事件）
+  const idle = await facade.watch({ workspaceRoot: root, teamId: 't-watch', sinceSeq: fresh.seq, timeoutMs: 250 })
+  assert.equal(idle.status, 'ok')
+  assert.equal(idle.changed, false, '无新事件时超时空返回')
+  assert.deepEqual(idle.events, [], '不重复回旧事件')
+
+  // ③ 非法参数
+  const badSeq = await facade.watch({ workspaceRoot: root, teamId: 't-watch', sinceSeq: -1 })
+  assert.equal(badSeq.status, 'error')
+  assert.equal(badSeq.code, 'MT_VALIDATION')
+  const badTeam = await facade.watch({ workspaceRoot: root, teamId: '../etc' })
+  assert.equal(badTeam.status, 'error', '路径穿越拒绝')
+  const noRoot = await facade.watch({ teamId: 't-watch' })
+  assert.equal(noRoot.status, 'error', '缺 workspaceRoot 拒绝')
+
+  // ④ 客户端必须暴露 watch，且 watch 是根级方法（可进 batch）
+  assert.ok(clientApiMethods().includes('watch'), '客户端 makeApi 必须暴露 watch')
+  const batched = await facade.batch({ calls: [{ kind: 'watch', args: { workspaceRoot: root, teamId: 't-watch', sinceSeq: 2, timeoutMs: 200 } }] })
+  assert.equal(batched.results[0].ok, true, 'watch 可进 batch（根级方法）')
+})

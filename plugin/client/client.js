@@ -2811,6 +2811,8 @@ window.__ModuleLoader__.load({
         describe: (query) => rpcCall(connection, 'myteam/describe', { query }),
         /* CHG-112：批量调用——首屏多次往返 → 一次；逐条返回 {ok,value|error} */
         batch: (query) => rpcCall(connection, 'myteam/batch', { query }),
+        /* CHG-113：长轮询追平——sinceSeq 后有新事件立刻返回，否则最多挂 timeoutMs */
+        watch: (query) => rpcCall(connection, 'myteam/watch', { query }),
         /* CHG-102：项目级存储状态 / 初始化（根级端点，只收 query）。
          * CHG-104 教训：面板门面加了方法、客户端的 api 表没加 → `discoveryApi.getStoreState` 是
          * undefined → 调用即 TypeError → catch 里 setStoreState(null) → 面板永远停在「加载中」。
