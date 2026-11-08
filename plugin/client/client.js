@@ -1089,8 +1089,12 @@ window.__ModuleLoader__.load({
       'roster.summonCardHint': '从角色库挑一个，拉进来就能领任务；同名角色召唤多次自动编号',
       'roster.menu.label': '对 {name} 做什么',
       'roster.menu.steer': '指导一下',
-      'roster.menu.steerHint': '在团队模式会话里指导实例（面板不另开写路径）。',
-      'roster.menu.steerNotice': '面板不另开写路径：请回到团队模式会话 —— 用 myteam_message（kind=steer）发指导，或用 myteam_interrupt 打断当前轮。',
+      'roster.menu.steerHint': '给这个实例发一条指导：记入账本并立即送达它的会话。',
+      'roster.menu.steerPlaceholder': '写清要它怎么调整（会记入账本并立即送达）',
+      'roster.menu.steerSend': '发送指导',
+      'roster.menu.steerCancel': '取消',
+      'roster.menu.steerSent': '已指导 {name}',
+      'roster.menu.steerUndelivered': '已记账，但 {name} 的会话不在线（未送达）—— 它重连后能读到这条指导',
       'roster.menu.suspend': '暂停领取新任务',
       'roster.menu.archive': '归档（排空后）',
       'roster.menu.remove': '移除实例',
@@ -2317,8 +2321,12 @@ window.__ModuleLoader__.load({
       'roster.summonCardHint': 'Pick a role from the library and it can claim tasks right away; summoning the same role twice auto-numbers it',
       'roster.menu.label': 'What to do with {name}',
       'roster.menu.steer': 'Steer it',
-      'roster.menu.steerHint': 'Steer the instance from the team-mode session (the panel opens no extra write path).',
-      'roster.menu.steerNotice': 'The panel opens no extra write path: go back to the team-mode session — send guidance with myteam_message (kind=steer), or interrupt the current turn with myteam_interrupt.',
+      'roster.menu.steerHint': 'Send this instance one piece of guidance: it is recorded in the ledger and delivered to its session immediately.',
+      'roster.menu.steerPlaceholder': 'Say what to adjust (recorded in the ledger, delivered immediately)',
+      'roster.menu.steerSend': 'Send guidance',
+      'roster.menu.steerCancel': 'Cancel',
+      'roster.menu.steerSent': 'Steered {name}',
+      'roster.menu.steerUndelivered': 'Recorded, but {name} is offline (not delivered) — it will be readable after reconnecting',
       'roster.menu.suspend': 'Stop claiming new tasks',
       'roster.menu.archive': 'Archive (after draining)',
       'roster.menu.remove': 'Remove instance',
@@ -4122,6 +4130,13 @@ window.__ModuleLoader__.load({
       '.mt-kbd{margin-left:auto;font-size:10px;line-height:15px;color:var(--dsw-alias-label-tertiary);border:.5px solid var(--dsw-alias-border-l2);border-radius:4px;padding:0 4px}',
       '.mt-menu-sep{height:1px;margin:3px 2px;background:var(--dsw-alias-border-l2)}',
       '.mt-menu-note{margin-top:3px;padding:4px 8px 2px;font-size:11px;line-height:1.5;color:var(--dsw-alias-label-tertiary);border-top:.5px solid var(--dsw-alias-border-l2)}',
+      /* A10（CHG-163）：成员菜单内联的「指导」输入框与未送达警示。
+       * 只用 --dsw-alias-* token（无硬编码颜色）；警示走 warning 色，和成功提示（.mt-notice 绿）区分开。 */
+      '.mt-menu-steer{display:flex;flex-direction:column;gap:6px;margin-top:2px;padding:6px 4px 2px;border-top:.5px solid var(--dsw-alias-border-l2)}',
+      '.mt-menu-steer textarea{width:100%;box-sizing:border-box;min-height:54px;resize:vertical;font:inherit;font-size:12px;line-height:1.5;color:var(--dsw-alias-label-primary);background:var(--dsw-alias-bg-base);border:.5px solid var(--dsw-alias-border-l2);border-radius:6px;padding:4px 6px}',
+      '.mt-menu-steer textarea:disabled{opacity:.55}',
+      '.mt-menu-steer-actions{display:flex;gap:6px;justify-content:flex-end}',
+      '.mt-menu-steer-alert{padding:4px 6px;font-size:11px;line-height:1.5;color:var(--dsw-alias-label-primary);border:.5px solid var(--dsw-alias-state-warning-primary);border-left-width:3px;border-radius:6px;background:color-mix(in srgb, var(--dsw-alias-state-warning-primary) 12%, transparent)}',
       /* CHG-82 G2：角色详情（design/role-detail.html 的 .detail-grid + .sec + .abl-row + 侧列） */
       '.mt-roledetail{width:min(680px,100%)}',
       '.mt-roledetail-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:10px;align-items:start}',
@@ -4832,6 +4847,14 @@ window.__ModuleLoader__.load({
     function MemberCard({ t, roleId, role, members, tasks, tokens, teamName, taskTitle, readOnly, api, teamId, onOpen, onChanged, onError, onNotice }) {
       const [menuFor, setMenuFor] = react.useState(null)
       const [busy, setBusy] = react.useState(false)
+      /* A10（CHG-163）：「指导」输入框的局部状态——面板里唯一「给成员发消息」的写入口。
+       * 为什么不复用 `busy`：指导是长文本输入 + 独立的发送中态，和四档管理动作的忙碌态混用会让
+       * 输入框在别的操作进行时被禁用（用户正在打字却突然不能输入）。 */
+      const [steerOpen, setSteerOpen] = react.useState(false)
+      const [steerDraft, setSteerDraft] = react.useState('')
+      const [steerBusy, setSteerBusy] = react.useState(false)
+      /** 未送达警示文案（`delivered:false`）：与成功 notice 走**不同**的视觉（warning 边框） */
+      const [steerWarn, setSteerWarn] = react.useState(null)
       const list = members ?? []
       const roleName = role?.name ?? roleLabel(roleId)
       const words = role?.interestWords ?? []
@@ -4866,6 +4889,63 @@ window.__ModuleLoader__.load({
           setBusy(false)
         }
       }
+      /**
+       * 展开/收起实例菜单。收起时顺手清掉指导输入框状态——否则下次打开会带着上一轮的草稿/警示，
+       * 看起来像是「刚刚又失败了」。
+       */
+      const toggleMenu = (id) => {
+        setSteerOpen(false)
+        setSteerDraft('')
+        setSteerWarn(null)
+        setMenuFor(menuFor === id ? null : id)
+      }
+      /**
+       * 指导（FR-14.2，A10 / CHG-163）：真的写——`memberOp(op:'steer')` 由 host 落
+       * `message.sent(kind=steer)` 并立即 followup 投递。
+       *
+       * 两条口径（不要合并成「成功」一种）：
+       *  - `status:'steered' && delivered:true` → 成功 notice；
+       *  - `status:'steered' && delivered:false` → **警示**：账本已记、成员会话不在线（未送达）。
+       *    把「记下来了」显示成「送到了」就是假成功（项目纪律）。
+       * 成员正在跑任务时带 `taskId`（host 也会兜底补），它才知道指导的是哪一单。
+       */
+      const sendSteer = async (member) => {
+        if (readOnly || steerBusy || !api) return
+        const content = String(steerDraft ?? '').trim()
+        if (!content) return
+        setSteerBusy(true)
+        setSteerWarn(null)
+        try {
+          const r = await api.memberOp({
+            teamId,
+            memberId: member.id,
+            op: 'steer',
+            content,
+            ...(member.currentTaskId ? { taskId: member.currentTaskId } : {}),
+          })
+          if (r?.status === 'error' || r?.status === 'drain-pending') {
+            onError?.(r.message ?? r.note ?? 'steer failed')
+            return
+          }
+          setSteerDraft('')
+          if (r?.status === 'steered' && r.delivered === false) {
+            // 账本落了但会话不在线：留在菜单里用警示样式说清，不关窗、不报成功
+            setSteerWarn(t('roster.menu.steerUndelivered').replace('{name}', String(member.instanceName ?? member.id)))
+            await onChanged?.()
+            return
+          }
+          setSteerWarn(null)
+          setSteerOpen(false)
+          setMenuFor(null)
+          onError?.(null)
+          onNotice?.(t('roster.menu.steerSent').replace('{name}', String(member.instanceName ?? member.id)))
+          await onChanged?.()
+        } catch (e) {
+          onError?.(String(e?.message ?? e))
+        } finally {
+          setSteerBusy(false)
+        }
+      }
       const statusChip = gate
         ? j('span', { className: 'mt-chip mt-chip-gate', children: [j('span', { className: 'mt-shape mt-shape-gate', 'aria-hidden': true }), t('roster.gate')] })
         : running
@@ -4890,14 +4970,42 @@ window.__ModuleLoader__.load({
         })
         return js('div', { className: 'mt-menupop mt-member-actions', role: 'menu', children: [
           j('div', { className: 'mt-menu-label', children: t('roster.menu.label').replace('{name}', member.instanceName) }),
-          /* 引导 / 接管：宿主 memberOp 只认 suspend|archive|remove|restore，没有 steer 写路径；
-           * 语义上等价的是队长会话里的 myteam_message(kind=steer) / myteam_interrupt。
-           * 面板不新造写路径（I2 账本唯一权威），点击给出可直接照做的说明。 */
-          item('steer', 'roster.menu.steer', '→', {
+          /* 引导 / 接管（FR-14.2，A10 / CHG-163）：**真的写**——点开输入框，发送走
+           * `memberOp(op:'steer')`（host 落 message.sent 并立即投递）。
+           * 只读团队（离线）没有写路径 → 隐藏入口：留一个「点了必然失败」的按钮就是欺骗（R34 / UI-1）。 */
+          readOnly ? null : item('steer', 'roster.menu.steer', '→', {
             title: t('roster.menu.steerHint'),
             kbd: 'steer',
-            onAct: () => { setMenuFor(null); onNotice?.(t('roster.menu.steerNotice')) },
+            disabled: member.status === 'removed' || member.status === 'archived',
+            onAct: () => { setSteerWarn(null); setSteerDraft(''); setSteerOpen(true) },
           }),
+          /* 指导输入框：内联在菜单里（不弹窗——指导是「顺手补一句」，弹窗会打断看板上下文） */
+          steerOpen ? js('div', { className: 'mt-menu-steer', children: [
+            j('textarea', {
+              'aria-label': t('roster.menu.steerPlaceholder'),
+              placeholder: t('roster.menu.steerPlaceholder'),
+              value: steerDraft,
+              disabled: steerBusy,
+              onChange: (event) => { setSteerDraft(event.target.value); setSteerWarn(null) },
+            }),
+            js('div', { className: 'mt-menu-steer-actions', children: [
+              j('button', {
+                className: 'mt-btn mt-btn-sm',
+                disabled: steerBusy,
+                onClick: () => { setSteerOpen(false); setSteerDraft(''); setSteerWarn(null) },
+                children: t('roster.menu.steerCancel'),
+              }),
+              j('button', {
+                className: 'mt-btn mt-btn-primary mt-btn-sm',
+                // 空内容不发送（后端也会 MT_VALIDATION，前端先拦一道）
+                disabled: steerBusy || String(steerDraft ?? '').trim().length === 0,
+                onClick: () => sendSteer(member),
+                children: steerBusy ? t('state.loading') : t('roster.menu.steerSend'),
+              }),
+            ] }),
+            /* 未送达：警示样式（warning 边框），不是成功提示 */
+            steerWarn ? j('div', { className: 'mt-menu-steer-alert', role: 'alert', children: steerWarn }) : null,
+          ] }) : null,
           item('suspend', 'roster.menu.suspend', '‖', { disabled: member.status !== 'active' }),
           j('div', { className: 'mt-menu-sep', 'aria-hidden': true }),
           item('archive', 'roster.menu.archive', '▤', { disabled: !['active', 'suspended'].includes(member.status) }),
@@ -4942,7 +5050,7 @@ window.__ModuleLoader__.load({
               className: 'mt-inst-menu-btn',
               'aria-expanded': menuFor === row.member.id,
               'aria-label': t('roster.menu.label').replace('{name}', row.member.instanceName),
-              onClick: () => setMenuFor(menuFor === row.member.id ? null : row.member.id),
+              onClick: () => toggleMenu(row.member.id),
               children: '⋯',
             }),
           ] })),
@@ -10802,6 +10910,41 @@ window.__ModuleLoader__.load({
       const dark = useDarkTheme()
       const themeAttr = { 'data-theme': dark ? 'dark' : 'light' }
       const discoveryApi = react.useMemo(() => makeApi(connection), [connection])
+      /* ── CHG-164（报告 A3）：能力协商（describe）——治「两端方法表漂移」──
+       * 为什么需要：客户端 `makeApi` 是**手写**方法表，服务端门面是另一份。任一漏写就是运行时
+       * `undefined`（CHG-104 整屏卡「加载中」）。describe 返回服务端**真实**方法表：缺方法时
+       * 按「不支持」降级（隐藏/置灰入口 + 提示重启宿主），而不是等调用时炸。
+       * 纪律：describe 拿不到（旧宿主 / 网络错）→ `methods:null` = **未知**，退回 `typeof` 探测
+       * （保守：不因为协商失败就禁用全部功能）。 */
+      const [capabilities, setCapabilities] = react.useState(null)
+      const capabilitiesRef = useRefSafe(null)
+      capabilitiesRef.current = capabilities
+      /* 批量是否可用：describe 明说没有 → false；调用报 MT_UNKNOWN_METHOD → 一次降级并记住
+       * （旧宿主上不该每次首屏都白试一次往返）。 */
+      const batchAllowedRef = useRefSafe(true)
+      react.useEffect(() => {
+        let alive = true
+        const describeFn = discoveryApi?.describe
+        if (typeof describeFn !== 'function') {
+          setCapabilities({ methods: null, version: 0, complete: false })
+          return undefined
+        }
+        Promise.resolve(describeFn({}))
+          .then((r) => {
+            if (!alive) return
+            const methods = Array.isArray(r?.methods) ? r.methods.map((method) => String(method)) : null
+            setCapabilities({ methods: methods ? new Set(methods) : null, version: Number(r?.version) || 0, complete: r?.complete !== false })
+            if (methods && !methods.includes('batch')) batchAllowedRef.current = false
+          })
+          .catch(() => { if (alive) setCapabilities({ methods: null, version: 0, complete: false }) })
+        return () => { alive = false }
+      }, [discoveryApi])
+      /** 端点是否被**服务端**支持：describe 拿到就按它判，否则退回 `typeof`（未知 = 不禁用） */
+      const hasEndpoint = react.useCallback((name) => {
+        const caps = capabilitiesRef.current
+        if (caps && caps.methods) return caps.methods.has(name)
+        return typeof discoveryApi?.[name] === 'function'
+      }, [discoveryApi])
       /* CHG-114：入口交接（每次挂载只消费一次）——从团队视图进来时直接落在项目作用域的团队页，
        * 侧栏入口没有交接（pendingNav=null）→ 仍按 CHG-42 的默认落在全局库。 */
       const entryNavRef = react.useRef(null)
@@ -10938,10 +11081,44 @@ window.__ModuleLoader__.load({
       const projectRootRef = useRefSafe(projectRoot)
       projectRootRef.current = projectRoot
       const loadProject = react.useCallback(async (root) => {
-        if (!root) { setProject(null); return }
+        if (!root) { setProject(null); setStoreState(undefined); return }
         const seq = ++loadSeqRef.current
         /** 过期响应：被更新的请求顶掉，或调用方的 root 已不是当前项目 */
         const stale = () => seq !== loadSeqRef.current || root !== projectRootRef.current
+        /* CHG-164（报告 A3）：**首屏一次往返**——把 getProject + getStoreState 打成一个 batch。
+         * 为什么值得：CHG-112 建了 batch 端点（「首屏 3 次往返 → 1 次」），但客户端**零消费**，
+         * 首屏仍是两次**串行** RPC（getStoreState 要等 getProject 回来才发），白等一个 RTT。
+         * 降级纪律（两层，缺一不可）：
+         *  ① describe 明说服务端没有 batch → 直接走两次调用，不白试；
+         *  ② 试了回 `MT_UNKNOWN_METHOD`/异常（旧宿主）→ 记住失败，本会话后续走两次调用。
+         * 无论哪条路，**结果语义与两次调用完全一致**（包括 getStoreState 失败 = 未知，
+         * 绝不阻塞面板）。 */
+        if (batchAllowedRef.current && hasEndpoint('batch') && hasEndpoint('getProject')) {
+          try {
+            const r = await discoveryApi.batch({
+              calls: [
+                { kind: 'getProject', args: { workspaceRoot: root } },
+                ...(hasEndpoint('getStoreState') ? [{ kind: 'getStoreState', args: { workspaceRoot: root } }] : []),
+              ],
+            })
+            if (stale()) return
+            const results = Array.isArray(r?.results) ? r.results : []
+            const first = results[0]
+            /* 只有「整批跑通且第一条成功」才认；否则落到下面的单次调用（不猜半截状态） */
+            if (r?.status === 'ok' && first?.ok === true) {
+              const p = first.value
+              if (p?.status === 'ok') { setProject(p); setError(null) } else setError(p?.message ?? t('error.unreadable'))
+              const s = results[1]?.ok === true ? results[1].value : undefined
+              setStoreState(s?.status === 'ok' ? s : undefined)
+              return
+            }
+            // 服务端不认 batch（旧宿主）→ 本会话永久降级，别每次首屏都白试
+            batchAllowedRef.current = false
+          } catch {
+            if (stale()) return
+            batchAllowedRef.current = false
+          }
+        }
         try {
           const p = await discoveryApi.getProject({ workspaceRoot: root })
           if (stale()) return
@@ -10951,7 +11128,12 @@ window.__ModuleLoader__.load({
           if (stale()) return
           setError(String(e?.message ?? e))
         }
-      }, [discoveryApi, t])
+        /* 降级路径：存储状态与项目**并行**发（不串行等），失败一律未知（不阻塞面板） */
+        if (!hasEndpoint('getStoreState')) { setStoreState(undefined); return }
+        discoveryApi.getStoreState({ workspaceRoot: root })
+          .then((r) => { if (!stale()) setStoreState(r?.status === 'ok' ? r : undefined) })
+          .catch(() => { if (!stale()) setStoreState(undefined) })
+      }, [discoveryApi, hasEndpoint, t])
 
       react.useEffect(() => { loadTeams() }, [loadTeams])
       // 项目候选：优先有团队的工作区；一个团队都没有时退回当前 GUI 的工作区列表（新项目也能建队/建角色）
@@ -10973,17 +11155,9 @@ window.__ModuleLoader__.load({
       react.useEffect(() => { loadProject(projectRoot) }, [projectRoot, loadProject])
       /* CHG-102 / CHG-104：项目存储状态。
        * 纪律：**读取失败绝不阻塞面板**——失败/方法缺失/加载中一律视为「未知」(undefined)，
-       * 照常渲染面板；只有明确拿到 `initialized:false` 才显示引导横幅（不替换整屏）。 */
-      react.useEffect(() => {
-        if (!projectRoot) { setStoreState(undefined); return undefined }
-        // 宿主 lib 可能是旧版本（门面方法未注册）→ 不能调用，否则 TypeError 会让面板卡死
-        if (typeof discoveryApi.getStoreState !== 'function') { setStoreState(undefined); return undefined }
-        let alive = true
-        discoveryApi.getStoreState({ workspaceRoot: projectRoot })
-          .then((r) => { if (alive) setStoreState(r?.status === 'ok' ? r : undefined) })
-          .catch(() => { if (alive) setStoreState(undefined) })
-        return () => { alive = false }
-      }, [projectRoot, discoveryApi])
+       * 照常渲染面板；只有明确拿到 `initialized:false` 才显示引导横幅（不替换整屏）。
+       * CHG-164：取数已并入 `loadProject`（首屏 batch / 降级并行），这里**不再单独发一次**——
+       * 两次都要拉同一份数据 = 首屏多一次往返，正是本项要治的病。 */
       /** 空态里的「初始化」：只建目录与元文件（幂等，不建团队不写账本） */
       const initStore = async () => {
         if (!projectRoot) return

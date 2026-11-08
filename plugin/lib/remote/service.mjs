@@ -329,10 +329,25 @@ export class MyTeamRemote extends TypertRemoteService {
     return r
   }
 
-  /** 成员管理（FR-14.2，CHG-48）：suspend/archive/remove/restore；remove 两段确认 */
-  async memberOp(args                                                                                                            ) {
+  /**
+   * 成员管理（FR-14.2，CHG-48）：suspend/archive/remove/restore；remove 两段确认。
+   *
+   * A10（CHG-163）：`steer`（指导）档需要 `content` / `taskId`——这里只是**透传**，不校验
+   * （校验在 host 的 `memberOp` 一处；门面改写载荷会让「面板发的」与「账本记的」分叉）。
+   */
+  async memberOp(args   
+                   
+                    
+                                                              
+                     
+                    
+                   
+   ) {
     const { teamId } = this.resolveTeam(args?.teamId)
-    return this.host.memberOp(teamId, String(args.memberId), String(args.op), args.confirm === true)
+    return this.host.memberOp(teamId, String(args.memberId), String(args.op), args.confirm === true, {
+      content: args.content,
+      taskId: args.taskId,
+    })
   }
 
   /** 人留言进任务 thread（actor=human，FR-12.2；CHG-16 裁决 4） */

@@ -78,6 +78,11 @@ export const TOOL_TIERS                           = {
   myteam_interrupt: 'C',
   myteam_message: 'C',
   myteam_resolve_proposal: 'C',
+  /* CHG-163（docs/10 KI-9）：知识提案入口——**写面归 C**的理由：它落的是团队账本事件
+   * （`knowledge.proposed` 进队长队列），不是只读自助；成员侧的同语义入口是
+   * `myteam_update_task` 的 `knowledgeDraft`（A 档，但只能提自己任务上的证据）。
+   * 队长侧收 C = 只有队长能起草 onboarding 初始条目，成员不能替团队立「团队级理解」。 */
+  myteam_propose_knowledge: 'C',
   myteam_adopt_knowledge: 'C',
   myteam_list_contributions: 'C',
   myteam_reload_contributions: 'C',

@@ -58,16 +58,21 @@ test('t85-2: 客户端 api 表不得发明服务端没有的方法（反向漂�
 })
 
 test('t85-3: 存储状态读取失败 → 降级为「未知」，不得变成永久加载', () => {
-  // 防御：旧宿主 lib 没注册方法时不能调用
+  /* CHG-164（报告 A3）：取数已并入 `loadProject`（首屏 batch + 降级并行），不再有独立的
+   * `useEffect(() => … getStoreState …)`。**不变量不变**：方法缺失/调用失败都必须短路成
+   * `undefined`（未知 = 照常渲染），不能是 `null`（= 永久「加载中」）。
+   * 断言从「按字面量切片」改为「按不变量」：先定位 `loadProject` 里的存储状态分支。 */
   assert.match(
     clientSource,
-    /typeof discoveryApi\.getStoreState !== 'function'[\s\S]{0,120}?setStoreState\(undefined\)/,
+    /!hasEndpoint\('getStoreState'\)\) \{ setStoreState\(undefined\); return \}/,
     '缺方法时必须短路为 undefined（未知），否则调 undefined 会 throw 并卡死面板',
   )
   // 失败兜底必须是 undefined（未知 = 照常渲染），不是 null（null = 永久加载中）
-  const effect = clientSource.slice(clientSource.indexOf('typeof discoveryApi.getStoreState'), clientSource.indexOf('}, [projectRoot, discoveryApi])'))
+  const start = clientSource.indexOf("if (!hasEndpoint('getStoreState'))")
+  assert.ok(start > 0, '找不到存储状态降级分支')
+  const effect = clientSource.slice(start, start + 600)
   assert.ok(effect.includes('.catch('), '必须有 catch 兜底')
-  assert.match(effect, /catch\(\(\) => \{ if \(alive\) setStoreState\(undefined\) \}\)/, 'catch 必须降级为 undefined')
+  assert.match(effect, /catch\(\(\) => \{ if \(!stale\(\)\) setStoreState\(undefined\) \}\)/, 'catch 必须降级为 undefined')
   assert.ok(!effect.includes('setStoreState(null)'), '不得再把失败写成 null（null 会渲染成永久「加载中」）')
 })
 

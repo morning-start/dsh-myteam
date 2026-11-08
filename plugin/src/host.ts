@@ -32,6 +32,11 @@ import { leadToolDefs, memberToolDefs, type ToolDef } from './tools/defs.ts'
 import { outputForTool } from './core/tools/output-contract.ts'
 import { wakeDecisionsFor, changeSince, type WakeDecision } from './core/scheduler/wake.ts'
 import { validatePlan, TERMINAL_STATES, downstreamOf, GATE_REJECT_BUDGET, type TaskProjection } from './core/scheduler/state.ts'
+/* A9（报告 KI-5 / CHG-163 冷启动重连）：只读折叠口径。
+ * 为什么不用 `this.service(teamId).projectionSnapshot`：`service()` 构造 TeamService 时会
+ * `bootstrapTeam` 落 `rules.version.adopted`——重连就成了**写账本**，违反「重连不改账本」不变量。
+ * `readOfflineTeam` + `foldTolerant` 只读文件、坏行/坏事件各自跳过，正好是重连需要的容错面。 */
+import { foldTolerant, isSafeTeamId, readOfflineTeam } from './core/index/offline-view.ts'
 // CHG-159（报告 A6）：领取前的写范围闸门（纯函数；与 scope-audit/waves 同一套路径语义）
 import { claimScopeVerdict } from './core/scheduler/waves.ts'
 import { diffTaskInput, structuralFieldsOf } from './core/tasks/diff.ts'
@@ -736,6 +741,27 @@ export class MyTeamHost {
     this.configOverride = config.configOverride ?? safeRead(rt, 'configOverride')
     // T24（CHG-45）：索引缺失时全量重建（冷启动/首次使用），保证面板全局视图先有离线数据
     this.ensureTeamIndex()
+    /* A9（报告 KI-5，CHG-163）：冷启动重连——把重启前既有活跃成员的 AgentHandle 捡回来。
+     *
+     * 为什么放在 constructor（而不是 initialize / recoverOnBoot 之前）：`memberHandles` 的三个
+     * 消费点全都「谁先跑谁说了算」——`syncTokens` 拿不到 handle 就把成员记 `no-session`（少算 token）、
+     * `wakeDecisionsFor` 投不出 followup（唤醒静默失效）、`recoverOnBoot` 判 `memberLive=false`
+     * 会把**活着的**成员正在跑的任务转 blocked。constructor 是它们共同的前置点（`ensureTeamIndex`
+     * 之后，索引已就绪；`initialize()` 里的启动对账/工具注册都在它之后）。
+     *
+     * 纪律同 `ensureTeamIndex`：**失败只 warn，绝不阻断启动**——宿主没有 `agents` 服务时插件也必须起得来。 */
+    try {
+      const reconnected = this.reconnectMembers()
+      if (reconnected.reconnected > 0 || reconnected.missing > 0) {
+        this.log(
+          'info',
+          `member reconnect on boot: ${reconnected.reconnected} session(s) restored, ${reconnected.missing} missing` +
+            (reconnected.skipped.length > 0 ? ` (skipped: ${reconnected.skipped.join('; ')})` : ''),
+        )
+      }
+    } catch (e) {
+      this.log('warn', `member reconnect on boot failed (startup continues): ${String(e)}`)
+    }
   }
 
   /**
@@ -1064,6 +1090,28 @@ export class MyTeamHost {
     }
   }
 
+  /**
+   * A10（FR-14.2 指导档，CHG-163）：成员消息投递的**唯一**构造点。
+   *
+   * 为什么收敛成一个方法：`myteam_message`（队长工具）与面板 `memberOp(op:'steer')` 是同一个语义
+   * （给成员发一条消息并立刻投递）。两处各写一份「文案 + 消息形状」必然漂移，而
+   * `followupMessage` 的 `{role,id,content,source}` 形状是 FIX-16 的实弹结论——不要在这里另造格式。
+   *
+   * 边界：返回**是否真的投递出去**。没有 handle（成员会话不在线）或 followup 抛错都返回 `false`，
+   * 调用方必须如实回报 `delivered:false`——**账本落了 ≠ 送到了**（项目纪律：不假装成功）。
+   */
+  private deliverMemberMessage(memberId: string, kind: string, content: string): boolean {
+    const agent = this.agentOf(this.memberHandles.get(memberId))
+    if (!agent?.followup) return false
+    try {
+      agent.followup(this.followupMessage(`[myteam] 队长消息（${kind}）：${content}`))
+      return true
+    } catch (e) {
+      this.log('warn', `message delivery to ${memberId} failed: ${String(e)}`)
+      return false
+    }
+  }
+
   private afterCommit(teamId: string, event: { seq: number; type: string; payload: Record<string, unknown> }): void {
     this.refreshTeamIndex(teamId)
     const wakes = wakeDecisionsFor(event) as WakeDecision[]
@@ -1289,12 +1337,45 @@ export class MyTeamHost {
           if (!r1.ok) return { status: 'error', code: r1.code, message: r1.message }
           const r2 = this.commit(teamId, { actor, type: 'plan.staged', payload: { teamId, planId: `plan-${Date.now()}`, roster, tasks: args.tasks, ...(preset ? { presetId: preset.definition.id } : {}) } })
           if (!r2.ok) return { status: 'error', code: r2.code, message: r2.message }
+          /*
+           * CHG-163（docs/10 KI-9 / FR-17.4 沉淀时机①）：**onboarding 采集钩子**。
+           *
+           * 为什么放在返回里而不是「顺手写一条知识」：知识库是**策展制**（成员无写入口、
+           * 队长也只能提案，采纳是人的动作）。规划轮能做的只有「提醒队长去采集」，
+           * 替用户拍板等于把策展制偷偷改成自动记忆（TF ADR-0009 反例）。
+           *
+           * 触发条件（两条同时满足才提示，否则每次提计划都唠叨）：
+           *  ① 知识库**一条条目都没有**（config/knowledge/ 为空）——已有沉淀说明采集过了；
+           *  ② 本团队账本里**没有** `knowledge.proposed`——有人提过（哪怕还没采纳）就不再催。
+           * 口径选「账本事件数」而不是「条目数」，是因为提案被驳回后条目仍为空：
+           * 只看条目会反复催同一个已被否决的提案（R27 的唠叨反模式）。
+           *
+           * 非阻塞：多读一次知识库目录 + 一次团队账本（成团时账本只有个位数事件）；
+           * 读不到就静默不提示——提示是附加信息，不是契约，绝不因它让 submit_plan 失败。
+           */
+          let knowledgeHint: string | undefined
+          try {
+            const kbEmpty = listKnowledge(knowledgeDirOf(this.workspaceRoot)).length === 0
+            const proposedBefore = readLedgerEvents(resolveTeamLedgerPath(this.workspaceRoot, teamId)).events
+              .some((e) => e.type === 'knowledge.proposed')
+            if (kbEmpty && !proposedBefore) {
+              knowledgeHint =
+                'onboarding 采集（FR-17.4 沉淀时机①）：本团队知识库还是空的。规划轮请先做一次采集——' +
+                '采什么：团队目标、领域约束、用户明确说过的边界与偏好（「既非项目自带、也非协作状态」的团队级理解）；' +
+                '怎么采：逐条起草后用 myteam_propose_knowledge 提案，**每条必须带证据**（task:/file:/session:/seq: 指针）；' +
+                '谁定夺：只提案不入库，用户确认后由队长 myteam_adopt_knowledge 采纳才写进 config/knowledge/。' +
+                '**不要凭印象编造条目**——没有证据就不提。'
+            }
+          } catch {
+            /* 读知识库/账本失败不阻断提交（提示是附加信息，不是契约） */
+          }
           return {
             status: 'staged',
             teamId,
             roster,
             ...(preset ? { presetId: preset.definition.id, presetName: preset.definition.name } : {}),
             ...(presetConfig && configApplied ? { configApplied } : {}),
+            ...(knowledgeHint ? { knowledgeHint } : {}),
             note:
               '草稿已暂存（无成员会话产生）；等待人工 Approve & Run / Revise / Discard' +
               (preset
@@ -1490,11 +1571,12 @@ export class MyTeamHost {
         }
         case 'myteam_message': {
           const to = String(args.to)
-          const r = this.commit(teamId, { actor, type: 'message.sent', payload: { teamId, messageId: `msg-${Date.now()}`, from: 'lead', to, taskId: args.taskId, kind: args.kind ?? 'notify', content: args.content } })
+          const kind = String(args.kind ?? 'notify')
+          const r = this.commit(teamId, { actor, type: 'message.sent', payload: { teamId, messageId: `msg-${Date.now()}`, from: 'lead', to, taskId: args.taskId, kind, content: args.content } })
           if (!r.ok) return { status: 'error', code: r.code, message: r.message }
-          if (to !== 'inbox') {
-            this.agentOf(this.memberHandles.get(to))?.followup?.(this.followupMessage(`[myteam] 队长消息（${String(args.kind ?? 'notify')}）：${String(args.content)}`))
-          }
+          // A10：投递口径收敛到 `deliverMemberMessage`（与面板 `memberOp(op:'steer')` 同一份构造）。
+          // 投不进去不抛：消息已落账，收件人下次上线读账本仍能拿到；抛错只会把「已记账」变成「失败」。
+          if (to !== 'inbox') this.deliverMemberMessage(to, kind, String(args.content))
           return { status: 'sent' }
         }
         case 'myteam_interrupt': {
@@ -1599,6 +1681,110 @@ export class MyTeamHost {
           return r.ok
             ? { status: 'adopted', entryPath: written.filePath, note: '知识条目已入库（config/knowledge/，带 evidence+contributor 归因）；成员索引下轮 spawn/重启生效' }
             : { status: 'error', code: r.code, message: r.message }
+        }
+        case 'myteam_propose_knowledge': {
+          /*
+           * CHG-163（docs/10 KI-9 / FR-17.4 沉淀时机①）：**队长侧提案入口**。
+           *
+           * 为什么需要它：知识库的写入口一直只有成员 `myteam_update_task` 的 knowledgeDraft
+           * （任务验收后提案）。「onboarding 采集」是规划轮的动作——那时还没有任何任务，
+           * 成员侧这条路物理上走不通，所以队长侧必须有独立的提案入口。
+           *
+           * 三条纪律（越界即破坏策展制）：
+           *  ① **只提案不写库**：只落 `knowledge.proposed`，绝不写 config/knowledge/——
+           *     入库必须随后 `myteam_adopt_knowledge` 采纳（TF ADR-0009 先例）。
+           *  ② **证据先行**（E8）：无证据直接拒绝且**账本零写入**（不消耗 seq）。
+           *  ③ 草案形状与成员侧完全同构（`KnowledgeDraft` + 同一 payload 形状），
+           *     否则队长审阅队列会出现两种草案，面板与采纳管线要分叉。
+           */
+
+          // ① 证据归一化：`{kind, ref}` → 账本里的 `kind:ref` 指针字符串。
+          //    kind 限定已知四类（这是**入参**不是历史账本，没有兼容包袱：未知类型放行只会
+          //    让「证据」变成自由文本，E8 就形同虚设）。
+          const evidenceIn = Array.isArray(args.evidence) ? (args.evidence as Array<Record<string, unknown>>) : []
+          const pointers: string[] = []
+          for (const item of evidenceIn) {
+            const kind = String(item?.kind ?? '').trim().toLowerCase()
+            const ref = String(item?.ref ?? '').trim()
+            if (!['task', 'file', 'session', 'seq'].includes(kind)) {
+              return {
+                status: 'error',
+                code: 'MT_KB_INVALID',
+                message: `evidence.kind 必须是 task|file|session|seq，实际 "${kind}"（证据指针是有类型的，不是自由文本）`,
+              }
+            }
+            if (ref.length === 0) {
+              return { status: 'error', code: 'MT_KB_EVIDENCE_REQUIRED', message: `证据指针 "${kind}:" 后缺少内容（ref 为空 = 没有证据）` }
+            }
+            pointers.push(`${kind}:${ref}`)
+          }
+          // ② 证据纪律（E8）：空数组 = 没证据 = 拒绝。必须在任何 commit 之前——
+          //    「先落账再校验」会给账本留下一条空证提案（成员侧分支的历史坑，此处不重演）。
+          if (pointers.length === 0) {
+            return {
+              status: 'error',
+              code: 'MT_KB_EVIDENCE_REQUIRED',
+              message: '知识提案必须带证据指针（task:<id> / file:<path> / session:<id> / seq:<n>）；没有证据就不要提（E8）',
+            }
+          }
+          // ③ 草案 id 由标题派生：KnowledgeDraft.id 受 ID_RE 约束（小写/数字/连字符），
+          //    中文标题派生不出合法 id → 哈希兜底（确定性，同一标题重复提案落在同一 id，
+          //    便于采纳时判重）。
+          const title = String(args.title ?? '').trim()
+          const slug = title.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 48)
+          const draftId = /^[a-z0-9][a-z0-9-]{1,63}$/.test(slug)
+            ? slug
+            : `kb-${createHash('sha1').update(title).digest('hex').slice(0, 8)}`
+          const relationIn = args.relation === undefined ? 'new' : String(args.relation)
+          const draft: KnowledgeDraft = {
+            id: draftId,
+            title,
+            body: String(args.body ?? ''),
+            tags: Array.isArray(args.tags) ? (args.tags as unknown[]).map(String).filter((t) => t.length > 0) : [],
+            // 条目证据是**单指针**（KnowledgeEntry.evidence 是数组，但 adoptDraft 只取一条）：
+            // 多条证据时取第一条，其余靠 relation:'refine' 逐条巩固（v2.7 演化式修订口径）。
+            evidence: pointers[0]!,
+            relation: relationIn as KnowledgeDraft['relation'],
+            ...(typeof args.targetId === 'string' && args.targetId.trim().length > 0 ? { targetId: args.targetId.trim() } : {}),
+          }
+          const check = validateDraft(draft)
+          if (!check.ok) return { status: 'error', code: check.code, message: check.message }
+          // ④ refine/contradict 的目标必须是**显式给的既有条目**。
+          //    为什么不能靠 validateDraft 兜：它允许 `targetId ?? draft.id` 的回落，
+          //    而本工具的 draft.id 是**新派生**的（slug/哈希），回落等于「指向一个刚编出来的 id」——
+          //    到采纳那一刻才炸（MT_KB_TARGET_MISMATCH），提案却白占了队长队列。
+          if (draft.relation === 'refine' || draft.relation === 'contradict') {
+            if (!draft.targetId) {
+              return {
+                status: 'error',
+                code: 'MT_KB_TARGET_REQUIRED',
+                message: `${draft.relation} 提案必须给 targetId（要精炼/矛盾的既有条目 id；新条目请用 relation:"new"）`,
+              }
+            }
+            if (!readKnowledgeEntry(knowledgeDirOf(this.workspaceRoot), draft.targetId)) {
+              return {
+                status: 'error',
+                code: 'MT_KB_NOT_FOUND',
+                message: `${draft.relation} 提案的目标条目 "${draft.targetId}" 不在知识库；先提 new 提案并采纳，或改用正确的 targetId`,
+              }
+            }
+          }
+          // ⑤ 落账（形状与成员侧 knowledgeDraft 分支一致：teamId/draftId/draft/proposedBy）
+          const proposed = this.commit(teamId, {
+            actor,
+            type: 'knowledge.proposed',
+            payload: { teamId, draftId, draft, proposedBy: actor },
+          })
+          return proposed.ok
+            ? {
+                status: 'proposed',
+                draftId,
+                relation: draft.relation ?? 'new',
+                ...(draft.targetId ? { targetId: draft.targetId } : {}),
+                evidence: pointers,
+                note: '提案已进队长队列（**未入库**）；用户确认后 myteam_adopt_knowledge({ draftId, decision:"adopted" }) 才写进 config/knowledge/',
+              }
+            : { status: 'error', code: proposed.code, message: proposed.message }
         }
         case 'myteam_participate_task': {
           const role = args.role === 'lead' ? 'lead' : 'coop'
@@ -3738,11 +3924,66 @@ export class MyTeamHost {
    * T27（CHG-48）：成员管理统一入口（面板 FR-14.2）——suspend/archive/remove/restore。
    * 写路径与 Lead 工具同管线（member.released / member.archived / member.restored），
    * actor 标注 human（面板操作），破坏性 remove 两段确认；restore 仅允许挂起/归档态。
+   *
+   * A10（CHG-163）：补 `steer`（指导）档——此前 UI 有「指导」、写路径没有（docs/14 §6.5 ③），
+   * 点了只会弹一句说明。语义 = 给成员发一条 `kind:'steer'` 消息并**立刻投递**：
+   *  ① 落 `message.sent`（`actor:'human'` / `from:'human'`——面板操作是人发起的）；
+   *  ② 投递复用 `deliverMemberMessage`（与 `myteam_message` 同一份 followup 构造，不另造格式）；
+   *  ③ **账本与送达分开如实回报**：没有 handle（成员会话不在线）→ 账本照落、返回 `delivered:false`
+   *     + `reason`。把「记下来了」说成「送到了」就是假成功（项目纪律）。
+   *
+   * 边界：
+   *  - `content` 空 → `MT_VALIDATION`（field=content）；
+   *  - 成员不存在 → `MT_VALIDATION`；
+   *  - `removed` / `archived` 是终态 → 拒绝并说清状态（往已移除的成员会话投消息没有收件人，
+   *    静默成功会变成一条永远读不到的假账）；
+   *  - 成员正在跑任务（`currentTaskId`）时自动带上 `taskId`——成员要能对上「指导的是哪一单」。
    */
-  memberOp(teamId: string, memberId: string, op: string, confirm: boolean): Record<string, unknown> {
+  memberOp(teamId: string, memberId: string, op: string, confirm: boolean, extra: { content?: unknown; taskId?: unknown } = {}): Record<string, unknown> {
     const member = this.service(teamId).projectionSnapshot.members[memberId]
     if (!member) return { status: 'error', code: 'MT_VALIDATION', message: `member "${memberId}" not found` }
     switch (op) {
+      case 'steer': {
+        const content = typeof extra.content === 'string' ? extra.content.trim() : ''
+        if (content.length === 0) {
+          return { status: 'error', code: 'MT_VALIDATION', field: 'content', message: 'steer requires non-empty content' }
+        }
+        if (member.status === 'removed' || member.status === 'archived') {
+          return {
+            status: 'error',
+            code: 'MT_VALIDATION',
+            message: `member "${memberId}" is ${member.status}; a ${member.status} member has no live session to steer (restore it first if that was unintended)`,
+          }
+        }
+        // 显式 taskId 优先；没给就看成员是否在跑任务（自动带上，成员才知道指导的是哪一单）
+        const explicitTaskId = typeof extra.taskId === 'string' ? extra.taskId.trim() : ''
+        const taskId = explicitTaskId.length > 0 ? explicitTaskId : member.currentTaskId
+        const r = this.commit(teamId, {
+          actor: 'human',
+          type: 'message.sent',
+          payload: {
+            teamId,
+            messageId: `msg-${Date.now()}-${randomUUID().slice(0, 8)}`,
+            from: 'human',
+            to: memberId,
+            content,
+            kind: 'steer',
+            ...(taskId ? { taskId } : {}),
+          },
+        })
+        if (!r.ok) return { status: 'error', code: r.code, message: r.message }
+        const delivered = this.deliverMemberMessage(memberId, 'steer', content)
+        return {
+          status: 'steered',
+          memberId,
+          delivered,
+          // 未送达必须点名原因（客户端据此显示警示文案，而不是成功提示）
+          ...(delivered
+            ? {}
+            : { reason: 'member session is offline (no live handle); the steer message is recorded in the ledger and stays readable after reconnect' }),
+          ...(taskId ? { taskId } : {}),
+        }
+      }
       case 'suspend':
       case 'archive':
       case 'remove': {
@@ -3758,7 +3999,7 @@ export class MyTeamHost {
         return r.ok ? { status: 'restored', memberId } : { status: 'error', code: r.code, message: r.message }
       }
       default:
-        return { status: 'error', code: 'MT_VALIDATION', message: `unsupported member op "${op}" (suspend|archive|remove|restore)` }
+        return { status: 'error', code: 'MT_VALIDATION', message: `unsupported member op "${op}" (suspend|archive|remove|restore|steer)` }
     }
   }
 
@@ -5715,6 +5956,110 @@ export class MyTeamHost {
     writeFileSync(filePath, `${JSON.stringify(file, null, 2)}\n`, 'utf8')
     this.tokensFiles.set(teamId, file)
     return file
+  }
+
+  /**
+   * A9（CHG-163）：**只读**成员会话快照（memberId 列表）——`memberHandles` 是内存态、不落盘，
+   * 测试与面板诊断需要一个「此刻哪些成员会话在线」的事实面。返回新数组：调用方改它不影响运行时。
+   *
+   * 为什么加 getter 而不是让测试摸私有字段：`memberHandles` 的键集合是「重连是否生效」的判据，
+   * 用公开只读面表达，测试与真实代码读的是同一份事实（`as any` 摸私有字段会悄悄绕过封装）。
+   */
+  memberHandleIds(): string[] {
+    return [...this.memberHandles.keys()]
+  }
+
+  /**
+   * A9（报告 KI-5，CHG-163）：**冷启动重连**——进程重启后把既有活跃成员的 `AgentHandle` 捡回来。
+   *
+   * 为什么必须有它：`memberHandles` 是**纯内存**（`dispose()` 里 `clear()`），重启即空。而它是
+   * 「成员会话还活着」的唯一判据，三个消费点都吃它：
+   *  - `syncTokens`：拿不到 handle → 该成员记 `no-session`（token 少算，覆盖率读数失真）；
+   *  - `wakeDecisionsFor` / `dispatchSweep`：投不出 followup → 唤醒**静默失效**（账本记了唤醒、成员没收到）；
+   *  - `recoverOnBoot`：`memberLive=false` → 在跑任务被转 `to-blocked`（**活着的**成员被当成死的）。
+   * CHG-135（成员卡落盘）+ CHG-142（启动对账）只覆盖 provisioning 半边，**既有活跃成员的重连无收口**。
+   *
+   * 三条硬不变量（重连是**纯内存重建**）：
+   *  ① **不改账本**——只用 `readOfflineTeam` + `foldTolerant` 只读折叠。**刻意不用** `this.service()`：
+   *     构造 `TeamService` 会 `bootstrapTeam` 落 `rules.version.adopted`，重连就变成写操作；
+   *  ② **不建会话**——只做 `agents.get(sessionId)` 的官方 lookup（`probeProvisionedSession` 同源口径），
+   *     `agents.create` 是 spawn 的事，重连不负责造成员；
+   *  ③ **不发消息**——重连只回答「谁还活着」，不 followup（判断活着 ≠ 该被叫醒）。
+   *
+   * 语义变化（`memberLive`）：从「**本进程**建过的」变成「本进程建过**或重连回来的**」。
+   * 因此 `recoveryAction` 里 `memberLive=false` 的含义收窄为「本进程 + 账本都证明不了它活着」——
+   * 这正是崩溃恢复想要的（真死的成员仍然走 `to-blocked`，不会因为重连被误判成活）。
+   *
+   * 边界（都不抛）：
+   *  - 宿主没有 `agents.get`（单测 mock / 旧宿主）→ 整轮进 `skipped`，**绝不抛**（插件不能因为
+   *    宿主少一个 API 就起不来）；
+   *  - `agents.get` 抛错 / 返回空 → 该成员进 `missing`（不猜、不伪造 handle），其它成员照常重连；
+   *  - 只重连 `active` / `suspended` 且账本里有 `sessionId` 的成员：`removed` / `archived` 是终态
+   *    （唤醒它们等于让死人干活），`spawn_failed` 没有会话可重连；
+   *  - 本进程已有 handle 的成员不覆盖（幂等；`spawnMember` 拿到的 handle 更权威）。
+   */
+  reconnectMembers(): { reconnected: number; missing: number; skipped: string[] } {
+    const summary: { reconnected: number; missing: number; skipped: string[] } = { reconnected: 0, missing: 0, skipped: [] }
+    const agents = this.rt.agents as { get?: (sessionId: string) => unknown } | undefined
+    if (!agents || typeof agents.get !== 'function') {
+      // 没有官方 lookup 口子就没有「重连」这件事：留痕（skipped）而不是静默报 0——
+      // 「没重连」与「重连了 0 个」是两回事，混起来会让启动日志骗人
+      summary.skipped.push('agents.get unavailable (host has no session lookup)')
+      return summary
+    }
+    const teamsDir = storeLayout(this.workspaceRoot).tasks
+    let teamIds: string[] = []
+    try {
+      if (!existsSync(teamsDir)) return summary
+      teamIds = readdirSync(teamsDir).filter((name) => existsSync(join(teamsDir, name, 'ledger.jsonl')))
+    } catch (e) {
+      summary.skipped.push(`teams dir unreadable: ${String(e)}`)
+      this.log('warn', `member reconnect skipped (teams dir unreadable): ${String(e)}`)
+      return summary
+    }
+    for (const teamId of teamIds) {
+      // 路径安全：目录名来自磁盘（用户手建 / 大小写变体 / 脏数据），只认白名单口径
+      if (!isSafeTeamId(teamId)) {
+        summary.skipped.push(`${teamId}: unsafe team id`)
+        continue
+      }
+      let projection: ReturnType<typeof foldTolerant>['proj']
+      try {
+        const read = readOfflineTeam(this.workspaceRoot, teamId)
+        if (!read) {
+          summary.skipped.push(`${teamId}: ledger path rejected`)
+          continue
+        }
+        projection = foldTolerant(teamId, read.events).proj
+      } catch (e) {
+        summary.skipped.push(`${teamId}: ${String((e as Error | undefined)?.message ?? e)}`)
+        this.log('warn', `member reconnect skipped for team ${teamId}: ${String(e)}`)
+        continue
+      }
+      for (const member of Object.values(projection.members)) {
+        // 终态不重连：removed / archived 不该再被唤醒，spawn_failed 没有会话
+        if (member.status !== 'active' && member.status !== 'suspended') continue
+        const sessionId = typeof member.sessionId === 'string' ? member.sessionId : ''
+        if (sessionId.length === 0) continue
+        if (this.memberHandles.has(member.id)) continue
+        let handle: unknown
+        try {
+          handle = agents.get(sessionId)
+        } catch (e) {
+          summary.missing += 1
+          this.log('warn', `member reconnect lookup failed for ${teamId}/${member.id} (session ${sessionId}): ${String(e)}`)
+          continue
+        }
+        if (!handle) {
+          summary.missing += 1
+          this.log('warn', `member reconnect: session ${sessionId} for ${teamId}/${member.id} not found in host (handle missing)`)
+          continue
+        }
+        this.memberHandles.set(member.id, handle)
+        summary.reconnected += 1
+      }
+    }
+    return summary
   }
 
   /** 冷启动恢复（T16）：对滞留 in_progress 任务按恢复表落事件 */

@@ -2,7 +2,7 @@
  * D5 接口域：myteam_* 工具定义（T7 收口，v2.5）。
  *
  * 两层注册（ADR-003）：
- *   - Lead 工具（53 个）：preset 层 → 仅队长会话可见；
+ *   - Lead 工具（54 个）：preset 层 → 仅队长会话可见；
  *   - 成员工具（9 个）：成员 setup 作用域 → 仅成员会话可见。
  *   （CHG-158：此数字此前写死为「22 个」，长期没随工具增长回改。现在以 `leadToolDefs()`
  *   的实际条数为准：加工具时必须同步改这一行——`t127-7` 的全仓扫描门禁只校验**名字**能不能
@@ -538,6 +538,43 @@ export function leadToolDefs(): ToolDef[] {
     { name: 'myteam_disband', description: '解散团队（两段确认+影响面）：全量排空→归档（名册+任务+tokens 快照，FR-14.1 影响面提示的数据源）。', parameters: { type: 'object', properties: { teamId: teamId(), confirm: bool('二段确认必须为 true', true) } } },
     { name: 'myteam_resolve_proposal', description: '处置成员结构提案（FR-11.4）：approved/rejected。**批准即执行对应变更**（CHG-88）：split → 落子任务 + 原任务取消；add-dep → 加依赖；reassign → 改派；cancel → 取消。驳回只留痕、结构不动。载荷不合规会拒绝并说明，不会留下「已批准但什么都没做」的半截状态。', parameters: { type: 'object', properties: { teamId: teamId(), proposalId: str('提案 id', true), decision: { type: 'string', enum: ['approved', 'rejected'], description: '处置决定', required: true }, note: str('处置说明') } } },
     { name: 'myteam_adopt_knowledge', description: '采纳/驳回知识提案（FR-17.4 策展门）：adopted 落 config/knowledge/（带 evidence+contributor 归因）；rejected 只留痕。draftId 来自 knowledge.proposed 事件。', parameters: { type: 'object', properties: { teamId: teamId(), draftId: str('知识提案 id（knowledge.proposed 事件的 draftId）', true), decision: { type: 'string', enum: ['adopted', 'rejected'], description: '策展决定', required: true }, note: str('处置说明') } } },
+    {
+      /* CHG-163（docs/10 KI-9 / FR-17.4）：**onboarding 采集的队长侧入口**。
+       * 为什么必须有：沉淀时机是「①onboarding 采集（规划轮队长起草初始条目）+ ②任务验收后提案」，
+       * 但 ② 由成员 `myteam_update_task` 的 knowledgeDraft 走、① 此前**物理上不存在**——
+       * 队长侧没有任何工具能发 `knowledge.proposed`。现在补上提案入口，采纳仍归 `myteam_adopt_knowledge`。
+       * 边界（三条，都是「不许越界」）：
+       *  ① **只提案不写库**：本工具落 `knowledge.proposed` 一条账本事件，**绝不**写 config/knowledge/——
+       *     入库必须随后由用户/队长 `myteam_adopt_knowledge` 采纳（策展制，TF ADR-0009 先例）。
+       *  ② **证据必填**（E8）：没证据就不提（`MT_KB_EVIDENCE_REQUIRED`），不留「先写后补」的口子。
+       *  ③ 草案形状照 `core/knowledge/knowledge.ts` 的 `KnowledgeDraft`（id 由 title 派生，免猜）。 */
+      name: 'myteam_propose_knowledge',
+      description: '起草知识库条目提案（onboarding 采集，CHG-163 / FR-17.4）：**只提案不写库**——落 `knowledge.proposed` 账本事件，入库必须随后 `myteam_adopt_knowledge` 采纳（策展制，绝不自动记忆）。采集口径：团队目标 / 领域约束 / 用户明确说过的边界与偏好；**不要凭印象编造条目**，没有证据就不提。`evidence` 至少一条（`task:<id>` / `file:<path>` / `session:<id>` / `seq:<n>`）；多条时取第一条作为条目证据指针（v2.7 多条证据经 `relation:"refine"` 逐条巩固）。`relation:"refine"|"contradict"` 必须给 `targetId`（既有条目）。',
+      parameters: {
+        type: 'object',
+        properties: {
+          teamId: str('团队 id（缺省取默认团队）'),
+          title: str('条目标题（一句话断言，不是主题词）', true),
+          body: str('条目正文（Markdown；写清结论 + 为什么 + 边界，别只写标题的复述）', true),
+          tags: arr({ type: 'string' }, '主题标签（用于 staleness 触达与提案候选匹配）'),
+          evidence: arr(
+            {
+              type: 'object',
+              properties: {
+                kind: { type: 'string', enum: ['task', 'file', 'session', 'seq'], description: '指针类型' },
+                ref: str('指针内容（任务 id / 文件路径 / 会话 id / 账本序号）', true),
+                excerpt: str('证据摘录（可选；账本只存指针，摘录请写进 body）'),
+              },
+              required: ['kind', 'ref'],
+            },
+            '证据指针数组（**至少一条**；无证据 → 拒绝，E8）',
+          ),
+          relation: { type: 'string', enum: ['new', 'refine', 'contradict'], description: '与既有条目的关系（缺省 new；refine=精炼 / contradict=矛盾待复核，二者必须给 targetId）' },
+          targetId: str('refine/contradict 的目标条目 id（必须已存在于知识库）'),
+        },
+        required: ['title', 'body'],
+      },
+    },
     {
       /* CHG-134（docs/20 §5.4）：创建技能（只写 myteam 队长预设）——**全员可用**（A 档，项目级封顶） */
       name: 'myteam_create_skill',

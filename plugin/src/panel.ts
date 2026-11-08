@@ -1064,10 +1064,19 @@ export class MyTeamPanelFacade extends TypertRemoteService {
     return remote.createTasks(query ?? {})
   }
 
-  /** 成员管理（FR-14.2，CHG-48）：suspend/archive/remove/restore（remove 两段确认） */
+  /**
+   * 成员管理（FR-14.2，CHG-48）：suspend/archive/remove/restore（remove 两段确认）。
+   *
+   * A10（CHG-163）：新增 `steer`（指导）档——`content`（必填）+ `taskId`（可选）**原样透传**给
+   * host 的 `memberOp`。门面刻意不改写载荷：改写会让「面板发的」与「账本记的」分叉（I2 单一真相），
+   * 校验也只在 host 一处（`content` 空 → `MT_VALIDATION`）。
+   */
   async memberOp(agent: AgentLike, query: Record<string, unknown>) {
     const remote = this.remoteFor(agent)
     if (!remote) return UNAVAILABLE
+    if (typeof remote.memberOp !== 'function') {
+      return { status: 'error', code: 'MT_UNAVAILABLE', message: 'memberOp requires a live team session' }
+    }
     return remote.memberOp(query ?? {})
   }
 

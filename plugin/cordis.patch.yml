@@ -74,6 +74,8 @@
                 你的职责边界（FR-10.1）：
                 1. 任务安排：把用户目标拆解为满足 AC 的任务集（requiredRole 必须在名册内、每任务 AC≥1 可检验），
                    用 myteam_submit_plan 提交草稿——草稿阶段绝不产生成员会话，等人工 Approve & Run。
+                   规划轮先做一次 onboarding 采集（团队目标 / 领域约束 / 用户明确说过的边界与偏好），
+                   用 myteam_propose_knowledge 逐条带证据提案，用户确认后 myteam_adopt_knowledge 才入库。
                 2. 结构整理：维护 docs/ 与 .team-workplace/ 的落位约定（structure.md）；叶子任务必须带 deliverableSpec。
                 3. 过程检查与调度：分派走原子 claim/attempt 机制；escalate 提醒出现时按 rescope > split > abort 次序裁决；
                    每任务 escalate 计数 >2 时建议用户人工介入。

@@ -1,14 +1,14 @@
 /**
  * P1-6（docs/21 §6）：**工具输出契约**——`jsonOutput` 双声明。
  *
- * 为什么必须有：62 个工具的 `output.schema` 此前只有 `{ status: string }` —— 结果契约只声明了
+ * 为什么必须有：63 个工具的 `output.schema` 此前只有 `{ status: string }` —— 结果契约只声明了
  * 一个字段，宿主的 `createSuccessResult → validateJsonSchemaValue` 等于什么都没校验，
  * 面板与模型也都不知道「这个工具能拿到什么」。
  *
  * 官方范式（`tool/lib/index.js:211-219`）是**双声明**：
  *   ① `output.schema` = 完整结果契约（成功字段与失败字段在同一个 schema 里）；
  *   ② `render` 只负责把值压成**紧凑 JSON**（不丢字段、不加装饰、不 pretty-print）。
- * 本模块是这两件事的唯一来源，`defs.ts` 的 62 个工具全部经它声明。
+ * 本模块是这两件事的唯一来源，`defs.ts` 的 63 个工具全部经它声明。
  *
  * 三条纪律（都是「为什么这么写」而不是「怎么写」）：
  *
@@ -17,7 +17,7 @@
  *
  *  ② **不改工具行为**：`properties` 只做**开放声明**（不加 `additionalProperties: false`），
  *     既有 `execute` 返回值原样通过宿主校验。本批只补声明、不动返回形状——
- *     62 个工具的真实返回里有 `field` / `currentRevision` / `attemptId` 等按路径才出现的字段，
+ *     63 个工具的真实返回里有 `field` / `currentRevision` / `attemptId` 等按路径才出现的字段，
  *     写死 `additionalProperties` 会让今天能用的工具明天报 `ToolOutputError`。
  *
  *  ③ **失败不抛**：`assertToolResult` 返回结构化结果（`{ok:false, code:'MT_TOOL_CONTRACT'}`）。
@@ -103,6 +103,8 @@ export const RESULT_STATUSES: readonly string[] = [
   'set',
   'spawned',
   'staged',
+  /* CHG-165（T133 并行分支）：`myteam_message` 的 steer 语义结果（消息已投递并转向成员当前轮）。 */
+  'steered',
   'timeout',
   'unavailable',
   'updated',
@@ -126,7 +128,7 @@ const RESULT_PROPERTIES: Record<string, JsonSchemaSpec> = {
 }
 
 /**
- * 统一结果契约：62 个工具**共同**的那部分。
+ * 统一结果契约：63 个工具**共同**的那部分。
  *
  * `required` 只有 `status`：它是唯一「所有工具、所有分支都一定给」的字段。
  * 其余字段按工具就地补（`TOOL_OUTPUT_FIELDS`），没补的也不代表拿不到——
@@ -187,6 +189,17 @@ export const TOOL_OUTPUT_FIELDS: Record<string, JsonSchemaSpec> = {
         type: 'object',
         description: '知识条目（id/title/tags/unverified/staleSince/proofCount/body）；stale 时 body 带待复核前缀',
       },
+    },
+  },
+  /* CHG-163（docs/10 KI-9）：队长侧**提案入口**的结果面——只回提案凭据，不回条目
+   * （条目要等 `myteam_adopt_knowledge` 采纳后才存在于 config/knowledge/，宣称有就是假的）。 */
+  myteam_propose_knowledge: {
+    properties: {
+      draftId: { type: 'string', description: '提案 id（knowledge.proposed 事件的 draftId；`myteam_adopt_knowledge` 用它采纳）' },
+      relation: { type: 'string', description: '与既有条目的关系声明（new/refine/contradict）' },
+      targetId: { type: 'string', description: 'refine/contradict 的目标条目 id（new 关系时缺省）' },
+      evidence: { type: 'array', items: { type: 'string' }, description: '归一化后的证据指针（kind:ref）；条目证据取第一条' },
+      note: { type: 'string', description: '下一步提示（未入库；等队长/用户采纳）' },
     },
   },
   /* ── Lead 工具：只读面 ───────────────────────────────────── */
@@ -347,10 +360,10 @@ export interface ToolContractEntry {
 }
 
 /**
- * 62 个工具的契约清单（**按名字排序**，与 `TOOL_TIERS` 同源）。
+ * 63 个工具的契约清单（**按名字排序**，与 `TOOL_TIERS` 同源）。
  *
  * 为什么从 `TOOL_TIERS` 派生而不是再写一份名单：档位表已经是「工具有哪些」的单一事实源
- * （t107 双向锁死），再抄一份 62 行名单必然漂移。数量/去重由 t121 断言。
+ * （t107 双向锁死），再抄一份 63 行名单必然漂移。数量/去重由 t121 断言。
  */
 export function describeContract(): ToolContractEntry[] {
   return Object.keys(TOOL_TIERS)

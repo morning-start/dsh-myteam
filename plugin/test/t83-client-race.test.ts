@@ -33,10 +33,14 @@ function sliceBetween(from: string, to: string): string {
   return source.slice(start, end)
 }
 
+/* CHG-164（报告 A3）：`loadProject` 的依赖数组多了 `hasEndpoint`（首屏 batch 的能力协商），
+ * 终点锚点不能再写死成 `[discoveryApi, t]`——按「`loadProject` 的收尾」定位，比依赖数组更稳。 */
+const LOAD_PROJECT_END = '}, [discoveryApi, hasEndpoint, t])'
+
 test('t76r-1: C3 · loadProject 有请求序号（useRef 而非 useState，不额外渲染）', () => {
   assert.ok(source.includes('const loadSeqRef = useRefSafe(0)'), '序号用 ref 承载（useState 会多一轮渲染）')
   assert.ok(!/loadSeqRef\s*=\s*react\.useState/.test(source), 'loadSeq 不得用 useState')
-  const body = sliceBetween('const loadProject = react.useCallback', '}, [discoveryApi, t])')
+  const body = sliceBetween('const loadProject = react.useCallback', LOAD_PROJECT_END)
   assert.ok(body.includes('const seq = ++loadSeqRef.current'), '发请求前自增并快照序号')
   assert.ok(
     body.indexOf('const seq = ++loadSeqRef.current') < body.indexOf('getProject('),
@@ -45,7 +49,7 @@ test('t76r-1: C3 · loadProject 有请求序号（useRef 而非 useState，不�
 })
 
 test('t76r-2: C3 · 落库前双守卫（序号 + root 未变），且守卫在 setProject 之前', () => {
-  const body = sliceBetween('const loadProject = react.useCallback', '}, [discoveryApi, t])')
+  const body = sliceBetween('const loadProject = react.useCallback', LOAD_PROJECT_END)
   assert.ok(body.includes('seq !== loadSeqRef.current'), '序号守卫：旧响应被新请求顶掉')
   assert.ok(body.includes('root !== projectRootRef.current'), 'root 守卫：切项目时旧 root 的响应必须丢弃')
   assert.ok(body.includes('const stale = () =>'), '守卫收敛成一个 stale() 判据（两处调用同一口径）')
