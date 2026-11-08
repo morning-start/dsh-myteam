@@ -56,11 +56,35 @@ import { validateEvidencePointer } from './knowledge/evidence-pointer.mjs'
                                                                              
                                                                           
 
+/**
+ * P0-3（docs/21 §6，来源官方 `types/journal.js:29-58`）：提交后通知 —— 把「durable 才算成功、
+ * durable 才唤醒」从**隐式代码顺序**升级成**显式契约**。
+ *
+ * 为什么必须是 `commit()` 的参数而不是让调用方在返回后自己通知：
+ *   - 只有 `commit()` 知道 `appendEvent`（含 fsync 屏障）**真的成功了**。在它外面通知，
+ *     「先通知、后发现没落盘」这类顺序错误没有任何东西能抓到——测试跑绿、崩溃后账本少一条；
+ *   - 校验失败 / 乐观锁冲突 / revision 跳号时**绝不能**通知：否则下游会收到一条**从未发生**
+ *     的事件（唤醒一个不存在的变更）；
+ *   - 回调抛错**不能**回滚：事件已经 fsync 进账本，把内存投影回滚等于让两者不一致，
+ *     调用方重试还会追加一条重复事件。所以只告警、结果仍是 `{ok:true}`。
+ */
+                                
+                                                     
+                                            
+ 
+
+/** 告警出口（缺省 `console.warn`；测试可注入以断言「确实告警了」） */
+                                    
+                             
+ 
+
                                      
                        
                 
                            
                           
+                                               
+                            
  
 
 export class TeamService {
@@ -136,12 +160,16 @@ export class TeamService {
   }
 
   /**
-   * 唯一写入口：校验（事件结构 + 领域规则）→ 单事件增量应用 → 账本 append（CHG-59）。
+   * 唯一写入口：校验（事件结构 + 领域规则）→ 单事件增量应用 → 版本连续性自证 → 账本 append（CHG-59）→ 提交通知（P0-3）。
    * 顺序刻意是「先算后写」：折返失败（非法转移等重放防线）时不落账本、不动内存投影，
    * 账本因此永远只含可重放的历史（旧实现在 append 后全量 fold，失败会留下不可重放的脏事件）。
    * 领域校验失败 = 账本不落任何事件（拒绝式）。
+   *
+   * 五段边界（每一段都在下一段开始前完成，任何一段失败都不污染后一段）：
+   *   ① 乐观锁 → ② 领域校验 → ③ 副本 apply + revision 连续性断言（P0-2）→ ④ 账本 append（fsync）→ ⑤ 切投影 + 通知（P0-3）
+   * ③ 之前失败 = 什么都没发生；④ 失败 = 内存投影仍是旧值（磁盘也没变）；⑤ 之后失败只可能来自通知回调，不影响已 durable 的事件。
    */
-  commit(draft             )               {
+  commit(draft             , opts                )               {
     // 0. 乐观锁（CHG-87 / QA-4）：先比版本再碰任何状态——冲突必须「什么都没发生」
     const revisionError = this.checkExpectedRevision(draft.expectedRevision)
     if (revisionError) return revisionError
@@ -150,21 +178,91 @@ export class TeamService {
     const domainCheck = this.checkDomain(draft)
     if (!domainCheck.ok) return domainCheck
 
-    // 2. 结构校验 → 在副本上增量应用（失败即弃）→ 落账 → 切换投影
+    // 2. 结构校验 → 在副本上增量应用（失败即弃，内存投影与账本都不动）
+    let event             
+    let nextProjection                
     try {
-      const event = validateEvent({ actor: draft.actor, type: draft.type, payload: draft.payload }, this.nextSeq)
-      const nextProjection = structuredClone(this.projection)
+      event = validateEvent({ actor: draft.actor, type: draft.type, payload: draft.payload }, this.nextSeq)
+      nextProjection = structuredClone(this.projection)
       applyEvent(nextProjection, event)
-      appendEvent(this.ledgerPath, event)
-      this.projection = nextProjection
-      this.events.push(event)
-      this.nextSeq = event.seq + 1
-      return { ok: true, event }
     } catch (e) {
       if (e instanceof LedgerValidationError) return { ok: false, code: e.code, message: e.message }
       if (e instanceof FoldError) return { ok: false, code: 'MT_INTERNAL_FOLD', message: e.message }
       return { ok: false, code: 'MT_INTERNAL', message: String(e) }
     }
+
+    // 3. P0-2：revision 必须恰好 +1 且等于「已应用事件数 + 1」——不成立即拒绝写入（见 checkRevisionContinuity）
+    const gap = this.checkRevisionContinuity(nextProjection.revision, draft.type)
+    if (gap) return gap
+
+    // 4. 落账（appendEvent 内含 fsync 持久化屏障）
+    try {
+      appendEvent(this.ledgerPath, event)
+    } catch (e) {
+      if (e instanceof LedgerValidationError) return { ok: false, code: e.code, message: e.message }
+      return { ok: false, code: 'MT_INTERNAL', message: String(e) }
+    }
+
+    // 5. 账本已 durable，才切换内存投影 / 推进 seq（此前任何一步失败都不该走到这里）
+    this.projection = nextProjection
+    this.events.push(event)
+    this.nextSeq = event.seq + 1
+
+    // 6. P0-3：durable 之后才通知（失败只告警，不改变 {ok:true}）
+    this.notifyCommitted(event, opts?.onCommitted)
+    return { ok: true, event }
+  }
+
+  /**
+   * P0-2（docs/21 §6，来源官方 `types/projection.js:212-217`）：`revision` 连续性自证。
+   *
+   * 契约是「`projection.revision` = 已应用事件数」（docs/04 §3.2）。`MT_REVISION_CONFLICT`
+   * 只是**乐观锁**：它比的是「调用方读到的版本」与「当前版本」，两边一起被改坏时照样放行——
+   * 它防并发，**防不了跳号**。而跳号正是「账本被篡改 / 重放污染」唯一可靠的运行时信号。
+   *
+   * 独立断言两条（缺一不可）：
+   *   ① 应用一条事件恰好 +1 —— 新建团队从 0 起，所以首条必须是 1，不可能凭空 2；
+   *   ② 结果必须等于「已落账事件数 + 1」—— 把 revision 与事件流**脱钩**（脏投影、漏应用、
+   *      多应用、重放写回错值）直接抓出来；只做 ① 时，一个被整体偏移的 revision 会一直自洽地 +1。
+   *
+   * 不成立 → 拒绝写入（账本零事件、seq 不消耗）：宁可这一次失败，也不能在脏事件流上继续追加，
+   * 否则错误会被「+1」永久掩盖，冷启动重放时才炸。
+   */
+          checkRevisionContinuity(nextRevision        , type           )                      {
+    const current = this.projection.revision
+    const applied = this.events.length
+    if (nextRevision === current + 1 && nextRevision === applied + 1) return null
+    const message =
+      `revision continuity violated: 应用 1 条事件后 revision ${current} → ${nextRevision}，` +
+      `但账本已应用 ${applied} 条（应为 ${applied + 1}）；事件流跳号 = 账本被篡改或重放污染，拒绝写入`
+    this.logWarn(`${message}（team ${this.teamId}, event ${type}）`)
+    return { ok: false, code: 'MT_REVISION_GAP', message }
+  }
+
+  /**
+   * P0-3（docs/21 §6）：提交通知。**只**在事件已 fsync 进账本、内存投影已切换之后调用。
+   *
+   * 回调抛错必须吞掉并告警：事件已 durable，把它变成 `{ok:false}` 才是真的错——
+   * 调用方会当作「没成功」重试一次，账本里就多出一条重复事件，而内存投影已经前进过。
+   */
+          notifyCommitted(event             , onCommitted                               )       {
+    if (typeof onCommitted !== 'function') return
+    try {
+      onCommitted(event)
+    } catch (e) {
+      this.logWarn(
+        `onCommitted callback threw after ${event.type}#${event.seq}（事件已 durable，通知失败不影响提交结果）: ${String(e)}`,
+      )
+    }
+  }
+
+          logWarn(message        )       {
+    const logger = this.opts.logger
+    if (logger && typeof logger.warn === 'function') {
+      logger.warn(`[myteam] ${message}`)
+      return
+    }
+    console.warn(`[myteam] ${message}`)
   }
 
   /**
@@ -363,7 +461,11 @@ export class TeamService {
         break
       }
       case 'member.spawned': {
-        if (Object.values(proj.members).filter((m) => m.status === 'active' || m.status === 'suspended').length >= this.effectiveConfig.limits.maxMembers) {
+        // CHG-142（两阶段 spawn）：同一 memberId 的相位更新（provisioning → active/failed）不得再吃配额——
+        // 否则第 N 名成员的 settle 会被误判「新成员准入」→ 永久停在 provisioning（启动对账同样被拒）。
+        // 只有「新 memberId 首次进场」才校验上限。
+        const existingMember = proj.members[String(p.memberId)]
+        if (!existingMember && Object.values(proj.members).filter((m) => m.status === 'active' || m.status === 'suspended').length >= this.effectiveConfig.limits.maxMembers) {
           return { ok: false, code: 'MT_MEMBER_LIMIT', message: `maxMembers ${this.effectiveConfig.limits.maxMembers} reached (ADR-008 self-managed quota)` }
         }
         // 运行时只认项目库

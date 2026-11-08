@@ -49,6 +49,8 @@ export const MT_CODES = [
   'MT_NOT_CLAIMABLE',
   'MT_REJECT_BUDGET',
   'MT_REVISION_CONFLICT',
+  /* P0-2（docs/21 §6）：revision 连续性自证失败 = 事件流跳号（账本被篡改 / 重放污染） */
+  'MT_REVISION_GAP',
   'MT_TASK_CYCLE',
   'MT_TASK_STRUCTURAL_EDIT',
   'MT_TASK_TERMINAL',
@@ -159,6 +161,8 @@ export const MT_CODE_DOCS                         = {
   MT_NOT_CLAIMABLE: '任务当前状态不允许 claim（不满足就绪条件：依赖未完成 / 已被占用 / 非 ready）。',
   MT_REJECT_BUDGET: '单门 fail 轮数达到 `GATE_REJECT_BUDGET`(2)，队长侧 pass 被拒，转人工（FR-5.2）。',
   MT_REVISION_CONFLICT: '乐观锁失败：传了 `expectedRevision` 但与当前投影版本不等，**账本零写入**（QA-4）。',
+  /* P0-2（docs/21 §6，来源官方 `types/projection.js:212-217`）：独立性断言，见 `TeamService.commit` 第 3 步 */
+  MT_REVISION_GAP: '`projection.revision` 没有随本次提交恰好 +1（或与已落账事件数脱钩）：**事件流跳号 = 账本被篡改或重放污染，拒绝写入**（P0-2）。',
   MT_TASK_CYCLE: '依赖成环（含自指、或 `rewireTo` 指回下游造成的环）。',
   MT_TASK_STRUCTURAL_EDIT: '尝试改任务的**结构字段**（AC / 交付物 / 依赖）但走错了入口——结构改动必须走 `rescope` 管线。',
   MT_TASK_TERMINAL: '任务已在终态（done / cancelled / failed），不允许再变更。',

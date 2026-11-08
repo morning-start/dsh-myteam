@@ -64,6 +64,95 @@ export function recoveryAction(facts                  )                 {
   return { kind: 'noop' } // 终态不恢复
 }
 
+/* ── P0-1（docs/21 §6）：两阶段 spawn 的三条件对账 ────────────── */
+
+/**
+ * 三条件探针结果（官方 `types/roster.js:339-386` 的 `reconcileProvisioning`）。
+ *
+ * 三个条件缺一不可，因为它们各自排除一种「看起来建成了、实际不可用」的假活：
+ *   - `sessionExists`：child 会话根本不存在（宿主崩在 create 之前或中途）；
+ *   - `continuable`：会话存在但不是可续会话（one-shot 子代理跑完即不可恢复，不能当成员）；
+ *   - `initialPromptAccepted`：会话在、也能续，但上岗引导（初始 user 消息）没被宿主接受——
+ *     成员起来了却不知道自己该做什么，等价于「没上岗」。
+ */
+                                          
+                        
+                      
+                                
+ 
+
+/** 对账输入：投影/账本里处于 `provisioning` 的成员事实（只读快照） */
+                                     
+                  
+                    
+                
+ 
+
+                                                                            
+
+                                         
+                  
+                                      
+                                                                    
+                
+ 
+
+const PROVISIONING_ACTIVE_REASON = 'session exists ∧ continuable ∧ initial prompt accepted'
+
+/**
+ * 启动对账（纯函数，无 IO）：把「停在 provisioning」的成员按三条件结算成 active / failed。
+ *
+ * 为什么必须是**纯函数**：对账跑在冷启动路径上，而冷启动最怕「对账代码自己崩」——
+ * 把宿主探测（`probe`）挡在外面之后，单测能穷举三条件矩阵，不需要真起会话。
+ *
+ * 幂等口径：**同一 memberId 只结算一次**（同一成员出两条结算事件正是账本要避免的重复写入）；
+ * 同样的 members + 同样的探针结果 → 同样的输出（探针自身有副作用时不作保证）。
+ *
+ * 判活的取向：**证明不了自己是活的，就判 failed**。failed 可重试（重新 spawn），
+ * 假 active 会静默丢任务——两种错误的代价不对称。
+ */
+export function reconcileProvisioning(
+  members                               ,
+  probe                                                ,
+)                           {
+  const settled = new Set        ()
+  const out                           = []
+  for (const member of members) {
+    // 只处理 provisioning：active / spawn_failed 是已结算状态，重复结算会写出重复事件
+    if (member.status !== 'provisioning') continue
+    if (settled.has(member.memberId)) continue
+    settled.add(member.memberId)
+    const sessionId = typeof member.sessionId === 'string' ? member.sessionId : ''
+    if (sessionId.length === 0) {
+      // 没记 sessionId = 探针无从下手（旧账本/坏 payload）；这本身就不构成「可恢复的 child」
+      out.push({
+        memberId: member.memberId,
+        action: 'settle-failed',
+        reason: 'no sessionId recorded at provisioning (cannot probe the child session)',
+      })
+      continue
+    }
+    let probed                         
+    try {
+      probed = probe(sessionId)
+    } catch (e) {
+      // 探针抛错 = 证明不了它是活的 → failed（可重试）；绝不因对账代码异常把成员判活
+      out.push({ memberId: member.memberId, action: 'settle-failed', reason: `probe threw: ${String(e)}` })
+      continue
+    }
+    const missing           = []
+    if (probed?.sessionExists !== true) missing.push('child session missing')
+    if (probed?.continuable !== true) missing.push('session is not continuable')
+    if (probed?.initialPromptAccepted !== true) missing.push('initial prompt was not accepted')
+    out.push(
+      missing.length === 0
+        ? { memberId: member.memberId, action: 'settle-active', reason: PROVISIONING_ACTIVE_REASON }
+        : { memberId: member.memberId, action: 'settle-failed', reason: `provisioning did not settle: ${missing.join('; ')}` },
+    )
+  }
+  return out
+}
+
 /** 恢复动作 → 账本事件（重构 attempt 用新 attemptId） */
 export function recoveryEventFor(action                , taskId        , newAttemptId         )                                                                 {
   switch (action.kind) {

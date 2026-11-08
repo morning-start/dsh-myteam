@@ -379,7 +379,7 @@ interface HandoffSessionRef {
 | `team.created` | teamId, name, goal | Lead 工具 |
 | `plan.clarify` | questions[{id,type,text,assumption}], round | Lead（硬终止计数在此累计） |
 | `plan.staged / plan.revised / plan.approved / plan.discarded` | planId, roster, tasks 快照 | Lead 工具 |
-| `member.spawned` | memberId, roleId, instanceName, sessionId, snapshotRef, status:'ok'\|'failed', skills?, mcpAllowlist?（CHG-54：成员级覆写时记录） | Lead 工具 |
+| `member.spawned` | memberId, roleId, instanceName, sessionId, snapshotRef, status:'provisioning'\|'active'\|'failed', reason?（CHG-142 两阶段 spawn 的相位事件：**同一 memberId 的相位更新不吃 maxMembers 配额**）, skills?, mcpAllowlist?（CHG-54：成员级覆写时记录） | Lead 工具 |
 | `member.interrupted` | memberId, reason | Lead 工具（myteam_interrupt；QA-2 勘误补行） |
 | `member.released / member.archived / member.restored` | memberId, mode, drained | Lead 工具 |
 | `task.created` | taskId, task(TaskInput), createdBy；task.gateChain 可为 host 按 taskTypes 展开后的链（CHG-55） | Lead 工具 |
@@ -501,7 +501,7 @@ interface HandoffSessionRef {
 
 ## 错误码（`MT_*`）
 
-> **本表由 `tools/gen-error-docs.mjs` 从 `plugin/src/core/errors.ts` 生成，共 75 个。**
+> **本表由 `tools/gen-error-docs.mjs` 从 `plugin/src/core/errors.ts` 生成，共 76 个。**
 > 手改会被覆盖，且 `plugin/test/t81-error-codes.test.ts` 会判红。
 >
 > **加码流程**：① `errors.ts` 加一行（含说明）→ ② `node tools/gen-error-docs.mjs` → ③ `cd plugin && npm test`。
@@ -537,7 +537,7 @@ interface HandoffSessionRef {
 | `MT_LEDGER_MISSING_RULES_VERSION` | 新账本的首事件不是 `rules.version.adopted`（I3 前提）。 |
 | `MT_LEDGER_UNKNOWN_TYPE` | 事件 `type` 不在 `EVENT_TYPES` 白名单里（旧版本写的账本用新代码打开时会看到）。 |
 
-### 任务与状态机（14）
+### 任务与状态机（15）
 
 | 码 | 什么时候会看到它 |
 |---|---|
@@ -550,6 +550,7 @@ interface HandoffSessionRef {
 | `MT_NO_AGENTS_SERVICE` | 宿主没给 `agents` 服务，无法 spawn 成员。 |
 | `MT_REJECT_BUDGET` | 单门 fail 轮数达到 `GATE_REJECT_BUDGET`(2)，队长侧 pass 被拒，转人工（FR-5.2）。 |
 | `MT_REVISION_CONFLICT` | 乐观锁失败：传了 `expectedRevision` 但与当前投影版本不等，**账本零写入**（QA-4）。 |
+| `MT_REVISION_GAP` | `projection.revision` 没有随本次提交恰好 +1（或与已落账事件数脱钩）：**事件流跳号 = 账本被篡改或重放污染，拒绝写入**（P0-2）。 |
 | `MT_TASK_CYCLE` | 依赖成环（含自指、或 `rewireTo` 指回下游造成的环）。 |
 | `MT_TASK_STRUCTURAL_EDIT` | 尝试改任务的**结构字段**（AC / 交付物 / 依赖）但走错了入口——结构改动必须走 `rescope` 管线。 |
 | `MT_TASK_TERMINAL` | 任务已在终态（done / cancelled / failed），不允许再变更。 |

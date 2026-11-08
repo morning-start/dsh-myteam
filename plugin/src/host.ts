@@ -67,7 +67,7 @@ import {
   summarizeSessionRecords,
   type SessionRecordView,
 } from './core/host/session-archaeology.ts'
-import { recoveryAction, checkArchiveGate } from './core/scheduler/recovery.ts'
+import { recoveryAction, checkArchiveGate, reconcileProvisioning, type ProvisioningMember, type ProvisioningProbeResult, type ProvisioningSettlement } from './core/scheduler/recovery.ts'
 /* CHG-135（docs/20 §5.2）：成员卡（子代理 / 会话依附角色的落盘事实） */
 import { writeMemberCard } from './core/members/member-card.ts'
 /* CHG-137/138（docs/19 §3）：工具权限档位（单一事实源 + 运行时门禁） */
@@ -208,6 +208,19 @@ function safeRead(obj: unknown, prop: string): any {
   } catch {
     return undefined
   }
+}
+
+/**
+ * FIX-14（KI-2）：`agents.create` 的返回形状未实证——真实宿主是 `Promise<AgentHandle>`，
+ * 单测桩是 handle 本体。两阶段 spawn 必须「先拿到 handle 再结算 active」，
+ * 所以这个判定只写一处，避免两处各判一遍然后行为分叉。
+ */
+function isThenable(value: unknown): value is PromiseLike<unknown> {
+  return (
+    (typeof value === 'object' || typeof value === 'function') &&
+    value !== null &&
+    typeof (value as { then?: unknown }).then === 'function'
+  )
 }
 
 export function resolveTeamLedgerPath(workspaceRoot: string, teamId: string): string {
@@ -551,6 +564,18 @@ export class MyTeamHost {
       this.log('warn', `session working directory unavailable; ${STORE_DIR} rooted at process cwd: ${this.workspaceRoot}`)
     }
     this.log('info', `store ready: ${dirs.root} (created ${dirs.created.length} dirs)`)
+    // P0-1（docs/21 §6）：两阶段 spawn 的启动对账——把上次进程崩在 `agents.create` 期间的成员
+    // 从 provisioning 结算掉（active / failed），否则它们永远不会被清理、也不会被唤醒。
+    // 放在工具注册之前（对账要写账本，不能被工具面并发影响），且**失败不得阻断启动**
+    // （`reconcileProvisioningOnBoot` 内部逐团队兜底，这里再兜一层）。
+    try {
+      const reconciled = this.reconcileProvisioningOnBoot()
+      if (reconciled.settled > 0) {
+        this.log('info', `spawn reconcile on boot: ${reconciled.settled} provisioning member(s) settled (${reconciled.active} active, ${reconciled.failed} failed)`)
+      }
+    } catch (e) {
+      this.log('warn', `spawn reconcile on boot failed (startup continues): ${String(e)}`)
+    }
     // CHG-91（插件团队贡献契约 v1）：装载第三方插件贡献的角色与团队模板。
     // **必须早于** registerLeadTools / registerRemote——工具与面板都要读这份目录。
     // 纪律：只读（JSON.parse 文件）、失败隔离（坏插件只进 warnings）、大声（warn 日志 + 面板红条）。
@@ -2583,6 +2608,24 @@ export class MyTeamHost {
 
   /* ── 成员 spawn（ADR-001：agents.create 直连 + setup 作用域）── */
 
+  /**
+   * 两阶段 spawn（P0-1，docs/21 §6，来源官方 `types/roster.js:206-288`）。
+   *
+   * 为什么必须先落 `provisioning` 再建 child：`agents.create` 是跨会话建 child 的动作，
+   * 宿主可能**在它执行中途崩掉**。旧实现「先建 child 后落账」在这种时刻没有任何记录——
+   * 下次启动不知道有这个成员，它就是一个永远不会被清理、也不会被唤醒的孤儿。
+   * 现在的顺序（每一段都必须在下一段开始前 durable）：
+   *   ① 持久化 `member.spawned{status:'provisioning'}`——名字 / sessionId 在此占用，
+   *      `maxMembers` 也在此判定（官方把名字预算放在 provisioning 段）；
+   *   ② 才 `agents.create` 建 child；
+   *   ③ 拿到 handle（child 真的起来了）→ 同 memberId 落 `status:'active'` 结算；
+   *   ④ 任何一步失败（create 抛错 / 初始 prompt 投递失败）→ 同 memberId 落
+   *      `status:'failed'` + `reason`，**不留 provisioning 残留**。
+   *
+   * 为什么**全程只有一个 memberId**：结算事件是同一 memberId 的更新，fold 按 memberId
+   * 覆盖（`proj.members[id] = member`），所以重试 / 对账重复结算都是幂等的，不会长出第二个成员。
+   * 这也是「崩溃后可对账」的前提——账本里认得出「同一个成员停在了哪一段」。
+   */
   spawnMember(teamId: string, roleId: string, instanceName?: string, overrides: { skills?: string[]; mcpAllowlist?: string[] } = {}): Record<string, unknown> {
     if (!this.rt.agents) return { status: 'error', code: 'MT_NO_AGENTS_SERVICE', message: 'ctx.agents unavailable' }
     const svc = this.service(teamId)
@@ -2607,45 +2650,26 @@ export class MyTeamHost {
     }
     const roleDef = resolveRuntimeRole(this.rolePaths, roleId)!.definition
 
-    // 账本校验先行（maxMembers/角色解析在 service.checkDomain）
-    const spawnEvent = this.commit(teamId, {
+    // ① 第一段：provisioning 先落账（崩溃在这里 = 启动时可对账，而不是孤儿）
+    // maxMembers / 角色解析在 service.checkDomain（账本校验先行）
+    const provisioningEvent = this.commit(teamId, {
       actor: 'lead',
       type: 'member.spawned',
       payload: {
-        teamId, memberId, roleId, instanceName: member.instanceName, sessionId, status: 'ok',
+        teamId, memberId, roleId, instanceName: member.instanceName, sessionId, status: 'provisioning',
         ...(member.skills ? { skills: member.skills } : {}),
         ...(member.mcpAllowlist ? { mcpAllowlist: member.mcpAllowlist } : {}),
       },
     })
-    if (!spawnEvent.ok) return { status: 'error', code: spawnEvent.code, message: spawnEvent.message }
+    if (!provisioningEvent.ok) return { status: 'error', code: provisioningEvent.code, message: provisioningEvent.message }
 
-    /*
-     * CHG-135（docs/20 §5.2）：**成员卡落盘**——`sessionId` 只写在
-     * `state/teams/<teamId>/members/<memberId>/member.json`（不散落全局）。
-     * 写失败只告警不阻断（账本才是权威；卡片是「重启后可查」的便利事实）。
-     */
+    // ② 第二段：建 child。同步抛错与异步 reject 必须走**同一**失败结算（否则失败路径会分叉）
+    let created: unknown
     try {
-      writeMemberCard(join(storeLayout(this.workspaceRoot).tasks, String(teamId)), {
-        version: 1,
-        memberId: String(memberId),
-        teamId: String(teamId),
-        roleId: String(roleId),
-        instanceName: String(member.instanceName ?? ''),
-        ...(sessionId ? { sessionId: String(sessionId) } : {}),
-        ...(member.skills ? { skills: member.skills.map((skill) => String(skill)) } : {}),
-        ...(member.mcpAllowlist ? { mcpAllowlist: member.mcpAllowlist.map((item) => String(item)) } : {}),
-        status: 'active',
-        createdAt: Date.now(),
-        updatedAt: Date.now(),
-      })
-    } catch (error) {
-      this.log('warn', `member card write failed (${String(memberId)}): ${String((error as Error | undefined)?.message ?? error)}`)
-    }
-
-    const created = this.rt.agents.create({
-      sessionId,
-      agentOptions: roleDef.model ?? undefined,
-      setup: async (agentCtx: any, agent: any) => {
+      created = this.rt.agents.create({
+        sessionId,
+        agentOptions: roleDef.model ?? undefined,
+        setup: async (agentCtx: any, agent: any) => {
         // ① 成员工具 9 个（仅该成员可见）
         for (const def of memberToolDefs()) {
           const compiled = compileParameters(def)
@@ -2716,24 +2740,244 @@ export class MyTeamHost {
           else if (guard.mcpDenied.length > 0 || guard.skillsShadowed.length > 0) this.log('info', `member ${memberId} capabilities enforced: ${capabilitySummary(guard)}`)
         }
       },
-    })
-    // FIX-14（KI-2 实弹）：agents.create 是 async（返回 Promise<AgentHandle>，dsh-agent/lib/index.js:453）。
-    // 同步存 Promise 会让 agentOf() 取不到 followup（P1：成员上岗引导静默丢失，t23 mock 同步返回掩盖）。
-    // fire-and-forget：handle 到手后回填 memberHandles 并发上岗引导（读板→claim→空闲 wait_for_change）。
-    void Promise.resolve(created).then((handle: any) => {
-      this.memberHandles.set(memberId, handle)
-      this.agentOf(handle)?.followup?.(this.followupMessage(`[myteam] 你已上岗（团队 ${teamId}，角色 ${roleId}）。请读板并领取与角色匹配的就绪任务（myteam_list_tasks → myteam_claim_task）；当前无就绪任务则用 myteam_wait_for_change 等待失效提示。`))
-    }).catch((e: unknown) => {
-      this.log('warn', `member ${memberId} handle/followup failed: ${String(e)}`)
-    })
-    // identity.json 快照（C3 不可变）
+      })
+    } catch (error) {
+      // create 同步抛错：与异步 reject 走**同一**失败结算（落 failed + reason，不留 provisioning）
+      return this.settleSpawnFailure(teamId, member, error)
+    }
+    // identity.json 快照（C3 不可变）+ 记忆区播种（T21，FR-6.1：幂等）：
+    // 都是「成员真的存在」的派生事实，与 handle 是否先到无关，保持同步落盘
+    // （异步宿主也不拖到 microtask——t33 直接读 identity 快照）。
     const identityDir = memberIdentityDirOf(this.workspaceRoot, teamId, memberId)
     if (!existsSync(identityDir)) mkdirSync(identityDir, { recursive: true })
     writeFileSync(join(identityDir, 'identity.json'), `${JSON.stringify({ ...member, roleSnapshot: roleDef, spawnedAt: Date.now() }, null, 2)}\n`, 'utf8')
     // 记忆区播种（T21，FR-6.1：幂等；R26：host 进程 fs；notes/ 留给成员自建）
     const memSeed = seedMemoryIfMissing(memoryDirFor(this.workspaceRoot, teamId, memberId), member)
     if (memSeed.seeded) this.log('info', `memory seeded for ${memberId}: ${memSeed.memoryMdPath}`)
+    // ③ 结算段：FIX-14（KI-2 实弹）——`agents.create` 是 async（返回 Promise<AgentHandle>，
+    // dsh-agent/lib/index.js:453），而同步桩返回 handle 本体。两种形状都必须**先拿到 handle**
+    // 再结算，否则「create 已返回」会被误当成「child 已起来」。
+    // 同步返回值走同步结算（投影立刻是 active，单测无需等 microtask）；Promise 走 then 结算。
+    if (isThenable(created)) {
+      void Promise.resolve(created).then(
+        (handle: unknown) => this.settleSpawnActive(teamId, member, handle),
+        (error: unknown) => { this.settleSpawnFailure(teamId, member, error) },
+      ).catch((e: unknown) => {
+        // 结算段自身异常（不该发生）：已建成的 child 留在 provisioning，交给下次启动对账
+        this.log('warn', `member ${memberId} settle failed: ${String(e)}`)
+      })
+    } else {
+      this.settleSpawnActive(teamId, member, created)
+    }
     return { status: 'spawned', memberId, sessionId }
+  }
+
+  /**
+   * 两阶段 spawn 的 **active 结算段**（官方 `checkpointInitialPrompt` → `settleProvisioning(active)`
+   * 的落点）。
+   *
+   * 顺序是**先投递初始 prompt、再落 active**，不是反过来：
+   *  - 先落 active 再投递，一旦投递失败就留下「账本 active 但从不干活」的静默僵尸（CHG-77 那类
+   *    事故正是这么来的）；
+   *  - 先投递，崩溃窗口里的成员停在 provisioning，下次启动的三条件对账能自愈
+   *    （初始 prompt 已在会话里 → `initialPromptAccepted`）。
+   * 我们的 `followup` 没有「durable」回执（宿主不给），所以「投递没抛错」是这里能拿到的最强证据；
+   * 真正的 durability 判定留给启动对账。
+   *
+   * 成员卡（CHG-135）与 handle 回填都在这里：只有真建成的成员才配拥有。
+   */
+  private settleSpawnActive(teamId: string, member: MemberInstance, handle: unknown): void {
+    // ① 初始 prompt（上岗引导）：投不出去 = 成员起来了却不知道做什么 → 按失败结算
+    try {
+      this.agentOf(handle)?.followup?.(this.followupMessage(`[myteam] 你已上岗（团队 ${teamId}，角色 ${member.roleId}）。请读板并领取与角色匹配的就绪任务（myteam_list_tasks → myteam_claim_task）；当前无就绪任务则用 myteam_wait_for_change 等待失效提示。`))
+    } catch (error) {
+      this.settleSpawnFailure(teamId, member, error)
+      // 初始 prompt 投不进去的 child 不能留着「假装在跑」：尽力释放（失败只告警）
+      try { void (handle as { dispose?: () => unknown } | undefined)?.dispose?.() } catch { /* 排空尽力而为 */ }
+      return
+    }
+    // ② 结算 active（同 memberId 的更新事件；fold 按 memberId 覆盖 = 幂等）
+    const settled = this.commit(teamId, {
+      actor: 'host',
+      type: 'member.spawned',
+      payload: {
+        teamId, memberId: member.memberId, roleId: member.roleId, instanceName: member.instanceName, sessionId: member.sessionId, status: 'active',
+        ...(member.skills ? { skills: member.skills } : {}),
+        ...(member.mcpAllowlist ? { mcpAllowlist: member.mcpAllowlist } : {}),
+      },
+    })
+    if (!settled.ok) {
+      // child 已建成但结算没落账：**不能假成功**——账本停在 provisioning，下次启动对账接手
+      this.log('warn', `member ${member.memberId} spawned but settle(active) rejected: ${settled.code} ${settled.message}`)
+      this.memberHandles.set(member.memberId, handle)
+      return
+    }
+    // ③ 成员卡落盘（CHG-135，docs/20 §5.2）：`sessionId` 只写在团队目录内，不散落全局；
+    //    写失败只告警（账本才是权威，卡片是「重启后可查」的便利事实）
+    try {
+      writeMemberCard(join(storeLayout(this.workspaceRoot).tasks, String(teamId)), {
+        version: 1,
+        memberId: String(member.memberId),
+        teamId: String(teamId),
+        roleId: String(member.roleId),
+        instanceName: String(member.instanceName ?? ''),
+        ...(member.sessionId ? { sessionId: String(member.sessionId) } : {}),
+        ...(member.skills ? { skills: member.skills.map((skill) => String(skill)) } : {}),
+        ...(member.mcpAllowlist ? { mcpAllowlist: member.mcpAllowlist.map((item) => String(item)) } : {}),
+        status: 'active',
+        createdAt: Date.now(),
+        updatedAt: Date.now(),
+      })
+    } catch (error) {
+      this.log('warn', `member card write failed (${String(member.memberId)}): ${String((error as Error | undefined)?.message ?? error)}`)
+    }
+    this.memberHandles.set(member.memberId, handle)
+  }
+
+  /**
+   * 两阶段 spawn 的 **failed 结算段**：同 memberId 落 `status:'failed'` + `reason`。
+   *
+   * 为什么失败也必须落终态：`provisioning` 只有两个合法出口（active / failed）——
+   * 失败不落账就留下**永久 provisioning**，成员既不能被重试、也不能被清理
+   * （docs/15 R1 的风险项正是这个）。结算本身被拒（例如角色已从项目库删除）只告警：
+   * 残留的 provisioning 交给下次启动对账，但这一次的失败原因必须同时进日志与工具返回，不能静默。
+   */
+  private settleSpawnFailure(teamId: string, member: MemberInstance, error: unknown): Record<string, unknown> {
+    const reason = String((error as Error | undefined)?.message ?? error ?? 'unknown spawn failure')
+    const settled = this.commit(teamId, {
+      actor: 'host',
+      type: 'member.spawned',
+      payload: { teamId, memberId: member.memberId, roleId: member.roleId, instanceName: member.instanceName, sessionId: member.sessionId, status: 'failed', reason },
+    })
+    if (!settled.ok) {
+      this.log('warn', `member ${member.memberId} spawn failed and settle(failed) rejected: ${settled.code} ${settled.message}`)
+    }
+    this.log('warn', `member ${member.memberId} spawn failed: ${reason}`)
+    // 回显 memberId/sessionId：失败也已在账本里占了一个（failed）成员，调用方要能定位它
+    // （重试 / 面板排查 / 后续对账），而不是只拿到一句错误。
+    return { status: 'error', code: 'MT_INTERNAL', message: `spawn member ${member.memberId} failed: ${reason}`, memberId: member.memberId, sessionId: member.sessionId }
+  }
+
+  /* ── P0-1：启动对账（两阶段 spawn 的收尾）───────────────────── */
+
+  /**
+   * 启动对账（P0-1，docs/21 §6，来源官方 `types/roster.js:339-386`）。
+   *
+   * 为什么读**账本**而不是投影：`member.spawned{status:'provisioning'}` 在 fold 里被折叠成
+   * `active`（`fold.ts` 的 status 只有 failed / 其它两支，本任务改动面不含 fold），所以投影
+   * 区分不出「已结算」与「停在 provisioning」；账本是唯一权威〔I2〕——按 memberId 取**最后一条**
+   * `member.spawned` 的 status，才是这个成员的真实阶段。
+   *
+   * 纪律：**对账失败不得阻断启动**。单个团队账本坏了只告警、其它团队照常对账；
+   * 结算被拒只告警，残留的 provisioning 下次启动再对一次。
+   */
+  reconcileProvisioningOnBoot(): { settled: number; active: number; failed: number } {
+    const summary = { settled: 0, active: 0, failed: 0 }
+    const teamsDir = storeLayout(this.workspaceRoot).tasks
+    let teamIds: string[] = []
+    try {
+      if (!existsSync(teamsDir)) return summary
+      teamIds = readdirSync(teamsDir).filter((name) => existsSync(join(teamsDir, name, 'ledger.jsonl')))
+    } catch (e) {
+      this.log('warn', `spawn reconcile skipped (teams dir unreadable): ${String(e)}`)
+      return summary
+    }
+    for (const teamId of teamIds) {
+      try {
+        const { events } = readLedgerEvents(join(teamsDir, teamId, 'ledger.jsonl'))
+        // 每个 memberId 只认最后一条 member.spawned（同 memberId 的更新事件 = 阶段推进）
+        const latest = new Map<string, Record<string, unknown>>()
+        for (const event of events) {
+          if (event.type !== 'member.spawned') continue
+          const payload = (event.payload ?? {}) as Record<string, unknown>
+          const memberId = typeof payload.memberId === 'string' ? payload.memberId : ''
+          if (memberId) latest.set(memberId, payload)
+        }
+        const provisioning: ProvisioningMember[] = []
+        for (const [memberId, payload] of latest) {
+          if (payload.status !== 'provisioning') continue
+          provisioning.push({ memberId, sessionId: typeof payload.sessionId === 'string' ? payload.sessionId : undefined, status: 'provisioning' })
+        }
+        if (provisioning.length === 0) continue
+        const settlements: ProvisioningSettlement[] = reconcileProvisioning(provisioning, (sessionId) => this.probeProvisionedSession(sessionId))
+        for (const settlement of settlements) {
+          const payload = latest.get(settlement.memberId) ?? {}
+          const status = settlement.action === 'settle-active' ? 'active' : 'failed'
+          const result = this.commit(teamId, {
+            actor: 'host',
+            type: 'member.spawned',
+            payload: {
+              teamId,
+              memberId: settlement.memberId,
+              roleId: String(payload.roleId ?? ''),
+              instanceName: String(payload.instanceName ?? settlement.memberId),
+              sessionId: payload.sessionId,
+              status,
+              reason: settlement.reason,
+            },
+          })
+          if (!result.ok) {
+            this.log('warn', `spawn reconcile: member ${settlement.memberId} (team ${teamId}) settle(${status}) rejected: ${result.code} ${result.message}`)
+            continue
+          }
+          summary.settled += 1
+          if (status === 'active') summary.active += 1
+          else summary.failed += 1
+          // 结算 active 是「自愈」，failed 是「这个成员没建成」——后者必须让人看见
+          this.log(status === 'active' ? 'info' : 'warn', `spawn reconcile: member ${settlement.memberId} (team ${teamId}) → ${status}: ${settlement.reason}`)
+        }
+      } catch (e) {
+        this.log('warn', `spawn reconcile failed for team ${teamId}: ${String(e)}`)
+      }
+    }
+    return summary
+  }
+
+  /**
+   * 对账探针（宿主侧 IO，纯函数 `reconcileProvisioning` 的注入点）。
+   *
+   * 三条件的宿主口径（`agents.get(sessionId)` 是官方 lookup 口径，`panel.ts` 注释同源）：
+   *  - `sessionExists`：`agents.get(sessionId)` 拿得到 Agent（拿不到 = child 不存在）；
+   *  - `continuable`：Agent 暴露 `descriptor.mode` 时按它判；本运行时的成员由 `agents.create`
+   *    建成 continuable 驻留会话（ADR-001），未暴露描述符时按 continuable 处理——
+   *    否则每次崩溃恢复都会把**活着的**成员误判 failed；
+   *  - `initialPromptAccepted`：会话事件流里是否已有 user 消息（官方 `messageAccepted` 同口径）。
+   *    读不到（宿主没暴露事件流）按 **false** 处理：证明不了「已上岗」就不能报 active。
+   */
+  private probeProvisionedSession(sessionId: string): ProvisioningProbeResult {
+    const dead: ProvisioningProbeResult = { sessionExists: false, continuable: false, initialPromptAccepted: false }
+    if (sessionId.length === 0) return dead
+    const agents = this.rt.agents
+    if (!agents || typeof agents.get !== 'function') {
+      // 没有 agents 服务 = 没有 child 能活；这不是「探针失败」，是「不存在」
+      return dead
+    }
+    let handle: unknown
+    try {
+      handle = agents.get(sessionId)
+    } catch (e) {
+      this.log('warn', `spawn reconcile probe failed for session ${sessionId}: ${String(e)}`)
+      return dead
+    }
+    if (!handle) return dead
+    const agent = handle as { session?: Record<string, unknown>; descriptor?: { mode?: unknown }; mode?: unknown }
+    const session = (agent.session ?? handle) as Record<string, unknown>
+    const descriptorMode = agent.descriptor?.mode ?? agent.mode ?? (session?.descriptor as { mode?: unknown } | undefined)?.mode
+    const continuable = descriptorMode === undefined ? true : descriptorMode === 'continuable'
+    let initialPromptAccepted = false
+    try {
+      const snapshotEvents = (session as { snapshotEvents?: (from: number) => unknown }).snapshotEvents
+      const events = typeof snapshotEvents === 'function' ? snapshotEvents.call(session, 0) : undefined
+      initialPromptAccepted =
+        Array.isArray(events) &&
+        events.some((event) => {
+          const e = event as { source?: { kind?: unknown }; message?: { source?: { kind?: unknown }; role?: unknown } }
+          return e?.source?.kind === 'user' || e?.message?.source?.kind === 'user' || e?.message?.role === 'user'
+        })
+    } catch {
+      initialPromptAccepted = false
+    }
+    return { sessionExists: true, continuable, initialPromptAccepted }
   }
 
   /**

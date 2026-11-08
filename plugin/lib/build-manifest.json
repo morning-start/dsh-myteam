@@ -1,10 +1,10 @@
 {
   "schema": 1,
-  "builtAt": "2026-11-08T07:27:05.328Z",
+  "builtAt": "2026-11-08T08:23:31.533Z",
   "node": "v22.23.2",
   "entry": "./lib/host.mjs",
-  "modules": 48,
-  "sourceHash": "387bc966cd6b60fb6b5a4e8691fa4cc98bf49c639cf64c1564130bf5c0261957",
+  "modules": 50,
+  "sourceHash": "30766feb0ee29e63b0c6d5ca7055c02f4fc07dc838bba980f231b7fcd411b6eb",
   "clientFile": "client/client.js",
   "clientHash": "d9e8245cbfda4f8d5a5600603246d0375e44b536162e774c137bf1481396802f",
   "files": [
@@ -15,7 +15,9 @@
     "core/contributions/discover.ts",
     "core/contributions/parse.ts",
     "core/errors.ts",
+    "core/gates/artifact-freshness.ts",
     "core/gates/command-gate.ts",
+    "core/gates/delivery-verdict.ts",
     "core/gates/scope-audit.ts",
     "core/host/session-archaeology.ts",
     "core/host/session-handoff.ts",
