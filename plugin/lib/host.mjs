@@ -60,6 +60,13 @@ import {
   runHandoff,
   TEAM_AGENT_PRESET_ID,
 } from './core/host/session-handoff.mjs'
+// CHG-120（M2-D ② / FR-16.4②）：会话考古（按 session:<id> 只读读一页历史）
+import {
+  buildSessionPageRequest,
+  resolveSessionHistoryCapability,
+  summarizeSessionRecords,
+                         
+} from './core/host/session-archaeology.mjs'
 import { recoveryAction, checkArchiveGate } from './core/scheduler/recovery.mjs'
 import { entryFromProjection, scanWorkspaceIndex, readWorkspaceIndex, writeWorkspaceIndex, upsertTeamEntry, upsertGlobalWorkspace, resolveMyteamHome } from './core/index/team-index.mjs'
 // CHG-91（插件团队贡献契约 v1）：装载第三方插件贡献的角色与团队模板
@@ -3651,6 +3658,72 @@ export class MyTeamHost {
       metadata,
       note: '已新建团队预设会话并注入上下文摘要（原会话保留；名册与任务由新队长自行决定）',
     }
+  }
+
+  /* ── 会话考古（CHG-120 / M2-D ② / FR-16.4②）──────────────────── */
+
+  /**
+   * 会话考古：按 `session:<id>` 指针**只读**读一段历史（不激活 Agent、不写当前上下文）。
+   *
+   * 为什么需要：handoff 摘要只给 `session:<id>` 指针（CHG-88），没有读取方它就是死链接。
+   * 宿主能力 = `SessionController.page`（注释原文「Read one message-aligned history page
+   * **without activating an Agent**」）——**只读**、按页（`beforeSeq` 往回翻）、有界
+   * （`maxMessages`）。
+   *
+   * 纪律：
+   *  1. 缺 `page` 能力 → `MT_UNAVAILABLE`（**不假装读到**、不返回空历史）；
+   *  2. 读成功且给了 `teamId` → 落一条 `session.read` 审计（读取即留痕，CHG-87 口径）；
+   *  3. 返回**有界摘要**（`summarizeSessionRecords`），原文只用于展示，不回写任何地方。
+   */
+  async readSessionHistory(args                          = {})                                   {
+    const sessionId = String(args.sessionId ?? '').trim()
+    if (!sessionId) return { status: 'error', code: 'MT_VALIDATION', field: 'sessionId', message: 'sessionId is required（形如 session:<id>）' }
+    const teamId = typeof args.teamId === 'string' && args.teamId.trim().length > 0 ? args.teamId.trim() : undefined
+    const capability = resolveSessionHistoryCapability(this.rt)
+    if (!capability) {
+      return {
+        status: 'error',
+        code: 'MT_UNAVAILABLE',
+        message: '宿主未提供 sessionController.page 能力，无法读取历史会话（会话考古不可用；不要伪造历史）',
+      }
+    }
+    let page                                                      
+    try {
+      page = await capability.page(buildSessionPageRequest(sessionId, {
+        ...(args.beforeSeq !== undefined ? { beforeSeq: Number(args.beforeSeq) } : {}),
+        ...(args.maxMessages !== undefined ? { maxMessages: Number(args.maxMessages) } : {}),
+      }))
+    } catch (error) {
+      const code = (error                                  )?.code
+      const message = (error                                     )?.message
+      return {
+        status: 'error',
+        code: typeof code === 'string' && code.length > 0 ? code : 'MT_HISTORY_FAILED',
+        message: typeof message === 'string' && message.length > 0 ? message : String(error),
+        sessionId,
+      }
+    }
+    const excerpt = summarizeSessionRecords(sessionId, page)
+    /* 读取留痕：有团队上下文就落 session.read（与 CHG-87 的成员证据指针同一事件类型） */
+    if (teamId) {
+      try {
+        this.commit(teamId, {
+          actor: 'human',
+          type: 'session.read',
+          payload: {
+            teamId,
+            sessionId,
+            pointer: `session:${sessionId}`,
+            by: 'human',
+            via: 'archaeology',
+            ...(Number.isFinite(Number(args.beforeSeq)) ? { beforeSeq: Number(args.beforeSeq) } : {}),
+          },
+        })
+      } catch {
+        /* 审计失败不阻断读取（读取是只读行为；留痕尽力而为） */
+      }
+    }
+    return { status: 'ok', ...excerpt }
   }
 
   /* ── token 侧车（FR-8.2：增量同步；disband 时随归档落最终快照）──────── */

@@ -332,6 +332,7 @@ interface HandoffSessionRef {
 | `resetTeamConfig(teamId, confirm)` | **恢复默认配置（CHG-57 工具面 / CHG-117 面板面）**：`confirm!==true` → `confirm-required`；删除团队级 `team.config.json` 并重建服务，返回 `{status:'reset'\|'noop', teamId, configSource}` | 写（删团队级配置） |
 | `getInbox(teamId)` | 人工待办（审批横幅/escalate 提醒/提案队列 badge） | 读 |
 | `getPlanFeedback(teamId)` | **计划质量反馈（FR-11.6，CHG-119）**：`{tasks:{total,terminal,open,byState}, granularity:{S,M,L,unset}, roleLoad:[{roleId,planned,open,members}], deviations:[{id,title,state,estimate,actualMs,running,actualBucket,overrun}], overrun:{over,comparable}, caliber:'heuristic', notes}`——**只读观测，不写账本、不自动改计划**；actual = 账本时间差（终态 = 终态事件 ts − created，未终态 = now − created） | 读（账本） |
+| `readSessionHistory(sessionId, teamId?, beforeSeq?, maxMessages?)` | **会话考古（M2-D ②，FR-16.4②，CHG-120）**：按 `session:<id>` **只读读一页历史**（宿主 `SessionController.page`，不激活 Agent、不推进游标）→ `{status:'ok', sessionId, items:[{seq?,role?,type?,ts?,text,truncated}], omitted, hasMore, chars, notes}`；`beforeSeq` 往回翻页；带 `teamId` 时落 `session.read` 审计；缺 `page` 能力 → `MT_UNAVAILABLE`（**不返回空历史假装成功**） | 读（宿主会话） |
 | `postComment(teamId, taskId, content)` | 人留言（写账本 actor=human，FR-12.2） | 写→账本 |
 | `planAction(teamId, action:'approve'\|'revise'\|'discard')` | 人审三动作（写账本） | 写→账本 |
 | `memberOp(teamId, memberId, op:'suspend'\|'archive'\|'remove'\|'restore', confirm?)` | 成员管理（FR-14.2，**CHG-48 已实装**）：写 `member.released`/`member.archived`/`member.restored`（actor=human）；`remove` 两段确认（confirm:false → `confirm-required`）；`restore` 仅允许 suspended/archived；成员仍有在跑任务 → `MT_DRAIN_PENDING`；已处于目标态/未知 op → `MT_VALIDATION` | 写→账本 |
@@ -482,7 +483,7 @@ interface HandoffSessionRef {
 
 ## 错误码（`MT_*`）
 
-> **本表由 `tools/gen-error-docs.mjs` 从 `plugin/src/core/errors.ts` 生成，共 74 个。**
+> **本表由 `tools/gen-error-docs.mjs` 从 `plugin/src/core/errors.ts` 生成，共 75 个。**
 > 手改会被覆盖，且 `plugin/test/t81-error-codes.test.ts` 会判红。
 >
 > **加码流程**：① `errors.ts` 加一行（含说明）→ ② `node tools/gen-error-docs.mjs` → ③ `cd plugin && npm test`。
@@ -490,7 +491,7 @@ interface HandoffSessionRef {
 > 客户端按码分支的地方（`plugin/client/client.js`）必须只认本表里的码；
 > 服务端新增码时若客户端要分支，同步改客户端并在 CHG 里记一笔。
 
-### 跨域通用（11）
+### 跨域通用（12）
 
 | 码 | 什么时候会看到它 |
 |---|---|
@@ -505,6 +506,7 @@ interface HandoffSessionRef {
 | `MT_UNKNOWN_METHOD` | 方法名不在宿主方法表里（客户端与服务端版本不一致，或拼错了）。 |
 | `MT_SCOPE_INVALID` | 作用域只接受 `project` \| `global`（缺省 = 项目级）。 |
 | `MT_SCOPE_PROJECT_ONLY` | 该内容只能存在于项目级（任务账本 / 历史 / 状态 / 导出 / 成员实例）；全局只有角色 / 团队 / 技能 / 工具 / 知识。 |
+| `MT_HISTORY_FAILED` | 会话考古读取历史页失败（宿主 `SessionController.page` 抛错且没带稳定错误码）；**不返回空历史假装成功**。 |
 
 ### 账本（append-only JSONL）（6）
 

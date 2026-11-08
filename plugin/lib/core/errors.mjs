@@ -105,6 +105,8 @@ export const MT_CODES = [
   // ── 会话移交（handoff）──────────────────────────────────────
   'MT_HANDOFF_FAILED',
   'MT_HANDOFF_NO_SESSION',
+  /* CHG-120（M2-D ②）：会话考古读取失败（宿主 page 抛错且无稳定错误码时的兜底） */
+  'MT_HISTORY_FAILED',
 
   // ── 插件贡献契约 ────────────────────────────────────────────
   'MT_CONTRIBUTION_CODE_IGNORED',
@@ -213,6 +215,7 @@ export const MT_CODE_DOCS                         = {
   // 会话移交
   MT_HANDOFF_FAILED: '移交时建会话或注入摘要失败；**仍回 sessionId**（不假装成功，也不吞掉已建会话）。',
   MT_HANDOFF_NO_SESSION: '移交目标会话不存在或不可写。',
+  MT_HISTORY_FAILED: '会话考古读取历史页失败（宿主 `SessionController.page` 抛错且没带稳定错误码）；**不返回空历史假装成功**。',
 
   // 插件贡献契约
   MT_CONTRIBUTION_CODE_IGNORED: '贡献物里的代码字段被宿主忽略（只做声明，不执行第三方代码）。',

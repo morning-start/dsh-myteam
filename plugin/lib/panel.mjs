@@ -121,6 +121,8 @@ import { isStoreInitialized, readManifest, storeLayout, ensureStore, rejectProje
                                                                    
                                                                        
                                                                    
+                                                                
+                                                                      
                                                              
                                             
                                                               
@@ -1054,6 +1056,16 @@ export class MyTeamPanelFacade extends TypertRemoteService {
     return remote.getPlanFeedback(query ?? {})
   }
 
+  /**
+   * CHG-120（M2-D ② / FR-16.4②）：会话考古——按 `session:<id>` 只读读一页历史。
+   * 旧宿主没有 `sessionController.page` → `MT_UNAVAILABLE`（**不假装读到**）。
+   */
+  async readSessionHistory(agent           , query                         ) {
+    const remote = this.remoteFor(agent)
+    if (!remote?.readSessionHistory) return UNAVAILABLE
+    return remote.readSessionHistory(query ?? {})
+  }
+
   /** 预设库（CHG-50）：三层只读目录（builtin/global/project） */
   async getPresets(agent           , query                         ) {
     const remote = this.remoteFor(agent)
@@ -1187,7 +1199,9 @@ markRemoteMethods(MyTeamPanelFacade.prototype, ['batch', 'describe', 'watch', 'l
   // CHG-117（FR-14.3 / docs/18 §7）：设置页配置写路径
   'saveTeamConfig', 'resetTeamConfig',
   // CHG-119（FR-11.6）：计划质量反馈（只读观测）
-  'getPlanFeedback'])
+  'getPlanFeedback',
+  // CHG-120（M2-D ② / FR-16.4②）：会话考古（按 session:<id> 只读读一页历史）
+  'readSessionHistory'])
 
 /**
  * 顶层装载行 apply（cordis.patch.yml myteam-panel 行）：

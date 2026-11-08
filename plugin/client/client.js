@@ -1142,6 +1142,18 @@ window.__ModuleLoader__.load({
       'settings.resetConfirmBody': '会删掉团队级 team.config.json（账本 / 成员不动），回到项目层或插件默认。',
       'settings.resetDone': '已恢复默认配置',
       'settings.unavailable': '宿主 lib 版本过旧：没有 saveTeamConfig 端点（升级插件后可用）。',
+      /* CHG-120（M2-D ② / FR-16.4②）：会话考古——按 session:<id> 只读读一页历史 */
+      'history.title': '会话考古',
+      'history.desc': '按 session:<id> 只读读取历史（不激活 Agent、不写当前上下文）',
+      'history.loading': '读取中…',
+      'history.empty': '这一页没有可读的历史记录',
+      'history.open': '考古',
+      'history.index': '会话索引（可考古）',
+      'history.truncated': '已截断',
+      'history.notes': '口径',
+      'history.failed': '读取失败：{msg}',
+      'history.more': '更早一页',
+      'history.chars': '本页 {n} 字符',
       'costbar.total': '累计 token',
       'costbar.hitRate': '缓存命中率',
       'costbar.today': '今日未命中 / 输出',
@@ -2338,6 +2350,18 @@ window.__ModuleLoader__.load({
       'settings.resetConfirmBody': 'Deletes the team-level team.config.json (ledger/members untouched) and falls back to project/plugin defaults.',
       'settings.resetDone': 'Team config reset to defaults',
       'settings.unavailable': 'Host lib is too old: no saveTeamConfig endpoint (upgrade the plugin).',
+      /* CHG-120（M2-D ② / FR-16.4②）：session archaeology — read one history page by session:<id> */
+      'history.title': 'Session archaeology',
+      'history.desc': 'Read history by session:<id> (read-only; never activates an Agent, never touches the current context)',
+      'history.loading': 'Reading...',
+      'history.empty': 'No history records on this page',
+      'history.open': 'Dig',
+      'history.index': 'Session index (diggable)',
+      'history.truncated': 'truncated',
+      'history.notes': 'Caliber',
+      'history.failed': 'Read failed: {msg}',
+      'history.more': 'Earlier page',
+      'history.chars': '{n} chars on this page',
       'costbar.total': 'Cumulative tokens',
       'costbar.hitRate': 'Cache hit rate',
       'costbar.today': 'Today uncached / output',
@@ -3029,6 +3053,8 @@ window.__ModuleLoader__.load({
         resetTeamConfig: (query) => call('resetTeamConfig', query),
         /* CHG-119（FR-11.6）：计划质量反馈（只读观测，不自动改计划） */
         getPlanFeedback: (query) => call('getPlanFeedback', query),
+        /* CHG-120（M2-D ② / FR-16.4②）：会话考古（按 session:<id> 只读读一页历史） */
+        readSessionHistory: (query) => call('readSessionHistory', query),
         getPresets: (query) => call('getPresets', query),
         memberOp: (query) => call('memberOp', query),
         planAction: (query) => call('planAction', query),
@@ -3608,6 +3634,11 @@ window.__ModuleLoader__.load({
       '.mt-dialog-head{display:flex;align-items:center;gap:8px;margin-bottom:8px}',
       '.mt-dialog-head strong{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}',
       '.mt-dialog-body{display:flex;flex-direction:column;gap:8px}',
+      /* CHG-120：会话考古抽屉——只读历史条目（按页读取，正文可换行） */
+      '.mt-history-list{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:8px;max-height:52vh;overflow:auto}',
+      '.mt-history-item{border:.5px solid var(--dsw-alias-border-l2);border-radius:8px;padding:8px 10px;background:var(--dsw-alias-bg-layer-1)}',
+      '.mt-history-meta{display:flex;align-items:center;gap:6px;flex-wrap:wrap;font-size:11px;color:var(--dsw-alias-label-tertiary)}',
+      '.mt-history-text{white-space:pre-wrap;font-size:12px;color:var(--dsw-alias-label-primary);margin-top:4px;word-break:break-word}',
       '.mt-dialog-actions{display:flex;gap:8px;justify-content:flex-end;margin-top:10px;flex-wrap:wrap}',
       '.mt-radio{display:inline-flex;align-items:center;gap:5px;font-size:12px;color:var(--dsw-alias-label-secondary);padding:2px 0}',
       '.mt-impactbox{border:.5px solid var(--dsw-alias-state-error-primary);border-radius:8px;padding:8px 10px;font-size:11px;color:var(--dsw-alias-label-secondary);display:flex;flex-direction:column;gap:3px}',
@@ -7368,6 +7399,8 @@ window.__ModuleLoader__.load({
       /* 两段确认：第一次保存回 `confirm-required` 时存下影响面 */
       const [pendingSave, setPendingSave] = react.useState(null)
       const [resetAsk, setResetAsk] = react.useState(false)
+      /* CHG-120（M2-D ②）：会话考古——当前打开的一页历史（null = 抽屉关闭） */
+      const [history, setHistory] = react.useState(null)
       react.useEffect(() => {
         if (!config?.config) return
         const next = JSON.parse(JSON.stringify(config.config))
@@ -7442,7 +7475,34 @@ window.__ModuleLoader__.load({
           setSaving(false)
         }
       }
-      /** 恢复默认（两段确认）：删团队层文件 → 重新拉生效配置 */
+      /**
+       * CHG-120（M2-D ② / FR-16.4②）：**会话考古**——按 `session:<id>` 只读读一页历史。
+       *
+       * 为什么放在设置页：handoff 结果里的「会话索引」是 `session:<id>` 指针的产出处；
+       * 没有读取方它就是死链接。旧宿主没有 `page` 能力 → 明确提示（不假装读到）。
+       * 翻页用 `beforeSeq`（本页最早一条 seq）往回读。
+       */
+      const openHistory = async (sessionId, beforeSeq) => {
+        if (!team?.sessionId) return
+        const request = { sessionId, ...(beforeSeq !== undefined ? { beforeSeq } : {}) }
+        setHistory({ ...request, loading: true, data: null, err: null })
+        try {
+          const api = makeApi(connection, team.sessionId)
+          if (typeof api.readSessionHistory !== 'function') {
+            setHistory({ ...request, loading: false, data: null, err: t('settings.unavailable') })
+            return
+          }
+          const r = await api.readSessionHistory({ teamId: team.teamId, ...request })
+          if (r?.status !== 'ok') {
+            setHistory({ ...request, loading: false, data: null, err: String(r?.message ?? r?.code ?? t('history.failed').replace('{msg}', '')) })
+            return
+          }
+          setHistory({ ...request, loading: false, data: r, err: null })
+        } catch (e) {
+          setHistory({ ...request, loading: false, data: null, err: t('history.failed').replace('{msg}', String(e?.message ?? e)) })
+        }
+      }
+
       const doReset = async () => {
         if (!editable || !team?.sessionId || saving) return
         setSaveErr(null)
@@ -7705,6 +7765,22 @@ window.__ModuleLoader__.load({
             j('span', { className: 'mt-rolechip mt-rolechip-mono', children: String(handoffResult.sessionId ?? '—') }),
             handoffResult.note ? j('span', { children: String(handoffResult.note) }) : null,
             handoffResult.summary ? j('pre', { className: 'mt-prompt-block', children: String(handoffResult.summary) }) : null,
+            /* CHG-120：会话索引 = session:<id> 指针列表，每条都能「考古」只读深读 */
+            (handoffResult.metadata?.sessionIndex ?? []).length > 0 ? js('div', { className: 'mt-setrows', children: [
+              j('b', { children: t('history.index') }),
+              ...handoffResult.metadata.sessionIndex.map((ref) => js('div', { key: ref.sessionId, className: 'mt-setrow', children: [
+                js('div', { className: 'mt-setrow-main', children: [
+                  j('div', { className: 'mt-setrow-title', children: String(ref.title ?? ref.sessionId) }),
+                  j('div', { className: 'mt-setrow-sub', children: `session:${ref.sessionId}${ref.taskId ? ` · ${ref.taskId}` : ''}` }),
+                ] }),
+                js('div', { className: 'mt-setrow-act', children: j('button', {
+                  className: 'mt-btn mt-btn-sm',
+                  'data-testid': `history-open-${ref.sessionId}`,
+                  onClick: () => openHistory(String(ref.sessionId)),
+                  children: t('history.open'),
+                }) }),
+              ] })),
+            ] }) : null,
             js('div', { className: 'mt-form-actions', children: [
               j('button', { className: 'mt-btn', onClick: () => setHandoffResult(null), children: t('action.close') }),
             ] }),
@@ -7714,6 +7790,54 @@ window.__ModuleLoader__.load({
         js('p', { className: 'mt-note-box', children: [j('b', { children: t('settings.footNote') }), j('span', { children: t('settings.footNoteSub') })] }),
         (config.warnings ?? []).length > 0 ? j('div', { className: 'mt-note-box mt-note-info', children: `${t('settings.warnings')}：${config.warnings.join('；')}` }) : null,
         err ? j('div', { className: 'mt-form-note mt-error-banner', role: 'alert', children: err }) : null,
+        /* CHG-120：会话考古抽屉（只读一页历史；翻页用 beforeSeq 往回读） */
+        history ? j('div', {
+          className: 'mt-overlay',
+          role: 'dialog',
+          'aria-modal': 'true',
+          'aria-label': t('history.title'),
+          onClick: (event) => { if (event?.target === event?.currentTarget) setHistory(null) },
+          children: js('div', { className: 'mt-dialog', children: [
+            js('div', { className: 'mt-dialog-head', children: [
+              js('div', { children: [
+                j('h3', { children: t('history.title') }),
+                j('p', { className: 'mt-hint', children: t('history.desc') }),
+              ] }),
+              j('button', { className: 'mt-btn', 'data-testid': 'history-close', onClick: () => setHistory(null), children: t('action.close') }),
+            ] }),
+            js('div', { className: 'mt-dialog-body', children: [
+              j('span', { className: 'mt-rolechip mt-rolechip-mono', children: `session:${history.sessionId}` }),
+              history.loading
+                ? j('div', { className: 'mt-hint', children: t('history.loading') })
+                : history.err
+                  ? j('div', { className: 'mt-form-note mt-error-banner', role: 'alert', children: history.err })
+                  : (history.data?.items ?? []).length === 0
+                    ? j('div', { className: 'mt-empty', children: t('history.empty') })
+                    : js('ol', { className: 'mt-history-list', children: (history.data.items ?? []).map((item, index) => js('li', { key: index, className: 'mt-history-item', children: [
+                      js('div', { className: 'mt-history-meta', children: [
+                        item.role ? j('b', { children: String(item.role) }) : null,
+                        item.type ? j('span', { children: String(item.type) }) : null,
+                        item.seq !== undefined ? j('span', { children: `#${item.seq}` }) : null,
+                        item.truncated ? j('span', { className: 'mt-chip mt-chip-warn', children: t('history.truncated') }) : null,
+                      ] }),
+                      j('div', { className: 'mt-history-text', children: String(item.text ?? '') }),
+                    ] })) }),
+              history.data ? js('div', { className: 'mt-form-actions', children: [
+                j('span', { className: 'mt-hint', children: t('history.chars').replace('{n}', String(history.data.chars ?? 0)) }),
+                history.data.hasMore ? j('button', {
+                  className: 'mt-btn mt-btn-sm',
+                  'data-testid': 'history-more',
+                  onClick: () => openHistory(history.sessionId, Number((history.data.items ?? [])[0]?.seq ?? 0) || undefined),
+                  children: t('history.more'),
+                }) : null,
+              ] }) : null,
+              history.data ? js('div', { className: 'mt-note-box mt-note-info', children: [
+                j('b', { children: t('history.notes') }),
+                ...(history.data.notes ?? []).map((note, index) => j('div', { key: index, children: String(note) })),
+              ] }) : null,
+            ] }),
+          ] }),
+        }) : null,
       ] })
     }
 
