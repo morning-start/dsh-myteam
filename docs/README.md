@@ -18,6 +18,7 @@
 | 给 myteam 贡献一套团队（第三方插件作者） | [16-插件团队贡献契约](16-插件团队贡献契约.md) | [skills/myteam-plugin-team/](../skills/myteam-plugin-team/README.md) |
 | 看 UI 怎么对齐设计稿、怎么复检 | [13-UI对齐分工](13-UI对齐分工.md) | [14-UI复检清单](14-UI复检清单.md) · [design/design-notes.md](../design/design-notes.md) |
 | 确认技术前提是否成立 | [02-技术可行性](02-技术可行性.md) | [06-风险与依赖](06-风险与依赖.md) |
+| 改配置字段 / 看 `team.config.json` 的权威定义 | [18-配置Schema定稿](18-配置Schema定稿.md) | [11-数据模型与存储设计](11-数据模型与存储设计.md) §4.6 · [schema](../plugin/schema/team-config.schema.json) |
 | 接手时先看有哪些坑与未偿技术债 | [06-风险与依赖](06-风险与依赖.md) | [agent-team-practices-checklist.md](agent-team-practices-checklist.md) |
 | 看调研依据、社区竞品怎么做的 | [01-调研与竞品](01-调研与竞品.md) | [agent-team-practices-checklist.md](agent-team-practices-checklist.md) |
 | 追阶段 3 当时交付了什么 | [10-实现说明-阶段3](10-实现说明-阶段3.md) | [08-验收报告](08-验收报告.md) §1 |
@@ -44,6 +45,7 @@
 | [15-官方AgentTeam对照与借鉴](15-官方AgentTeam对照与借鉴.md) | 官方四包全景、十二维对照、差异逐条、10 条借鉴、共存风险 | 想复用官方实现、或与之共存 |
 | [16-插件团队贡献契约](16-插件团队贡献契约.md) | 贡献点目录、`plugin.json` / 角色 / 团队模板契约、优先级、生命周期、安全边界、契约测试矩阵 | 写第三方团队插件、或改贡献物装载逻辑 |
 | [17-项目级存储架构](17-项目级存储架构.md) | **现行存储口径**：`.dsh-myteam/` 目录契约、上传纪律、`resolveProjectRoot` 唯一入口、面板作用域、迁移与验收 | 碰任何落盘路径、或疑惑「数据到底写哪了」 |
+| [18-配置Schema定稿](18-配置Schema定稿.md) | **配置唯一权威定义**：`team.config.json` 全字段（类型/默认/约束/影响面）、三层合并语义、角色 schema 扩展、模板组合面、版本迁移裁决、设置页写契约 | 要加/改配置字段、写设置页、或实现 `saveTeamConfig` |
 | [agent-team-practices-checklist.md](agent-team-practices-checklist.md) | 六来源（NM/CX/LY/BA/TC/TF）的实践清单，按来源标注共识项 | PRD 的依据之一：某个做法是不是行业共识 |
 
 ## 按角色找（谁维护哪几份）
@@ -73,7 +75,7 @@
 | 架构决策 | [03-架构与ADR](03-架构与ADR.md) 的 ADR-001~014 | 只留聊天里的架构决定不算数；改架构先改 ADR |
 | 接口与数据契约 | [04-API与数据契约](04-API与数据契约.md) | 实现与本文冲突时**改实现**（要改契约走 CHG） |
 | `MT_*` 错误码表 | `plugin/src/core/errors.ts` | [docs/04](04-API与数据契约.md) 文末的码表由 [tools/gen-error-docs.mjs](../tools/gen-error-docs.mjs) **生成**，**不要手改**（会被下次生成覆盖，且 `t78` / `t81` 判红）。加码流程：改 `errors.ts` → `node tools/gen-error-docs.mjs` → `cd plugin && npm test` |
-| 变更编号 | [09-变更记录](09-变更记录.md) | **唯一 CHG 编号来源**（当前登记到 CHG-102；CHG-95 为空号）。任何文档引用 CHG 时以此为准 |
+| 变更编号 | [09-变更记录](09-变更记录.md) | **唯一 CHG 编号来源**（当前登记到 CHG-116）。任何文档引用 CHG 时以此为准 |
 | 数字口径 | [08-验收报告](08-验收报告.md) §0 数字复核表 | 08 §0 是**最近一次复核时点**的真值；代码变了要重跑 `cd plugin && npm test` 再改 08，不要拿别处的旧数字反推 |
 | 存储落点 | [17-项目级存储架构](17-项目级存储架构.md) | 17 定**目录契约与上传纪律**（现行），11 定数据模型与重建方式，04 管接口签名 |
 | 贡献契约 | [16-插件团队贡献契约](16-插件团队贡献契约.md) | 声明「本文是唯一权威」：实现与本文冲突时改实现 |
@@ -109,7 +111,7 @@
 
 | 形态 | 约定 |
 |---|---|
-| 正文文档 | `NN-中文名.md`，`NN` 为两位流程编号（`00`~`17`），按阶段递增 |
+| 正文文档 | `NN-中文名.md`，`NN` 为两位流程编号（`00`~`18`），按阶段递增 |
 | 可视化伴生文件 | 与正文同号同名的 `.html`（如 [11-data-model.html](11-data-model.html)）；改数据模型时两份一起改 |
 | 任务夹 | [myteam/](myteam/) 下按 `<yyyyMMdd>-r<N>-<slug>/` 建目录，收口后随代码提交 |
 | 清单类文档 | 不带编号（如 [agent-team-practices-checklist.md](agent-team-practices-checklist.md)），因为它是**输入材料**而非阶段产出 |

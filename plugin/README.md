@@ -27,10 +27,11 @@ npx tsc -p tsconfig.json --noEmit
 
 | 路径 | 职责 |
 |---|---|
-| `src/` | TypeScript 源码真身：42 个 `.ts` + 1 个遗留转发 `host.js` |
-| `lib/` | 构建产物：42 个 `.mjs` + `build-manifest.json`；`main` 指向 `lib/host.mjs`，随包分发 |
+| `src/` | TypeScript 源码真身：43 个 `.ts` + 1 个遗留转发 `host.js` |
+| `lib/` | 构建产物：43 个 `.mjs` + `build-manifest.json`；`main` 指向 `lib/host.mjs`，随包分发 |
 | `client/` | `client.js` 面板浏览器产物——**不经 src 编译**，由 `exports["./client"]` 直载，指纹单独记 |
-| `test/` | 单测 67 个文件（`node --test`） |
+| `test/` | 单测 73 个文件（`node --test`） |
+| `schema/` | `team-config.schema.json`：配置的机器可读定稿（与 [docs/18](../docs/18-配置Schema定稿.md)、`src/core/config/team-config.ts` 三方同步，`t89` 守门） |
 | `scripts/` | `build-lib.mjs`：构建脚本（代码生成器，不是运行时） |
 | `locale/` | 面板文案 `zh.json` / `en.json` |
 | `cordis.patch.yml` | 装载声明（preset EntryGroup 三行，见下文「装载形态」） |
@@ -152,7 +153,7 @@ node tools/check-drift.mjs    # 退出码 0 = MISMATCH: 0
 cd plugin && npm test
 ```
 
-- `test/` 下 72 个测试文件；**条数以 `npm test` 实际输出为准**（增删测试后不要抄旧数字）。
+- `test/` 下 73 个测试文件；**条数以 `npm test` 实际输出为准**（增删测试后不要抄旧数字）。
 - 门禁型测试不是装饰：`t42`（src↔lib 指纹）、`t80`（构建三道闸）、`t81`（错误码双向锁死）、`t76`（贡献契约）都在「实现与声明分叉」时变红。
 - 需要真实宿主会话的探针（`core/members/smoke.ts`）不在 CI 内，按文件头注释在插件 dev profile 里跑。
 
@@ -164,6 +165,7 @@ cd plugin && npm test
 | [../docs/03-架构与ADR.md](../docs/03-架构与ADR.md) | 五域划分、核心数据流、ADR-001~014 |
 | [../docs/04-API与数据契约.md](../docs/04-API与数据契约.md) | 工具 / 端点 / 错误码契约（错误码表由 `tools/gen-error-docs.mjs` 生成，不要手改） |
 | [../docs/11-数据模型与存储设计.md](../docs/11-数据模型与存储设计.md) | 账本事件与投影字段 |
+| [../docs/18-配置Schema定稿.md](../docs/18-配置Schema定稿.md) | **配置字段的唯一权威定义**（`team.config.json` / 角色 schema / 模板组合面 / 设置页写契约） |
 | [../docs/16-插件团队贡献契约.md](../docs/16-插件团队贡献契约.md) | 第三方插件怎么贡献角色与团队模板 |
 | [../skills/myteam-plugin-team/README.md](../skills/myteam-plugin-team/README.md) | 贡献方视角的 skill 包与可执行校验器 |
 
