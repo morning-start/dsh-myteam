@@ -1245,6 +1245,11 @@ export class MyTeamHost {
             return this.roleError(e)
           }
         }
+        /* CHG-133（docs/20 §8）：导出 / 导入团队快照（仅队长） */
+        case 'myteam_export_team':
+          return this.exportTeamTool(args)
+        case 'myteam_import_team':
+          return this.importTeamTool(args)
         /* CHG-132（docs/20 §3/§5.1）：发布团队定义到全局团队库（人类专属） */
         case 'myteam_publish_team':
           return this.publishTeamTool(args)
@@ -2971,6 +2976,126 @@ export class MyTeamHost {
   }
 
   /* ── 团队模板管理（CHG-57）：内置只读、写项目层、两段确认；面板仍只读 ── */
+
+  /**
+   * CHG-133（docs/20 §8）：**导出团队快照**——仅队长（C 档只读）。
+   *
+   * 快照是**定义 + 计数**（名册 / 名称 / 目标 / 团队层配置 / 事件数），**不含**成员会话 id、
+   * 记忆、token 明细——那些是运行态，导出即泄露。
+   */
+  exportTeamTool(args                          = {})                          {
+    const teamId = String(args.teamId ?? this.defaultTeamId()).trim()
+    const dir = join(storeLayout(this.workspaceRoot).tasks, teamId)
+    if (!teamId || !existsSync(dir)) {
+      return { status: 'error', code: 'MT_VALIDATION', field: 'teamId', message: `团队不存在：${teamId}（先用 myteam_list_teams 看有哪些）` }
+    }
+    const proj = this.service(teamId).projectionSnapshot                
+                   
+                   
+                                                                                            
+     
+    const roster = Object.values(proj.members ?? {})
+      .map((member) => ({
+        roleId: String(member.roleId ?? ''),
+        instanceName: String(member.instanceName ?? ''),
+        ...(Array.isArray(member.skills) ? { skills: (member.skills             ).map((skill) => String(skill)) } : {}),
+      }))
+      .filter((entry) => entry.roleId.length > 0)
+    let config         
+    const configPath = join(dir, 'team.config.json')
+    try {
+      if (existsSync(configPath)) config = JSON.parse(readFileSync(configPath, 'utf8'))           
+    } catch {
+      config = undefined
+    }
+    const eventCount = readLedgerEvents(this.service(teamId).ledgerPath).events.length
+    const snapshot = {
+      version: 1,
+      teamId,
+      name: String(proj.name ?? ''),
+      goal: String(proj.goal ?? ''),
+      roster,
+      ...(config === undefined ? {} : { config }),
+      eventCount,
+      exportedAt: Date.now(),
+    }
+    const label = String(args.label ?? teamId).replace(/[^A-Za-z0-9._-]/g, '_')
+    const exportsDir = join(storeLayout(this.workspaceRoot).history, 'exports')
+    const filePath = join(exportsDir, `${label}-${Date.now()}.json`)
+    const text = `${JSON.stringify(snapshot, null, 2)}\n`
+    try {
+      mkdirSync(exportsDir, { recursive: true })
+      writeFileSync(filePath, text, 'utf8')
+    } catch (error) {
+      return { status: 'error', code: 'MT_INTERNAL', teamId, message: String((error                     )?.message ?? error) }
+    }
+    return {
+      status: 'ok',
+      teamId,
+      filePath,
+      bytes: Buffer.byteLength(text, 'utf8'),
+      counts: { roster: roster.length, events: eventCount, hasConfig: config !== undefined },
+      note: '快照只含团队定义 + 计数（不含会话 id / 记忆 / token 明细）',
+    }
+  }
+
+  /**
+   * CHG-133（docs/20 §8）：**导入团队快照**——仅队长（C 档写；**新 id，永不覆盖**）。
+   *
+   * 导入 = 建**新草稿团队**（走 `submit_plan` staging + `approve_plan` 人审）；
+   * 快照里的 `teamId` 只作 `sourceTeamId` 溯源；任务 / 账本 / 会话不导入。
+   */
+  async importTeamTool(args                          = {})                                   {
+    const raw = String(args.filePath ?? '').trim()
+    if (!raw) return { status: 'error', code: 'MT_VALIDATION', field: 'filePath', message: 'filePath is required' }
+    const filePath = /^[A-Za-z]:[\\/]|^\//.test(raw) ? raw : join(this.workspaceRoot, raw)
+    if (!existsSync(filePath)) {
+      return { status: 'error', code: 'MT_VALIDATION', field: 'filePath', message: `快照文件不存在：${filePath}` }
+    }
+    let snapshot                                                                                           
+    try {
+      snapshot = JSON.parse(readFileSync(filePath, 'utf8'))                   
+    } catch (error) {
+      return { status: 'error', code: 'MT_VALIDATION', field: 'filePath', message: `快照不是合法 JSON：${String((error                     )?.message ?? error)}` }
+    }
+    if (Number(snapshot.version) !== 1) {
+      return { status: 'error', code: 'MT_VALIDATION', field: 'version', message: `不支持的快照版本：${String(snapshot.version)}（期望 1）` }
+    }
+    if (!Array.isArray(snapshot.roster)) {
+      return { status: 'error', code: 'MT_VALIDATION', field: 'roster', message: '快照缺少 roster 数组' }
+    }
+    const roster = (snapshot.roster                                                                    )
+      .map((entry) => ({
+        roleId: String(entry?.roleId ?? ''),
+        instanceName: String(entry?.instanceName ?? ''),
+        ...(Array.isArray(entry?.skills) ? { skills: (entry.skills             ).map((skill) => String(skill)) } : {}),
+      }))
+      .filter((entry) => entry.roleId.length > 0)
+    if (roster.length === 0) {
+      return { status: 'error', code: 'MT_VALIDATION', field: 'roster', message: '快照名册为空（至少需要队长角色）' }
+    }
+    const captainRoleId = this.roleCatalog()
+      .map((entry) => entry.definition                                                   )
+      .find((definition) => definition.isCaptain === true)?.id
+    if (captainRoleId && !roster.some((entry) => entry.roleId === String(captainRoleId))) {
+      roster.push({ roleId: String(captainRoleId), instanceName: 'captain' })
+    }
+    /* 名称必须唯一（同一团队名会撞 MT_TEAM_STATE）：显式 name 优先，否则「源名+导入+短时间戳」 */
+    const name = String(args.name ?? `${String(snapshot.name || snapshot.teamId || '团队')}（导入-${Date.now().toString(36)}）`).trim()
+    const staged = await this.executeLeadTool('myteam_submit_plan', { teamName: name, goal: String(snapshot.goal ?? ''), roster, tasks: [] }, {})                                      
+    if (String(staged.status) !== 'staged') {
+      return { status: 'error', code: typeof staged.code === 'string' ? staged.code : 'MT_INTERNAL', message: String(staged.message ?? '导入失败'), filePath }
+    }
+    return {
+      status: 'ok',
+      teamId: String(staged.teamId ?? ''),
+      sourceTeamId: String(snapshot.teamId ?? ''),
+      sourceFile: filePath,
+      name,
+      rosterCount: roster.length,
+      note: '已导入为新草稿团队（新 id，永不覆盖）；任务 / 账本 / 会话不导入',
+    }
+  }
 
   /**
    * CHG-132（docs/20 §3/§5.1）：**发布团队定义到全局团队库**——人类专属（H 档）。
