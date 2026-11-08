@@ -526,6 +526,17 @@ export function leadToolDefs(): ToolDef[] {
     { name: 'myteam_resolve_proposal', description: '处置成员结构提案（FR-11.4）：approved/rejected。**批准即执行对应变更**（CHG-88）：split → 落子任务 + 原任务取消；add-dep → 加依赖；reassign → 改派；cancel → 取消。驳回只留痕、结构不动。载荷不合规会拒绝并说明，不会留下「已批准但什么都没做」的半截状态。', parameters: { type: 'object', properties: { teamId: teamId(), proposalId: str('提案 id', true), decision: { type: 'string', enum: ['approved', 'rejected'], description: '处置决定', required: true }, note: str('处置说明') } } },
     { name: 'myteam_adopt_knowledge', description: '采纳/驳回知识提案（FR-17.4 策展门）：adopted 落 config/knowledge/（带 evidence+contributor 归因）；rejected 只留痕。draftId 来自 knowledge.proposed 事件。', parameters: { type: 'object', properties: { teamId: teamId(), draftId: str('知识提案 id（knowledge.proposed 事件的 draftId）', true), decision: { type: 'string', enum: ['adopted', 'rejected'], description: '策展决定', required: true }, note: str('处置说明') } } },
     {
+      /* CHG-128（docs/19 §M3）：可复用技能清单——**全员可读**（A 档） */
+      name: 'myteam_list_skills',
+      description: '列出可复用技能（全员可读，CHG-128 / docs/19 §M3）：返回 `{status, total, declared:[{name, boundBy:[{roleId,origin}]}], host:{available, skills?}, note?}`。`declared` = 角色目录里**已绑定**的技能名（去重 + 哪些角色在用）；`host` = 宿主技能服务（拿不到时 `available:false` 并给 `note` 说明，**不伪造清单**）。绑定技能用 `myteam_create_role` / `myteam_update_role` 的 `skills`；技能本身是**外部资产**（宿主/插件），本项目只管引用。',
+      parameters: {
+        type: 'object',
+        properties: {
+          withRoles: bool('是否带「哪些角色绑定了它」（缺省 true；false 时 declared 为纯字符串数组）'),
+        },
+      },
+    },
+    {
       /* CHG-127（docs/19 §5.3）：发布角色到全局（**人类专属** H 档；单向不可逆） */
       name: 'myteam_publish_role',
       description: '把**项目库**的角色发布到**全局库**（人类专属，CHG-127 / docs/19 §5.3）：`{roleId, confirm?}`。**单向不可逆**——发布后全局库那份不会回流到任何项目副本（快照语义）；全局已有同名角色时先回 `confirm-required`（`impact.exists:true`），带 `confirm:true` 才覆盖。**模型只能提案**：这是 H 档操作，需要人在场确认。',

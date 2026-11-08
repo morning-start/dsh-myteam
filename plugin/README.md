@@ -153,7 +153,7 @@ node tools/check-drift.mjs    # 退出码 0 = MISMATCH: 0
 cd plugin && npm test
 ```
 
-- `test/` 下 82 个测试文件；**条数以 `npm test` 实际输出为准**（增删测试后不要抄旧数字）。
+- `test/` 下 83 个测试文件；**条数以 `npm test` 实际输出为准**（增删测试后不要抄旧数字）。
 - 门禁型测试不是装饰：`t42`（src↔lib 指纹）、`t80`（构建三道闸）、`t81`（错误码双向锁死）、`t76`（贡献契约）都在「实现与声明分叉」时变红。
 - 需要真实宿主会话的探针（`core/members/smoke.ts`）不在 CI 内，按文件头注释在插件 dev profile 里跑。
 

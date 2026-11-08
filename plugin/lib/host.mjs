@@ -1245,6 +1245,9 @@ export class MyTeamHost {
             return this.roleError(e)
           }
         }
+        /* CHG-128（docs/19 §M3）：可复用技能清单（全员可读） */
+        case 'myteam_list_skills':
+          return this.listSkillsTool(args)
         /* CHG-127（docs/19 §5.3）：发布角色到全局（人类专属；单向不可逆） */
         case 'myteam_publish_role':
           return this.publishRoleTool(args)
@@ -2952,6 +2955,57 @@ export class MyTeamHost {
   }
 
   /* ── 团队模板管理（CHG-57）：内置只读、写项目层、两段确认；面板仍只读 ── */
+
+  /**
+   * CHG-128（docs/19 §M3）：**可复用技能清单**——全员可读（A 档）。
+   *
+   * 口径（docs/19 §1 R1：项目管到「角色」为止）：
+   *  - 技能是**外部资产**（宿主 `skills` 服务 / 插件贡献 / `DSH_HOME/skills`），本项目只维护
+   *    「角色绑定了哪些」——所以这一条的首要数据是**角色目录里的 `skills` 声明**（去重 + 绑定者）；
+   *  - 宿主技能服务**可用就并进来**（`host.available:true` + 清单）；拿不到就**如实标不可用**
+   *    并给 `note`，**绝不伪造一份假清单**（docs/19 §6 第 8 条）。
+   */
+  listSkillsTool(args                          = {})                          {
+    const withRoles = args.withRoles !== false
+    const declared = new Map                                              ()
+    for (const entry of this.roleCatalog()) {
+      const definition = entry.definition                                                
+      const skills = Array.isArray(definition.skills) ? definition.skills : []
+      for (const skill of skills) {
+        const name = String(skill ?? '').trim()
+        if (!name) continue
+        const bucket = declared.get(name) ?? []
+        bucket.push({ roleId: String(definition.id ?? ''), origin: String(entry.origin) })
+        declared.set(name, bucket)
+      }
+    }
+    const names = [...declared.keys()].sort((a, b) => a.localeCompare(b))
+    /* 宿主技能服务（可选能力）：有就用，没有就诚实标不可用 */
+    let host                          = { available: false }
+    try {
+      const service = (this.rt                                                    )?.skills
+      if (service && typeof service.list === 'function') {
+        const raw = service.list()
+        const skills = (Array.isArray(raw) ? raw : []).map((item) => {
+          const record = (item ?? {})                                                           
+          return {
+            name: String(record.name ?? record.id ?? ''),
+            ...(typeof record.description === 'string' && record.description.length > 0 ? { description: record.description } : {}),
+          }
+        }).filter((item) => item.name.length > 0)
+        host = { available: true, skills }
+      }
+    } catch {
+      host = { available: false }
+    }
+    return {
+      status: 'ok',
+      total: names.length,
+      declared: withRoles ? names.map((name) => ({ name, boundBy: declared.get(name) ?? [] })) : names,
+      host,
+      ...(host.available === true ? {} : { note: '宿主未暴露 skills 服务：这里只列「角色已绑定」的技能名；可复用资产的权威清单以宿主为准（不伪造）' }),
+    }
+  }
 
   /**
    * CHG-127（docs/19 §5.3）：**发布角色到全局库**——人类专属（H 档）。
