@@ -1245,6 +1245,9 @@ export class MyTeamHost {
             return this.roleError(e)
           }
         }
+        /* CHG-129（docs/19 §M10）：token / 成本只读查询（全员可读） */
+        case 'myteam_get_tokens':
+          return this.getTokensTool(args)
         /* CHG-128（docs/19 §M3）：可复用技能清单（全员可读） */
         case 'myteam_list_skills':
           return this.listSkillsTool(args)
@@ -2955,6 +2958,21 @@ export class MyTeamHost {
   }
 
   /* ── 团队模板管理（CHG-57）：内置只读、写项目层、两段确认；面板仍只读 ── */
+
+  /**
+   * CHG-129（docs/19 §M10）：**token / 成本只读查询**——全员可读（A 档）。
+   *
+   * 口径（CHG-86 §P0-3）：`days` 是**按天增量桶**——基线 = 成员累计量（冷启动从
+   * `tokens.json.totals` 恢复），本次累计 − 基线 = 增量记到当天；重复读不改变结果，
+   * 也不会写负数（累计量回退时只重置基线）。
+   *
+   * **估算标注**：tokenMeter 给的是估算值，不是账单——返回里不放任何「金额」字段。
+   */
+  getTokensTool(args                          = {})                          {
+    const teamId = String(args.teamId ?? this.defaultTeamId())
+    const tokens = this.syncTokens(teamId)
+    return { status: 'ok', teamId, tokens }
+  }
 
   /**
    * CHG-128（docs/19 §M3）：**可复用技能清单**——全员可读（A 档）。
