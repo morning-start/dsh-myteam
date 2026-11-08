@@ -68,6 +68,8 @@ import {
                          
 } from './core/host/session-archaeology.mjs'
 import { recoveryAction, checkArchiveGate } from './core/scheduler/recovery.mjs'
+/* CHG-124（docs/19 §M6）：任务依赖图谱纯函数（Kahn 分层 + 环检测） */
+import { buildTaskGraph } from './core/scheduler/task-graph.mjs'
 import { entryFromProjection, scanWorkspaceIndex, readWorkspaceIndex, writeWorkspaceIndex, upsertTeamEntry, upsertGlobalWorkspace, resolveMyteamHome } from './core/index/team-index.mjs'
 // CHG-91（插件团队贡献契约 v1）：装载第三方插件贡献的角色与团队模板
 import { loadContributions } from './core/contributions/parse.mjs'
@@ -1243,6 +1245,9 @@ export class MyTeamHost {
             return this.roleError(e)
           }
         }
+        /* CHG-124（docs/19 §M6）：任务依赖图谱只读查询（全员可读） */
+        case 'myteam_get_task_graph':
+          return this.getTaskGraphTool(args)
         /* CHG-123（docs/19 §M0/M2）：团队目录 + 详情（全员可读） */
         case 'myteam_list_teams':
           return this.listTeamsTool(args)
@@ -2938,6 +2943,38 @@ export class MyTeamHost {
   }
 
   /* ── 团队模板管理（CHG-57）：内置只读、写项目层、两段确认；面板仍只读 ── */
+
+  /**
+   * CHG-124（docs/19 §M6）：**任务依赖图谱只读查询**——全员可读（A 档）。
+   *
+   * 为什么必须有：依赖是**写**（`create_task.deps` / `edit_task` / `rescope_task`），
+   * 但模型此前只能拿 `deps` 数组手算拓扑——无法判断「哪些能并行」「有没有环」。
+   * 这一条把图谱视图（面板 `getBoard().graph` 同源）暴露给模型。
+   *
+   * 口径：
+   *  - `edges`: `from` = 被依赖（前置），`to` = 依赖它的（后继）——与 `deps` 语义一致；
+   *  - `layers`: 拓扑层级（Kahn 分层，同层可并行；**只含无环部分**）；
+   *  - `cycles`: 环（Kahn 剩余节点 + 其可达边）——有环时 `hasCycle:true`，`layers` 不完整；
+   *  - **只读**：不写账本、不改任何任务。
+   */
+  getTaskGraphTool(args                          = {})                          {
+    const teamId = String(args.teamId ?? this.defaultTeamId())
+    const tasks = Object.values(this.service(teamId).projectionSnapshot.tasks ?? {})                
+                
+                   
+                                                                                           
+       
+    /* 分层/环检测在纯函数里（`core/scheduler/task-graph.ts`）——可脱团队单测 */
+    const graph = buildTaskGraph(tasks.map((task) => ({
+      id: String(task.id),
+      title: String(task.input?.title ?? ''),
+      state: String(task.state),
+      priority: String(task.input?.priority ?? ''),
+      requiredRole: String(task.input?.requiredRole ?? ''),
+      deps: (task.input?.deps ?? []).map((dep) => String(dep)),
+    })))
+    return { status: 'ok', teamId, ...graph }
+  }
 
   /**
    * CHG-123（docs/19 §M0/M2）：**团队目录**——全员可读（A 档）。

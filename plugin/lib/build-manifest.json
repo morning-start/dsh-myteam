@@ -1,10 +1,10 @@
 {
   "schema": 1,
-  "builtAt": "2026-11-08T06:00:22.082Z",
+  "builtAt": "2026-11-08T06:03:51.688Z",
   "node": "v22.23.2",
   "entry": "./lib/host.mjs",
-  "modules": 45,
-  "sourceHash": "67f5edf4eb07b175d07bb97fc1e7543e32e5b44f5fcd4c3d4d6f4242c2162738",
+  "modules": 46,
+  "sourceHash": "28a2474e921a2c592b50edc31fce35bd53b570b0f67cd6acc907409eb68ecaea",
   "clientFile": "client/client.js",
   "clientHash": "5d2fd3d4abed301aeef8573f36671a2350cb69fa192f124514e9890c06c8fc55",
   "files": [
@@ -39,6 +39,7 @@
     "core/scheduler/fold.ts",
     "core/scheduler/recovery.ts",
     "core/scheduler/state.ts",
+    "core/scheduler/task-graph.ts",
     "core/scheduler/wake.ts",
     "core/service.ts",
     "core/tasks/diff.ts",
