@@ -59,9 +59,13 @@ test('t86-5: 服务端两个门面都产出 rootDisplay（贡献目录 / 存储�
 
   // 归档两处（archiveView / archiveList）也要带——归档目录同样是绝对路径
   const host = readFileSync(join(import.meta.dirname, '..', 'src', 'host.ts'), 'utf8')
-  const archiveView = host.slice(host.indexOf('archiveView(teamId?: string)'), host.indexOf('archiveList()'))
+  /* CHG-123：按**定义**取切片（`archiveList()` 现在也会被工具方法调用，取首个调用点会切空） */
+  const archiveViewAt = host.indexOf('archiveView(teamId?: string)')
+  const archiveListAt = host.indexOf('archiveList(): {')
+  assert.ok(archiveViewAt > 0 && archiveListAt > archiveViewAt, 'archiveView / archiveList 定义必须存在')
+  const archiveView = host.slice(archiveViewAt, archiveListAt)
   assert.ok(archiveView.includes('rootDisplay: displayPath(root)'), 'archiveView 必须带 rootDisplay')
-  const archiveList = host.slice(host.indexOf('archiveList()'), host.indexOf('archiveList()') + 400)
+  const archiveList = host.slice(archiveListAt, archiveListAt + 400)
   assert.ok(archiveList.includes('rootDisplay: displayPath(root)'), 'archiveList 必须带 rootDisplay')
 })
 

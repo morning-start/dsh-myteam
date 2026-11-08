@@ -1243,6 +1243,11 @@ export class MyTeamHost {
             return this.roleError(e)
           }
         }
+        /* CHG-123（docs/19 §M0/M2）：团队目录 + 详情（全员可读） */
+        case 'myteam_list_teams':
+          return this.listTeamsTool(args)
+        case 'myteam_get_team':
+          return this.getTeamTool(args)
         /* CHG-122（docs/19 §M1）：角色目录只读视图（全员可读） */
         case 'myteam_list_roles':
           return this.listRolesTool(args)
@@ -2933,6 +2938,87 @@ export class MyTeamHost {
   }
 
   /* ── 团队模板管理（CHG-57）：内置只读、写项目层、两段确认；面板仍只读 ── */
+
+  /**
+   * CHG-123（docs/19 §M0/M2）：**团队目录**——全员可读（A 档）。
+   *
+   * 数据源 = 工作区索引（`readWorkspaceIndex`，CHG-91 的团队索引落点）+ 归档目录名。
+   * 为什么不用 `agents.list()`：那是**活的** agent 列表（门面通道），Lead 工具没有 agent
+   * 上下文，且「有哪些团队」问的是磁盘事实而不是进程内对象。
+   *
+   * 只读：不写索引、不写账本、不 fold 任何团队。
+   */
+  listTeamsTool(args                          = {})                          {
+    const state = String(args.state ?? 'all')
+    const includeArchived = args.includeArchived !== false
+    const index = readWorkspaceIndex(this.workspaceRoot)                
+                            
+                                       
+                 
+    const teams = (index?.teams ?? []).map((entry) => ({
+      teamId: String(entry.teamId ?? ''),
+      name: String(entry.name ?? ''),
+      goal: String(entry.goal ?? ''),
+      state: String(entry.state ?? ''),
+      tasks: Number(entry.tasks ?? entry.taskCount ?? 0),
+    })).filter((team) => team.teamId.length > 0)
+    const filtered = state === 'all' ? teams : teams.filter((team) => team.state === state)
+    const archived = includeArchived ? this.archiveList() : { teams: []             }
+    return {
+      status: 'ok',
+      workspaceRoot: this.workspaceRoot,
+      state,
+      total: filtered.length,
+      teams: filtered,
+      ...(includeArchived ? { archived: { count: archived.teams.length, ids: archived.teams } } : {}),
+      /* 口径：索引为空 ≠ 没有团队（可能从未扫描）——如实说明，不让调用方误判 */
+      ...(index === undefined ? { note: '工作区索引尚未生成（团队从未被扫描过）；团队列表可能不完整' } : {}),
+    }
+  }
+
+  /**
+   * CHG-123（docs/19 §M2）：**团队详情**——全员可读（A 档）。
+   *
+   * 只读投影：名 / 目标 / 状态 / 计数 / 名册摘要。不存在 → `MT_VALIDATION`（`field:'teamId'`），
+   * **不返回空对象假装成功**（docs/19 §6 第 8 条）。
+   */
+  getTeamTool(args                          = {})                          {
+    const teamId = String(args.teamId ?? '').trim()
+    if (!teamId) return { status: 'error', code: 'MT_VALIDATION', field: 'teamId', message: 'teamId is required' }
+    const dir = join(storeLayout(this.workspaceRoot).tasks, teamId)
+    if (!existsSync(dir)) {
+      return { status: 'error', code: 'MT_VALIDATION', field: 'teamId', message: `团队不存在：${teamId}（先用 myteam_list_teams 看有哪些团队）` }
+    }
+    const proj = this.service(teamId).projectionSnapshot                
+                   
+                   
+                    
+                                                
+                                                                                                                                
+     
+    const tasks = Object.values(proj.tasks ?? {})
+    const members = Object.values(proj.members ?? {}).map((member) => ({
+      id: String(member.id ?? ''),
+      roleId: String(member.roleId ?? ''),
+      instanceName: String(member.instanceName ?? ''),
+      status: String(member.status ?? ''),
+      ...(member.currentTaskId ? { currentTaskId: String(member.currentTaskId) } : {}),
+    }))
+    return {
+      status: 'ok',
+      teamId,
+      name: String(proj.name ?? ''),
+      goal: String(proj.goal ?? ''),
+      state: String(proj.state ?? ''),
+      counts: {
+        tasks: tasks.length,
+        done: tasks.filter((task) => task.state === 'done').length,
+        running: tasks.filter((task) => task.state === 'in_progress').length,
+        members: members.length,
+      },
+      members,
+    }
+  }
 
   /**
    * CHG-122（docs/19 §M1）：**角色目录只读视图**——全员可读（A 档）。

@@ -526,6 +526,28 @@ export function leadToolDefs()            {
     { name: 'myteam_resolve_proposal', description: '处置成员结构提案（FR-11.4）：approved/rejected。**批准即执行对应变更**（CHG-88）：split → 落子任务 + 原任务取消；add-dep → 加依赖；reassign → 改派；cancel → 取消。驳回只留痕、结构不动。载荷不合规会拒绝并说明，不会留下「已批准但什么都没做」的半截状态。', parameters: { type: 'object', properties: { teamId: teamId(), proposalId: str('提案 id', true), decision: { type: 'string', enum: ['approved', 'rejected'], description: '处置决定', required: true }, note: str('处置说明') } } },
     { name: 'myteam_adopt_knowledge', description: '采纳/驳回知识提案（FR-17.4 策展门）：adopted 落 config/knowledge/（带 evidence+contributor 归因）；rejected 只留痕。draftId 来自 knowledge.proposed 事件。', parameters: { type: 'object', properties: { teamId: teamId(), draftId: str('知识提案 id（knowledge.proposed 事件的 draftId）', true), decision: { type: 'string', enum: ['adopted', 'rejected'], description: '策展决定', required: true }, note: str('处置说明') } } },
     {
+      /* CHG-123（docs/19 §M0/M2）：团队目录 + 详情——**全员可读**（A 档） */
+      name: 'myteam_list_teams',
+      description: '列出本工作区的团队目录（全员可读，CHG-123 / docs/19 §M0）：从工作区索引读，返回 `{status, workspaceRoot, teams:[{teamId,name,goal,state,tasks}], archived:{count,ids}}`。**只读**；团队是按项目隔离的（一个工作区一个团队库），跨工作区请先切项目。',
+      parameters: {
+        type: 'object',
+        properties: {
+          state: { type: 'string', enum: ['all', 'draft', 'active', 'archived', 'discarded'], description: '只列某状态（缺省 all）' },
+          includeArchived: bool('是否带上归档团队 id 列表（缺省 true）'),
+        },
+      },
+    },
+    {
+      name: 'myteam_get_team',
+      description: '读单个团队详情（全员可读，CHG-123 / docs/19 §M2）：`{status, teamId, name, goal, state, counts:{tasks,done,running,members}, members:[{id,roleId,instanceName,status,currentTaskId?}]}`。**只读**；团队不存在 → `MT_VALIDATION`（`field: teamId`），不返回空对象假装成功。',
+      parameters: {
+        type: 'object',
+        properties: {
+          teamId: teamId(),
+        },
+      },
+    },
+    {
       /* CHG-122（docs/19 §M1）：角色目录只读视图——**全员可读**（A 档） */
       name: 'myteam_list_roles',
       description: '列出角色目录（全员可读，CHG-122 / docs/19 §M1）：返回所有可聘任角色——内置（builtin，只读）/ 全局（global）/ 项目（project）/ 插件贡献（plugin），每条带 id / name / description / origin / readOnly。**只读**：不写库、不改角色；建/改角色用 myteam_create_role / myteam_update_role。',
