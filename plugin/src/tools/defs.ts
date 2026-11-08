@@ -526,6 +526,46 @@ export function leadToolDefs(): ToolDef[] {
     { name: 'myteam_resolve_proposal', description: '处置成员结构提案（FR-11.4）：approved/rejected。**批准即执行对应变更**（CHG-88）：split → 落子任务 + 原任务取消；add-dep → 加依赖；reassign → 改派；cancel → 取消。驳回只留痕、结构不动。载荷不合规会拒绝并说明，不会留下「已批准但什么都没做」的半截状态。', parameters: { type: 'object', properties: { teamId: teamId(), proposalId: str('提案 id', true), decision: { type: 'string', enum: ['approved', 'rejected'], description: '处置决定', required: true }, note: str('处置说明') } } },
     { name: 'myteam_adopt_knowledge', description: '采纳/驳回知识提案（FR-17.4 策展门）：adopted 落 config/knowledge/（带 evidence+contributor 归因）；rejected 只留痕。draftId 来自 knowledge.proposed 事件。', parameters: { type: 'object', properties: { teamId: teamId(), draftId: str('知识提案 id（knowledge.proposed 事件的 draftId）', true), decision: { type: 'string', enum: ['adopted', 'rejected'], description: '策展决定', required: true }, note: str('处置说明') } } },
     {
+      /* CHG-130（docs/19 §M10）：审计事件流只读查询——**队长 + 显式授权成员**（CM 档） */
+      name: 'myteam_get_audit',
+      description: '读团队审计事件流（CM 档，CHG-130 / docs/19 §M10）：`{teamId?, limit?, beforeSeq?}` → `{status, teamId, total, count, events:[{seq,type,actor,ts}], nextBeforeSeq}`。**只读**：不写账本；按 `seq` 倒序取最近 N 条，`nextBeforeSeq` 用于往前翻页（不含）。成员默认只能看自己相关的事件（C5），队长看全团队。',
+      parameters: {
+        type: 'object',
+        properties: {
+          teamId: teamId(),
+          limit: num('返回条数（1~200，缺省 50）'),
+          beforeSeq: num('翻页游标：只返回 seq 小于它的更早事件'),
+        },
+      },
+    },
+    {
+      /* CHG-130（docs/19 §M9）：会话移交（摘要 → 新团队预设会话）——**仅队长**（C 档） */
+      name: 'myteam_handoff',
+      description: '会话移交（队长专属，CHG-130 / docs/19 §M9 / FR-16.3）：`{teamId?, sourceSessionId?}` → **提取当前团队上下文摘要** + 程序化建**新**团队预设会话 + 把摘要作为首条消息注入；**原会话原样保留**（FR-16.3 明令不做原地变身）。**不建成员、不建任务、不写团队账本**；宿主缺 `sessionController` → `MT_UNAVAILABLE`（**不假装成功**）；建会话成功但注入失败 → 报错**并带 sessionId**（会话已存在，可手动粘贴摘要）。',
+      parameters: {
+        type: 'object',
+        properties: {
+          teamId: teamId(),
+          sourceSessionId: str('来源会话 id（写进摘要索引，便于新队长按需深读）'),
+        },
+      },
+    },
+    {
+      /* CHG-130（docs/19 §M9）：会话考古（按 session:<id> 只读读一页历史）——**CM 档** */
+      name: 'myteam_read_session',
+      description: '会话考古（CM 档，CHG-130 / docs/19 §M9 / FR-16.4②）：`{sessionId, teamId?, beforeSeq?, maxMessages?}` → 按 `session:<id>` **只读读一页历史**（宿主 `SessionController.page`：不激活 Agent、不推进游标）→ `{status, sessionId, items:[{seq?,role?,type?,ts?,text,truncated}], omitted, hasMore, chars, notes}`。`beforeSeq` 往回翻页；带 `teamId` 时落 `session.read` 审计；**缺 `page` 能力 → `MT_UNAVAILABLE`**（不返回空历史假装成功）。',
+      parameters: {
+        type: 'object',
+        properties: {
+          sessionId: str('会话 id（形如 session:<id> 里的 <id>）', true),
+          teamId: teamId(),
+          beforeSeq: num('往回翻页游标（不含）'),
+          maxMessages: num('单页消息上限（宿主会按自己的默认值再封顶）'),
+        },
+        required: ['sessionId'],
+      },
+    },
+    {
       /* CHG-129（docs/19 §M10）：token / 成本只读查询——**全员可读**（A 档） */
       name: 'myteam_get_tokens',
       description: '读团队 token 成本（全员可读，CHG-129 / docs/19 §M10）：`{teamId?}` → `{status, teamId, tokens:{days, totals, ...}}`。**只读**：不写账本、不改任务；`days` 是按天的增量桶（CHG-86 口径：基线 = 成员累计量，冷启动从 `tokens.json.totals` 恢复）。**估算标注**：tokenMeter 给的是估算值，不是账单。',

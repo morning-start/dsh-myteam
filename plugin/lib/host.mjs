@@ -1245,6 +1245,13 @@ export class MyTeamHost {
             return this.roleError(e)
           }
         }
+        /* CHG-130（docs/19 §M9/§M10）：审计查询 + 会话面（移交 / 考古） */
+        case 'myteam_get_audit':
+          return this.getAuditTool(args)
+        case 'myteam_handoff':
+          return this.handoffTeam(args)
+        case 'myteam_read_session':
+          return this.readSessionHistory(args)
         /* CHG-129（docs/19 §M10）：token / 成本只读查询（全员可读） */
         case 'myteam_get_tokens':
           return this.getTokensTool(args)
@@ -2958,6 +2965,39 @@ export class MyTeamHost {
   }
 
   /* ── 团队模板管理（CHG-57）：内置只读、写项目层、两段确认；面板仍只读 ── */
+
+  /**
+   * CHG-130（docs/19 §M10）：**审计事件流只读查询**——队长 + 显式授权成员（CM 档）。
+   *
+   * 为什么必须有：面板有 `getAudit` 端点，但模型侧没有工具——无法自审「我做过什么」
+   * （docs/19 §M10 缺口）。返回按 `seq` 倒序取最近 N 条，`nextBeforeSeq` 用于往前翻页。
+   *
+   * 只读：不写账本、不 fold；坏行容错（`readLedgerEvents` 已跳过坏行）。
+   */
+  getAuditTool(args                          = {})                          {
+    const teamId = String(args.teamId ?? this.defaultTeamId())
+    const rawLimit = Number(args.limit ?? 50)
+    const limit = Math.min(Math.max(Number.isFinite(rawLimit) ? Math.trunc(rawLimit) : 50, 1), 200)
+    const beforeSeq = Number.isFinite(Number(args.beforeSeq)) ? Number(args.beforeSeq) : undefined
+    const svc = this.service(teamId)
+    const all = readLedgerEvents(svc.ledgerPath).events                                                                             
+    const filtered = beforeSeq === undefined ? all : all.filter((event) => Number(event.seq ?? 0) < beforeSeq)
+    const slice = filtered.slice(-limit)
+    return {
+      status: 'ok',
+      teamId,
+      total: all.length,
+      count: slice.length,
+      events: slice.map((event) => ({
+        seq: Number(event.seq ?? 0),
+        type: String(event.type ?? ''),
+        actor: String(event.actor ?? ''),
+        ts: Number(event.ts ?? 0),
+      })),
+      nextBeforeSeq: slice.length > 0 ? Number(slice[0].seq ?? 0) : null,
+      note: '只读审计事件流（按 seq 倒序取最近 N 条；nextBeforeSeq 用于往前翻页）',
+    }
+  }
 
   /**
    * CHG-129（docs/19 §M10）：**token / 成本只读查询**——全员可读（A 档）。
