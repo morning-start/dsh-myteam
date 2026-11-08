@@ -7,9 +7,12 @@
  *   - 写路径：在投影副本上 applyEvent 单事件（O(1)），成功才落账并切换内存投影；
  *   - 冷启动：openLedger 全量重放一次（O(n)，唯一恢复路径，team.json 不落盘）；
  *   - 折返失败（重放防线触发）不写账本、不改投影——账本永远只含可重放的历史。
+ *   - P1-3（CHG-150）：写路径的「副本」由 `structuredClone` 换成 **copy-on-write**——
+ *     未触及的集合**接回旧引用**，视图缓存（`remote/views.ts` 两级 WeakMap）才能跨提交命中。
  */
 import { join, dirname } from 'node:path'
 import { mkdirSync, existsSync } from 'node:fs'
+import { isDeepStrictEqual } from 'node:util'
 import {
   appendEvent,
   openLedger,
@@ -85,6 +88,54 @@ export interface TeamServiceOptions {
   configOverride?: unknown
   /** P0-3：提交通知回调抛错时的告警出口；缺省走 `console.warn` */
   logger?: TeamServiceLogger
+}
+
+/**
+ * P1-3（CHG-150）：投影里「下游视图拿引用当缓存键」的顶层集合。
+ *
+ * 只列集合、不列标量：`state` / `name` / `goal` / `revision` 是原始值，比较即相等，
+ * 不影响引用身份；而这 6 个集合是 `remote/views.ts` 两级 WeakMap 的键（`members` → `tasks`）。
+ */
+const CACHEABLE_COLLECTION_KEYS = [
+  'tasks',
+  'members',
+  'participations',
+  'proposals',
+  'perTaskMessages',
+  'inbox',
+] as const
+
+/**
+ * P1-3（CHG-150）：在**隔离副本**上应用一条事件，再把「内容没变」的集合**接回旧引用**。
+ *
+ * 这是 `commit()` 第 2 步的「副本 apply」，从 `structuredClone(整个投影)` 改成 copy-on-write。
+ *
+ * **为什么隔离仍是深隔离（`structuredClone`），而不是活投影上直接 `{ ...projection }`**：
+ *   `applyEvent` 除了换集合引用（`fold.ts` 的 `copyTouchedCollections`），还会**原地改元素内部**——
+ *   `proj.members[id].status = …`、`proj.tasks[id].input.title = …`、`proj.tasks[id].evidenceRefs.push(…)`、
+ *   `proj.proposals[id].status = …`。浅拷贝共享这些嵌套对象，于是「失败回滚」根本不成立：
+ *   投影引用没换，但**内容已经被这次失败的提交改掉了**（t122-2/t122-3 用 `===` + 深比较双重断言这一点）。
+ *   一层浅拷贝也不够——上面这些写是**两层**（集合 → 元素 → `input` / 数组）。
+ *
+ * **为什么不在 service 里复制一份「哪些事件触及哪些集合」的表**：
+ *   那张表在 `fold.ts`（`MEMBER_TOUCHING_EVENTS` 等）。两份表一旦漂移——新增事件类型只改了一边——
+ *   就是「少复制一次」：缓存拿着**没变**的集合引用返回**已经变了**的视图，是正确性事故。
+ *   这里用**深比较**代替**知识**：内容没变就复用旧引用，任何新增事件类型自动正确，不需要同步维护。
+ *
+ * **代价与收益**：每条事件多一次逐集合深比较（O(集合大小)），换来的是**跨提交引用稳定**。
+ *   视图缓存（`remote/views.ts`）拿集合引用当键：未触及集合引用不变 ⇔ 该视图输入没变 ⇒ 命中缓存、零 frame。
+ *   在 P1-3 之前，`structuredClone` 每次都换掉全部引用，缓存**必然 miss**，面板每帧全量重建。
+ */
+function applyEventOnCopyOnWriteProjection(prev: TeamProjection, event: LedgerEvent): TeamProjection {
+  const working = structuredClone(prev)
+  applyEvent(working, event)
+  // 深比较回收旧引用：被这次事件真正改过的集合保留新克隆，改过但内容相同的也接回旧的（等价，省一次重建）
+  for (const key of CACHEABLE_COLLECTION_KEYS) {
+    if (isDeepStrictEqual(working[key], prev[key])) {
+      ;(working as unknown as Record<(typeof CACHEABLE_COLLECTION_KEYS)[number], unknown>)[key] = prev[key]
+    }
+  }
+  return working
 }
 
 export class TeamService {
@@ -168,6 +219,10 @@ export class TeamService {
    * 五段边界（每一段都在下一段开始前完成，任何一段失败都不污染后一段）：
    *   ① 乐观锁 → ② 领域校验 → ③ 副本 apply + revision 连续性断言（P0-2）→ ④ 账本 append（fsync）→ ⑤ 切投影 + 通知（P0-3）
    * ③ 之前失败 = 什么都没发生；④ 失败 = 内存投影仍是旧值（磁盘也没变）；⑤ 之后失败只可能来自通知回调，不影响已 durable 的事件。
+   *
+   * P1-3（CHG-150）：③ 的「副本」是 copy-on-write（`applyEventOnCopyOnWriteProjection`）——
+   * 未触及的集合**保持原引用**，下游视图缓存才能跨提交命中（零 frame）；隔离性由深克隆保证，
+   * 所以「失败不污染原投影」这条不变量与旧实现等价（t122-2/t122-3 逐引用 + 深比较双重锁定）。
    */
   commit(draft: CommitDraft, opts?: CommitOptions): CommitResult {
     // 0. 乐观锁（CHG-87 / QA-4）：先比版本再碰任何状态——冲突必须「什么都没发生」
@@ -183,8 +238,8 @@ export class TeamService {
     let nextProjection: TeamProjection
     try {
       event = validateEvent({ actor: draft.actor, type: draft.type, payload: draft.payload }, this.nextSeq)
-      nextProjection = structuredClone(this.projection)
-      applyEvent(nextProjection, event)
+      // P1-3：copy-on-write 副本——未触及集合保持原引用（视图缓存零 frame），隔离性由深克隆保证
+      nextProjection = applyEventOnCopyOnWriteProjection(this.projection, event)
     } catch (e) {
       if (e instanceof LedgerValidationError) return { ok: false, code: e.code, message: e.message }
       if (e instanceof FoldError) return { ok: false, code: 'MT_INTERNAL_FOLD', message: e.message }

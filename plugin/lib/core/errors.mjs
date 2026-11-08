@@ -32,6 +32,10 @@ export const MT_CODES = [
   /* P1-6（docs/21 §6）：工具返回值违反结果契约（缺 status / 状态不在词表 / 字段类型不符）。
    * 由 `core/tools/output-contract.ts` 的 `assertToolResult` 产出（**返回**而不是抛）。 */
   'MT_TOOL_CONTRACT',
+  /* P1-5（docs/21 §6）：成员护栏判定**执行环境不可用**（命令不存在 / ENOENT / 权限不足）。
+   * 与 `MT_UNAVAILABLE`（依赖的宿主服务未注册）是两件事：那个换个 profile 就能好，
+   * 这个重试 / 换命令 / 换参数都修不好——必须转人工，且**禁止自动重试**。 */
+  'MT_ENV_UNAVAILABLE',
 
   // ── 账本（append-only JSONL）────────────────────────────────
   'MT_LEDGER_BAD_ACTOR',
@@ -145,6 +149,8 @@ export const MT_CODE_DOCS                         = {
   MT_UNKNOWN_TOOL: '调用了未注册的 `myteam_*` 工具名（拼写错、或被 `toolPolicy` 收窄掉了）。',
   MT_EXTERNAL_FAILURE: '门禁里跑的外部命令自身失败（非零退出、被信号杀），不是门禁判定为 fail。',
   MT_TOOL_CONTRACT: '工具返回值违反结果契约（缺 `status` / `status` 不在结果状态词表 / `code`·`message` 类型不符）。**返回**而不是抛出，调用方决定记日志还是阻断。',
+  MT_ENV_UNAVAILABLE:
+    '成员护栏判定**执行环境不可用**（命令不存在 / `command not found` / `ENOENT` / 权限不足）。重试、换命令、换参数都修不好环境——交付判定转人工，**禁止自动重试**（P1-5）。',
 
   // 账本
   MT_LEDGER_BAD_ACTOR: '事件 `actor` 不是 `member:<id>` / `lead` / `system` 之一。',

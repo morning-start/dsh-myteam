@@ -48,7 +48,19 @@ import { zeroBuckets, dayKeyOf, accumulate, emptyTokensFile, type TokensFile } f
 // CHG-86（P0-2）：归档落盘（disband 时写快照；面板归档视图读快照）
 import { buildArchiveSnapshot, writeArchive, readArchive, listArchives, archiveRootOf } from './core/archive/archive-store.ts'
 // CHG-87（M2-C 剩余，FR-5.3/FR-5.4）：command 门禁 + scope 完成审计
-import { runVerifyCommand, validateVerifyCommand, classifyVerifyResult, resolveTimeoutMs, type VerifyCommand } from './core/gates/command-gate.ts'
+import { runVerifyCommand, validateVerifyCommand, classifyVerifyResult, resolveTimeoutMs, truncateOutput, type VerifyCommand } from './core/gates/command-gate.ts'
+/* P1-5 接线（docs/21 §6，CHG-147 的纯函数模块）：成员单调用护栏四类检测 */
+import {
+  blocksCompletion,
+  createGuardState,
+  guardReminder,
+  observeCall,
+  observeEmptyTurn,
+  type GuardCall,
+  type GuardOptions,
+  type GuardState,
+  type GuardVerdict,
+} from './core/agent/guard.ts'
 import { auditWriteScopes, filesTouchedOf, type ScopeAudit } from './core/gates/scope-audit.ts'
 // CHG-87（M2-D 剩余，FR-16.4③）：证据指针三类解析（task/file/session）
 import { evidenceRefsOf, parseEvidencePointer } from './core/knowledge/evidence-pointer.ts'
@@ -214,6 +226,15 @@ export interface MyTeamConfig {
    * 「被宿主砍掉且无人知道」之间二选一。超时只告警（`timedOut` 名单进日志），不再等待。
    */
   disposalTimeoutMs?: number
+  /**
+   * P1-5（docs/21 §6）：单调用护栏的阈值覆盖（`repeatThreshold` / `stuckThreshold` /
+   * `stuckTimeoutMs` / `envThreshold` / `emptyTurnThreshold`）。
+   *
+   * 为什么允许按行配置：不同档位/不同团队的「打转」成本不同（纯文档团队应更早提醒，
+   * 长任务团队需要更宽的时间窗）。非法值由 `guard.ts` 归一回落默认——配置写错不得
+   * 静默变成「永不触发」，也不得让护栏自己抛错打断成员调用。
+   */
+  guardOptions?: GuardOptions
 }
 
 /* ── 纯函数域（无 ctx 依赖，便于单测 J1）────────────────────────── */
@@ -396,6 +417,108 @@ export function deliverablePathsOf(spec: unknown, extra: readonly string[] = [])
   return [...new Set(out)]
 }
 
+/* ── P1-5 接线（docs/21 §6）：成员单调用护栏 ─────────────────────────── */
+
+/**
+ * 「回合边界」工具：成员的这一回合以此结束（交出控制权 / 宣告结果）。
+ *
+ * 为什么是这两个：`myteam_update_task` 是**申报**（progress / done / failed），
+ * `myteam_escalate_task` 是**上报受阻**——两者都意味着「本回合结束了」。
+ * **`myteam_wait_for_change` 不在其中**：等待本来就是空闲成员的正常行为（提示词明确让成员
+ * 无就绪任务时去等），把它算成回合边界会让「老实等待」被误判成空转（护栏变成新的误杀源）。
+ *
+ * 为什么需要回合边界：空转判据（`empty-turn`）是**回合**粒度——「一个回合里没有任何真实动作」
+ * 才是只说不做。宿主的成员通道没有 turn 结束回调（`executeMemberTool` 每次只看到一次调用），
+ * 所以用「申报/上报」这两个天然收尾点作为回合结束的挂点。
+ */
+export const GUARD_TURN_BOUNDARY_TOOLS: ReadonlySet<string> = new Set(['myteam_update_task', 'myteam_escalate_task'])
+
+/** `no-active-peer` 短路的可执行文案（必须给动作：先看名册，再唤醒，最后才等） */
+export const NO_ACTIVE_PEER_HINT = '先 myteam_list_tasks + myteam_get_team 确认名册，再 myteam_message 唤醒，然后才等'
+
+/** 护栏输出尾部预算（字符）：环境特征匹配只需要「哪一句」，账本/日志不能无界 */
+const GUARD_OUTPUT_TAIL_LIMIT = 2000
+
+/**
+ * 稳定 JSON（递归按 key 排序）：护栏的签名 = 「同一条命令」的唯一身份。
+ *
+ * 为什么不用裸 `JSON.stringify`：对象键序在 JS 里不稳定（模型每次生成参数顺序可能不同），
+ * 键序不同就会把「同一条命令」算成两条 —— 复读/挂死/环境三类判据会**整体失效**。
+ * 解析失败（循环引用 / 不可序列化）退化为 `String(value)`：签名宁可粗糙也不抛错
+ * （抛错 = 成员工具调用整体失败，代价远大于漏杀一次）。
+ */
+export function stableGuardJson(value: unknown): string {
+  const seen = new WeakSet<object>()
+  const walk = (node: unknown): unknown => {
+    if (node === null || typeof node !== 'object') return node
+    if (seen.has(node as object)) return '[circular]'
+    seen.add(node as object)
+    if (Array.isArray(node)) return node.map(walk)
+    const out: Record<string, unknown> = {}
+    for (const key of Object.keys(node as Record<string, unknown>).sort((a, b) => a.localeCompare(b))) {
+      out[key] = walk((node as Record<string, unknown>)[key])
+    }
+    return out
+  }
+  try {
+    return JSON.stringify(walk(value)) ?? ''
+  } catch {
+    return String(value)
+  }
+}
+
+/** 输出指纹（`stuck` 判据：两次输出一字不差才算挂死；只取前 32 位十六进制，账本不需要全量） */
+export function guardOutputHash(output: string): string {
+  return createHash('sha256').update(String(output ?? '')).digest('hex').slice(0, 32)
+}
+
+/**
+ * 从成员工具结果里取「真实退出码」（复用 `CommandRunResult.exitCode` 的形状）。
+ *
+ * 为什么失败要映射成 1：成员通道里没有任何工具直接跑 shell（命令执行在 verify 门 / 成员自己的
+ * bash 里），但 `status:'error'` 与「命令以非 0 退出」在护栏看来是同一类事实——
+ * **这条调用失败了**。环境不可用判据问的正是「同一环境特征是否连续导致失败」；
+ * 结果里自带 `exitCode` 时以它为准（verify 门会带真实值）。
+ * 成功映射成 0：只有真实成功才解除 `env-unavailable` 的 latch（见 guard.ts 注释）。
+ */
+export function guardExitCodeOf(result: Record<string, unknown>): number | null | undefined {
+  const raw = result?.exitCode
+  if (typeof raw === 'number' && Number.isFinite(raw)) return Math.trunc(raw)
+  if (raw === null) return null
+  if (result?.status === 'error') return 1
+  return 0
+}
+
+/**
+ * 构造一次护栏观测（`GuardCall`）。
+ *
+ * `output` 只保留有界尾部：它只用于 `env-unavailable` 的特征匹配，**不进状态、不落账**
+ * （账本只存 `outputHash`）——完整输出可能几 MB。
+ */
+export function guardCallOf(name: string, args: Record<string, unknown>, result: Record<string, unknown>, at: number): GuardCall {
+  const output = truncateOutput(stableGuardJson(result), GUARD_OUTPUT_TAIL_LIMIT)
+  return {
+    tool: String(name ?? ''),
+    // 签名 = 工具名 + 规范化参数（同签名 = 「同一条命令再来一遍」）
+    signature: `${String(name ?? '')}|${stableGuardJson(args ?? {})}`,
+    outputHash: guardOutputHash(output),
+    exitCode: guardExitCodeOf(result),
+    at,
+    output,
+  }
+}
+
+/** 护栏判定的对外形状（附在成员工具结果里；`kind` 是枚举锚点，`hint` 必须可执行） */
+export function guardPayloadOf(verdict: GuardVerdict): Record<string, unknown> {
+  return {
+    kind: verdict.kind,
+    message: verdict.message,
+    hint: verdict.hint,
+    ...(verdict.signature ? { signature: verdict.signature } : {}),
+    ...(typeof verdict.count === 'number' ? { count: verdict.count } : {}),
+  }
+}
+
 /** 从账本统计 plan.clarify 事件数（FR-1.6 硬终止计数，T7 防统计盲区） */
 export function countClarifyRoundsIn(ledgerPath: string): number {
   try {
@@ -523,6 +646,15 @@ export class MyTeamHost {
    * 在 constructor 里用行 config 构造（字段初始化早于 constructor body，拿不到 this.config）。
    */
   private readonly disposalGate: AdmissionGate
+  /**
+   * P1-5（docs/21 §6）：成员单调用护栏状态（memberId → 纯数据计数 + 本回合动作数 + 最近判定）。
+   *
+   * 为什么状态挂在 host 侧而不是成员会话里：`executeMemberTool` 是成员每次工具调用的唯一入口，
+   * 宿主在这里能拿到「谁调了什么、结果是什么」；把计数交给成员会话意味着它必须能被持久化/
+   * 重建，而护栏口径是「本次会话内的连续段」——host 存活期就是它的自然作用域（崩溃即重置，
+   * 与 guard.ts「状态是纯数据」的设计一致）。
+   */
+  private guardRecords = new Map<string, { state: GuardState; toolsInTurn: number; lastVerdict?: GuardVerdict }>()
   /** CHG-71 派单唤醒节流：team 级（合并突发事件）与 member 级（防重复打扰） */
   private lastDispatchAt = new Map<string, number>()
   private lastDispatchWakeAt = new Map<string, number>()
@@ -781,6 +913,8 @@ export class MyTeamHost {
     operations.push(...this.disposalGate.pending())
     this.memberHandles.clear()
     this.services.clear()
+    // 护栏状态随运行时一起退休（host 卸载后残留的计数没有意义，成员 id 复用时还会串味）
+    this.guardRecords.clear()
     void this.settleDisposal(operations)
   }
 
@@ -1344,6 +1478,9 @@ export class MyTeamHost {
           const interruptAgent = this.agentOf(this.memberHandles.get(memberId))
           if (interruptAgent?.cancel) {
             interruptAgent.cancel({ kind: 'user' })
+            // P1-5：中断 = 这一轮到此为止——宿主没有 turn 结束回调，这里的空转检查是
+            // 「只说不做、被队长打断」的成员唯一会被记到的位置（结论只进 warn 日志）。
+            this.noteGuardTurnEnd(memberId)
             this.commit(teamId, { actor, type: 'member.interrupted', payload: { teamId, memberId, reason: args.reason } })
             return { status: 'interrupted', note: 'interrupt 只停当前轮；会话保留' }
           }
@@ -1725,8 +1862,10 @@ export class MyTeamHost {
     if (gate === 'archive') {
       const evaluated = this.evaluateArchiveGate(teamId, taskId, actor)
       return {
-        status: evaluated.pass ? 'gate-pass' : 'gate-fail',
+        // P1-5：环境不可用 latch → needs-human（人工裁决入口），既不是 pass 也不是可自动重试的 fail
+        status: evaluated.needsHuman === true ? 'needs-human' : evaluated.pass ? 'gate-pass' : 'gate-fail',
         gate,
+        ...(evaluated.needsHuman === true ? { code: 'MT_ENV_UNAVAILABLE' } : {}),
         taskState: this.service(teamId).projectionSnapshot.tasks[taskId]?.state ?? task.state,
         note: evaluated.note,
         ...(evaluated.reason ? { reason: evaluated.reason } : {}),
@@ -2152,6 +2291,11 @@ export class MyTeamHost {
    * `task.evidence` 事件 —— 它比「正文里有没有那行标记」更硬（正文可能被摘要截断）。
    *
    * `docText` 只取**新鲜**产物的内容：陈旧文件是上游写的，不能当本阶段的交付顶替。
+   *
+   * P1-5 接线（docs/21 §6）：如果该任务的实现者已经 latch 了 `env-unavailable`，
+   * 交付判定**直接** `needs-human`——`blocksCompletion` 的语义是「环境根本不可用，
+   * 任何『完成』声明都一定是假的」：此时重试、换命令、换参数都修不好环境，
+   * 自动重试只会继续烧 token（P1-5 的整个存在理由）。
    */
   private deliveryJudgementFor(teamId: string, taskId: string): { judgement: DeliveryJudgement; payload: Record<string, unknown> } {
     const task = this.service(teamId).projectionSnapshot.tasks[taskId]
@@ -2160,13 +2304,24 @@ export class MyTeamHost {
     const hasEvidence = extractEvidenceBlock(reply.text) !== undefined || (task?.evidenceRefs?.length ?? 0) > 0
     const minLength = deliverableMinLength(task?.input.taskType)
     const docText = this.artifactTextOf(freshness.fresh)
-    const judgement = judgeDeliverable({
+    const judged = judgeDeliverable({
       ...(reply.stopReason ? { stopReason: reply.stopReason } : {}),
       text: reply.text,
       minLength,
       docText,
       hasEvidence,
     })
+    // P1-5：环境不可用 latch 优先于一切交付信号（含证据块）——它证伪的是「能不能跑」，
+    // 不是「跑得对不对」，所以不能走 evidence 分支放行。
+    const guard = this.guardVerdict(String(task?.assignee ?? ''))
+    const blocked = blocksCompletion(guard)
+    const judgement: DeliveryJudgement = blocked && guard
+      ? {
+          verdict: 'needs-human',
+          signal: 'none',
+          reason: `环境不可用（guard:${guard.kind}）：${guard.message} —— 转人工；重试/换命令/换参数都修不好环境，禁止自动重试`,
+        }
+      : judged
     return {
       judgement,
       payload: {
@@ -2180,6 +2335,8 @@ export class MyTeamHost {
         staleArtifacts: freshness.stale,
         // 区分「真的新鲜」与「没拍过基线」：兼容分支不该看起来像一次成功的新鲜度校验
         ...(freshness.enforced ? {} : { freshness: 'baseline-missing' }),
+        // P1-5：护栏结论进同一份 gate 载荷（不新增事件型）
+        ...(blocked && guard ? { guardBlocked: true, guard: guardPayloadOf(guard) } : {}),
       },
     }
   }
@@ -2195,13 +2352,17 @@ export class MyTeamHost {
    *  ② **交付判定**：`judgeDeliverable` 判 delivered（空文件 / 无证据 + 无正文 / 有拒绝词 = 不算交付）。
    * 判定结论（verdict / signal / 新鲜与陈旧清单）随 `task.gate.result` 载荷落账本，
    * **不新增事件型**（保持 40 型）。这样「产物在但没人写过它」这类假绿在账本里可查。
+   *
+   * P1-5：`guardBlocked`（环境不可用 latch）**不落 gate.result fail**，而是返回
+   * `needsHuman` —— fail 会被 fold 放回 `ready`（自动重试），而环境不可用时重试只会继续烧
+   * token。任务停在 `gate:archive` 等人工裁决，这才是「禁止自动重试」的实现面。
    */
   private evaluateArchiveGate(
     teamId: string,
     taskId: string,
     actor: string,
     declaredPaths: string[] = [],
-  ): { pass: boolean; note: string; reason?: string } {
+  ): { pass: boolean; note: string; reason?: string; needsHuman?: boolean } {
     const task = this.service(teamId).projectionSnapshot.tasks[taskId]
     if (!task || task.state !== 'gate:archive') {
       return { pass: false, note: '', reason: `task "${taskId}" is not at gate:archive` }
@@ -2214,7 +2375,7 @@ export class MyTeamHost {
       freshness.fresh.map((path) => ({ path })),
       existsUnderWorkspace,
     )
-    // ② P1-2：交付判定（产物陈旧 / 空文件 / 无证据 / 命中拒绝词 都不算交付）
+    // ② P1-2 + P1-5：交付判定（产物陈旧 / 空文件 / 无证据 / 命中拒绝词 / 环境不可用 都不算交付）
     const { judgement, payload } = this.deliveryJudgementFor(teamId, taskId)
     const delivered = placement.pass && judgement.verdict === 'delivered'
     if (delivered) {
@@ -2233,6 +2394,16 @@ export class MyTeamHost {
     const reason = placement.pass
       ? `交付判定未通过（${judgement.signal}）：${judgement.reason}`
       : (placement.reason ?? 'deliverable 未落位')
+    // P1-5：环境不可用 → 转人工，**不落 fail**（fail 会被 fold 放回 ready = 自动重试）
+    if (payload.guardBlocked === true) {
+      this.log('warn', `archive gate blocked by guard for ${teamId}/${taskId}: ${reason}`)
+      return {
+        pass: false,
+        needsHuman: true,
+        note: `archive gate 转人工：${reason}（任务停在 gate:archive，禁止自动重试；请人工确认环境后强制放行）`,
+        reason,
+      }
+    }
     this.commit(teamId, {
       actor,
       type: 'task.gate.result',
@@ -2958,20 +3129,68 @@ export class MyTeamHost {
     }
   }
 
+  /**
+   * P2-1（docs/21 §6）：团队里**能产生事件**的活跃成员（`active` / `provisioning`，排除本人）。
+   *
+   * 为什么排除本人：等待的语义是「等**别人**的动作」——自己不会给自己发消息、也不会给自己
+   * 派单，把自己算进去等于「永远有人在动」，短路永远不生效（这正是修复前空等超时的形态）。
+   *
+   * 为什么 `provisioning` 也算：两阶段 spawn 期间成员已落账、即将上岗，它的
+   * `member.spawned(active)` 结算就是一条会到来的事件——不能因为「还没 active」就判没人。
+   * 投影里 fold 会把 provisioning 折叠成 active，这里同时认两个字面量（防御旧账本）。
+   */
+  private activePeersOf(teamId: string, excludeMemberId: string): Array<{ id: string; roleId: string; status: string }> {
+    try {
+      const members = Object.values(this.service(teamId).projectionSnapshot.members)
+      return members
+        .filter((member) => String(member.id) !== String(excludeMemberId ?? ''))
+        .filter((member) => member.status === 'active' || (member.status as string) === 'provisioning')
+        .map((member) => ({ id: String(member.id), roleId: String(member.roleId), status: String(member.status) }))
+    } catch (e) {
+      // 读不到名册（坏账本 / 未知团队）→ 当「没有活跃 peer」：等待本来就等不到东西，
+      // 立即返回并留痕，比空等 60s 再超时更诚实（也不抛错，等待工具不该炸掉成员回合）。
+      this.log('warn', `active peers unavailable for ${teamId}: ${String(e)}`)
+      return []
+    }
+  }
+
   /** myteam_wait_for_change：异步长轮询（修订：原实现用 Atomics.wait 在宿主主线程
    *  同步阻塞 500ms/次，最长 60s——会冻结整个 Harness 事件循环；改为 setTimeout
-   *  间隔轮询，账本有新事件立即返回，失效提示语义不变（F9）。 */
+   *  间隔轮询，账本有新事件立即返回，失效提示语义不变（F9）。
+   *
+   *  P2-1（docs/21 §6）：**无活跃 peer 时立即返回** `no-active-peer`。
+   *  为什么：账本只会在别人动作时出现新事件——团队里没有第二个活跃成员时，等待
+   *  **在数学上**不会等到任何东西（空等 60s 纯粹浪费一次模型回合 + 一轮 token）。
+   *  返回的是**可执行文案**（先看名册 → 再唤醒 → 最后才等），不是错误：
+   *  成员据此先 self-service 确认名册，而不是把「没人在」当成故障。
+   */
   private async waitForChange(args: Record<string, unknown>): Promise<Record<string, unknown>> {
     const teamId = String(args.teamId ?? this.defaultTeamId())
     const sinceSeq = Number(args.sinceSeq ?? 0)
     const timeoutMs = Math.min(Math.max(Number(args.timeoutMs ?? 60000), 0), 300000)
     const ledgerPath = resolveTeamLedgerPath(this.workspaceRoot, teamId)
+    const excludeMemberId = typeof args.memberId === 'string' ? args.memberId : ''
     const deadline = Date.now() + timeoutMs
     while (Date.now() < deadline) {
       const { events } = readLedgerEvents(ledgerPath)
+      // 已经有变化 → 先回答变化（比「没人在」更有信息量）
       const result = changeSince(events as never, sinceSeq, args.taskId ? String(args.taskId) : undefined)
       if (result.changed) {
-        return { status: 'changed', cause: result.cause, note: '失效提示：重新 myteam_get_task/myteam_list_tasks 读取（不推正文）' }
+        return { status: 'changed', changed: true, cause: result.cause, note: '失效提示：重新 myteam_get_task/myteam_list_tasks 读取（不推正文）' }
+      }
+      // P2-1：没有活跃 peer → 等不到新事件，立即返回（不 sleep、不消耗模型回合）。
+      // `status` 复用词表里的 `unavailable`（没有**可等待对象** = 本次等待不可用）；
+      // 语义由 `cause: 'no-active-peer'` 承载 —— 不新增状态字面量（结果契约词表是别处的单一来源）。
+      const peers = this.activePeersOf(teamId, excludeMemberId)
+      if (peers.length === 0) {
+        return {
+          status: 'unavailable',
+          changed: false,
+          cause: 'no-active-peer',
+          peers: [],
+          hint: NO_ACTIVE_PEER_HINT,
+          note: '团队里没有其他活跃成员：等待不会产生新事件。先确认名册 / 唤醒对方，再回来等',
+        }
       }
       await new Promise((r) => setTimeout(r, 500))
     }
@@ -3455,6 +3674,8 @@ export class MyTeamHost {
     }
     // CHG-93：排空面**如实**记录（原实现硬编码 running:0/pending:0，「排空完成」是假的）
     const drained = { running: 0, pending: this.pendingMessagesFor(teamId, memberId) }
+    // P1-5：释放 = 这一轮到此为止——同 interrupt，空转只能在「交出控制权」的入口补检查
+    this.noteGuardTurnEnd(memberId)
     // 释放前记忆审计（T21：违规落 memory.audit，不阻断释放——M2 再议 hard 阻断）
     const memAudit = this.auditMemberMemory(teamId, memberId)
     const r = this.commit(teamId, { actor, type: mode === 'archive' ? 'member.archived' : 'member.released', payload: { teamId, memberId, mode, drained } })
@@ -3464,6 +3685,8 @@ export class MyTeamHost {
       if (mode === 'remove') {
         void handle.dispose?.()
         this.memberHandles.delete(memberId)
+        // 成员真的没了：护栏状态随之退休（留在 Map 里会让成员 id 复用时带着旧计数）
+        this.guardRecords.delete(memberId)
       }
       // suspend/archive：会话保留（宿主侧栏可见），仅停止领新任务
     }
@@ -3505,7 +3728,98 @@ export class MyTeamHost {
 
   /* ── 成员工具 execute ──────────────────────────────────────── */
 
+  /** 取（或初始化）某成员的护栏状态；阈值来自行 config 的 `guardOptions` */
+  private guardRecordOf(memberId: string): { state: GuardState; toolsInTurn: number; lastVerdict?: GuardVerdict } {
+    const key = String(memberId ?? '')
+    let record = this.guardRecords.get(key)
+    if (!record) {
+      record = { state: createGuardState(), toolsInTurn: 0 }
+      this.guardRecords.set(key, record)
+    }
+    return record
+  }
+
+  /** 最近一次护栏判定（面板 / 交付判定 / 测试读这一份；没触发过 → undefined） */
+  guardVerdict(memberId: string): GuardVerdict | undefined {
+    return this.guardRecords.get(String(memberId ?? ''))?.lastVerdict
+  }
+
+  /**
+   * P1-5 接线：观测一次成员工具调用（`executeMemberTool` 的统一收口）。
+   *
+   * 顺序即协议：
+   *  ① **回合边界**：`myteam_update_task` / `myteam_escalate_task` 意味着本回合结束——
+   *     若本回合零真实动作 → `observeEmptyTurn`（只说不做）；
+   *  ② **调用类判据**：`observeCall` 按 env-unavailable > repeat > stuck 顺序判（guard.ts 里
+   *     就是按这个顺序写的，这里不重排）；调用类判据**优先于**空回合（前者证明本次调用已无意义）；
+   *  ③ 命中 → 一条 warn（grep 锚点 `[GUARD · <kind>]`）+ 把 `{kind,message,hint}` 附在结果里
+   *     （**不改变现有字段**：成员看到提醒，同时老代码照旧读 status）。
+   *
+   * 为什么边界工具只走空回合判据、不走 `observeCall`：`wait_for_change`/`update_task` 是
+   * 常态动作（空闲等待、进度申报），把它们算进「复读/挂死」是纯噪音；而它们**也不能**
+   * 清掉空回合计数（否则空转永远攒不到 2）。
+   */
+  private observeMemberCall(
+    member: MemberInstance,
+    name: string,
+    args: Record<string, unknown>,
+    result: Record<string, unknown>,
+  ): Record<string, unknown> {
+    const record = this.guardRecordOf(String(member.memberId))
+    const boundary = GUARD_TURN_BOUNDARY_TOOLS.has(name)
+    let verdict: GuardVerdict | undefined
+    if (boundary) {
+      // 本回合一个真实动作都没有 → 空转（阈值 2：单次「只申报没动作」可能只是刚接手，连续两次才是打转）
+      if (record.toolsInTurn === 0) verdict = observeEmptyTurn(record.state, this.config.guardOptions ?? {})
+      record.toolsInTurn = 0
+    } else {
+      record.toolsInTurn += 1
+      verdict = observeCall(record.state, guardCallOf(name, args, result, Date.now()), this.config.guardOptions ?? {})
+    }
+    if (!verdict) return result
+    record.lastVerdict = verdict
+    this.log('warn', guardReminder(verdict))
+    return { ...result, guard: guardPayloadOf(verdict) }
+  }
+
+  /**
+   * 回合结束时的空转检查（`observeMemberCall` 之外的挂点：中断 / 释放）。
+   *
+   * 宿主的成员通道**没有** turn 结束回调（`executeMemberTool` 每次只看一次调用），
+   * 所以除了「申报类工具」这个主挂点，再在 `myteam_interrupt` / `release_member` 这两个
+   * 「这一轮到此为止」的入口补一次检查——否则一个只说话不干活、被队长中断的成员永远不会被
+   * 记成空转。返回判定（调用方负责 warn；没有可附的调用结果）。
+   */
+  private noteGuardTurnEnd(memberId: string): GuardVerdict | undefined {
+    const record = this.guardRecordOf(memberId)
+    const verdict = record.toolsInTurn === 0 ? observeEmptyTurn(record.state, this.config.guardOptions ?? {}) : undefined
+    record.toolsInTurn = 0
+    if (verdict) {
+      record.lastVerdict = verdict
+      this.log('warn', guardReminder(verdict))
+    }
+    return verdict
+  }
+
+  /**
+   * 成员工具入口（P1-5 接线点）：**先执行、后观测**。
+   *
+   * 为什么统一包一层而不是在每个 case 里插：护栏要的是「每次工具调用的结果」，散在 9 个
+   * case 里必然漏（历史上「新增工具忘了埋点」正是这类缺陷的固定形态）。包一层还顺带解决
+   * 异步结果：`myteam_wait_for_change` 返回 Promise，必须在**结算之后**再观测，
+   * 否则签名/输出都会是 `[object Promise]`。
+   */
   executeMemberTool(member: MemberInstance, name: string, args: Record<string, unknown>): Record<string, unknown> {
+    const result = this.executeMemberToolInner(member, name, args)
+    if (isThenable(result)) {
+      return (result as Promise<Record<string, unknown>>).then((settled) =>
+        this.observeMemberCall(member, name, args, settled ?? {}),
+      ) as unknown as Record<string, unknown>
+    }
+    return this.observeMemberCall(member, name, args, result)
+  }
+
+  private executeMemberToolInner(member: MemberInstance, name: string, args: Record<string, unknown>): Record<string, unknown> {
     const teamId = member.teamId
     const actor = `member:${member.memberId}`
     /* CHG-138（docs/19 §3）：**成员通道硬拦**——成员只能调 A 档工具（C5 铁律的运行时保证） */
@@ -3582,11 +3896,15 @@ export class MyTeamHost {
           // 加上没有任何 Lead 工具/面板端点能提交 review 裁决，任务永远到不了 done。
           // 现在：门禁链第一道是 archive → host 立即落位校验；是 review/verify → 提示等队长裁决。
           let gateNote: string | undefined
+          // P1-5：环境不可用 latch 让交付判定转人工——此时**不能**把申报当 completed 放行
+          let gateNeedsHuman = false
           if (status === 'done') {
             const tAfter = svc.projectionSnapshot.tasks[taskId]
             const declared = (args.deliverablePaths as string[] | undefined) ?? []
             if (tAfter?.state === 'gate:archive') {
-              gateNote = this.evaluateArchiveGate(teamId, taskId, actor, declared).note || undefined
+              const evaluated = this.evaluateArchiveGate(teamId, taskId, actor, declared)
+              gateNote = evaluated.note || undefined
+              gateNeedsHuman = evaluated.needsHuman === true
             } else if (tAfter?.state.startsWith('gate:')) {
               const gate = tAfter.state.slice('gate:'.length)
               gateNote = `已进入 gate:${gate}，等待队长裁决（myteam_review_task / 面板「门禁裁决」）`
@@ -3626,7 +3944,8 @@ export class MyTeamHost {
               ? `知识库存在 tags 相交条目，供队长复核时参考关系：${candidates.map((c) => `${c.id}(${c.shared.join('/')})`).join('、')}`
               : undefined
             return {
-              status: 'completed',
+              status: gateNeedsHuman ? 'needs-human' : 'completed',
+              ...(gateNeedsHuman ? { code: 'MT_ENV_UNAVAILABLE' } : {}),
               note: gateNote ?? '已进入门禁链；知识提案待队长审',
               ...(knowledgeHint ? { knowledgeHint } : {}),
               ...(touched.length > 0
@@ -3637,7 +3956,8 @@ export class MyTeamHost {
           // 记忆审计（T21：任务收口后扫描，违规落 memory.audit；R28：不阻塞主流程）
           const audit = this.auditMemberMemory(teamId, member.memberId, taskId)
           return {
-            status: status === 'done' ? 'completed' : status,
+            status: gateNeedsHuman ? 'needs-human' : status === 'done' ? 'completed' : status,
+            ...(gateNeedsHuman ? { code: 'MT_ENV_UNAVAILABLE' } : {}),
             note: status === 'done' ? (gateNote ?? '已进入门禁链；知识提案（如有）待队长审') : undefined,
             ...(audit && audit.violations > 0
               ? { memoryAudit: { violations: audit.violations, note: '私有记忆存在无证据指针条目，已落账本 memory.audit（FR-6.2）' } }
@@ -3653,7 +3973,8 @@ export class MyTeamHost {
         case 'myteam_wait_for_change': {
           // 成员侧等待：与 Lead 侧同一异步长轮询实现（工具 execute 返回 Promise，
           // 宿主工具管线 await 之；不再阻塞事件循环）。
-          return this.waitForChange({ ...args, teamId }) as unknown as Record<string, unknown>
+          // P2-1：把「本人」传进去——活跃 peer 判定要排除自己（自己等自己必然空转）
+          return this.waitForChange({ ...args, teamId, memberId: member.memberId }) as unknown as Record<string, unknown>
         }
         case 'myteam_propose_task_change': {
           const proposalId = `prop-${Date.now()}`

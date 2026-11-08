@@ -62,7 +62,46 @@ export interface TaskProjection {
   id: string
   input: TaskInput
   state: TaskState
+  /**
+   * P2-2（docs/21 §6，来源 NM `src/types.ts:179-188`）：当前 attempt 的**能力票据**。
+   * 成员每次 update 必须出示；陈旧即被拒（`MT_ATTEMPT_STALE`）。
+   */
   attemptId?: string
+  /**
+   * P2-2：**执行世代号**（单调递增，0/缺省 = 从未 claim 过）。
+   *
+   * 为什么要和 `attemptId` 拆开：`attemptId` 是**能力票据**（对得上就行），世代号是**排序事实**
+   * （谁比谁新）。重派/重试必须让更早的 attempt 全部失效——只靠票据字符串做不到「更早」，
+   * 也回答不了「这次 claim 是第几代」。两者生命周期也不同：票据随 claim 生成、随撤权立即失效；
+   * 世代号只增不减（跨撤权/重试保留）。
+   */
+  attempt?: number
+  /**
+   * P2-2：撤权/交接的**不透明世代票据**——撤权已发出、但下一次 attempt 还没开始时持有。
+   *
+   * 为什么不能复用 `attemptId`：`attemptId` 属于「正在跑的那次」，撤权后必须立刻失效；
+   * 而「有一笔交接还没落地」这件事要继续被记住（否则调度器会把任务当成从没跑过）。
+   * 官方的置位时机是 `invalidateTaskAttempt`（NM `refs/competitors/dsh-agent-teams/src/state.ts:214-226`
+   * ——清 `attemptId`、发新 `handoffId`）。
+   */
+  handoffId?: string
+  /**
+   * P2-2：**重派中**——交接正在静默排空旧持有人，此刻调度器不得派单。
+   *
+   * 为什么是独立布尔而不是从 `handoffId` 推导：两者的生命周期不同——`handoffId` 在排空完成后
+   * 仍要保留到下一次 attempt 开始（否则「交接已落地」这段事实丢失），而「不能派单」这道闸门
+   * 在排空完成时就落下。合在一起就没法表达「票据还在、闸门已开」。
+   */
+  reassigning?: boolean
+  /**
+   * P2-2：**已停放的 attempt → 停放原因**（`attemptId` 为键）。
+   *
+   * 为什么用**普通对象**而不是 `Map`：投影会跨层（`commit` 里 `structuredClone`、面板 RPC、
+   * 导出 JSON）。`Map` 虽然能被 `structuredClone`，但 `JSON.stringify(new Map())` 恒为 `{}`——
+   * 序列化路径上会**静默丢光**停放记录（排查时看到「没有停放」而实际停了）。
+   * 普通对象两种克隆/序列化都保真，代价只是键必须是字符串——`attemptId` 本来就是字符串。
+   */
+  parkedAttempts?: Record<string, string>
   assignee?: string
   /** CHG-69（FR-21）：多队员负责（主负责 + 协作）；assignee = 当前 claim 的执行者，两者可不同 */
   assignees?: string[]

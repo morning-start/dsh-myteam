@@ -501,7 +501,7 @@ interface HandoffSessionRef {
 
 ## 错误码（`MT_*`）
 
-> **本表由 `tools/gen-error-docs.mjs` 从 `plugin/src/core/errors.ts` 生成，共 77 个。**
+> **本表由 `tools/gen-error-docs.mjs` 从 `plugin/src/core/errors.ts` 生成，共 78 个。**
 > 手改会被覆盖，且 `plugin/test/t81-error-codes.test.ts` 会判红。
 >
 > **加码流程**：① `errors.ts` 加一行（含说明）→ ② `node tools/gen-error-docs.mjs` → ③ `cd plugin && npm test`。
@@ -509,7 +509,7 @@ interface HandoffSessionRef {
 > 客户端按码分支的地方（`plugin/client/client.js`）必须只认本表里的码；
 > 服务端新增码时若客户端要分支，同步改客户端并在 CHG 里记一笔。
 
-### 跨域通用（13）
+### 跨域通用（14）
 
 | 码 | 什么时候会看到它 |
 |---|---|
@@ -520,6 +520,7 @@ interface HandoffSessionRef {
 | `MT_UNKNOWN_TOOL` | 调用了未注册的 `myteam_*` 工具名（拼写错、或被 `toolPolicy` 收窄掉了）。 |
 | `MT_EXTERNAL_FAILURE` | 门禁里跑的外部命令自身失败（非零退出、被信号杀），不是门禁判定为 fail。 |
 | `MT_TOOL_CONTRACT` | 工具返回值违反结果契约（缺 `status` / `status` 不在结果状态词表 / `code`·`message` 类型不符）。**返回**而不是抛出，调用方决定记日志还是阻断。 |
+| `MT_ENV_UNAVAILABLE` | 成员护栏判定**执行环境不可用**（命令不存在 / `command not found` / `ENOENT` / 权限不足）。重试、换命令、换参数都修不好环境——交付判定转人工，**禁止自动重试**（P1-5）。 |
 | `MT_NOT_CLAIMABLE` | 任务当前状态不允许 claim（不满足就绪条件：依赖未完成 / 已被占用 / 非 ready）。 |
 | `MT_BATCH_NOT_ROOT` | 批量调用只支持根级方法（形参只有 query）；agent 作用域的方法请单独调用。 |
 | `MT_UNKNOWN_METHOD` | 方法名不在宿主方法表里（客户端与服务端版本不一致，或拼错了）。 |
