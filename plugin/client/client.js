@@ -9986,9 +9986,49 @@ window.__ModuleLoader__.load({
           await loadProject(projectRoot)
         } catch (e) { setError(String(e?.message ?? e)) }
       }
-      /* 5s 轮询（POLL_MS）：切到后台（visibilityState=hidden）时跳过本轮，不请求网关；
-       * 回到可见时立刻补一次，避免「切回来要等一个周期才更新」。监听器在 effect 清理时移除。 */
+      /**
+       * CHG-113：**长轮询追平**——账本一有新事件就刷新，替代 5s 轮询。
+       *
+       * 为什么能替：`watch` 在服务端挂着等（最多 25s），有新事件**立刻**返回；
+       * 客户端拿到 `changed:true` 才重新拉看板，`changed:false` 就重开——空闲时零请求，
+       * 有变化时毫秒级。切到后台时暂停（不请求网关），回到可见立刻补一次。
+       *
+       * 降级：旧宿主没有 `watch` 方法 → 直接返回，由下面的 5s 轮询兜底（绝不把面板搞死）。
+       */
       react.useEffect(() => {
+        if (typeof discoveryApi.watch !== 'function') return undefined
+        if (!projectRoot) return undefined
+        const teamId = selectedTeamId || (project?.teams ?? [])[0]?.teamId || ''
+        if (!teamId) return undefined
+        let alive = true
+        let since = 0
+        const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms))
+        const loop = async () => {
+          while (alive) {
+            if (isHidden()) { await sleep(1000); continue }
+            try {
+              const r = await discoveryApi.watch({ workspaceRoot: projectRoot, teamId, sinceSeq: since, timeoutMs: 20000 })
+              if (!alive) return
+              if (typeof r?.seq === 'number') since = r.seq
+              if (r?.changed) {
+                await loadProject(projectRoot)
+                await loadTeams()
+              } else if (r?.status === 'empty') {
+                /* 团队还没建账本：慢一点等，别把网关打满 */
+                await sleep(2000)
+              }
+            } catch {
+              /* 网关/网络抖动：退避后重试，不弹错（面板已有自己的 error 通道） */
+              await sleep(3000)
+            }
+          }
+        }
+        void loop()
+        return () => { alive = false }
+      }, [projectRoot, selectedTeamId, project, discoveryApi, loadProject, loadTeams])
+      /* 回退：只有宿主没有 `watch` 时才用 5s 轮询（CHG-113 之前的行为） */
+      react.useEffect(() => {
+        if (typeof discoveryApi.watch === 'function') return undefined
         const tick = () => {
           if (isHidden()) return
           loadTeams()
@@ -10001,7 +10041,7 @@ window.__ModuleLoader__.load({
           clearInterval(timer)
           if (typeof document !== 'undefined') document.removeEventListener('visibilitychange', onVisible)
         }
-      }, [loadTeams, loadProject, projectRoot])
+      }, [loadTeams, loadProject, projectRoot, discoveryApi])
 
       // 角色详情：点开时按当前项目角色库拉一次（含定义全文与在册情况）
       react.useEffect(() => {
@@ -11698,6 +11738,8 @@ window.__ModuleLoader__.load({
      */
     function useConvBoard(connection, sessionId) {
       const [state, setState] = react.useState(() => ({ tasks: [], live: 0, gates: 0, roles: 0, members: [], team: undefined, loaded: false }))
+      /* CHG-113：`tick` 由 watch 循环推进——账本有新事件就重拉看板（替代轮询刷新） */
+      const [tick, setTick] = react.useState(0)
       react.useEffect(() => {
         if (!sessionId || !connection) return undefined
         let alive = true
@@ -11727,7 +11769,37 @@ window.__ModuleLoader__.load({
           })
         }).catch(() => { if (alive) setState((prev) => ({ ...prev, loaded: true })) })
         return () => { alive = false }
-      }, [sessionId, connection])
+      }, [sessionId, connection, tick])
+
+      /**
+       * CHG-113：**团队视图自动追平**——拿到 teamId 后挂 `watch` 长轮询，
+       * 账本一有新事件就 `setTick` 重拉（`changed:false` 就重开，空闲零请求）。
+       * 旧宿主没有 `watch` → 直接返回，保持「打开时拉一次」的旧行为。
+       */
+      const teamId = state.team?.teamId
+      react.useEffect(() => {
+        if (!teamId || !connection) return undefined
+        const api = makeApi(connection, sessionId)
+        if (typeof api.watch !== 'function') return undefined
+        let alive = true
+        let since = 0
+        const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms))
+        const loop = async () => {
+          while (alive) {
+            if (isHidden()) { await sleep(1000); continue }
+            try {
+              const r = await api.watch({ teamId, sinceSeq: since, timeoutMs: 20000 })
+              if (!alive) return
+              if (typeof r?.seq === 'number') since = r.seq
+              if (r?.changed) setTick((value) => value + 1)
+            } catch {
+              await sleep(3000)
+            }
+          }
+        }
+        void loop()
+        return () => { alive = false }
+      }, [teamId, connection, sessionId])
       return state
     }
     /** 计数渲染：0 条任务不等于「无数据」时照样显示 0；缺数据（未加载）显示 — 占位 */

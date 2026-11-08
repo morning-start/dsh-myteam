@@ -181,3 +181,37 @@ test('t85-9: watch 长轮询——新事件立刻返回 / 无事件超时空返�
   const batched = await facade.batch({ calls: [{ kind: 'watch', args: { workspaceRoot: root, teamId: 't-watch', sinceSeq: 2, timeoutMs: 200 } }] })
   assert.equal(batched.results[0].ok, true, 'watch 可进 batch（根级方法）')
 })
+
+test('t85-10: 面板与团队视图都用 watch 自动追平（5s 轮询降级为回退）（CHG-113）', () => {
+  // ① 面板：watch 循环存在，且 5s 轮询只在「宿主没有 watch」时启用
+  assert.ok(
+    /if \(typeof discoveryApi\.watch !== 'function'\) return undefined/.test(clientSource),
+    '面板：没有 watch 时直接返回（不重复轮询）',
+  )
+  assert.ok(
+    /const r = await discoveryApi\.watch\(\{[^}]*workspaceRoot: projectRoot, teamId,[^}]*sinceSeq: since, timeoutMs: 20000 \}\)/.test(clientSource),
+    '面板：watch 循环带 sinceSeq/timeoutMs',
+  )
+  assert.ok(
+    /if \(r\?\.changed\) \{\s*await loadProject\(projectRoot\)/.test(clientSource),
+    '面板：changed 才重拉看板（空闲零请求）',
+  )
+  // ② 回退分支：只有无 watch 才起 setInterval
+  const fallbackAt = clientSource.indexOf('回退：只有宿主没有')
+  assert.ok(fallbackAt > 0, '回退注释存在')
+  const fallback = clientSource.slice(fallbackAt, clientSource.indexOf('}, [loadTeams, loadProject, projectRoot, discoveryApi])'))
+  assert.ok(fallback.includes("if (typeof discoveryApi.watch === 'function') return undefined"), '回退分支必须有守卫')
+  assert.ok(fallback.includes('setInterval(tick, POLL_MS)'), '回退分支保留 5s 轮询')
+  // ③ 团队视图：useConvBoard 由 watch 推进 tick
+  assert.ok(
+    /const api = makeApi\(connection, sessionId\)[\s\S]{0,200}?if \(typeof api\.watch !== 'function'\) return undefined/.test(clientSource),
+    '团队视图：无 watch 时保持一次性加载',
+  )
+  assert.ok(
+    /if \(r\?\.changed\) setTick\(\(value\) => value \+ 1\)/.test(clientSource),
+    '团队视图：changed 推进 tick 重拉',
+  )
+  // ④ 两处都要在后台暂停（不请求网关）
+  const hiddenCount = (clientSource.match(/if \(isHidden\(\)\) \{ await sleep\(1000\); continue \}/g) ?? []).length
+  assert.equal(hiddenCount, 2, '面板与团队视图都要在 hidden 时暂停（实际 ' + hiddenCount + ' 处）')
+})
