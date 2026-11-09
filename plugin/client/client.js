@@ -4641,11 +4641,16 @@ window.__ModuleLoader__.load({
       '.mt-vlink-on{color:var(--dsw-alias-label-primary);background:var(--dsw-alias-bg-layer-2);font-weight:600}',
       '.mt-viewbar-hint{font-size:11px;color:var(--dsw-alias-label-tertiary)}',
       /* [G6 flow · 会话页 conversation.html / 单角色调用 guest.html] */
-      /* CHG-156：团队视图 = **对话式居中阅读列**。原来是满宽面板（左右各 16px 贴边，宽屏下一行 2000px 没人读），
-       * 现在与「对话」tab 的消息列对齐：正文最多 720px 居中，窄屏退回 28px 边距。
-       * 纪律：用 `padding-inline` 居中，**不用** `max-width + margin-inline:auto`——后者会让滚动条贴到内容上，
-       * 与宿主的对话列不是同一种居中方式。 */
-      '.mt-conv{display:flex;flex-direction:column;height:100%;min-height:0;overflow-y:auto;padding-block:20px 40px;padding-inline:max(28px,calc((100% - 720px) / 2));box-sizing:border-box;color:var(--dsw-alias-label-primary)}',
+      /* CHG-156：团队视图 = **对话式居中阅读列**。原来是满宽面板（左右各 16px 贴边，宽屏下一行 2000px 没人读）。
+       * CHG-167：**列宽 720 → 1400**——720 是「纯文字对话」的阅读列宽，但团队视图首页是
+       * **多列看板 + 四张统计卡 + 总览分段条**：720 下四列泳道挤成一条窄缝、每列只剩 ~170px，
+       * 任务卡标题逐字折行（用户实测截图）。看板类界面的「一眼看全局」靠宽度，不靠行长。
+       * 1400 是「宽屏也读得下、但不会退回满宽面板」的中庸值；1188px 这类中等视口下
+       * `calc()` 为负 → `max(28px, …)` 收到 28px 边距 = **近乎满宽但不贴边**。
+       * 纪律不变：用 `padding-inline` 居中，**不用** `max-width + margin-inline:auto`——后者会让
+       * 滚动条贴到内容上，与宿主的对话列不是同一种居中方式。
+       * 边界：视口 < 1456px 时 `calc()` 变负 → `max(28px, …)` 兜底为 28px 边距，**永不横向溢出**。 */
+      '.mt-conv{display:flex;flex-direction:column;height:100%;min-height:0;overflow-y:auto;padding-block:20px 40px;padding-inline:max(28px,calc((100% - 1400px) / 2));box-sizing:border-box;color:var(--dsw-alias-label-primary)}',
       '.mt-conv-head{display:flex;align-items:center;gap:12px;flex-wrap:wrap;padding-bottom:12px;border-bottom:.5px solid var(--dsw-alias-border-l2);flex:none}',
       '.mt-conv-title{display:inline-flex;align-items:center;gap:8px;min-width:0}',
       '.mt-conv-title b{font-size:13px;font-weight:600}',
