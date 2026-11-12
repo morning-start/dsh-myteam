@@ -26,7 +26,7 @@ import { mkdtempSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'nod
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { MyTeamHost, type HostRuntime } from '../src/host.ts'
-import { buildTokensView } from '../src/remote/views.ts'
+import { buildTokensView } from '../src/core/index/views.ts'
 import { buildOfflineTokens } from '../src/core/index/offline-view.ts'
 import {
   coverageOf,

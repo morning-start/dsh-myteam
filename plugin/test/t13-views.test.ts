@@ -5,7 +5,7 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { TeamService, bootstrapTeam } from '../src/core/service.ts'
 import { copyToProject } from '../src/core/roles/role-store.ts'
-import { buildBoardView, buildTaskDetailView, buildTokensView } from '../src/remote/views.ts'
+import { buildBoardView, buildTaskDetailView, buildTokensView } from '../src/core/index/views.ts'
 import { emptyTokensFile, accumulate } from '../src/core/ledger/token-sidecar.ts'
 
 function setup() {
@@ -56,6 +56,36 @@ test('T13: tokens view derives hit rate (REV-5)', () => {
   file = accumulate(file, 'm1', '2026-10-25', { uncachedInput: 100, cacheRead: 900, cacheWrite: 50, output: 200 })
   const view = buildTokensView(file) as { totals: Record<string, { hitRate: number | null }> }
   assert.ok(Math.abs(view.totals['m1'].hitRate! - 900 / 1050) < 1e-9)
+})
+
+test('T13: task detail sharedScopes —— claim 闸门（CHG-161）的事前可见化（CHG-171）', () => {
+  const service = setup()
+  const mk = (taskId: string, extra: Record<string, unknown>) => {
+    const r = service.commit({ actor: 'lead', type: 'task.created', payload: { teamId: 't1', taskId, task: { title: taskId.toUpperCase(), description: 'd', acceptanceCriteria: ['ac'], deliverableSpec: { path: 'docs/x.md' }, deps: [], requiredRole: 'implementer', priority: 'P1', gateChain: ['review', 'archive'], ...extra } } })
+    assert.equal(r.ok, true, `${taskId} 建单成功`)
+  }
+  /* k1（setup 建）未声明 writeScopes → 无块（未声明 ≠ 冲突） */
+  assert.equal(buildTaskDetailView(service, 'k1', readEvents(service.ledgerPath))!.sharedScopes, undefined)
+  mk('k2', { writeScopes: ['src/'] })
+  mk('k3', { writeScopes: ['src/a.ts'] })
+  mk('k4', { writeScopes: ['lib/'] })
+  mk('k5', {})
+  mk('k6', { writeScopes: ['lib/db.ts'] })
+  const events = () => readEvents(service.ledgerPath)
+  /* k2 ready：blocking 空（没有 in_progress 重叠）；queued = k3（ready 重叠），不含 k4（不重叠）/ k5（未声明） */
+  const d2 = buildTaskDetailView(service, 'k2', events())!
+  assert.deepEqual(d2.sharedScopes, { blocking: [], queued: [{ taskId: 'k3', title: 'K3' }] })
+  /* k2 claim → in_progress 后：k3 再看 k2 = blocking（此刻会被闸门拦，点名在等谁） */
+  const claim = service.commit({ actor: 'm1', type: 'task.claimed', payload: { teamId: 't1', taskId: 'k2', memberId: 'm1', attemptId: 'a2' } })
+  assert.equal(claim.ok, true)
+  const d3 = buildTaskDetailView(service, 'k3', events())!
+  assert.deepEqual(d3.sharedScopes!.blocking, [{ taskId: 'k2', title: 'K2' }])
+  assert.deepEqual(d3.sharedScopes!.queued, [])
+  /* k4/k6 同范围（lib/ vs lib/db.ts 重叠）：互相 queued；字典序稳定 */
+  const d4 = buildTaskDetailView(service, 'k4', events())!
+  assert.deepEqual(d4.sharedScopes!.queued, [{ taskId: 'k6', title: 'K6' }])
+  /* k5 未声明 → 无块 */
+  assert.equal(buildTaskDetailView(service, 'k5', events())!.sharedScopes, undefined)
 })
 
 test('T13: plan banner three actions map to ledger events (FR-1.2 唯一写入口)', () => {

@@ -117,6 +117,12 @@ export const MT_CODES = [
   /* CHG-120（M2-D ②）：会话考古读取失败（宿主 page 抛错且无稳定错误码时的兜底） */
   'MT_HISTORY_FAILED',
 
+  // ── 文件系统（CHG-174/175：原子写与收尾闸门）──────────────────
+  'MT_FS_WRITE_FAILED',
+  'MT_FS_SYMLINK_REFUSED',
+  'MT_FS_ROLLBACK_INCOMPLETE',
+  'MT_FS_LOG_MISUSE',
+
   // ── 插件贡献契约 ────────────────────────────────────────────
   'MT_CONTRIBUTION_CODE_IGNORED',
   'MT_CONTRIBUTION_FILE_MISSING',
@@ -230,6 +236,12 @@ export const MT_CODE_DOCS                         = {
   MT_HANDOFF_FAILED: '移交时建会话或注入摘要失败；**仍回 sessionId**（不假装成功，也不吞掉已建会话）。',
   MT_HANDOFF_NO_SESSION: '移交目标会话不存在或不可写。',
   MT_HISTORY_FAILED: '会话考古读取历史页失败（宿主 `SessionController.page` 抛错且没带稳定错误码）；**不返回空历史假装成功**。',
+
+  // 文件系统（CHG-174/175：原子写与收尾闸门）
+  MT_FS_WRITE_FAILED: '原子写失败（父目录不存在 / 磁盘满 / 权限不足）。目标文件**保持原样**，重跑一次即可。',
+  MT_FS_SYMLINK_REFUSED: '目标路径是符号链接，拒绝写入——否则「整份替换」会把它替换成普通文件，等于写穿到链接目标。',
+  MT_FS_ROLLBACK_INCOMPLETE: '多文件操作失败后回滚本身也失败了（磁盘满 / 权限）。**不谎称已回滚**：消息里同时带原始错误与回滚错误，需人工核对涉及的台账文件。',
+  MT_FS_LOG_MISUSE: '记账本重复绑定：嵌套两层会让提交集合分裂（回滚看似成功但文件还在），因此直接拒绝。',
 
   // 插件贡献契约
   MT_CONTRIBUTION_CODE_IGNORED: '贡献物里的代码字段被宿主忽略（只做声明，不执行第三方代码）。',

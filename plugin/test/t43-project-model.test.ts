@@ -28,7 +28,7 @@ import {
 } from '../src/core/roles/role-store.ts'
 import { BUILTIN_ROLES, builtinRole } from '../src/core/roles/builtin-roles.ts'
 import { buildTaskGraph, dependencyChain } from '../src/core/tasks/graph.ts'
-import { buildBoardView, buildProjectView, participantsOf } from '../src/remote/views.ts'
+import { buildBoardView, buildProjectView, participantsOf } from '../src/core/index/views.ts'
 import { TeamService, bootstrapTeam } from '../src/core/service.ts'
 
 let seq = 0

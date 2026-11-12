@@ -13,7 +13,7 @@
 import { test, beforeEach } from 'node:test'
 import assert from 'node:assert/strict'
 import { applyEvent, foldEvents } from '../src/core/scheduler/fold.ts'
-import { __clearViewCache, buildBoardView, buildTaskDetailView, viewCacheStats } from '../src/remote/views.ts'
+import { __clearViewCache, buildBoardView, buildTaskDetailView, viewCacheStats } from '../src/core/index/views.ts'
 import { emptyProjection } from '../src/core/scheduler/state.ts'
 import type { TeamProjection } from '../src/core/scheduler/state.ts'
 import type { LedgerEvent } from '../src/core/ledger/ledger.ts'

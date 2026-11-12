@@ -47,9 +47,10 @@
  *   - 初始化幂等（`ensureStore` 可重复调用），只补缺，不覆盖已有文件；
  *   - 旧目录 `.team-workplace` 走一次性迁移（`migrateLegacyStore`），迁移后保留备份名。
  */
-import { existsSync, mkdirSync, readFileSync, renameSync, rmSync, writeFileSync } from 'node:fs'
+import { existsSync, mkdirSync, readFileSync, renameSync, rmSync } from 'node:fs'
 import { homedir } from 'node:os'
 import { basename, isAbsolute, join, normalize, relative, resolve, sep } from 'node:path'
+import { writeTextAtomic } from '../fs/write-log.ts'
 
 /* ── 常量 ─────────────────────────────────────────────────────── */
 
@@ -356,7 +357,7 @@ export const STORE_README = `# .dsh-myteam —— 项目级团队存储
 function writeIfMissing(path: string, content: string): boolean {
   if (existsSync(path)) return false
   mkdirSync(join(path, '..'), { recursive: true })
-  writeFileSync(path, content, 'utf8')
+  writeTextAtomic(path, content)
   return true
 }
 
@@ -472,7 +473,7 @@ export function removeLegacyGitignoreBlock(projectRoot: string): boolean {
   const next = `${head.replace(/\s+$/, '')}${head.trim() ? '\n' : ''}${tail.replace(/^\s*\n/, '')}`.replace(/\n{3,}/g, '\n\n')
   try {
     if (next.trim().length === 0) rmSync(path)
-    else writeFileSync(path, next.endsWith('\n') ? next : `${next}\n`, 'utf8')
+    else writeTextAtomic(path, next.endsWith('\n') ? next : `${next}\n`)
     return true
   } catch {
     return false

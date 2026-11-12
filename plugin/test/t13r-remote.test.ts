@@ -174,3 +174,46 @@ test('t13r-8: getAudit 账本事件流新→旧分页；getConfig 生效配置 +
     rmSync(root, { recursive: true, force: true })
   }
 })
+
+test('t13r-9: getConfig.runtime.builtinToolsHide —— 实际生效的隐藏状态（R41-③ / CHG-170）', async () => {
+  const root = mkdtempSync(join(tmpdir(), 't13r9-'))
+  try {
+    /* ① 默认 rt（restrict 存在、schemas() 为空 → 名单视为全已知）：9/9 生效 */
+    {
+      const { remote } = setup(root)
+      const cfg: any = await remote.getConfig({})
+      const hide = cfg.runtime?.builtinToolsHide
+      assert.ok(hide, 'getConfig 附 runtime.builtinToolsHide')
+      assert.equal(hide.enabled, true)
+      assert.equal(hide.restricted, true)
+      assert.equal(hide.configured.length, 9, 'configured = 完整名单')
+      assert.equal(hide.effective.length, 9, 'schemas() 为空 → 全名单生效')
+      assert.ok(hide.effective.every((n: string) => hide.configured.includes(n)), 'effective ⊆ configured')
+    }
+    /* ② 宿主没有 tools.restrict：restricted=false、effective=[]（诚实降级，不假装生效） */
+    {
+      const rt = makeRuntime(root) as any
+      delete rt.tools.restrict
+      const host = new MyTeamHost(rt)
+      host.initialize()
+      const remote = new MyTeamRemote(rt, host)
+      const hide = (await remote.getConfig({})).runtime.builtinToolsHide
+      assert.equal(hide.restricted, false)
+      assert.deepEqual(hide.effective, [], '没执行 restrict → 生效清单为空')
+      assert.equal(hide.configured.length, 9, 'configured 仍列完整名单')
+    }
+    /* ③ 宿主 schemas() 只认识部分名单（CHG-58 语义）：只 deny 宿主真正存在的名字 */
+    {
+      const rt = makeRuntime(root) as any
+      rt.tools.schemas = () => [{ name: 'spawn_teammate' }, { name: 'bash' }]
+      const host = new MyTeamHost(rt)
+      host.initialize()
+      const remote = new MyTeamRemote(rt, host)
+      const hide = (await remote.getConfig({})).runtime.builtinToolsHide
+      assert.deepEqual(hide.effective, ['spawn_teammate'], 'effective 只含宿主全局工具集里真实存在的')
+      assert.equal(hide.restricted, true)
+    }
+  } finally {
+    rmSync(root, { recursive: true, force: true })
+  }
+})

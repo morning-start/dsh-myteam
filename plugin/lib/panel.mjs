@@ -55,7 +55,7 @@ const DESCRIPTOR_KEY = '@deepseek-ai/dsh-typert-protocol/remote-methods'
 const PANEL_PROTOCOL_VERSION = 1
 import { readGlobalIndex } from './core/index/team-index.mjs'
 import { buildOfflineAudit, buildOfflineBoard, buildOfflinePresets, buildOfflineProject, buildOfflineTaskDetail, buildOfflineTokens, isSafeTeamId, projectRolePaths, readOfflineTeam, roleUsage } from './core/index/offline-view.mjs'
-import { buildProjectView, buildRoleDetailView,                       } from './remote/views.mjs'
+import { buildProjectView, buildRoleDetailView,                       } from './core/index/views.mjs'
 import { assertValidRole, deleteProjectRoleSafe, listRoleCatalog, readProjectRole, saveProjectRole } from './core/roles/role-store.mjs'
 // CHG-87（docs/04 §2 承诺的 roleOp 端点）：与 host 侧共用同一份角色库写实现
 import { roleOp as roleOpImpl } from './core/roles/role-ops.mjs'

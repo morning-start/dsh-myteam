@@ -13,8 +13,9 @@
  *   - C7 守门：删除被预设绑定的角色拒绝并列占用方；
  *   - FR-10.1：预设名册必含且仅含一个队长。
  */
-import { readFileSync, writeFileSync, existsSync, readdirSync, mkdirSync, unlinkSync, appendFileSync } from 'node:fs'
+import { readFileSync, existsSync, readdirSync, mkdirSync, unlinkSync } from 'node:fs'
 import { join, dirname } from 'node:path'
+import { appendText, writeTextAtomic } from '../fs/write-log.mjs'
 import { BUILTIN_ROLES,                                       builtinRole } from './builtin-roles.mjs'
 
 /**
@@ -108,7 +109,7 @@ export function writeProjectRoleCard(paths                , def                )
   assertValidRole(def)
   const p = projectRoleFilePath(paths)
   mkdirSync(dirname(p), { recursive: true })
-  writeFileSync(p, `${JSON.stringify(def, null, 2)}\n`, 'utf8')
+  writeTextAtomic(p, `${JSON.stringify(def, null, 2)}\n`)
   return { filePath: p }
 }
 
@@ -160,7 +161,7 @@ export function writeProjectRole(dir        , def                )              
   assertValidRole(def)
   mkdirSync(dir, { recursive: true })
   const p = projectRolePath(dir, def.id)
-  writeFileSync(p, `${JSON.stringify(def, null, 2)}\n`, 'utf8')
+  writeTextAtomic(p, `${JSON.stringify(def, null, 2)}\n`)
   return { filePath: p }
 }
 
@@ -193,7 +194,7 @@ export function roleAuditPath(paths                )         {
 export function appendRoleAudit(paths                , entry                )         {
   const p = roleAuditPath(paths)
   mkdirSync(dirname(p), { recursive: true })
-  appendFileSync(p, `${JSON.stringify({ ts: Date.now(), actor: entry.actor ?? 'human', action: entry.action, roleId: entry.roleId, file: entry.file })}\n`, 'utf8')
+  appendText(p, `${JSON.stringify({ ts: Date.now(), actor: entry.actor ?? 'human', action: entry.action, roleId: entry.roleId, file: entry.file })}\n`)
   return p
 }
 
@@ -473,7 +474,7 @@ export function globalRoleAuditPath(paths                )         {
 function appendGlobalRoleAudit(paths                , entry                , actor         )         {
   const p = globalRoleAuditPath(paths)
   mkdirSync(dirname(p), { recursive: true })
-  appendFileSync(p, `${JSON.stringify({ ts: Date.now(), actor: actor ?? 'human', scope: 'global', action: entry.action, roleId: entry.roleId, file: entry.file })}\n`, 'utf8')
+  appendText(p, `${JSON.stringify({ ts: Date.now(), actor: actor ?? 'human', scope: 'global', action: entry.action, roleId: entry.roleId, file: entry.file })}\n`)
   return p
 }
 
@@ -498,7 +499,7 @@ export function saveGlobalRole(
   const dir = requireGlobalDir(paths)
   mkdirSync(dir, { recursive: true })
   const filePath = join(dir, `${def.id}.json`)
-  writeFileSync(filePath, `${JSON.stringify(def, null, 2)}\n`, 'utf8')
+  writeTextAtomic(filePath, `${JSON.stringify(def, null, 2)}\n`)
   const auditPath = appendGlobalRoleAudit(paths, { action: existing ? 'updated' : 'created', roleId: def.id, file: filePath }, opts.actor)
   return { filePath, action: existing ? 'updated' : 'created', auditPath }
 }

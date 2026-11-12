@@ -1,7 +1,20 @@
 # 04-API 与数据契约
 
 > TL 主导维护，PM 确认业务语义，QA 依据此做契约测试。
-> 对应 PRD v2.3 §6（工具清单）/§7（数据模型）/ADR-001~008。
+> 对应 PRD v4.0 §6（工具清单）/§7（数据模型）/ADR-001~016。
+
+> **v4.0 待落契约（M3，CHG-178）**：本文当前描述的是 v3.x 的 63 工具 / 40 端点 / 58 门面。M3 将新增或变更以下契约，**实施前先在本文件补行、再改实现**（避免「实现先行、文档追认」）：
+>
+> | 契约 | 变化 | 关联 |
+> |---|---|---|
+> | `role.delegation` | 角色 schema 新增 `{canSpawn, allowedRoles[], maxDepth?, maxChildren?}` | FR-32 / docs/18 |
+> | `member.spawned` | 载荷 +`parentMemberId?` / `depth` / `rootMemberId?`（**不新增事件型**，仍 40 型） | FR-32 |
+> | `myteam_spawn_member` / `myteam_release_member` | 档位 **C → CM**（成员需角色授权可见）；release 增 `cascade?: boolean` | FR-32 |
+> | `myteam_list_members` | **新增**（A 档，只读成员树） | FR-32 |
+> | `getProjectBoard` / `getProjectSummary` | **新增**两个 Remote 端点（项目级看板聚合 / 五指标汇总）；Remote 40 → 42、门面 58 → 60 | FR-33 |
+> | 错误码 | 新增成员树相关错误码（深度超限 / 有子成员未排空 / 子成员数超限；M3 实现后由 `gen-error-docs.mjs` 生成进本文码表，届时本节改为具体码名） | FR-32 |
+>
+> 目标体系与验收场景见 [docs/23](23-项目目标重梳理.md)。
 
 ## 1. 模型工具契约（myteam_*）
 
@@ -502,7 +515,7 @@ interface HandoffSessionRef {
 
 ## 错误码（`MT_*`）
 
-> **本表由 `tools/gen-error-docs.mjs` 从 `plugin/src/core/errors.ts` 生成，共 78 个。**
+> **本表由 `tools/gen-error-docs.mjs` 从 `plugin/src/core/errors.ts` 生成，共 82 个。**
 > 手改会被覆盖，且 `plugin/test/t81-error-codes.test.ts` 会判红。
 >
 > **加码流程**：① `errors.ts` 加一行（含说明）→ ② `node tools/gen-error-docs.mjs` → ③ `cd plugin && npm test`。
@@ -559,6 +572,15 @@ interface HandoffSessionRef {
 | `MT_TASK_TERMINAL` | 任务已在终态（done / cancelled / failed），不允许再变更。 |
 | `MT_TEAM_STATE` | 团队状态不允许当前操作（如同名 active 团队已存在、非 draft 时批准计划）。 |
 | `MT_VERIFY_NO_COMMAND` | `gate:verify` 要求任务声明 `verifyCommand`，但没声明（不能用人工裁决冒充真跑命令）。 |
+
+### 文件系统（原子写 / 收尾闸门）（4）
+
+| 码 | 什么时候会看到它 |
+|---|---|
+| `MT_FS_WRITE_FAILED` | 原子写失败（父目录不存在 / 磁盘满 / 权限不足）。目标文件**保持原样**，重跑一次即可。 |
+| `MT_FS_SYMLINK_REFUSED` | 目标路径是符号链接，拒绝写入——否则「整份替换」会把它替换成普通文件，等于写穿到链接目标。 |
+| `MT_FS_ROLLBACK_INCOMPLETE` | 多文件操作失败后回滚本身也失败了（磁盘满 / 权限）。**不谎称已回滚**：消息里同时带原始错误与回滚错误，需人工核对涉及的台账文件。 |
+| `MT_FS_LOG_MISUSE` | 记账本重复绑定：嵌套两层会让提交集合分裂（回滚看似成功但文件还在），因此直接拒绝。 |
 
 ### 归档（1）
 

@@ -8,6 +8,17 @@
 
                                                         
 
+/**
+ * CHG-170（R41-③）：随配置视图下发的**宿主运行时事实**（可选）。
+ *
+ * 为什么不是 TeamConfig 的字段：`builtinToolsHide` 是 host 级行为（initialize 时执行一次），
+ * 不属于任何合并层；离线/旧宿主拿不到时**整个键缺席**，客户端显示「—」不编 0
+ * （与覆盖率徽标的「未知不编 0」同一纪律）。
+ */
+                                       
+                                                                                                         
+ 
+
                                 
               
                      
@@ -21,11 +32,14 @@
                                       
                                   
                                 
+                                                          
+                                            
    
+                                
                     
  
 
-export function buildConfigPayload(config            , warnings          , source              = 'default')                {
+export function buildConfigPayload(config            , warnings          , source              = 'default', runtime                       )                {
   return {
     status: 'ok',
     source,
@@ -44,7 +58,9 @@ export function buildConfigPayload(config            , warnings          , sourc
       taskTypes: config.taskTypes,
       clarify: config.clarify,
       memory: config.memory,
+      taskPlanning: config.taskPlanning,
     },
+    ...(runtime ? { runtime } : {}),
     warnings,
   }
 }

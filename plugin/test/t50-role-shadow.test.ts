@@ -24,7 +24,7 @@ import {
   writeProjectRoleCard,
   type RoleEntry,
 } from '../src/core/roles/role-store.ts'
-import { buildRoleCatalogView, buildRoleDetailView } from '../src/remote/views.ts'
+import { buildRoleCatalogView, buildRoleDetailView } from '../src/core/index/views.ts'
 
 const pathsOf = (root: string) => ({ projectRolesDir: join(root, 'config', 'roles') })
 

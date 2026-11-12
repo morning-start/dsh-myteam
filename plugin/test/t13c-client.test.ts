@@ -244,6 +244,21 @@ test('t13c-2h: 团队工作台（CHG-49/69）——五标签、审计/设置数�
   assert.ok(source.includes('mt-seg') && source.includes('mt-viewbar'), '视图条样式')
 })
 
+test('t13c-2j: 任务详情「共享写范围」块（CHG-171 / R41 串行链收尾）', () => {
+  const source = readFileSync(clientPath, 'utf8')
+  assert.ok(source.includes('function SharedScopesBlock'), 'SharedScopesBlock 组件存在')
+  assert.ok(source.includes('j(SharedScopesBlock, { t, shared: detail.sharedScopes })'), '紧跟写入范围审计块挂载')
+  /* 与审计块同口径：无数据整块不渲染，不显示空壳 */
+  assert.ok(source.includes('if (blocking.length === 0 && queued.length === 0) return null'), '空态整块不渲染')
+  /* 五个新键 zh/en 成对 */
+  for (const key of ['scope.shared.title', 'scope.shared.blocking', 'scope.shared.queued', 'scope.shared.none', 'scope.shared.note']) {
+    const hits = source.split(`'${key}':`).length - 1
+    assert.equal(hits, 2, `${key} 必须 zh/en 各一条（实际 ${hits}）`)
+  }
+  /* 样式零新增：复用 mt-sec/mt-scope-row/mt-scope-chip/mt-hint（t62-10 唯一选择器门禁不受影响） */
+  assert.ok(!source.includes('.mt-shared-scopes{'), '不新增顶层选择器（复用既有样式）')
+})
+
 test('t13c-2i: 开箱团队（CHG-50/51/69）——全局随行资产里的模板目录（来源/队员/看板列）', () => {
   const source = readFileSync(clientPath, 'utf8')
   assert.ok(source.includes("'global.presets'") && source.includes("'global.assets'"), '全局随行资产 + 模板目录')

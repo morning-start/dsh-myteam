@@ -12,8 +12,9 @@
  *  ② **原子写**（tmp + rename）——半截卡片比没有卡片更糟；
  *  ③ **读兼容**：卡片不存在时调用方回落投影（`readMemberCard` 返回 `undefined`，不抛）。
  */
-import { existsSync, mkdirSync, readFileSync, readdirSync, renameSync, rmSync, writeFileSync } from 'node:fs'
+import { existsSync, mkdirSync, readFileSync, readdirSync } from 'node:fs'
 import { join } from 'node:path'
+import { writeTextAtomic } from '../fs/write-log.ts'
 
 export const MEMBER_CARD_FILE = 'member.json'
 
@@ -66,14 +67,7 @@ export function writeMemberCard(teamDir: string, card: MemberCard): { filePath: 
   const filePath = memberCardPath(teamDir, String(card.memberId))
   const dir = join(teamDir, 'members', String(card.memberId))
   mkdirSync(dir, { recursive: true })
-  const tmp = `${filePath}.tmp-${process.pid}-${Date.now()}`
-  try {
-    writeFileSync(tmp, `${JSON.stringify({ ...card, updatedAt: card.updatedAt || Date.now() }, null, 2)}\n`, 'utf8')
-    renameSync(tmp, filePath)
-  } catch (error) {
-    try { rmSync(tmp, { force: true }) } catch { /* 清理失败不掩盖原始错误 */ }
-    throw error
-  }
+  writeTextAtomic(filePath, `${JSON.stringify({ ...card, updatedAt: card.updatedAt || Date.now() }, null, 2)}\n`)
   return { filePath }
 }
 

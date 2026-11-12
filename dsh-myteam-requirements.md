@@ -1,5 +1,6 @@
-# dsh-myteam 插件需求定义 v3.0
+# dsh-myteam 插件需求定义 v4.0
 
+> v4.0 重梳理（2026-11-11，用户「本项目的主要目标需要重新梳理」+ 四点澄清，CHG-178）：**目标体系重排——角色 / 任务两类资源 + 团队聘任容器**。①**资源模型**：角色是全局 / 项目两级资源（全局可到处复用、项目仅本项目可用；运行时只认项目库，全局 → 项目单向复制）；任务是**项目级资源**（不存在全局任务）；**成员不是资源**，是「角色 × 团队」的聘任记录；子 Agent 是成员的再聘任（同一团队内父子树）。②**支柱一 FR-32 角色即资源 → 子 Agent 编队**：成员可在角色 `delegation.canSpawn` 显式授权下派生**子成员**，父子关系落 `member.spawned{parentMemberId,depth,rootMemberId}`；`limits.memberMaxDepth` 默认 0→**1**、硬上限 **2**；子成员工具集 **⊆** 父成员（C5 新增第 9 条）；父成员释放前必须排空子成员（默认拒绝 + `cascade:true` 级联）。③**支柱二 FR-33 任务即资源 → 项目共享看板**：项目内全部团队 / 全部层级任务聚合到**一张项目看板**，项目有活跃团队时**默认落地 = 任务看板**；三种分组（团队 / 角色 / 父子根）+ 五个汇总指标；新增 `state/index/tasks.json` 派生索引（可重建）与 `getProjectBoard` / `getProjectSummary` 两个端点。④**冲突裁决**：撤销 §1 非目标「不引入成员管理成员的递归权限」、修订 FR-3.9 与 ADR-010 反模式 #4（改为「**无授权**的嵌套禁止」）、docs/19 §1 资源模型扩展、CHG-7「扁平 DAG」**保持不变**（层级只在成员树，任务不做父子）。⑤工具 63→**64**（+`myteam_list_members`；成员 9→12；A 19 / C 35 / CM 4 / H 6），Remote 40→**42**、门面 58→**60**，M3 合计 **≈9d**。目标体系正本见 [docs/23](docs/23-项目目标重梳理.md)。
 > v3.0 增补（2026-11-01，CHG-64~68，用户拍板）：**面板信息架构与实体关系（FR-19~24 新增，设计稿先行）**——①**作用域分层**：全局只有角色（内置 + 全局资产），项目比全局多「团队」「任务」两个实体，且**项目自身也有一个角色**；项目层导航 = 角色 / 团队 / 任务三标签。②**任务 / 团队解耦**：任务升项目级实体（派单 / 依赖 / 门禁 / 证据在任务上），与团队是**多对多参与关系**（主责 1 / 协作 N）；关系三处显性化（参与团队轨 / 任务卡团队 chip / 详情「参与团队」区块 + 团队「参与任务」tab）；任务上标注负责队员。③**词汇与实体**：UI 不出现「成员」，团队内称**队员** = 角色 × 团队聘任记录（快照召唤固化）；兴趣词进角色 schema（interestWords[]）。④**依赖图**：必须带箭头（指向下游），横向 / 竖向双布局。⑤**设计原则**：实现细节不出 UI、演示数据虚构、面板撑满页面。详见 §13 与 docs/00 FR-19~24。
 > 依据：`agent-team-practices-checklist.md`（下称【清单】）× 当前 Harness 实测能力（2026-10-25 探查）× TF 补充调研（`docs/01-调研与竞品.md`，2026-10-25）× Hindsight 记忆架构调研（2026-10-25，CHG-18，详见 docs/01）。
 > v2.13 增补（2026-10-28，CHG-36，用户提出）：**预置团队（FR-10.6 新增）**——对位用户全局 PM·TL·QA 预设的分工（需求侧/开发侧/验收侧），在 myteam 内置「标准三人组」预置团队：新增内置角色 需求验证员（req-validator）/开发者（developer）/验收员（acceptor）（内置 3→6），队长 submit_plan **未显式给名册时按预置模板成团**（队长+三人组，FR-10.1 恰一队长由模板保证）；成员 spawn 时内置角色自动复制进项目库（引用即复制不变）。
@@ -34,6 +35,8 @@
 
 **一句话**：dsh-myteam 是一个在 DSH Harness 内提供**独立多智能体团队运行时**的插件——自带任务账本、状态机、质量门禁、预设与角色系统、可视化面板；**零依赖内核内置的 `agentTeams` 服务与配套工具**，成员为插件自管的独立根级 Agent。**它不专为开发服务，而是面向所有 Agent 实体的通用团队平台——本质是一种 Agent Resource（人力资源式）管理能力**：把任意领域的角色组织成团队、分派任务、流转文档、度量成本。内置默认预设是开发团队，小说写作/视频脚本等团队靠角色库 + 配置适配（FR-10.3）。
 
+**v4.0 口径（目标重梳理，CHG-178）**：只做两件事，且分开做——**① 团队与成员**：把「角色」聘任成成员，成员再派生更小的子 Agent（角色是全局 / 项目两级资源，成员是聘任记录）；**② 任务与看板**：任务只属于项目（不存在全局任务），项目内全部团队 / 层级任务聚合到**一张共享看板**，在最外层同步整套进度。两条铁律：角色可复用（全局 → 项目单向复制）、任务项目级（团队通过参与接手）。详见 [docs/23](docs/23-项目目标重梳理.md)。
+
 **明确非目标（v1 不做）**：
 - 不做 npm 市场发布纪律（J6/J7/J8 全套），仅保留 `engines.dsh` 一行防错装〔J6 降级〕。
 - 不做多 Workspace 多活跃团队（v1 每 Workspace 至多 1 个活跃团队，归档不限）。
@@ -41,7 +44,8 @@
 - 不做跨进程并发协调（诚实沿用单进程串行〔I10〕）。
 - 不做跨项目全局角色**运行时**（全局库仅展示/存档〔CHG-5〕，不参与项目运行时；这保留了隔离性，不是砍功能）。
 - **不代用户连接 MCP**（v2.0）：MCP server 的连接/鉴权属宿主与用户配置；插件只做**声明、可见性过滤、"未验证"标记**〔C8 思想〕，绝不自动连接或代管凭据。
-- 队长不是"大家长"：不承担具体领域功能，职责限定为任务安排/结构整理/过程检查与调度（FR-10.1）；不引入成员管理成员的递归权限。
+- 队长不是"大家长"：不承担具体领域功能，职责限定为任务安排/结构整理/过程检查与调度（FR-10.1）；~~不引入成员管理成员的递归权限~~ → **v4.0 修订（CHG-178）**：改为「不引入**无授权**的成员派生」——队长 + 角色 `delegation.canSpawn` 显式授权可派生**子成员**（同一团队内父子树，深度默认 1 / 硬上限 2，子成员能力 ⊆ 父成员；FR-32）。
+- **不做全局任务**（v4.0）：任务只属于项目，跨项目汇总不在本插件；**不做成员树无限深度**（硬上限 2 层）；**不做子团队**（team 树，子 Agent 仍在同一团队同一账本）；**不做任务父子层级**（任务保持扁平 DAG，层级只在成员树）。
 
 ## 2. 与内核的关系（架构总闸，〔实测〕）
 
@@ -212,7 +216,7 @@
 | FR-3.6 | 技能按成员隔离注册：成员 scope 上注册独立 provider，扫"插件内置只读 + 成员私有 notes/skills/"两个根；不泄露到全局 | C6〔必做〕〔M2〕 |
 | FR-3.7 | 技能删除守门：被角色绑定/使用中/被依赖时拒绝并列出占用方 | C7〔M3〕 |
 | FR-3.8 | 声明的 CLI 依赖对照 PATH 校验，缺失拒绝分配；MCP 只声明展示"未验证"，不自动连接 | C8〔M3〕 |
-| FR-3.9 | `maxMembers`（默认 **6**〔REV-1：宿主 `maxActiveSubagents=8` 按父树共享、超限不排队直接拒，留余量；T0 探针核实 `agents.create` 是否同一池〕）、`memberMaxDepth`（默认 0，成员不得再生成嵌套子代理）可配 | C9〔M1〕 |
+| FR-3.9 | `maxMembers`（默认 **6**〔REV-1：宿主 `maxActiveSubagents=8` 按父树共享、超限不排队直接拒，留余量；T0 探针核实 `agents.create` 是否同一池〕）、`memberMaxDepth`（**v4.0 修订（CHG-178）**：默认 **1**、硬上限 **2**——成员可在角色 `delegation.canSpawn` 授权下再派子成员，子成员能力 ⊆ 父成员；v3.x 的「默认 0、不得嵌套」作废）、`maxChildren`（**v4.0 新增**，默认 3）可配 | C9〔M1 / v4.0 M3〕 |
 | FR-3.10 | **capabilityState（applied/pending）与 availability（running/idle）正交上报**，面板双列显示，避免"看着在跑其实配置没生效" | C10〔M1〕 |
 | FR-3.11 | 成员移除/归档前先**排空**：该成员在跑任务与待处理输入排完才报成功；归档释放其持有的任务（防 K9 卡死） | D8〔M1〕 |
 | FR-3.12 | 归档是可逆第三态：`suspend / archive / remove` 三档；归档后成员 ref 解析显式报 `archived` 而非伪装 unknown-ref | D9〔M2〕 |
@@ -331,7 +335,7 @@
     "direction": "LR"
   },
   "views": { "default": "board", "tabs": ["board", "swimlane", "dag", "roster"] },
-  "limits": { "maxMembers": 6, "memberMaxDepth": 0 },
+  "limits": { "maxMembers": 6, "memberMaxDepth": 1, "maxChildren": 3 },
   "gates": { "enabled": true, "commandTimeoutMs": 120000 }
 }
 ```
@@ -520,7 +524,7 @@
 
 | 区块 | 内容 | 编辑权 |
 |---|---|---|
-| 行为配置表单 | maxMembers / memberMaxDepth / taskPlanning / gates 开关与超时 / hideBuiltinTeamTools / attachments TTL / memory.evidenceRequired | 项目 config（team.config.json）可视化编辑 + JSON 源视图切换；**patch 硬上限以只读形式展示**（"插件默认/硬上限"列，编辑不得越过——§8 冲突规则的 UI 化） |
+| 行为配置表单 | maxMembers / memberMaxDepth / maxChildren / taskPlanning / gates 开关与超时 / hideBuiltinTeamTools / attachments TTL / memory.evidenceRequired | 项目 config（team.config.json）可视化编辑 + JSON 源视图切换；**patch 硬上限以只读形式展示**（"插件默认/硬上限"列，编辑不得越过——§8 冲突规则的 UI 化） |
 | 状态目录 | `.team-workplace/` 路径展示 + "打开目录" + gitignore 托管块状态（state/archive/logs 已忽略 ✓） | 只读展示 |
 | 内置工具隐藏 | hideBuiltinTeamTools 开关 + 当前宿主团队工具清单预览 | config |
 | 关于 | 版本 / engines.dsh 兼容范围 / 文档链接 | 只读 |
@@ -756,7 +760,7 @@ backlog ──(deps 全 done)──► ready ──(claim+attemptId)──► in
 
 ## 8. 配置项（双层：cordis.patch.yml 管默认与硬上限，team.config.json 管项目覆盖与 UI）
 
-`maxMembers(6)` · `memberMaxDepth(0)` · `taskPlanning("captain"|"template")` · `hideBuiltinTeamTools(true)` · `gates.enabled(true)` · `gates.commandTimeoutMs(120000)` · `wake.idleWatermark` · `attachments.ttlHours(24|72)` · `memory.evidenceRequired(true)` · `audit.writeScopes(true)` · **UI/看板/泳道/视图（team.config.json，FR-9.1）**
+`maxMembers(6)` · `memberMaxDepth(1，硬上限 2)` · `maxChildren(3)` · `taskPlanning("captain"|"template")` · `hideBuiltinTeamTools(true)` · `gates.enabled(true)` · `gates.commandTimeoutMs(120000)` · `wake.idleWatermark` · `attachments.ttlHours(24|72)` · `memory.evidenceRequired(true)` · `audit.writeScopes(true)` · **UI/看板/泳道/视图（team.config.json，FR-9.1）**
 
 冲突规则：patch 层默认值与硬上限在升级中存活；项目 config 可覆盖 UI 与行为参数，但**不得超过 patch 硬上限**（冲突取更严格者）；数组整条替换〔K5〕。
 

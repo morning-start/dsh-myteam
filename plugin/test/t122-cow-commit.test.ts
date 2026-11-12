@@ -31,7 +31,7 @@ import { TeamService } from '../src/core/service.ts'
 import { copyToProject } from '../src/core/roles/role-store.ts'
 import { openLedger, type LedgerEvent } from '../src/core/ledger/ledger.ts'
 import { foldEvents } from '../src/core/scheduler/fold.ts'
-import { __clearViewCache, buildBoardView, viewCacheStats } from '../src/remote/views.ts'
+import { __clearViewCache, buildBoardView, viewCacheStats } from '../src/core/index/views.ts'
 
 const COLUMNS = ['backlog', 'ready', 'running', 'gates', 'done']
 const MAPPING = {

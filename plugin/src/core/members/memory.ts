@@ -9,7 +9,8 @@
  *  - R26：播种用 host 进程 fs（由 host.ts 在 spawn 流程调用，本文件纯函数不碰 ctx）
  *  - FR-6.4（不宣告交接）在提示词层（T20），不在本文件。
  */
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs'
+import { existsSync, mkdirSync } from 'node:fs'
+import { writeTextAtomic } from '../fs/write-log.ts'
 import { memberMemoryDir } from '../workspace/layout.ts'
 
 /** 成员记忆目录（FR-6.1：绑定成员身份，随 identity 目录走） */
@@ -49,7 +50,7 @@ export function seedMemoryIfMissing(
   const memoryMdPath = [dir, 'memory.md'].join('/')
   if (!existsSync(dir)) mkdirSync(dir, { recursive: true })
   if (!existsSync(memoryMdPath)) {
-    writeFileSync(memoryMdPath, memorySeedTemplate(member), 'utf8')
+    writeTextAtomic(memoryMdPath, memorySeedTemplate(member))
     return { seeded: true, memoryMdPath }
   }
   return { seeded: false, memoryMdPath }

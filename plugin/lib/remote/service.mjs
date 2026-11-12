@@ -165,11 +165,11 @@ export class MyTeamRemote extends TypertRemoteService {
     return { status: 'ok', ...buildAuditView(teamId, events()                                                                                                            , { limit: args.limit, beforeSeq: args.beforeSeq }) }
   }
 
-  /** 生效配置（FR-14.3，CHG-49/55）：来源链 + 看板/流水线/限制/门禁/任务类型 + 告警 */
+  /** 生效配置（FR-14.3，CHG-49/55）：来源链 + 看板/流水线/限制/门禁/任务类型 + 告警；CHG-170 附宿主运行时事实（R41-③ 实际生效的内置工具隐藏） */
   async getConfig(args                      = {}) {
     const { teamId } = this.resolveTeam(args?.teamId)
     const svc = this.host.service(teamId)
-    return buildConfigView(svc, svc.configSource)
+    return buildConfigView(svc, svc.configSource, { builtinToolsHide: this.host.builtinToolsHide })
   }
 
   /**
@@ -183,7 +183,7 @@ export class MyTeamRemote extends TypertRemoteService {
     if ((result                       )?.status !== 'ok') return result
     const svc = this.host.service(teamId)
     /* 生效视图放前面（source/config/warnings 与 getConfig 同形），保存回执放后面 */
-    return { ...buildConfigView(svc, svc.configSource), ...result, status: 'ok' }
+    return { ...buildConfigView(svc, svc.configSource, { builtinToolsHide: this.host.builtinToolsHide }), ...result, status: 'ok' }
   }
 
   /** 恢复团队默认配置（CHG-57 工具面 / CHG-117 面板面）：删团队层文件并重建缓存 */
@@ -581,7 +581,7 @@ markRemoteMethods(MyTeamRemote.prototype, ['getBoard', 'getTaskDetail', 'getToke
   'getContributions', 'reloadContributions'])
 
 // views.ts 纯函数复用（buildDetail/buildBoard/buildTokens 薄转发，避免 client 打包拉入 service 类型）
-import { buildAuditView, buildBoardView, buildConfigView, buildTaskDetailView, buildTokensView } from './views.mjs'
+import { buildAuditView, buildBoardView, buildConfigView, buildTaskDetailView, buildTokensView } from '../core/index/views.mjs'
 /* CHG-119（FR-11.6）：计划质量反馈投影（纯函数） */
 import { buildPlanFeedback } from './plan-feedback.mjs'
 function buildDetail(service                                   , events                           , taskId        ) {

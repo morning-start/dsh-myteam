@@ -16,8 +16,9 @@
  *   - index 注入按 audience 过滤（软约束：无 audience 条目全员可见）。
  * 纯函数 + 文件 IO 分离〔J1〕。
  */
-import { readFileSync, writeFileSync, existsSync, readdirSync, mkdirSync } from 'node:fs'
+import { readFileSync, existsSync, readdirSync, mkdirSync } from 'node:fs'
 import { join } from 'node:path'
+import { writeTextAtomic } from '../fs/write-log.mjs'
 import { storeLayout } from '../workspace/layout.mjs'
 
 export const INDEX_BUDGET_LINES = 40
@@ -376,9 +377,9 @@ export function readKnowledgeEntry(dir        , id        )                     
 export function writeKnowledgeEntry(dir        , entry                )                       {
   mkdirSync(dir, { recursive: true })
   const filePath = join(dir, `${entry.id}.md`)
-  writeFileSync(filePath, entryToMarkdown(entry), 'utf8')
+  writeTextAtomic(filePath, entryToMarkdown(entry))
   const index = buildIndex(listKnowledge(dir))
-  writeFileSync(join(dir, 'index.json'), `${JSON.stringify(index, null, 2)}\n`, 'utf8')
+  writeTextAtomic(join(dir, 'index.json'), `${JSON.stringify(index, null, 2)}\n`)
   return { filePath }
 }
 

@@ -1,12 +1,12 @@
 {
   "schema": 1,
-  "builtAt": "2026-11-09T02:25:54.719Z",
+  "builtAt": "2026-11-12T15:36:27.633Z",
   "node": "v22.23.2",
   "entry": "./lib/host.mjs",
-  "modules": 54,
-  "sourceHash": "8a96645d31aed0b8e61f45854915bfc492501c5fa3277e208f3dad0576f399df",
+  "modules": 56,
+  "sourceHash": "d318d2a45785dfe751d2a24c671a598554fe11da5d82b36ed9f62b07181b8da0",
   "clientFile": "client/client.js",
-  "clientHash": "8aafbb3e95d8465c54341f9b2a918ecefe2f6280956533dbbcbdb0bc6b04374d",
+  "clientHash": "c2d0fc1774f7b929bbb4de6d27410a2f62d8e088e5a6c85a70bf3060afe02ddd",
   "files": [
     "core/agent/guard.ts",
     "core/archive/archive-store.ts",
@@ -16,6 +16,8 @@
     "core/contributions/discover.ts",
     "core/contributions/parse.ts",
     "core/errors.ts",
+    "core/fs/atomic-write.ts",
+    "core/fs/write-log.ts",
     "core/gates/artifact-freshness.ts",
     "core/gates/command-gate.ts",
     "core/gates/delivery-verdict.ts",
@@ -25,6 +27,7 @@
     "core/host/team-charter.ts",
     "core/index/offline-view.ts",
     "core/index/team-index.ts",
+    "core/index/views.ts",
     "core/knowledge/evidence-pointer.ts",
     "core/knowledge/knowledge.ts",
     "core/ledger/ledger.ts",
@@ -34,7 +37,6 @@
     "core/members/member-card.ts",
     "core/members/member-setup.ts",
     "core/members/memory.ts",
-    "core/members/smoke.ts",
     "core/presets/preset-store.ts",
     "core/roles/builtin-roles.ts",
     "core/roles/captain-skills.ts",
@@ -60,7 +62,7 @@
     "panel.ts",
     "remote/plan-feedback.ts",
     "remote/service.ts",
-    "remote/views.ts",
+    "smoke.ts",
     "tools/defs.ts"
   ]
 }

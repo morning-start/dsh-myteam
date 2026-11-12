@@ -32,9 +32,10 @@ async function loadCodeTable() {
 
 /** 域前缀 → 中文域名的展示分组（顺序即文档顺序）。 */
 const DOMAINS = [
-  { label: '跨域通用', test: (c) => !/^MT_(LEDGER|TASK|ATTEMPT|CROSS|DEPENDENCY|DRAIN|EVIDENCE|MEMBER|NO_AGENTS|NOT_CLAIMABLE|REJECT|REVISION|TEAM|VERIFY|ARCHIVE|KB|ROLE|ROSTER|PRESET|HANDOFF|CONTRIBUTION|PLUGIN)_/.test(c) },
+  { label: '跨域通用', test: (c) => !/^MT_(LEDGER|TASK|ATTEMPT|CROSS|DEPENDENCY|DRAIN|EVIDENCE|MEMBER|NO_AGENTS|NOT_CLAIMABLE|REJECT|REVISION|TEAM|VERIFY|ARCHIVE|KB|ROLE|ROSTER|PRESET|HANDOFF|CONTRIBUTION|PLUGIN|FS)_/.test(c) },
   { label: '账本（append-only JSONL）', test: (c) => c.startsWith('MT_LEDGER_') },
   { label: '任务与状态机', test: (c) => /^MT_(TASK|ATTEMPT|CROSS|DEPENDENCY|DRAIN|EVIDENCE|MEMBER|NO_AGENTS|NOT_CLAIMABLE|REJECT|REVISION|TEAM_STATE|VERIFY)(_|$)/.test(c) },
+  { label: '文件系统（原子写 / 收尾闸门）', test: (c) => c.startsWith('MT_FS_') },
   { label: '归档', test: (c) => c === 'MT_ARCHIVE_FAILED' },
   { label: '知识库', test: (c) => c.startsWith('MT_KB_') },
   { label: '角色库', test: (c) => c.startsWith('MT_ROLE_') },

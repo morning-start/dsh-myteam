@@ -8,7 +8,8 @@
  * - rules.version：校验规则演进标记〔I3〕，账本首事件必须是 rules.version.adopted。
  * - 纯函数 fold 与 IO 分离（〔J1〕），投影在 D2/T3 实现。
  */
-import { readFileSync, writeFileSync, statSync, truncateSync, openSync, writeSync, closeSync, fsyncSync } from 'node:fs'
+import { readFileSync, statSync } from 'node:fs'
+import { appendText, writeTextAtomic } from '../fs/write-log.ts'
 
 /** 账本事件类型全集（PRD §7.2 + CHG-16 增补），payload 校验器见 validatePayload */
 export const EVENT_TYPES = [
@@ -273,13 +274,7 @@ export function openLedger(filePath: string): LedgerOpenResult {
   if (dirty) {
     // 重写：只保留能解析的事件行（中部坏行剔除、尾部残行截断），其余原样保留
     const contentToWrite = goodLines.length > 0 ? `${goodLines.join('\n')}\n` : ''
-    truncateSync(filePath, 0)
-    if (contentToWrite.length > 0) {
-      const fd = openSync(filePath, 'r+')
-      writeSync(fd, contentToWrite, 0, 'utf8')
-      fsyncSync(fd)
-      closeSync(fd)
-    }
+    writeTextAtomic(filePath, contentToWrite)
   }
   const nextSeq = events.length > 0 ? events[events.length - 1].seq + 1 : 0
   return { events, nextSeq, truncated, corrupted, compacted: dirty }
@@ -300,11 +295,8 @@ export function appendEvent(filePath: string, event: LedgerEvent): void {
     if (event.type !== 'rules.version.adopted') {
       throw new LedgerValidationError('MT_LEDGER_MISSING_RULES_VERSION', 'first event must be rules.version.adopted')
     }
-    writeFileSync(filePath, line, 'utf8')
+    appendText(filePath, line, { ensureParent: true })
     return
   }
-  const fd = openSync(filePath, 'a')
-  writeSync(fd, line, 0, 'utf8')
-  fsyncSync(fd)
-  closeSync(fd)
+  appendText(filePath, line)
 }

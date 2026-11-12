@@ -7,7 +7,9 @@
 > - 代码常量与合并实现：[plugin/src/core/config/team-config.ts](../plugin/src/core/config/team-config.ts)（`DEFAULT_CONFIG` / `PATCH_CEILINGS`）
 > - 本文档（字段语义、组合面、迁移口径）
 >
-> 关联：FR-9.1（配置驱动）、FR-14.3（设置页）、FR-18（create-team 章程）、FR-13.2（create-role 扩充）、R12（三层合并复杂度）、R4b（patch × config × 临时参数）、CHG-55/56/102（落盘与三层合并）、CHG-91（插件贡献契约 v1）。
+> 关联：FR-9.1（配置驱动）、FR-14.3（设置页）、FR-18（create-team 章程）、FR-13.2（create-role 扩充）、R12（三层合并复杂度）、R4b（patch × config × 临时参数）、CHG-55/56/102（落盘与三层合并）、CHG-91（插件贡献契约 v1）、**CHG-178（v4.0 目标：角色 `delegation` / `memberMaxDepth` 1 / 硬上限 2 / `maxChildren`）**。
+>
+> **v4.0 目标（M3 待落，CHG-178）**：`limits.memberMaxDepth` 默认 0 → **1**、`PATCH_CEILINGS` 0 → **2**；新增 `limits.maxChildren`（默认 3）；角色 schema 新增 `delegation{canSpawn,allowedRoles,maxDepth,maxChildren}`。**在 M3-1 改完 `team-config.ts` / `team-config.schema.json` 之前，本节表格里的「v4.0 目标」列是目标值、不是当前生效值**——`t89` 三处同源门禁在 M3-1 一并更新。
 
 ---
 
@@ -41,13 +43,13 @@
 
 1. **顺序**：内置默认 ← 项目层 ← 团队层（后层覆盖前层，逐层独立校验）。
 2. **数组整条替换**（`board.columns` / `board.cardFields` / `pipeline.stages` / `views.tabs` / 每个 `taskTypes.*.gateChain`）：不拼接、不深度合并（K5 反坑）。
-3. **对象段落按子键合并**（`board` / `pipeline` / `dag` / `views` / `limits` / `gates` / `taskTypes` / `clarify` / `memory` / `audit` 的内部子键）；子键值仍是对象时**浅并一层**，不做无限递归。
+3. **对象段落按子键合并**（`board` / `pipeline` / `dag` / `views` / `limits` / `gates` / `taskTypes` / `clarify` / `memory` / `audit` 的内部子键）；子键值仍是对象时**浅并一层**，不做无限递归。**顶层标量**（`taskPlanning`，CHG-173）不走段落合并——直接整条替换。
 4. **未知键**：告警 `unknown config key "<key>" ignored`，**不报错**——这是前后兼容的承重墙（旧版本读新配置不会崩）。
 5. **逐层校验**（每层各自判定，失败**只废这一层**）：
    - 结构校验 `isStructurallyValidConfig`：只拒「类型明显错误」（已知段落存在但不是对象、`board.columns` 不是字符串数组）；
    - 终态覆盖 `validateCoverage`：`done` / `failed` / `blocked` / `cancelled` 必须被 `board.columns ∪ board.columnMapping` 覆盖（看板不能有任务落不进任何列）。
    - 失败 → 该层整层忽略、`fellBack = true`、告警写进 `warnings`，**其余层保留**（拒绝式但不误伤）。
-6. **硬上限钳制**（`applyCeilings`，更严格者胜）：`limits.maxMembers ≤ 6`、`limits.memberMaxDepth ≤ 0`，超出即钳制 + 告警（`PATCH_CEILINGS` 是 patch 层给不出更高值的硬顶）。
+6. **硬上限钳制**（`applyCeilings`，更严格者胜）：`limits.maxMembers ≤ 6`、`limits.memberMaxDepth ≤ 2`（**v4.0 目标**；v3.x 为 0）、`limits.maxChildren ≤ 6`（v4.0 新增），超出即钳制 + 告警（`PATCH_CEILINGS` 是 patch 层给不出更高值的硬顶）。
 7. **结果面**：`loadEffectiveConfig` 返回 `{ config, warnings, fellBack, applied: { project, team } }`；`getConfig` 的 `source ∈ default | project | team` 是**最后生效的层**，`mergeChain` 展示三层与各自是否生效。
 
 ---
@@ -93,7 +95,8 @@
 | 字段 | 类型 | 默认 | 校验 | 影响面 |
 |---|---|---|---|---|
 | `maxMembers` | `integer` | `6` | `1..6`（硬上限 6） | 团队最多成员数；超过即钳制 + 告警 |
-| `memberMaxDepth` | `integer` | `0` | `0..0`（硬上限 0） | 成员再派成员的深度；ADR-010 定死「成员内不得嵌套委派」 |
+| `memberMaxDepth` | `integer` | `0`（**v4.0 目标 1**） | `0..0`（**v4.0 目标 `0..2`**） | 成员再派成员的深度；**v4.0 修订（CHG-178）**：授权角色可派生子成员，深度默认 1 / 硬上限 2，子成员能力 ⊆ 父成员（ADR-015） |
+| `maxChildren` | `integer` | `3`（**v4.0 新增**） | `1..6` | 单成员子 Agent 上限；角色 `delegation.maxChildren` 可覆写，不超过 6 |
 | `maxTasks` | `integer` | `20` | `≥1` | 单团队任务数上限 |
 
 ### 3.6 `gates` —— 门禁默认
@@ -126,6 +129,12 @@
 | 字段 | 类型 | 默认 | 校验 | 影响面 |
 |---|---|---|---|---|
 | `writeScopes` | `boolean` | `true` | — | 任务声明 `writeScopes` 时是否对照证据块申报文件对账；越界**只留痕不阻断**（CHG-87 / FR-5.4） |
+
+### 3.11 `taskPlanning` —— DAG 来源二选一（顶层标量；CHG-173 / FR-1.3）
+
+| 字段 | 类型 | 默认 | 校验 | 影响面 |
+|---|---|---|---|---|
+| `taskPlanning` | `"captain"\|"template"` | `"captain"` | 枚举；**唯一的顶层标量字段** | `captain` = 任务组全由队长推导（默认）；`template` = submit_plan **未显式给任务**时按 `pipeline.stages` 生成内置固定流水线模板任务组（线性链，每阶段一任务）。诚实边界：模板生成的 AC 与交付物路径是**占位**（description 注明 + 结果 `templateNote` 提醒队长编辑）；显式 `tasks` 永远优先；`stages` 为空或名册无非队长角色 → `MT_VALIDATION`（不静默回退 captain）。合并走「整条替换」；设置页「任务来源（DAG）」开关可视化 |
 
 ---
 
@@ -253,7 +262,7 @@
   "pipeline": { "swimlaneBy": "stage", "stages": ["plan", "dev", "gates", "integrate"], "layout": "serpentine" },
   "dag": { "showModel": true, "collapseGroups": true, "direction": "LR" },
   "views": { "default": "board", "tabs": ["board", "swimlane", "dag", "roster"] },
-  "limits": { "maxMembers": 6, "memberMaxDepth": 0, "maxTasks": 20 },
+  "limits": { "maxMembers": 6, "memberMaxDepth": 1, "maxChildren": 3, "maxTasks": 20 },
   "gates": { "enabled": true, "commandTimeoutMs": 120000 },
   "taskTypes": {
     "default": { "gateChain": ["review", "archive"] },

@@ -352,7 +352,7 @@ test('t71-10: 面板 updateTask 透传 expectedRevision（详情视图 revision 
   const root = mkdtempSync(join(tmpdir(), 't71-rev-panel-'))
   const { host, teamId } = await team(root)
   const cr = host.executeLeadTool('myteam_create_task', { teamId, task: TASK() }, {}) as any
-  const { buildTaskDetailView } = await import('../src/remote/views.ts')
+  const { buildTaskDetailView } = await import('../src/core/index/views.ts')
   const detail = buildTaskDetailView(host.service(teamId), cr.taskId, readEvents(host.service(teamId).ledgerPath))
   assert.equal(detail?.revision, host.service(teamId).projectionSnapshot.revision)
 })

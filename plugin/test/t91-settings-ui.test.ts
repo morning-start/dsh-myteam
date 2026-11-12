@@ -121,6 +121,11 @@ test('t91-1: 在线团队 —— 常用字段是可编辑控件，无改动时�
   /* 记忆证据开关 */
   const evidence = byLabel(tree, 'settings.evidenceLabel').find((node) => node.type === 'button')
   assert.equal(typeof evidence?.props?.onClick, 'function')
+  /* CHG-173（FR-1.3）：任务来源（DAG）开关——captain/template */
+  const planning = byLabel(tree, 'settings.taskPlanning').find((node) => node.type === 'button')
+  assert.ok(planning, '任务来源开关存在')
+  assert.equal(typeof planning.props.onClick, 'function')
+  assert.equal(planning.props['aria-checked'], false, '默认 captain（aria-checked=false）')
   /* 无改动：保存按钮 disabled */
   const save = byTestId(tree, 'settings-save')
   assert.ok(save, '保存按钮存在')
@@ -175,4 +180,28 @@ test('t91-5: 新增文案 zh/en 成对（20 个键不得只加一边）', () => 
     const hits = source.split(`'${key}':`).length - 1
     assert.equal(hits, 2, `${key} 必须 zh/en 各一条（实际 ${hits}）`)
   }
+})
+
+test('t91-6: R41-③ —— 内置工具隐藏显示「实际生效」，假开关禁回潮', () => {
+  /* ① 源码契约：旧假开关（永远关闭且禁用的 toggle）不得回潮 + 新四态文案 zh/en 成对 */
+  assert.ok(!source.includes("[toggle(false, t('settings.hideTools'))]"), '假开关不得回潮')
+  assert.ok(source.includes('config.runtime?.builtinToolsHide'), '设置页读外层载荷的 runtime.builtinToolsHide（cfg 是内层 team config）')
+  for (const key of ['settings.hideToolsEff', 'settings.hideToolsOff', 'settings.hideToolsNoRestrict', 'settings.hideToolsList']) {
+    const hits = source.split(`'${key}':`).length - 1
+    assert.equal(hits, 2, `${key} 必须 zh/en 各一条（实际 ${hits}）`)
+  }
+  assert.ok(source.includes('.mt-hideeff-warn'), '未生效警示走 token 类（零硬编码色值）')
+  assert.ok(!source.includes('原始调用记录'), '旧错误语义文案不得回潮（隐藏的是宿主内置工具，不是调用记录）')
+  /* ② 行为：生效态显示 n/total + deny 清单 */
+  const withRuntime = renderSettings({ cfg: { ...CONFIG, runtime: { builtinToolsHide: { enabled: true, restricted: true, configured: ['a', 'b'], effective: ['a'] } } } })
+  assert.ok(findAll(withRuntime, (n) => n.props?.children === 'settings.hideToolsEff').length > 0, '生效态显示计数')
+  assert.ok(findAll(withRuntime, (n) => n.props?.children === 'settings.hideToolsList').length > 0, '生效态显示实际 deny 清单')
+  /* restricted=false：明说「隐藏未执行」（不假装生效） */
+  const noRestrict = renderSettings({ cfg: { ...CONFIG, runtime: { builtinToolsHide: { enabled: true, restricted: false, configured: ['a'], effective: [] } } } })
+  assert.ok(findAll(noRestrict, (n) => n.props?.children === 'settings.hideToolsNoRestrict').length > 0, '无 restrict 明说未执行')
+  /* enabled=false：明说未启用 */
+  const off = renderSettings({ cfg: { ...CONFIG, runtime: { builtinToolsHide: { enabled: false, restricted: false, configured: ['a'], effective: [] } } } })
+  assert.ok(findAll(off, (n) => n.props?.children === 'settings.hideToolsOff').length > 0, '关闭态明说未启用')
+  /* 无 runtime（离线/旧宿主）：显示「—」不编 0 */
+  assert.ok(findAll(renderSettings(), (n) => n.props?.children === '—').length > 0, '未知显示 — 不编 0')
 })

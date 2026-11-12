@@ -11,8 +11,8 @@
  * CHG-102：落盘根改为项目级 `.dsh-myteam/`，路径统一从 `core/workspace/layout.ts` 取。
  */
 
-import { existsSync, mkdirSync, readFileSync, writeFileSync, renameSync } from 'node:fs'
-import { dirname } from 'node:path'
+import { existsSync, readFileSync } from 'node:fs'
+import { writeTextAtomic } from '../fs/write-log.ts'
 import { storeLayout, teamConfigPath as teamConfigPathOf } from '../workspace/layout.ts'
 
 export interface TeamConfig {
@@ -36,6 +36,14 @@ export interface TeamConfig {
    * false = 关闭审计（非开发团队/纯文档团队可能不想要这层噪音）。
    */
   audit: { writeScopes: boolean }
+  /**
+   * FR-1.3（CHG-173）：DAG 来源二选一。唯一的**顶层标量**字段：
+   *  - `captain`（默认）= 队长按目标推导任务组（现状行为）；
+   *  - `template` = submit_plan 未显式给任务时，按 `pipeline.stages` 生成内置固定
+   *    流水线模板任务组（线性链，每阶段一任务；AC 与交付物路径是**占位**，
+   *    approve 前由队长编辑——诚实标注，不假装想好的计划）。
+   */
+  taskPlanning: 'captain' | 'template'
 }
 
 export const DEFAULT_CONFIG: TeamConfig = {
@@ -64,6 +72,8 @@ export const DEFAULT_CONFIG: TeamConfig = {
   memory: { evidenceRequired: true },
   // scope 完成审计（CHG-87，FR-5.4）：默开——越界只留痕不阻断交付
   audit: { writeScopes: true },
+  // DAG 来源（FR-1.3，CHG-173）：默认队长推导；'template' = 按 pipeline.stages 生成模板任务组
+  taskPlanning: 'captain',
 }
 
 /** patch 层硬上限（升级存活；config 不得超过，冲突取更严格者） */
@@ -155,6 +165,15 @@ export function applyCeilings(config: TeamConfig, warnings: string[]): TeamConfi
  * （`limits` 越界由 `applyCeilings` 钳制，不在这里拒绝）。 */
 export function isStructurallyValidConfig(value: unknown): boolean {
   if (!isPlainObject(value)) return false
+  // 顶层标量（CHG-173）：taskPlanning 是 TeamConfig 里唯一的非段落字段——合并走「整条替换」，
+  // 校验只查枚举取值。放在段落校验**之前**：段落循环假定值是对象，标量不能进那个循环。
+  const scalars: Record<string, (v: unknown) => boolean> = {
+    taskPlanning: (v) => oneOf(v, ['captain', 'template']),
+  }
+  for (const [key, check] of Object.entries(scalars)) {
+    if (!(key in value)) continue
+    if (!check(value[key])) return false
+  }
   const sections: Record<string, (v: Record<string, unknown>) => boolean> = {
     board: (v) => (v.columns === undefined || isStringList(v.columns))
       && (v.columnMapping === undefined || (isPlainObject(v.columnMapping) && Object.values(v.columnMapping).every(isStringList)))
@@ -251,10 +270,7 @@ export function readTeamConfigRaw(workspaceRoot: string, teamId: string): unknow
 /** 原子写团队级配置（tmp + rename；父目录自动创建） */
 export function writeTeamConfigRaw(workspaceRoot: string, teamId: string, value: unknown): string {
   const path = teamConfigPath(workspaceRoot, teamId)
-  mkdirSync(dirname(path), { recursive: true })
-  const tmp = `${path}.tmp`
-  writeFileSync(tmp, `${JSON.stringify(value, null, 2)}\n`, 'utf8')
-  renameSync(tmp, path)
+  writeTextAtomic(path, `${JSON.stringify(value, null, 2)}\n`, { ensureParent: true })
   return path
 }
 

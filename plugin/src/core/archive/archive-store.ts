@@ -24,8 +24,9 @@
  *  - **纯函数与 IO 分离**〔J1〕：`buildArchiveSnapshot` 无 IO，`writeArchive` 只写不读，
  *    `readArchive` 只读不写；这样快照结构可以在单测里不碰磁盘地断言。
  */
-import { existsSync, mkdirSync, readdirSync, readFileSync, writeFileSync } from 'node:fs'
+import { existsSync, mkdirSync, readdirSync, readFileSync } from 'node:fs'
 import { join } from 'node:path'
+import { writeTextAtomic } from '../fs/write-log.ts'
 import type { TeamProjection } from '../scheduler/state.ts'
 import type { TokensFile } from '../ledger/token-sidecar.ts'
 import { teamArchiveDir, archiveRoot, STORE_DIR } from '../workspace/layout.ts'
@@ -154,7 +155,7 @@ export interface ArchiveWriteResult {
 }
 
 function writeJson(filePath: string, value: unknown): void {
-  writeFileSync(filePath, `${JSON.stringify(value, null, 2)}\n`, 'utf8')
+  writeTextAtomic(filePath, `${JSON.stringify(value, null, 2)}\n`)
 }
 
 /**

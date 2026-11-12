@@ -170,7 +170,7 @@ test('T102 ⑤ 挂载与文案：总览卡挂在会话视图，zh/en 键齐全',
     assert.ok(enBlock.includes(`'${key}'`), `en 缺 ${key}`)
   }
   /* 服务端：messageCount 进 BoardView + 缓存命中回填（消息事件只动 inbox/perTaskMessages，不回填就是旧数） */
-  const viewsSource = readFileSync(join(here, '..', 'src', 'remote', 'views.ts'), 'utf8')
+  const viewsSource = readFileSync(join(here, '..', 'src', 'core', 'index', 'views.ts'), 'utf8')
   assert.match(viewsSource, /messageCount: number/, 'BoardView 接口必须有 messageCount')
   assert.match(viewsSource, /entry\.view\.messageCount = messageCountOf\(proj\)/, '缓存命中必须回填 messageCount')
   assert.match(viewsSource, /messageCount: messageCountOf\(proj\)/, '看板构建必须写入 messageCount')

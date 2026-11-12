@@ -13,6 +13,8 @@
 | 用浏览器按真实渲染查 UI | `cdp-debug.mjs`（配合 `.debug/scenario-*.mjs`） |
 | 造一份能点的演示数据 | `seed-demo-project.mjs` / `seed-demo-team.mjs` / `seed-panel-check.mjs` |
 | 核对 src 与 lib 是否一致 | `check-drift.mjs` / `diff-one.mjs` |
+| 守分层与写盘出口（违规即红） | `check-architecture.mjs`（A1–A5 五条硬红线） |
+| 体检当前架构长什么样（分层占比 / 枢纽 / 环 / 子域矩阵） | `arch-report.mjs`（恒退 0，只报告；结论见 `docs/22`） |
 | 量提交性能 | `smoke-commit-perf.mjs` |
 | 复现实弹环境 | `tools/runtime/package.json` |
 | 解包宿主 asar 取源码 | `extract-asar.mjs` |

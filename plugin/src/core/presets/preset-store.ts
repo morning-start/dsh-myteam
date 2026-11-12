@@ -16,8 +16,9 @@
  *   - 非法 JSON / 缺字段只跳过该文件并记 warning，不抛错（一个坏文件不能拖垮目录）；
  *   - 同 id 跨层不合并（三层各是一份来源，运行时归属由使用方决定）。
  */
-import { existsSync, mkdirSync, readdirSync, readFileSync, renameSync, unlinkSync, writeFileSync } from 'node:fs'
-import { dirname, join } from 'node:path'
+import { existsSync, readdirSync, readFileSync, unlinkSync } from 'node:fs'
+import { join } from 'node:path'
+import { writeTextAtomic } from '../fs/write-log.ts'
 import { DEFAULT_CONFIG } from '../config/team-config.ts'
 import { storeLayout } from '../workspace/layout.ts'
 
@@ -282,10 +283,7 @@ export function writeProjectPreset(workspaceRoot: string, definition: PresetDefi
   if (exists && opts.overwrite !== true) {
     return { ok: false, code: 'MT_PRESET_EXISTS', message: `preset "${definition.id}" already exists; pass overwrite=true to update it` }
   }
-  mkdirSync(dirname(path), { recursive: true })
-  const tmp = `${path}.tmp`
-  writeFileSync(tmp, `${JSON.stringify(definition, null, 2)}\n`, 'utf8')
-  renameSync(tmp, path)
+  writeTextAtomic(path, `${JSON.stringify(definition, null, 2)}\n`, { ensureParent: true })
   return { ok: true, definition, path, created: !exists }
 }
 

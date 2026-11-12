@@ -14,9 +14,10 @@
  *  - 写失败不阻断 commit 主路径（调用方 catch + warn）；
  *  - 不进入模型上下文（F2），面板只读。
  */
-import { existsSync, mkdirSync, readFileSync, readdirSync, renameSync, writeFileSync } from 'node:fs'
+import { existsSync, readFileSync, readdirSync } from 'node:fs'
 import { homedir } from 'node:os'
-import { dirname, join } from 'node:path'
+import { join } from 'node:path'
+import { writeTextAtomic } from '../fs/write-log.ts'
 import { foldEvents } from '../scheduler/fold.ts'
 import type { TeamProjection } from '../scheduler/state.ts'
 import { storeLayout } from '../workspace/layout.ts'
@@ -171,10 +172,7 @@ export function scanWorkspaceIndex(workspaceRoot: string): WorkspaceIndex {
 /* ── 读写（原子写） ── */
 
 function writeJsonAtomic(path: string, data: unknown): void {
-  mkdirSync(dirname(path), { recursive: true })
-  const tmp = `${path}.tmp`
-  writeFileSync(tmp, `${JSON.stringify(data, null, 2)}\n`, 'utf8')
-  renameSync(tmp, path)
+  writeTextAtomic(path, `${JSON.stringify(data, null, 2)}\n`, { ensureParent: true })
 }
 
 export function readWorkspaceIndex(workspaceRoot: string): WorkspaceIndex | undefined {

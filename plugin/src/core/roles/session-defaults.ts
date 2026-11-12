@@ -13,8 +13,9 @@
  * 跨重启恢复的口径：本文件是**默认值**，不是运行期状态——启动时读它重建提示词 section；
  * 会话内改动用同一个文件覆盖写（单写者：host 进程）。
  */
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs'
-import { dirname, join } from 'node:path'
+import { existsSync, readFileSync } from 'node:fs'
+import { join } from 'node:path'
+import { writeTextAtomic } from '../fs/write-log.ts'
 import type { RoleDefinition } from './builtin-roles.ts'
 import { storeLayout } from '../workspace/layout.ts'
 
@@ -76,8 +77,7 @@ export function writeSessionDefaults(
     updatedAt: opts.now ?? new Date().toISOString(),
     ...(opts.actor ? { actor: opts.actor } : {}),
   }
-  mkdirSync(dirname(filePath), { recursive: true })
-  writeFileSync(filePath, `${JSON.stringify(file, null, 2)}\n`, 'utf8')
+  writeTextAtomic(filePath, `${JSON.stringify(file, null, 2)}\n`, { ensureParent: true })
   return { filePath, file }
 }
 

@@ -78,3 +78,23 @@ test('T11: valid override survives coverage check; clarify round picks up CHG-16
   })
   assert.equal(result2.fellBack, false)
 })
+
+test('T11b: taskPlanning 顶层标量（CHG-173 / FR-1.3）——合并整条替换 + 枚举校验 + 默认值', () => {
+  // 默认值 = captain
+  assert.equal(DEFAULT_CONFIG.taskPlanning, 'captain')
+  // 合并走「整条替换」（标量不走段落合并）
+  const merged = mergeConfig(DEFAULT_CONFIG, { taskPlanning: 'template' }, [])
+  assert.equal(merged.taskPlanning, 'template')
+  const merged2 = mergeConfig(merged, {}, [])
+  assert.equal(merged2.taskPlanning, 'template', '未覆盖时保留前层')
+  // 结构校验：合法枚举通过、非法值拒绝（整层回退）
+  assert.equal(isStructurallyValidConfig({ taskPlanning: 'template' }), true)
+  assert.equal(isStructurallyValidConfig({ taskPlanning: 'auto' }), false)
+  const bad = loadEffectiveConfig({ taskPlanning: 'auto' })
+  assert.equal(bad.fellBack, true, '非法枚举 → 该层整层忽略')
+  assert.equal(bad.config.taskPlanning, 'captain')
+  // 生效路径：项目层设 template → effectiveConfig.taskPlanning = template
+  const good = loadEffectiveConfig({ taskPlanning: 'template' })
+  assert.equal(good.fellBack, false)
+  assert.equal(good.config.taskPlanning, 'template')
+})

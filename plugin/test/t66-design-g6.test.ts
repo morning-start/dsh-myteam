@@ -316,3 +316,41 @@ test('t66-6: 会话页团队视图（conversation.view）—— 只读真实账�
   assert.ok(source.includes("t('g6.dock.running')") && source.includes("t('g6.dock.gates')"), 'composer dock 真实计数')
   assert.ok(source.includes('if (live === 0 && unread === 0) return null'), 'dock chip 空态不渲染')
 })
+
+test('t66-7: 单角色调用面板入口（CHG-172 / A11 / FR-16.1）——多选 / 载体 / 诚实边界', () => {
+  const { module, source } = loadClient()
+  const GuestApplySection = module.__testG6.GuestApplySection
+  assert.equal(typeof GuestApplySection, 'function', '__testG6.GuestApplySection 可渲染')
+  const t = (k) => k
+  const walkAll = (node, out) => {
+    if (!node || typeof node !== 'object') return out
+    if (node.type === 'button') out.push(node)
+    for (const child of node.children ?? []) walkAll(child, out)
+    return out
+  }
+  /* ① 有在线载体：每个角色一枚可点选 chip + 载体明示 + 0 选时主按钮禁用 */
+  const carrier = { teamId: 't1', online: true, sessionId: 's1' }
+  const tree = GuestApplySection({ t, roles: ROLES, carrier, busy: false, note: null, onApply: () => {} })
+  const classes = collectClasses(tree)
+  for (const name of ['mt-guest-apply', 'mt-guest-chips', 'mt-guest-chip']) assert.ok(classes.has(name), `渲染出 .${name}`)
+  assert.ok(collectText(tree).join('').includes('guest.carrier'), '在线时显示载体团队')
+  const buttons = walkAll(tree, [])
+  const chips = buttons.filter((b) => String(b.props?.className ?? '').includes('mt-guest-chip'))
+  assert.equal(chips.length, ROLES.length, '每个角色一枚 chip')
+  assert.ok(chips.every((b) => b.props['aria-pressed'] === false), '默认全不选（aria-pressed）')
+  const applyBtn = buttons.find((b) => String(b.props?.children ?? '') === 'guest.apply')
+  assert.ok(applyBtn && applyBtn.props.disabled === true, '0 选时主按钮禁用')
+  /* ② 无在线团队：明说 noCarrier（不假装成功）+ 空库提示 */
+  assert.ok(collectText(GuestApplySection({ t, roles: ROLES, carrier: null, busy: false, note: null, onApply: () => {} })).join('').includes('guest.noCarrier'), '无载体明说不可用')
+  assert.ok(collectText(GuestApplySection({ t, roles: [], carrier: null, busy: false, note: null, onApply: () => {} })).join('').includes('guest.empty'), '空角色库有提示')
+  /* ③ 静态：挂载点在角色页（贡献区块之后、角色库之前）+ 新键 zh/en 成对 + CHG-110 删的演示组件不复活 */
+  assert.ok(source.includes('j(GuestApplySection, {'), '角色页挂载 GuestApplySection')
+  const mountAt = source.indexOf('j(GuestApplySection, {')
+  assert.ok(mountAt > source.indexOf('j(ContributionsSection, {') && mountAt < source.indexOf('j(RoleLibrary, {'), '挂载顺序：贡献区块 → 单角色调用 → 角色库')
+  for (const key of ['guest.section', 'guest.sub', 'guest.pick', 'guest.empty', 'guest.apply', 'guest.applying', 'guest.carrier', 'guest.noCarrier', 'guest.applied', 'guest.failed', 'guest.honesty']) {
+    const hits = source.split(`'${key}':`).length - 1
+    assert.equal(hits, 2, `${key} 必须 zh/en 各一条（实际 ${hits}）`)
+  }
+  assert.ok(!source.includes('function ApplyRolesCard') && !source.includes('function GuestCallComposer'), 'CHG-110 删除的演示组件不复活（新组件是 GuestApplySection）')
+  assert.ok(!source.includes("useState('tech-w')"), '演示默认值不回潮')
+})

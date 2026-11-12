@@ -25,7 +25,7 @@ import { projectRolePaths } from '../src/core/index/offline-view.ts'
 import { MyTeamHost, type HostRuntime } from '../src/host.ts'
 import { MyTeamRemote } from '../src/remote/service.ts'
 import { MyTeamPanelFacade } from '../src/panel.ts'
-import { buildBoardView, buildTaskDetailView } from '../src/remote/views.ts'
+import { buildBoardView, buildTaskDetailView } from '../src/core/index/views.ts'
 
 /* ── 1. diff 纯函数 ───────────────────────────────────────────── */
 

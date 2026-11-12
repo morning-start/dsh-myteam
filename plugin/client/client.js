@@ -953,6 +953,12 @@ window.__ModuleLoader__.load({
       'scope.warnNote': '仅警告，不阻断门禁（FR-5.4）。',
       'scope.badge': '越界 {n}',
       'scope.checkedAt': '审计时间 {time}',
+      /* CHG-171：共享写范围（claim 闸门事前可见化） */
+      'scope.shared.title': '共享写范围',
+      'scope.shared.blocking': '阻塞中（等它完成）',
+      'scope.shared.queued': '排队串行（先到先得）',
+      'scope.shared.none': '（无）',
+      'scope.shared.note': '范围重叠的任务会被 claim 闸门拦下串行执行；调整 writeScopes 或等前置完成后即可认领。',
       /* CHG-87 §3.3：乐观锁冲突 */
       'edit.conflict': '任务已被修改（当前 revision {revision}），请重新加载后重试。',
       /* CHG-87 §4.3：证据指针 */
@@ -1175,12 +1181,19 @@ window.__ModuleLoader__.load({
       'settings.teamSizeSub': '一个团队最多同时聘任多少个角色（不含队长）',
       'settings.delegateDepth': '委派深度',
       'settings.delegateDepthSub': '实例能否自己再拉一个角色进团队，0 表示禁止',
+      /* CHG-173（FR-1.3）：DAG 来源二选一 */
+      'settings.taskPlanning': '任务来源（DAG）',
+      'settings.taskPlanningSub': '开 = template：队长没拆活时按 pipeline.stages 生成模板任务组（AC 与交付物是占位，审批前请编辑）；关 = captain：任务组全由队长推导',
       'settings.gatesSub': '任务完成前必须跑通类型检查与单测',
       'settings.gateTimeoutLabel': '门禁命令超时',
       'settings.gateTimeoutSub': '单条门禁命令的最长执行时间，超时按失败计',
       'settings.seconds': '秒',
       'settings.hideTools': '隐藏内置团队工具',
-      'settings.hideToolsSub': '在会话里隐藏 myteam_* 工具的原始调用记录，只看结果',
+      'settings.hideToolsSub': '团队激活期间对队长会话 deny 宿主内置 agentTeams 工具（spawn_teammate / team_task_* 等 9 个），防止两套团队语义互串；host 级行为，此处只读',
+      'settings.hideToolsEff': '已生效：实际隐藏 {n} / {total} 个内置工具',
+      'settings.hideToolsOff': '未启用（内置团队工具保持可见）',
+      'settings.hideToolsNoRestrict': '宿主未提供 tools.restrict——隐藏未执行',
+      'settings.hideToolsList': '实际 deny：{list}',
       'settings.evidenceLabel': '知识必须带证据',
       'settings.evidenceSub': '没有证据引用的结论不能写进共享知识库',
       'settings.ceiling': '硬上限 {v}',
@@ -1498,6 +1511,18 @@ window.__ModuleLoader__.load({
       'g6.guest.candFoot': '已加载的再输一次是刷新；要卸掉就写 -reviewer',
       'g6.guest.hint': '这个会话不是团队，所以 /myteam new 在这里不可用 —— 团队只能从 team 预设新建。单角色调用随时可用，两者互不干扰。',
       'g6.guest.section': '单角色调用（/myteam+ 演示）',
+      /* CHG-172（A11）：单角色调用面板入口（角色 tab 管理场景） */
+      'guest.section': '单角色调用',
+      'guest.sub': '把角色临时注入本项目会话（下一轮生效）',
+      'guest.pick': '点选要启用的角色（可多选）',
+      'guest.empty': '角色库为空：先创建或复制一个角色进来。',
+      'guest.apply': '应用到当前项目（{n}）',
+      'guest.applying': '正在应用…',
+      'guest.carrier': '载体：团队 {team} 的活动会话',
+      'guest.noCarrier': '面板应用需要任一在线团队会话作载体：先开一个团队会话，或在任意会话直接输入 /myteam+<角色>',
+      'guest.applied': '✓ 已写入会话默认值（{n} 个角色，下一轮会话生效）',
+      'guest.failed': '应用失败',
+      'guest.honesty': '只写 config/session-defaults.json：不进团队账本、不产生实例会话、不影响在线团队。',
       'g6.guest.blurb': '按审查准则过了一遍，三个风险点，文档缺两块：',
       'g6.guest.risk1': '风险 1 · 灰度开关没有默认值。',
       'g6.guest.risk2': '风险 2 · 契约里没写金额精度。',
@@ -2191,6 +2216,11 @@ window.__ModuleLoader__.load({
       'scope.warnNote': 'Warning only; the gate is not blocked (FR-5.4).',
       'scope.badge': '{n} out of scope',
       'scope.checkedAt': 'Audited {time}',
+      'scope.shared.title': 'Shared write scopes',
+      'scope.shared.blocking': 'Blocking (waiting on)',
+      'scope.shared.queued': 'Queued serial (first come, first served)',
+      'scope.shared.none': '(none)',
+      'scope.shared.note': 'Tasks with overlapping scopes are serialized by the claim gate; adjust writeScopes or wait for the blocker to finish.',
       'edit.conflict': 'The task was modified (current revision {revision}); reload and retry.',
       'evref.task': 'task',
       'evref.file': 'file',
@@ -2407,12 +2437,18 @@ window.__ModuleLoader__.load({
       'settings.teamSizeSub': 'How many roles one team may appoint at once (the captain does not count)',
       'settings.delegateDepth': 'Delegation depth',
       'settings.delegateDepthSub': 'Whether an instance may pull another role into the team; 0 disables it',
+      'settings.taskPlanning': 'Task source (DAG)',
+      'settings.taskPlanningSub': 'On = template: when the captain provides no tasks, seed a template pipeline from pipeline.stages (AC & deliverables are placeholders — edit before approving); Off = captain: the captain derives all tasks',
       'settings.gatesSub': 'Type check and unit tests must pass before a task completes',
       'settings.gateTimeoutLabel': 'Gate command timeout',
       'settings.gateTimeoutSub': 'Longest run time for one gate command; a timeout counts as failure',
       'settings.seconds': 's',
       'settings.hideTools': 'Hide built-in team tools',
-      'settings.hideToolsSub': 'Hide raw myteam_* tool calls in the conversation and only show results',
+      'settings.hideToolsSub': 'While a team is active the host denies its built-in agentTeams tools (spawn_teammate / team_task_* etc., 9 total) in captain sessions to prevent cross-talk; host-level, read-only here',
+      'settings.hideToolsEff': 'Effective: {n} / {total} built-in tools actually denied',
+      'settings.hideToolsOff': 'Disabled (built-in team tools stay visible)',
+      'settings.hideToolsNoRestrict': 'Host does not provide tools.restrict — hiding was not executed',
+      'settings.hideToolsList': 'Actually denied: {list}',
       'settings.evidenceLabel': 'Knowledge needs evidence',
       'settings.evidenceSub': 'Conclusions without an evidence pointer cannot enter the shared knowledge base',
       'settings.ceiling': 'ceiling {v}',
@@ -2730,6 +2766,17 @@ window.__ModuleLoader__.load({
       'g6.guest.candFoot': 'Typing a loaded role again refreshes it; write -reviewer to unload',
       'g6.guest.hint': 'This session is not a team, so /myteam new is unavailable here — teams are only created from the team preset. Single-role calls are always available and the two never interfere.',
       'g6.guest.section': 'Single-role call (/myteam+ demo)',
+      'guest.section': 'Single-role calls',
+      'guest.sub': 'Temporarily inject roles into this project’s sessions (effective next turn)',
+      'guest.pick': 'Pick roles to enable (multi-select)',
+      'guest.empty': 'Role library is empty: create or copy a role first.',
+      'guest.apply': 'Apply to this project ({n})',
+      'guest.applying': 'Applying…',
+      'guest.carrier': 'Carrier: active session of team {team}',
+      'guest.noCarrier': 'Applying from the panel needs any online team session as carrier: open a team session first, or type /myteam+<role> in any session',
+      'guest.applied': '✓ Written to session defaults ({n} roles, effective next session)',
+      'guest.failed': 'Apply failed',
+      'guest.honesty': 'Writes config/session-defaults.json only: no team ledger events, no instance sessions, online teams untouched.',
       'g6.guest.blurb': 'Went through it against the review checklist: three risks, two documents missing:',
       'g6.guest.risk1': 'Risk 1 · the rollout switch has no default.',
       'g6.guest.risk2': 'Risk 2 · the contract does not state amount precision.',
@@ -4342,6 +4389,13 @@ window.__ModuleLoader__.load({
       '.mt-setrow-sub{font-size:12px;color:var(--dsw-alias-label-tertiary);margin-top:1px;line-height:1.55;max-width:45em}',
       '.mt-setrow-act{flex:none;display:flex;align-items:center;gap:12px}',
       '.mt-readonly-val{font-size:12px;background:var(--dsw-alias-bg-layer-2);border:.5px solid var(--dsw-alias-border-l2);border-radius:6px;padding:5px 8px;color:var(--dsw-alias-label-tertiary);font-variant-numeric:tabular-nums;white-space:nowrap}',
+      '.mt-hideeff-warn{font-size:12px;background:var(--dsw-alias-bg-layer-2);border:.5px solid var(--dsw-alias-state-warning-primary);border-radius:6px;padding:5px 8px;color:var(--dsw-alias-state-warning-primary);white-space:nowrap}',
+      /* CHG-172：单角色调用多选 chips（选中态走 aria-pressed，token 同源） */
+      '.mt-guest-chips{display:flex;flex-wrap:wrap;gap:6px}',
+      '.mt-guest-chip{display:inline-flex;align-items:center;gap:6px;border:.5px solid var(--dsw-alias-border-l1);border-radius:999px;background:var(--dsw-alias-bg-layer-1);color:var(--dsw-alias-label-secondary);padding:4px 10px;font-size:12px;cursor:pointer;max-width:100%}',
+      '.mt-guest-chip[aria-pressed="true"]{border-color:var(--dsw-alias-label-emphasis, var(--dsw-alias-label-primary));color:var(--dsw-alias-label-primary);background:color-mix(in srgb, var(--dsw-alias-label-emphasis, var(--dsw-alias-label-primary)) 8%, transparent)}',
+      '.mt-guest-chip-id{font-weight:600;color:inherit}',
+      '.mt-guest-warn{color:var(--dsw-alias-state-warning-primary)}',
       '.mt-input-num{width:64px;box-sizing:border-box;text-align:center;background:var(--dsw-alias-bg-base);border:.5px solid var(--dsw-alias-border-l3);border-radius:6px;color:var(--dsw-alias-label-secondary);padding:5px 8px;font-size:12px;font-variant-numeric:tabular-nums}',
       '.mt-input-num:focus{outline:0;border-color:var(--dsw-alias-label-emphasis, var(--dsw-alias-label-primary))}',
       '.mt-toggle{width:40px;height:24px;border-radius:999px;background:var(--dsw-alias-border-l3);border:0;padding:0;position:relative;cursor:pointer;flex:none}',
@@ -4452,21 +4506,28 @@ window.__ModuleLoader__.load({
       '.mt-tinfo b{display:block;font-size:12px;font-weight:600;line-height:1.35;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}',
       '.mt-tinfo span{display:block;font-size:12px;color:var(--dsw-alias-label-tertiary);line-height:1.4;font-variant-numeric:tabular-nums}',
       '.mt-lanes{flex:1;min-height:0;overflow:auto;padding:12px 16px 20px;display:flex;flex-direction:column;gap:10px;min-width:0}',
-      '.mt-lane{border:.5px solid var(--dsw-alias-border-l2);border-radius:10px;background:var(--dsw-alias-border-l2);padding:10px 12px;display:grid;grid-template-columns:128px repeat(var(--mt-lane-cols,4),minmax(0,1fr));gap:1px;overflow:hidden;margin-bottom:6px}',
+      /* CHG-178（U3）：`.mt-lane` 必须是 `flex:none`。
+       * 之前是默认的 `flex:0 1 auto`——7 行总高超过泳道容器时**行被压扁**（实测 136 → 93px），
+       * 而 `.mt-lane` 又 `overflow:hidden`，行内最后一行字（「N 个任务」）就被行底边切掉。
+       * 不收缩 + 容器滚动才是设计稿口径（app.css `.lane`）。 */
+      '.mt-lane{flex:none;border:.5px solid var(--dsw-alias-border-l2);border-radius:10px;background:var(--dsw-alias-border-l2);padding:8px 10px;display:grid;grid-template-columns:128px repeat(var(--mt-lane-cols,4),minmax(0,1fr));gap:1px;overflow:hidden;margin-bottom:0}',
       '.mt-lane-head{display:flex;align-items:center;gap:6px;margin-bottom:8px;background:var(--dsw-alias-bg-layer-2);padding:6px 10px;font-size:12px;font-weight:600;letter-spacing:.02em;color:var(--dsw-alias-label-tertiary)}',
       '.mt-lane-head .mt-lane-count{margin-left:0;color:var(--dsw-alias-label-tertiary);font-variant-numeric:tabular-nums}',
       /* 行高统一：行头与格子同高（design 的泳道是等高表格，空列不能被内容撑成两种高度） */
-      '.mt-lane-label{background:var(--dsw-alias-bg-base);padding:8px 10px;display:flex;flex-direction:column;gap:2px;justify-content:center;min-width:0;min-height:96px}',
+      /* CHG-178（U3）：行高按设计稿 56px（原来 96px —— 空行整整占 96px，一屏只放得下 7 行还全是空白） */
+      '.mt-lane-label{background:var(--dsw-alias-bg-base);padding:8px 10px;display:flex;flex-direction:column;gap:1px;justify-content:center;min-width:0;min-height:56px}',
       '.mt-lane-label-unassigned{background:var(--dsw-alias-bg-layer-1)}',
       '.mt-lane-label b{font-size:12px;font-weight:600;color:var(--dsw-alias-label-primary);display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}',
       '.mt-lane-label .mt-lane-role{display:flex;align-items:center;gap:6px;min-width:0}',
+      '.mt-lane-label .mt-lane-role b{flex:1;min-width:0}',
+      '.mt-lane-total{flex:none;font-size:11px;color:var(--dsw-alias-label-tertiary);font-variant-numeric:tabular-nums}',
       '.mt-lane-label .mt-lane-sub{font-size:12px;color:var(--dsw-alias-label-tertiary);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-variant-numeric:tabular-nums}',
       '.mt-lane-label .mt-avatar{width:24px;height:24px;font-size:12px}',
       '.mt-lane-label .mt-avatar-dashed{border-style:dashed;color:var(--dsw-alias-label-tertiary)}',
       /* CHG-85：格子内卡片多了要能滚，不该把整行撑到几百 px（未认领行 9 张卡时行高失控，
          泳道页底部被面板裁掉）。design/app.css 的 .lane-cell{min-height:56px} 是「最小」不是「无限」。
          CHG-85 后续：改成「限 4 张 + 折叠成『还有 N 个』」，格子本身不再需要限高。 */
-      '.mt-lane-cell{background:var(--dsw-alias-bg-base);padding:5px;display:flex;flex-direction:column;gap:4px;min-height:96px;min-width:0}',
+      '.mt-lane-cell{background:var(--dsw-alias-bg-base);padding:5px;display:flex;flex-direction:column;gap:4px;min-height:56px;min-width:0}',
       /* CHG-85：折叠行（design/tasks.html 的 mt-trow-more 同款） */
       '.mt-lane-more{display:block;width:100%;box-sizing:border-box;margin-top:1px;padding:3px 6px;border:.5px dashed var(--dsw-alias-border-l2);border-radius:4px;background:none;color:var(--dsw-alias-label-tertiary);font:inherit;font-size:11px;line-height:1.5;text-align:center;cursor:default}',
       '.mt-lane-cell-empty{background:var(--dsw-alias-bg-layer-1)}',
@@ -5456,12 +5517,14 @@ window.__ModuleLoader__.load({
             const total = row.cells.reduce((sum, cell) => sum + cell.length, 0)
             return js('div', { className: 'mt-lane', key: row.key, children: [
               js('div', { className: 'mt-lane-label' + (row.unassigned ? ' mt-lane-label-unassigned' : ''), children: [
+                /* CHG-178（U3）：任务数并进「角色行」右侧 —— 原来单独占第三行，行高被撑到 96px 还
+                 * 压到行底边上（文字被 overflow:hidden 切掉）。两行 = 设计稿口径。 */
                 js('div', { className: 'mt-lane-role', children: [
                   j('span', { className: row.unassigned ? 'mt-avatar mt-avatar-dashed' : 'mt-avatar', 'aria-hidden': true, children: label.avatar }),
-                  j('b', { children: label.title }),
+                  j('b', { title: label.title, children: label.title }),
+                  j('span', { className: 'mt-lane-total', title: t('lanes.count').replace('{n}', String(total)), children: String(total) }),
                 ] }),
-                j('span', { className: 'mt-lane-sub', title: label.title, children: label.sub }),
-                j('span', { className: 'mt-lane-sub', children: t('lanes.count').replace('{n}', String(total)) }),
+                j('span', { className: 'mt-lane-sub', title: label.sub, children: label.sub }),
               ] }),
               ...row.cells.map((cell, i) => j('div', {
                 key: `${row.key}-${stageStates[i].name}`,
@@ -5802,6 +5865,37 @@ window.__ModuleLoader__.load({
       ] })
     }
 
+    /**
+     * 共享写范围（CHG-171 / R41 串行链收尾）：claim 闸门（CHG-161）的**事前**可见化——
+     * 任务详情里直接点名「和谁共享写范围、现在等谁」。blocking = 此刻会被闸门拦；
+     * queued = 排队串行（先到先得，后到的 claim 被拦）。无 sharedScopes 时整块不渲染。
+     */
+    function SharedScopesBlock({ t, shared }) {
+      if (!shared || typeof shared !== 'object') return null
+      const blocking = Array.isArray(shared.blocking) ? shared.blocking : []
+      const queued = Array.isArray(shared.queued) ? shared.queued : []
+      if (blocking.length === 0 && queued.length === 0) return null
+      const peers = (list) => list.length > 0
+        ? list.map((p) => j('span', { key: p.taskId, className: 'mt-scope-chip', children: `${String(p.taskId)} ${String(p.title ?? '')}`.trim() }))
+        : [j('span', { className: 'mt-hint', children: t('scope.shared.none') })]
+      return js('section', { className: 'mt-sec mt-shared-scopes', children: [
+        js('div', { className: 'mt-dsec-head', children: [
+          j('h4', { children: t('scope.shared.title') }),
+          j('span', { className: 'mt-line', 'aria-hidden': true }),
+          j('span', { className: 'mt-n', children: String(blocking.length + queued.length) }),
+        ] }),
+        js('div', { className: 'mt-scope-row', children: [
+          j('span', { className: 'mt-scope-k', children: t('scope.shared.blocking') }),
+          j('span', { className: 'mt-scope-v', children: peers(blocking) }),
+        ] }),
+        js('div', { className: 'mt-scope-row', children: [
+          j('span', { className: 'mt-scope-k', children: t('scope.shared.queued') }),
+          j('span', { className: 'mt-scope-v', children: peers(queued) }),
+        ] }),
+        j('p', { className: 'mt-hint', children: t('scope.shared.note') }),
+      ] })
+    }
+
     /* ── 任务详情（design/detail.html）：主区整页 = 面包屑 + 主列/侧列 + 成本归因 ── */
     // T25：离线团队走 loader（getOfflineTaskDetail），readOnly=true 时隐藏沟通输入
     // CHG-73：动作条（重新规划/取消/编辑）+ 证据过期横幅 + 改动记录折叠区 + 取消横幅
@@ -6000,6 +6094,8 @@ window.__ModuleLoader__.load({
             }),
             /* 写入范围审计（CHG-87 §2.3 / FR-5.4）：紧跟在门禁区下方；无 scopeAudit 时整块不渲染 */
             j(ScopeAuditBlock, { t, audit: detail.scopeAudit }),
+            /* 共享写范围（CHG-171 / R41 串行链收尾）：紧跟审计块；无 sharedScopes 时整块不渲染 */
+            j(SharedScopesBlock, { t, shared: detail.sharedScopes }),
             /* 验收标准：逐条 pass 标记（证据带 acs 时以证据为准；任务已完成 = 全通过） */
             acs.length > 0 ? js('section', { className: 'mt-sec', children: [
               js('div', { className: 'mt-dsec-head', children: [
@@ -7424,25 +7520,36 @@ window.__ModuleLoader__.load({
         }
       }
       const edges = []
+      /* CHG-178（U2）：**边与卡必须用同一套坐标系**。
+       * 卡片是 `left: pos.x + extraX`（竖向）/ `top: pos.y + extraY`（横向）——内容在画布里居中
+       * 时才有那笔偏移；而边原来直接用裸 `pos.x/pos.y`，于是整条依赖链被画到卡片上方
+       * `extraY`（横向，实测差 275px）处，看起来就是「一堆悬空的断线」。
+       * 这里补上同款偏移，边才真正连到卡片的左右/上下边缘。 */
+      const edgeDx = dir === 'v' ? extraX : 0
+      const edgeDy = dir === 'h' ? extraY : 0
       for (const task of tasks) {
         for (const dep of task.deps ?? []) {
           if (!byId.has(dep)) continue
           const a = pos.get(dep)
           const b = pos.get(task.id)
           if (!a || !b) continue
+          const ax = a.x + edgeDx
+          const ay = a.y + edgeDy
+          const bx = b.x + edgeDx
+          const by = b.y + edgeDy
           let d
           if (dir === 'h') {
-            const sx = a.x + a.w + 1
-            const sy = a.y + a.h / 2
-            const tx = b.x - 2
-            const ty = b.y + b.h / 2
+            const sx = ax + a.w + 1
+            const sy = ay + a.h / 2
+            const tx = bx - 2
+            const ty = by + b.h / 2
             const c = Math.max(24, Math.abs(tx - sx) * 0.45)
             d = `M${sx} ${sy} C${sx + c} ${sy} ${tx - c} ${ty} ${tx} ${ty}`
           } else {
-            const sx = a.x + a.w / 2
-            const sy = a.y + a.h + 1
-            const tx = b.x + b.w / 2
-            const ty = b.y - 2
+            const sx = ax + a.w / 2
+            const sy = ay + a.h + 1
+            const tx = bx + b.w / 2
+            const ty = by - 2
             const c = Math.max(20, Math.abs(ty - sy) * 0.45)
             d = `M${sx} ${sy} C${sx} ${sy + c} ${tx} ${ty - c} ${tx} ${ty}`
           }
@@ -7852,6 +7959,17 @@ window.__ModuleLoader__.load({
           return next
         })
       }
+      /** CHG-173：顶层标量（taskPlanning）编辑——无段落，直接换值（合并走整条替换） */
+      const editTop = (patch) => {
+        setSaveErr(null)
+        setSavedNote(null)
+        setDraft((prev) => {
+          const base = prev ?? JSON.parse(JSON.stringify(c))
+          const next = { ...base, ...patch }
+          syncJson(next)
+          return next
+        })
+      }
       /** 源视图 → 表单：解析失败**不写**（错误就地显示，草稿不动） */
       const applyJson = () => {
         setJsonErr(null)
@@ -8076,6 +8194,22 @@ window.__ModuleLoader__.load({
         onClick: () => onChange?.(!checked),
       })
       const ceiling = (value) => j('span', { className: 'mt-readonly-val', children: t('settings.ceiling').replace('{v}', String(value)) })
+      /* CHG-170（R41-③）：内置工具隐藏显示「实际生效」——删除旧假开关（toggle(false) 永远关闭且禁用）。
+       * hideBuiltinTeamTools 是 host 级行为（此处改不了），设置页只显示三个事实：启用与否 /
+       * 宿主是否提供 tools.restrict（restricted=false = 隐藏未执行）/ 实际 deny 的工具清单。 */
+      const hideInfo = config.runtime?.builtinToolsHide
+      const hideToolsAct = (() => {
+        if (!hideInfo) return j('span', { className: 'mt-readonly-val', children: '—' })
+        if (!hideInfo.enabled) return j('span', { className: 'mt-readonly-val', children: t('settings.hideToolsOff') })
+        if (!hideInfo.restricted) return j('span', { className: 'mt-hideeff-warn', children: t('settings.hideToolsNoRestrict') })
+        return j('span', { className: 'mt-readonly-val', children: t('settings.hideToolsEff').replace('{n}', String(hideInfo.effective.length)).replace('{total}', String(hideInfo.configured.length)) })
+      })()
+      const hideToolsSub = js('div', { children: [
+        j('div', { children: t('settings.hideToolsSub') }),
+        hideInfo && hideInfo.enabled && hideInfo.restricted && hideInfo.effective.length > 0
+          ? j('div', { className: 'mt-hint', children: t('settings.hideToolsList').replace('{list}', hideInfo.effective.join('、')) })
+          : null,
+      ] })
       return js('div', { className: 'mt-page mt-page-narrow', children: [
         js('div', { className: 'mt-page-head', children: [
           js('div', { children: [
@@ -8136,9 +8270,11 @@ window.__ModuleLoader__.load({
           js('div', { className: 'mt-setrows', children: [
             row('teamSize', t('settings.teamSize'), t('settings.teamSizeSub'), [ceiling(CONFIG_CEILINGS.maxMembers), numInput(limits.maxMembers, t('settings.teamSize'), (v) => editSection('limits', { maxMembers: v }), { min: 1, max: CONFIG_CEILINGS.maxMembers })]),
             row('depth', t('settings.delegateDepth'), t('settings.delegateDepthSub'), [ceiling(CONFIG_CEILINGS.memberMaxDepth), numInput(limits.memberMaxDepth, t('settings.delegateDepth'), (v) => editSection('limits', { memberMaxDepth: v }), { min: 0, max: CONFIG_CEILINGS.memberMaxDepth })]),
+            /* CHG-173（FR-1.3）：DAG 来源——captain（默认，队长推导）/ template（按 pipeline.stages 生成模板任务组） */
+            row('taskPlanning', t('settings.taskPlanning'), t('settings.taskPlanningSub'), [toggle((cfg.taskPlanning ?? 'captain') === 'template', t('settings.taskPlanning'), (v) => editTop({ taskPlanning: v ? 'template' : 'captain' }))]),
             row('gates', t('settings.gates'), t('settings.gatesSub'), [toggle(gates.enabled !== false, t('settings.gates'), (v) => editSection('gates', { enabled: v }))]),
             row('timeout', t('settings.gateTimeoutLabel'), t('settings.gateTimeoutSub'), [ceiling(CONFIG_CEILINGS.commandTimeoutMs / 1000), numInput(Math.round(Number(gates.commandTimeoutMs ?? 0) / 1000), t('settings.gateTimeoutLabel'), (v) => editSection('gates', { commandTimeoutMs: v === undefined ? undefined : Math.round(Number(v) * 1000) }), { min: 1, max: CONFIG_CEILINGS.commandTimeoutMs / 1000 }), j('span', { className: 'mt-hint', children: t('settings.seconds') })]),
-            row('hideTools', t('settings.hideTools'), t('settings.hideToolsSub'), [toggle(false, t('settings.hideTools'))]),
+            row('hideTools', t('settings.hideTools'), hideToolsSub, [hideToolsAct]),
             row('evidence', t('settings.evidenceLabel'), t('settings.evidenceSub'), [toggle(cfg.memory?.evidenceRequired !== false, t('settings.evidenceLabel'), (v) => editSection('memory', { evidenceRequired: v }))]),
           ] }),
         ] }),
@@ -8490,6 +8626,54 @@ window.__ModuleLoader__.load({
         j('span', { className: 'mt-rolecard-create-ico', 'aria-hidden': true, children: '＋' }),
         j('span', { className: 'mt-rolecard-create-title', children: t('roles.createRole') }),
         j('span', { className: 'mt-rolecard-create-hint', children: t('roles.createRoleHint') }),
+      ] })
+    }
+
+    /**
+     * 单角色调用（CHG-172 / A11 / FR-16.1）：`/myteam+` 的可视化多选入口，挂角色库顶部。
+     *
+     * PRD v2.3（CHG-13）拍板：UI 多选面板不作指派入口、**保留于角色 tab 管理场景**——这里就是那个保留点。
+     * 诚实边界（不复活 CHG-110 删掉的演示版，零硬编码角色名）：
+     *  - 只写 `.dsh-myteam/config/session-defaults.json`（下一轮会话生效），不进团队账本、不产生实例会话；
+     *  - 写路径需要任一**在线团队会话**作载体（facade 按会话路由）——没有时明说 + 指向 /myteam+ 命令，不假装成功；
+     *  - 角色来自已加载的真实角色库（含来源标注）。
+     */
+    function GuestApplySection({ t, roles, carrier, busy, note, onApply }) {
+      const [picked, setPicked] = react.useState([])
+      const toggle = (id) => setPicked((cur) => (cur.includes(id) ? cur.filter((x) => x !== id) : [...cur, id]))
+      const list = Array.isArray(roles) ? roles : []
+      return js('section', { className: 'mt-ssection mt-guest-apply', children: [
+        js('div', { className: 'mt-dsec-head', children: [
+          j('h4', { children: t('guest.section') }),
+          j('span', { className: 'mt-dsec-line', 'aria-hidden': true }),
+          j('span', { className: 'mt-dsec-n', children: t('guest.sub') }),
+        ] }),
+        list.length > 0
+          ? j('div', { className: 'mt-guest-chips', role: 'group', 'aria-label': t('guest.pick'), children: list.map((role) => j('button', {
+            key: role.id,
+            type: 'button',
+            className: 'mt-guest-chip',
+            'aria-pressed': picked.includes(role.id),
+            onClick: () => toggle(role.id),
+            children: [
+              j('span', { className: 'mt-guest-chip-id', children: String(role.id) }),
+              role.origin ? j('span', { className: `mt-src mt-src-${role.origin}`, children: t(`roles.origin.${role.origin}`) }) : null,
+            ],
+          })) })
+          : j('p', { className: 'mt-hint', children: t('guest.empty') }),
+        js('div', { className: 'mt-form-actions', children: [
+          j('button', {
+            className: 'mt-btn',
+            disabled: busy || picked.length === 0,
+            onClick: () => onApply?.(picked),
+            children: busy ? t('guest.applying') : t('guest.apply').replace('{n}', String(picked.length)),
+          }),
+          carrier
+            ? j('span', { className: 'mt-hint', children: t('guest.carrier').replace('{team}', String(carrier.teamId ?? carrier.name ?? '')) })
+            : j('span', { className: 'mt-hint', children: t('guest.noCarrier') }),
+        ] }),
+        note ? j('div', { className: note.kind === 'ok' ? 'mt-hint' : 'mt-hint mt-guest-warn', role: note.kind === 'ok' ? 'status' : 'alert', children: note.text }) : null,
+        j('p', { className: 'mt-hint', children: t('guest.honesty') }),
       ] })
     }
 
@@ -11018,6 +11202,13 @@ window.__ModuleLoader__.load({
       const [capCatalog, setCapCatalog] = react.useState(undefined)
       /* CHG-76 B：批量新建草稿抽屉（参与既有抽屉互斥，不另起状态库） */
       const [batchCreate, setBatchCreate] = react.useState(false)
+      /* CHG-172（A11 / FR-16.1）：单角色调用应用——写路径 = facade.applyRoles（需在线团队会话作载体，不写团队账本）
+       * CHG-178（U1 · P0）：这两个 useState **必须**留在所有早退之前。
+       * 早退分支（`scope === 'global'` 的预设/技能子页、全局角色库、加载中）会跳过下面所有代码；
+       * 之前它们声明在 11839 行（早退之后），于是「全局 → 项目」切换时 hook 数量变多 → React #310
+       * （Rendered more hooks than during the previous render）→ 整屏「面板渲染失败」。 */
+      const [guestBusy, setGuestBusy] = react.useState(false)
+      const [guestNote, setGuestNote] = react.useState(null)
 
       /* CHG-72：抽屉互斥——同一时间只开一个表单，避免「点了新建团队却看到任务表单」 */
       /* CHG-84：打开建团向导时若预设目录还没就绪（或上次读取失败），立刻触发拉取 ——
@@ -11671,6 +11862,24 @@ window.__ModuleLoader__.load({
         if (message) setNotice(message)
         await loadProject(projectRoot)
       }
+      /* CHG-172（A11 / FR-16.1）：单角色调用应用——写路径 = facade.applyRoles（需在线团队会话作载体，不写团队账本）
+       * CHG-178：`guestBusy` / `guestNote` 两个 state 已上移到 Panel 顶部（早退之前），此处只留动作。 */
+      const applyGuestRoles = async (picked) => {
+        if (guestBusy || !Array.isArray(picked) || picked.length === 0) return
+        const carrier = (pv.teams ?? []).find((team) => team.online && team.sessionId)
+        if (!carrier) { setGuestNote({ kind: 'warn', text: t('guest.noCarrier') }); return }
+        setGuestBusy(true)
+        setGuestNote(null)
+        try {
+          const r = await makeApi(connection, carrier.sessionId).applyRoles({ teamId: carrier.teamId, roles: picked })
+          if (r?.status === 'ok') setGuestNote({ kind: 'ok', text: t('guest.applied').replace('{n}', String(picked.length)) })
+          else setGuestNote({ kind: 'warn', text: String(r?.message ?? r?.code ?? t('guest.failed')) })
+        } catch (e) {
+          setGuestNote({ kind: 'warn', text: String(e?.message ?? e) })
+        } finally {
+          setGuestBusy(false)
+        }
+      }
       /* CHG-73：批量编排——按主责团队分组逐个 batchTaskOp（每条事件同一 batchId 由服务端落） */
       /* 角色页（design/roles.html）：三层来源分区 + 搜索/来源筛选 + 引用计数 + 复制/对比 + 创建卡 */
       const rolesPage = js('div', { children: [
@@ -11682,6 +11891,15 @@ window.__ModuleLoader__.load({
           workspaceRoot: projectRoot,
           onNotice: setNotice,
           onChanged: () => loadProject(projectRoot),
+        }),
+        /* CHG-172（A11 / FR-16.1）：单角色调用——/myteam+ 的可视化多选入口（PRD 拍板保留在角色 tab 管理场景） */
+        j(GuestApplySection, {
+          t,
+          roles: pv.roles ?? [],
+          carrier: (pv.teams ?? []).find((team) => team.online && team.sessionId) ?? null,
+          busy: guestBusy,
+          note: guestNote,
+          onApply: applyGuestRoles,
         }),
         j(RoleLibrary, {
           t,
@@ -13594,6 +13812,8 @@ window.__ModuleLoader__.load({
       TeamPlanTasksCard, TeamCollapsedCard, DockChip,
       /* CHG-157：团队总览卡（组件 + 纯函数，mock loader 下可断言分桶/叙述） */
       TeamOverviewCard, teamOverviewOf, ovBucketOf, ovNarrativeText,
+      /* CHG-172（A11）：单角色调用面板入口（角色 tab 管理场景，FR-16.1） */
+      GuestApplySection,
     }
 
     /* 测试专用出口（t75-chg89-gaps）：CHG-89 三个新入口所在组件的纯渲染面。

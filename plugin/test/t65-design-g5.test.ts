@@ -117,9 +117,11 @@ test('t65-1: 四屏的设计稿元素在实现里都有对应 class（lanes / da
   // 否则 9 个无依赖任务拉成一列 900px 高、底部被面板裁掉
   assert.ok(source.includes('const perRowV ='), '竖向同层折行参数')
   assert.ok(source.includes('const perRowH ='), '横向同层分列参数')
-  // 行高统一（design 泳道是等高表格）
-  assert.ok(/\.mt-lane-label\{[^}]*min-height:96px/.test(source), '泳道行头最小高度统一')
-  assert.ok(/\.mt-lane-cell\{[^}]*min-height:96px/.test(source), '泳道格子最小高度与行头一致')
+  // 行高统一（design/app.css `.lane-cell{min-height:56px}` —— CHG-178 从 96 收回设计稿口径）
+  assert.ok(/\.mt-lane-label\{[^}]*min-height:56px/.test(source), '泳道行头最小高度统一（56px）')
+  assert.ok(/\.mt-lane-cell\{[^}]*min-height:56px/.test(source), '泳道格子最小高度与行头一致（56px）')
+  // CHG-178：泳道行不参与 flex 收缩，否则行被压扁 + overflow:hidden 把行内文字切掉
+  assert.ok(/\.mt-lane\{[^}]*flex:none/.test(source), '泳道行不收缩（容器滚动而非压扁行）')
   // 箭头永远指下游：markerEnd 出现在 SVG 连线属性里
   assert.ok(source.includes('markerEnd:'), 'SVG 连线带 marker 箭头')
   // 非法落点抖动 + 弹回（150ms；reduced-motion 只闪边框）

@@ -8,6 +8,17 @@ import type { TeamConfig } from './team-config.ts'
 
 export type ConfigLayer = 'default' | 'project' | 'team'
 
+/**
+ * CHG-170（R41-③）：随配置视图下发的**宿主运行时事实**（可选）。
+ *
+ * 为什么不是 TeamConfig 的字段：`builtinToolsHide` 是 host 级行为（initialize 时执行一次），
+ * 不属于任何合并层；离线/旧宿主拿不到时**整个键缺席**，客户端显示「—」不编 0
+ * （与覆盖率徽标的「未知不编 0」同一纪律）。
+ */
+export interface ConfigPayloadRuntime {
+  builtinToolsHide?: { enabled: boolean; restricted: boolean; configured: string[]; effective: string[] }
+}
+
 export interface ConfigPayload {
   status: 'ok'
   source: ConfigLayer
@@ -21,11 +32,14 @@ export interface ConfigPayload {
     taskTypes: TeamConfig['taskTypes']
     clarify: TeamConfig['clarify']
     memory: TeamConfig['memory']
+    /** CHG-173（FR-1.3）：DAG 来源（唯一的顶层标量字段，随 config 载荷下发） */
+    taskPlanning: TeamConfig['taskPlanning']
   }
+  runtime?: ConfigPayloadRuntime
   warnings: string[]
 }
 
-export function buildConfigPayload(config: TeamConfig, warnings: string[], source: ConfigLayer = 'default'): ConfigPayload {
+export function buildConfigPayload(config: TeamConfig, warnings: string[], source: ConfigLayer = 'default', runtime?: ConfigPayloadRuntime): ConfigPayload {
   return {
     status: 'ok',
     source,
@@ -44,7 +58,9 @@ export function buildConfigPayload(config: TeamConfig, warnings: string[], sourc
       taskTypes: config.taskTypes,
       clarify: config.clarify,
       memory: config.memory,
+      taskPlanning: config.taskPlanning,
     },
+    ...(runtime ? { runtime } : {}),
     warnings,
   }
 }

@@ -27,10 +27,10 @@ npx tsc -p tsconfig.json --noEmit
 
 | 路径 | 职责 |
 |---|---|
-| `src/` | TypeScript 源码真身：54 个 `.ts` + 1 个遗留转发 `host.js` |
-| `lib/` | 构建产物：54 个 `.mjs` + `build-manifest.json`；`main` 指向 `lib/host.mjs`，随包分发 |
+| `src/` | TypeScript 源码真身：56 个 `.ts` + 1 个遗留转发 `host.js` |
+| `lib/` | 构建产物：56 个 `.mjs` + `build-manifest.json`；`main` 指向 `lib/host.mjs`，随包分发 |
 | `client/` | `client.js` 面板浏览器产物——**不经 src 编译**，由 `exports["./client"]` 直载，指纹单独记 |
-| `test/` | 单测 121 个文件（`node --test`） |
+| `test/` | 单测 124 个文件（`node --test`） |
 | `schema/` | `team-config.schema.json`：配置的机器可读定稿（与 [docs/18](../docs/18-配置Schema定稿.md)、`src/core/config/team-config.ts` 三方同步，`t89` 守门） |
 | `scripts/` | `build-lib.mjs`：构建脚本（代码生成器，不是运行时） |
 | `locale/` | 面板文案 `zh.json` / `en.json` |
@@ -54,7 +54,7 @@ npx tsc -p tsconfig.json --noEmit
 | **D3 成员** | `core/members/member-setup.ts` | `setup(agentCtx)` 作用域组装：9 个成员工具 + `tools.restrict` 收窄 + 角色提示词 + 技能 provider |
 | | `core/members/capability-guard.ts` | 技能 / MCP allowlist 的执行面（MCP 真收窄；技能走 deny-by-shadow，无 deny API） |
 | | `core/members/memory.ts` | 成员记忆区（`memory.md` + `notes/`）的幂等播种与事后审计 |
-| | `core/members/smoke.ts` | 动态冒烟探针（六项），需真实宿主会话，**不进 CI** |
+| | `src/smoke.ts` | 动态冒烟探针（六项），需真实宿主会话，**不进 CI** |
 | **D4 角色库** | `core/roles/role-store.ts` | 三来源解析（builtin / global / project）、引用即复制、C7 守门、名册队长唯一性 |
 | | `core/roles/builtin-roles.ts` | 内置只读角色 + 五档 `RoleOrigin`（builtin < plugin < global < project-role < project） |
 | | `core/roles/role-ops.ts` | 角色库写操作统一入口 `roleOp` —— 工具侧与面板侧共用同一份实现 |
@@ -157,16 +157,17 @@ node tools/check-drift.mjs    # 退出码 0 = MISMATCH: 0
 cd plugin && npm test
 ```
 
-- `test/` 下 121 个测试文件；**条数以 `npm test` 实际输出为准**（当前基线 858 条；增删测试后不要抄旧数字）。
-- 门禁型测试不是装饰：`t42`（src↔lib 指纹）、`t80`（构建三道闸）、`t81`（错误码双向锁死）、`t76`（贡献契约）都在「实现与声明分叉」时变红。
-- 需要真实宿主会话的探针（`core/members/smoke.ts`）不在 CI 内，按文件头注释在插件 dev profile 里跑。
+- `test/` 下 124 个测试文件；**条数以 `npm test` 实际输出为准**（当前基线 913 条；增删测试后不要抄旧数字）。
+- 门禁型测试不是装饰：`t42`（src↔lib 指纹）、`t80`（构建三道闸）、`t81`（错误码双向锁死）、`t76`（贡献契约）、`t137`（分层与写盘出口，见 `tools/check-architecture.mjs`）都在「实现与声明分叉」时变红。
+- 需要真实宿主会话的探针（`src/smoke.ts`，CHG-174 从 `core/members/` 移出入口层）不在 CI 内，按文件头注释在插件 dev profile 里跑。
 
 ## 相关文档
 
 | 文档 | 什么时候读 |
 |---|---|
 | [../README.md](../README.md) | 项目定位、仓库规范、当前状态 |
-| [../docs/03-架构与ADR.md](../docs/03-架构与ADR.md) | 五域划分、核心数据流、ADR-001~014 |
+| [../docs/03-架构与ADR.md](../docs/03-架构与ADR.md) | 五域划分、核心数据流、ADR-001~016 |
+| [../docs/23-项目目标重梳理.md](../docs/23-项目目标重梳理.md) | **v4.0 目标体系**：角色 / 任务两类资源、FR-32 子 Agent 编队、FR-33 项目共享看板、M3 任务分解 |
 | [../docs/04-API与数据契约.md](../docs/04-API与数据契约.md) | 工具 / 端点 / 错误码契约（错误码表由 `tools/gen-error-docs.mjs` 生成，不要手改） |
 | [../docs/11-数据模型与存储设计.md](../docs/11-数据模型与存储设计.md) | 账本事件与投影字段 |
 | [../docs/18-配置Schema定稿.md](../docs/18-配置Schema定稿.md) | **配置字段的唯一权威定义**（`team.config.json` / 角色 schema / 模板组合面 / 设置页写契约） |

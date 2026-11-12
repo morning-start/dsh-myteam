@@ -19,10 +19,14 @@
  * 零依赖边界（PRD §2/§9）：绝不 import/调用 agentTeams 服务与内置团队工具；
  * 宿主服务白名单见 PRD §9（agents/subagents/tools/typert/tokenMeter/sessionProjections）。
  */
-import { dirname, join, isAbsolute, sep } from 'node:path'
+import { join, isAbsolute, sep } from 'node:path'
 import { randomUUID, createHash } from 'node:crypto'
-import { existsSync, mkdirSync, writeFileSync, readFileSync, readdirSync, statSync, unlinkSync } from 'node:fs'
+import { existsSync, readFileSync, readdirSync, statSync, unlinkSync } from 'node:fs'
 import { ensureWorkplaceDirs, ensureGitignoreManagedBlock } from './host-workspace.mjs'
+/* CHG-174：**唯一写盘出口**。host 不再直接 `writeFileSync` —— 那是「写一半」的唯一来源：
+ * 没有 fsync 屏障、临时文件名固定、不拒符号链接。全部经 `writeTextAtomic`（八步写序），
+ * 门禁 `tools/check-architecture.mjs` 的 A2 规则守着这条边界。 */
+import { writeTextAtomic } from './core/fs/write-log.mjs'
 import { resolveProjectRoot, storeLayout, teamLedgerPath as teamLedgerPathOf, scratchDir as scratchDirOf, memberIdentityDir as memberIdentityDirOf, displayPath, STORE_DIR } from './core/workspace/layout.mjs'
 // CHG-103：作用域契约（全局 vs 项目级）——角色两级都可用，任务/历史/状态只能项目级
 import { normalizeScope } from './core/workspace/scope.mjs'
@@ -391,8 +395,7 @@ export function readArtifactBaselineRecord(filePath        )                    
 
 /** 写产物基线记录（父目录自动创建；返回落盘路径） */
 export function writeArtifactBaselineRecord(filePath        , record                        )         {
-  mkdirSync(dirname(filePath), { recursive: true })
-  writeFileSync(filePath, `${JSON.stringify(record, null, 2)}\n`, 'utf8')
+  writeTextAtomic(filePath, `${JSON.stringify(record, null, 2)}\n`, { ensureParent: true })
   return filePath
 }
 
@@ -667,6 +670,20 @@ export class MyTeamHost {
           lastDispatchWakeAt = new Map                ()
           tokensFiles = new Map                    ()
   /**
+   * R41-③：内置团队工具隐藏的**实际生效**状态（initialize 时机记录一次，只读快照）。
+   *
+   * 为什么要在 host 上留这份状态：`hideBuiltinTeamTools` 是 host 级行为（不是 team.config），
+   * 旧设置页只显示「配置期望值」（甚至只是一颗永远关闭的假开关）——R41-③ 裁决要求显示
+   * **实际生效**的 deny 清单。三个字段都是事实而非期望：`restricted=false` 表示宿主根本
+   * 没提供 `tools.restrict`（隐藏未执行），`effective ⊆ configured` 是过滤后的真实 deny。
+   */
+          builtinToolsHideState                                                                                       = {
+    enabled: true,
+    restricted: false,
+    configured: [],
+    effective: [],
+  }
+  /**
    * CHG-86（P0-3）：token 侧车的**上次读到的累计量**基线（teamId → memberId → 四桶）。
    * session 投影给的是全生命周期累计量；没有基线就只能把总量记进"今天"这一个桶，
    * 历史按天数据每次读盘都被抹掉。有了基线，每次只落增量，days 自然长出多天。
@@ -702,6 +719,10 @@ export class MyTeamHost {
       this.log('info', `project root = ${resolution.root} (source: ${resolution.source})`)
     }
     return this._workspaceRoot
+  }
+  /** R41-③：面板设置页读「实际生效」的内置工具隐藏状态（只读快照，initialize 后恒有值） */
+  get builtinToolsHide()                                                                                       {
+    return this.builtinToolsHideState
   }
   get rolePaths()                 {
     if (!this._rolePaths) {
@@ -889,6 +910,13 @@ export class MyTeamHost {
     this.registerRemote()
     // hideBuiltinTeamTools（PRD §2.4）：隐藏宿主内置团队工具。
     // restrict 只能移除工具（practices.md §4 最弱机制）——符合"隐藏"语义。
+    // R41-③：无论走哪个分支，都把**实际生效**状态记下来（设置页显示事实，不显示期望）。
+    this.builtinToolsHideState = {
+      enabled: this.config.hideBuiltinTeamTools !== false,
+      restricted: Boolean(this.rt.tools?.restrict),
+      configured: [...HOST_TEAM_TOOLS_TO_HIDE],
+      effective: [],
+    }
     if (this.config.hideBuiltinTeamTools !== false && this.rt.tools?.restrict) {
       try {
         // CHG-58：restrict 只接受"当前已知的全局工具名"——先过滤，避免宿主没装内置团队
@@ -899,11 +927,13 @@ export class MyTeamHost {
             .filter((name) => name.length > 0),
         )
         const deny = known.size === 0 ? [...HOST_TEAM_TOOLS_TO_HIDE] : HOST_TEAM_TOOLS_TO_HIDE.filter((name) => known.has(name))
+        this.builtinToolsHideState = { enabled: true, restricted: true, configured: [...HOST_TEAM_TOOLS_TO_HIDE], effective: deny }
         if (deny.length > 0) {
           this.rt.tools.restrict({ deny })
           this.log('info', `builtin team tools hidden (${deny.length})`)
         }
       } catch (e) {
+        /* 状态保持 effective:[]（restricted:true 但一条都没生效——诚实） */
         this.log('warn', `restrict for hiding builtin tools failed: ${String(e)}`)
       }
     }
@@ -1311,8 +1341,54 @@ export class MyTeamHost {
           }
           const tasksIn = (args.tasks ?? [])                     
           const svc0 = this.service(teamId)
+          /*
+           * FR-1.3（CHG-173）：taskPlanning='template' —— DAG 来源二选一的另一档。
+           * 队长没给任务（tasksIn 为空）且配置选了 template 时，按 `pipeline.stages`
+           * 生成**内置固定流水线模板任务组**（线性链：每阶段一任务，deps 串成一条）。
+           *
+           * 三条边界（诚实第一）：
+           *  ① 显式 tasks 永远优先——模板只补「队长没拆活」这一种空缺；
+           *  ② 生成的 AC / 交付物路径是**占位**（description 注明 + 结果 note 提醒编辑），
+           *     不假装这是一份想好的计划；路径走 archive 门禁时会如实 fail（落位校验），
+           *     队长编辑后即可通过——宁可 needs-human 也不放水；
+           *  ③ stages 为空或名册没有非队长角色 → 明确拒绝（MT_VALIDATION），
+           *     不静默回退 captain 模式（配置说了 template 就按 template 办）。
+           */
+          let templateNote                    
+          let tasksFinal = tasksIn
+          if (tasksIn.length === 0 && (svc0.effectiveConfig.taskPlanning ?? 'captain') === 'template') {
+            const stages = svc0.effectiveConfig.pipeline.stages
+            const workers = roster.filter((entry) => entry.roleId !== 'captain')
+            if (stages.length === 0 || workers.length === 0) {
+              return {
+                status: 'error',
+                code: 'MT_VALIDATION',
+                message: `taskPlanning='template' 需要 pipeline.stages 非空且名册含至少一个非队长角色（当前 stages=${stages.length}，非队长角色=${workers.length}）`,
+              }
+            }
+            const slugOf = (raw        ) => String(raw).toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '')
+            const used = new Set        ()
+            const ids = stages.map((stage, i) => {
+              const base = `stage-${slugOf(String(stage)) || `task-${i + 1}`}`
+              let id = base
+              let n = 2
+              while (used.has(id)) { id = `${base}-${n}`; n += 1 }
+              used.add(id)
+              return id
+            })
+            tasksFinal = stages.map((stage, i) => ({
+              id: ids[i],
+              title: String(stage),
+              description: `模板流水线任务组（FR-1.3 taskPlanning:'template'）：阶段「${String(stage)}」，由配置自动生成——验收标准与交付物路径是占位，approve 前请按实际目标编辑。`,
+              acceptanceCriteria: [`「${String(stage)}」阶段完成：产出落位并通过门禁链（模板占位，请按实际目标修改）`],
+              deps: i === 0 ? [] : [ids[i - 1]],
+              requiredRole: workers[i % workers.length].roleId,
+              deliverableSpec: { path: `docs/${ids[i]}.md`, producer: workers[i % workers.length].roleId, reviewer: 'captain', archiver: 'captain' },
+            }))
+            templateNote = `taskPlanning='template'：已按 pipeline.stages 生成 ${ids.length} 个模板任务（线性链 ${ids.join(' → ')}）；AC 与交付物路径是占位，approve 前请用 myteam_edit_task 调整（FR-1.3）。`
+          }
           const tasksMap                                          = {}
-          for (let i = 0; i < tasksIn.length; i++) tasksMap[String(tasksIn[i].id ?? `task-${i + 1}`)] = tasksIn[i]                           
+          for (let i = 0; i < tasksFinal.length; i++) tasksMap[String(tasksFinal[i].id ?? `task-${i + 1}`)] = tasksFinal[i]                           
           const rosterRoles = [...new Set([...roster.map((r0) => r0.roleId), 'captain'])]
           const planCheck = validatePlan(tasksMap         , svc0.effectiveConfig.limits.maxTasks, rosterRoles)
           if (!planCheck.ok) {
@@ -1335,7 +1411,7 @@ export class MyTeamHost {
           }
           const r1 = this.commit(teamId, { actor, type: 'team.created', payload: { teamId, name: args.teamName, goal: args.goal, roster } })
           if (!r1.ok) return { status: 'error', code: r1.code, message: r1.message }
-          const r2 = this.commit(teamId, { actor, type: 'plan.staged', payload: { teamId, planId: `plan-${Date.now()}`, roster, tasks: args.tasks, ...(preset ? { presetId: preset.definition.id } : {}) } })
+          const r2 = this.commit(teamId, { actor, type: 'plan.staged', payload: { teamId, planId: `plan-${Date.now()}`, roster, tasks: tasksFinal, ...(preset ? { presetId: preset.definition.id } : {}) } })
           if (!r2.ok) return { status: 'error', code: r2.code, message: r2.message }
           /*
            * CHG-163（docs/10 KI-9 / FR-17.4 沉淀时机①）：**onboarding 采集钩子**。
@@ -1376,8 +1452,10 @@ export class MyTeamHost {
             ...(preset ? { presetId: preset.definition.id, presetName: preset.definition.name } : {}),
             ...(presetConfig && configApplied ? { configApplied } : {}),
             ...(knowledgeHint ? { knowledgeHint } : {}),
+            ...(templateNote ? { templateNote } : {}),
             note:
               '草稿已暂存（无成员会话产生）；等待人工 Approve & Run / Revise / Discard' +
+              (templateNote ? `；${templateNote}` : '') +
               (preset
                 ? `；已应用团队模板「${preset.definition.name}」（队长 + ${preset.definition.members.length} 名队员）` +
                   (configApplied ? `；配置段落已落团队：${configApplied.join('/')}` : '')
@@ -1426,20 +1504,41 @@ export class MyTeamHost {
           // 任务不进 tasksMap）——批准后成员上岗看到空板、无任务可 claim，"Run"断在任务上板。
           // 成员就位后把 staged 计划的任务逐条入库（task.created → backlog；必须先 spawn——
           // task.created 领域校验 rosterRoles 以投影成员角色为准，空投影会走草稿分支误拒）。
+          //
+          // CHG-169（FIX-13 增强）：**保留计划 id + deps 重映射**。旧实现无条件重编号 `task-N`，模板任务组
+          // （stage-plan → stage-dev → …）与显式计划里带 deps 的任务会全部悬空——dep 指向
+          // 计划里的 id，入库后不存在 → task.created 领域校验拒绝（DAG 断）。现在：
+          // 计划 id 空闲 = 原样保留；被占用 = 重编号 task-N 兜底；deps 走 plan-id → final-id 映射。
           const stagedTasks = (stagedPlan.payload?.tasks                                              ) ?? []
+          const projNow = this.service(teamId).projectionSnapshot.tasks
+          const taken = new Set(Object.keys(projNow))
+          let maxN = 0
+          for (const id of Object.keys(projNow)) {
+            const mm = /^task-(\d+)$/.exec(id)
+            if (mm) maxN = Math.max(maxN, Number(mm[1]))
+          }
+          const planIdOf = (t                         ) => (typeof t.id === 'string' && t.id.trim() ? t.id.trim() : '')
+          const idMap = new Map                ()
+          for (const t of stagedTasks) {
+            const want = planIdOf(t)
+            if (!want) continue
+            if (!taken.has(want)) { idMap.set(want, want); taken.add(want); continue }
+            let finalId = `task-${maxN + 1}`
+            maxN += 1
+            while (taken.has(finalId)) { finalId = `task-${maxN + 1}`; maxN += 1 }
+            idMap.set(want, finalId)
+            taken.add(finalId)
+          }
           const createdTasks           = []
           const createErrors           = []
           for (const t of stagedTasks) {
-            const proj0 = this.service(teamId).projectionSnapshot.tasks
-            let maxN = 0
-            for (const id of Object.keys(proj0)) {
-              const mm = /^task-(\d+)$/.exec(id)
-              if (mm) maxN = Math.max(maxN, Number(mm[1]))
-            }
-            const taskId = `task-${maxN + 1}`
-            const r2 = this.commit(teamId, { actor, type: 'task.created', payload: { teamId, taskId, task: this.taskWithGateChain(teamId, t) } })
-            if (r2.ok) createdTasks.push(taskId)
-            else createErrors.push(`create_task ${String(t.taskKey ?? taskId)}: ${r2.message}`)
+            const want = planIdOf(t)
+            const finalId = want ? (idMap.get(want) ?? `task-${(maxN += 1)}`) : `task-${(maxN += 1)}`
+            const deps = Array.isArray(t.deps) ? (t.deps             ).map((d) => idMap.get(String(d)) ?? String(d)) : undefined
+            const taskInput = { ...t, ...(deps !== undefined ? { deps } : {}) }
+            const r2 = this.commit(teamId, { actor, type: 'task.created', payload: { teamId, taskId: finalId, task: this.taskWithGateChain(teamId, taskInput) } })
+            if (r2.ok) createdTasks.push(finalId)
+            else createErrors.push(`create_task ${String(t.taskKey ?? finalId)}: ${r2.message}`)
           }
           return {
             status: 'approved',
@@ -3616,8 +3715,11 @@ export class MyTeamHost {
     // 都是「成员真的存在」的派生事实，与 handle 是否先到无关，保持同步落盘
     // （异步宿主也不拖到 microtask——t33 直接读 identity 快照）。
     const identityDir = memberIdentityDirOf(this.workspaceRoot, teamId, memberId)
-    if (!existsSync(identityDir)) mkdirSync(identityDir, { recursive: true })
-    writeFileSync(join(identityDir, 'identity.json'), `${JSON.stringify({ ...member, roleSnapshot: roleDef, spawnedAt: Date.now() }, null, 2)}\n`, 'utf8')
+    writeTextAtomic(
+      join(identityDir, 'identity.json'),
+      `${JSON.stringify({ ...member, roleSnapshot: roleDef, spawnedAt: Date.now() }, null, 2)}\n`,
+      { ensureParent: true },
+    )
     // 记忆区播种（T21，FR-6.1：幂等；R26：host 进程 fs；notes/ 留给成员自建）
     const memSeed = seedMemoryIfMissing(memoryDirFor(this.workspaceRoot, teamId, memberId), member)
     if (memSeed.seeded) this.log('info', `memory seeded for ${memberId}: ${memSeed.memoryMdPath}`)
@@ -4386,8 +4488,7 @@ export class MyTeamHost {
     ].join('\n')
     const filePath = join(dir, 'SKILL.md')
     try {
-      mkdirSync(dir, { recursive: true })
-      writeFileSync(filePath, frontmatter, 'utf8')
+      writeTextAtomic(filePath, frontmatter, { ensureParent: true })
     } catch (error) {
       return { status: 'error', code: 'MT_INTERNAL', skillId, message: String((error                     )?.message ?? error) }
     }
@@ -4433,8 +4534,7 @@ export class MyTeamHost {
       createdAt: Date.now(),
     }
     try {
-      mkdirSync(toolsRoot, { recursive: true })
-      writeFileSync(filePath, `${JSON.stringify(definition, null, 2)}\n`, 'utf8')
+      writeTextAtomic(filePath, `${JSON.stringify(definition, null, 2)}\n`, { ensureParent: true })
     } catch (error) {
       return { status: 'error', code: 'MT_INTERNAL', toolId, message: String((error                     )?.message ?? error) }
     }
@@ -4495,8 +4595,7 @@ export class MyTeamHost {
     const filePath = join(exportsDir, `${label}-${Date.now()}.json`)
     const text = `${JSON.stringify(snapshot, null, 2)}\n`
     try {
-      mkdirSync(exportsDir, { recursive: true })
-      writeFileSync(filePath, text, 'utf8')
+      writeTextAtomic(filePath, text, { ensureParent: true })
     } catch (error) {
       return { status: 'error', code: 'MT_INTERNAL', teamId, message: String((error                     )?.message ?? error) }
     }
@@ -4626,8 +4725,7 @@ export class MyTeamHost {
       updatedAt: Date.now(),
     }
     try {
-      mkdirSync(global.teams, { recursive: true })
-      writeFileSync(filePath, `${JSON.stringify(definition, null, 2)}\n`, 'utf8')
+      writeTextAtomic(filePath, `${JSON.stringify(definition, null, 2)}\n`, { ensureParent: true })
     } catch (error) {
       return { status: 'error', code: 'MT_INTERNAL', teamId, message: String((error                     )?.message ?? error) }
     }
@@ -5952,8 +6050,7 @@ export class MyTeamHost {
     }
     // ④ 观测表与四桶一起落盘（覆盖率是派生读数，观测才需要持久化）
     file = { ...file, memberMeter }
-    if (!existsSync(dir)) mkdirSync(dir, { recursive: true })
-    writeFileSync(filePath, `${JSON.stringify(file, null, 2)}\n`, 'utf8')
+    writeTextAtomic(filePath, `${JSON.stringify(file, null, 2)}\n`, { ensureParent: true })
     this.tokensFiles.set(teamId, file)
     return file
   }
