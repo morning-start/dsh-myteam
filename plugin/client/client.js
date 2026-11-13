@@ -1005,7 +1005,11 @@ window.__ModuleLoader__.load({
       'detail.costMiss': '未命中 / 输出',
       'detail.costShare': '占团队消耗',
       'detail.costNote': '按 tokenMeter 用量比例分摊，非精确计量。',
-      'detail.costUnavailable': '成本数据不可用（离线团队读 tokens.json 失败或还没产生用量）',
+      'detail.costUnavailable': '成本数字不可用的三种原因：离线读不到 tokens 计量 / 还没产生用量 / 计量字段不完整',
+      /* CHG-185：成本归因「没有数字」三档（离线 / 无用量 / 字段缺失）—— 缺数据一律显示 —，绝不伪造 0 */
+      'cost.offline': '离线：读不到该团队的 tokens 计量（启动团队会话后可用）—— 数值显示 —',
+      'cost.noUsage': '该团队还没有产生用量（还没有成员跑过任务）—— 数值显示 —',
+      'cost.partial': '计量字段不完整（只有部分计数），不显示估算值 —— 缺的项显示 —',
       'detail.ops': '任务操作',
       'detail.cancelTaskBtn': '取消此任务',
       'detail.cancelNote': '取消后已产出证据保留，任务转 blocked 并回到队长重规划。',
@@ -2263,7 +2267,11 @@ window.__ModuleLoader__.load({
       'detail.costMiss': 'Uncached / output',
       'detail.costShare': 'Share of team',
       'detail.costNote': 'Apportioned by tokenMeter usage, not a precise measurement.',
-      'detail.costUnavailable': 'Cost data unavailable (offline team: tokens.json unreadable or no usage yet)',
+      'detail.costUnavailable': 'Three reasons cost numbers can be unavailable: offline metering unreadable / no usage yet / incomplete metering fields',
+      /* CHG-185: three kinds of "no numbers" (offline / no usage / partial fields) — missing data always shows —, never a fabricated 0 */
+      'cost.offline': 'Offline: this team tokens metering is unreadable (start a team session to enable it) — values show —',
+      'cost.noUsage': 'This team has no usage yet (no member has run a task) — values show —',
+      'cost.partial': 'Metering fields are incomplete (partial counts only); no estimate is shown — missing values show —',
       'detail.ops': 'Task actions',
       'detail.cancelTaskBtn': 'Cancel this task',
       'detail.cancelNote': 'Cancelling keeps produced evidence; the task turns blocked and goes back to the captain for re-planning.',
@@ -5910,6 +5918,33 @@ window.__ModuleLoader__.load({
       ] })
     }
 
+    /**
+     * CHG-185：成本归因的「没有数字」三档判定 —— 纯函数，可单测。
+     *
+     * 为什么单独抽出来：旧实现把三种完全不同的事压进一句话（离线读不到 sidecar / 在线但
+     * 还没产生用量 / 读到了但计量字段缺失），用户无法判断要不要处理。判定收在这里，渲染只
+     * 按 tone 出；**非 ok 的 tone 一律渲染 `—`**（绝不显示伪造的 0）。
+     *
+     * @param {'offline'|'loaded'} loadState sidecar 是否读到（只读 / 离线团队 / 无端点 = offline）
+     * @param {object|null|undefined} tokens  getTokens 的 tokens 视图（null = 读到了但没有；undefined = 还在读）
+     * @param {(key: string) => string} t     文案查表（注入而非闭包，保证本函数无副作用、可单测）
+     * @returns {{tone: 'offline'|'no-usage'|'partial'|'loading'|'ok', text: string}}
+     */
+    function costDegradeOf(loadState, tokens, t) {
+      if (loadState === 'offline') return { tone: 'offline', text: t('cost.offline') }
+      /* 还在读（undefined）不是「没有用量」——不猜，值留 —、提示先不出 */
+      if (tokens === undefined) return { tone: 'loading', text: '' }
+      if (!tokens) return { tone: 'no-usage', text: t('cost.noUsage') }
+      /* 用量口径 = 四桶之和（buildTokens 视图按成员分桶，没有扁平 input/output/cached 字段） */
+      const used = Object.values(tokens.totals ?? {}).reduce((sum, bucket) => sum
+        + Number(bucket?.uncachedInput ?? 0) + Number(bucket?.cacheRead ?? 0)
+        + Number(bucket?.cacheWrite ?? 0) + Number(bucket?.output ?? 0), 0)
+      if (!(used > 0)) return { tone: 'no-usage', text: t('cost.noUsage') }
+      /* 计量完整度以 sidecar 的 coverage 三态为单一来源（coverageOfFile 派生），不在这里另立口径 */
+      const partial = tokens.coverage === 'partial' || tokens.coverage === 'none'
+      return partial ? { tone: 'partial', text: t('cost.partial') } : { tone: 'ok', text: '' }
+    }
+
     /* ── 任务详情（design/detail.html）：主区整页 = 面包屑 + 主列/侧列 + 成本归因 ── */
     // T25：离线团队走 loader（getOfflineTaskDetail），readOnly=true 时隐藏沟通输入
     // CHG-73：动作条（重新规划/取消/编辑）+ 证据过期横幅 + 改动记录折叠区 + 取消横幅
@@ -5935,6 +5970,8 @@ window.__ModuleLoader__.load({
           .catch(() => { if (alive) setCost(null) })
         return () => { alive = false }
       }, [teamId, readOnly, refreshToken])
+      /* CHG-185：sidecar 读取态 —— 只读（离线 / 归档团队）或没有端点 = 读不到（offline） */
+      const costLoadState = readOnly || !api || typeof api.getTokens !== 'function' ? 'offline' : 'loaded'
       const closeBtn = j('button', { className: 'mt-btn', onClick: onClose, children: t('action.close') })
       if (!detail) {
         return js('div', { className: 'mt-detail-page', children: [
@@ -6030,7 +6067,10 @@ window.__ModuleLoader__.load({
         const denom = Number(bucket.uncachedInput ?? 0) + Number(bucket.cacheRead ?? 0) + Number(bucket.cacheWrite ?? 0)
         return denom > 0 ? `${((Number(bucket.cacheRead ?? 0) / denom) * 100).toFixed(1)}%` : '—'
       }
-      const costKnown = cost !== undefined && cost !== null
+      /* CHG-185：三档降级（离线 / 无用量 / 字段缺失）的判定收在纯函数里；渲染只认 tone */
+      const degrade = costDegradeOf(costLoadState, cost, t)
+      /* 只有 ok 才出真实数字；其余（含加载中）一律 —，绝不显示伪造的 0 */
+      const costKnown = degrade.tone === 'ok'
       const teamTokens = tokenCount(teamSum)
       /* 时间线节点语义（H4：形状 + 文字；颜色只作第三顺位） */
       const tlTone = (type) => {
@@ -6318,7 +6358,8 @@ window.__ModuleLoader__.load({
                   j('span', { className: 'mt-cost-val', children: costKnown ? `${fmtTok(tokenCount(taskSum))} / ${fmtTok(teamTokens)}` : '—' }),
                 ] }),
                 j('p', { className: 'mt-hint', children: t('detail.costNote') }),
-                costKnown ? null : j('p', { className: 'mt-hint', children: t('detail.costUnavailable') }),
+                /* CHG-185：三档各出一句（离线 / 无用量 / 字段缺失），加载中 text 为空不出；总说明在 title 里 */
+                costKnown ? null : j('p', { className: `mt-hint mt-cost-${degrade.tone}`, title: t('detail.costUnavailable'), children: degrade.text }),
               ] }),
             ] }),
             /* 任务操作：重新规划 / 编辑 / 取消（RPC 动作一个不丢） */
