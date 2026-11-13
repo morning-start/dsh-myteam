@@ -105,10 +105,20 @@ export const FROZEN_A2 = []
  * `evaluateArchiveGate` / `autoEvaluateGateChain`）**逐字**搬进
  * `core/gates/gate-execution.ts` → 5,311 → **4,815**（-496 行，入口占比 34.2% → **31.9%**）。
  * 逐字核验 **443/443 逻辑行一致**；`GateExecutionDeps` 17 个成员。
- * 下一刀切剩下的私有方法体：`batchTaskOp` / `createTasksBatch` / `materializeSplitProposal`
- * （都是「批量 / 物化」这类**行为边界**，不是端点）。
+ *
+ * ── CHG-191（T159c）──────────────────────────────────────────────────────────
+ * 第三刀（收口）已落：批量编排 3 个私有方法（`batchTaskOp` / `createTasksBatch` /
+ * `materializeSplitProposal`）**逐字**搬进 `core/tasks/batch-orchestration.ts` →
+ * 4,815 → **4,405**（-410 行，入口占比 31.9% → **30.1%**）。
+ * 逐字核验 **417/417 逻辑行一致**；`BatchOrchestrationDeps` 7 个成员。
+ * `resolveProposal` **没有**搬（提案裁决入口：参数校验 + 按 type 分发 + 驳回留痕，与
+ * 「物化」的载荷形状无关），留在入口层原位。
+ *
+ * 下一刀切剩下的私有方法体：`afterCommit` / `dispatchSweep` / `refreshTeamIndex`
+ * （装配与唤醒逻辑）。⚠️ **入口层再降要靠装配逻辑下沉，不是端点**——`executeLeadTool`
+ * 的 switch 已经是纯「工具名 → 适配层」路由表，再按端点切只是把转发行搬来搬去。
  */
-export const A6_LIMIT = { 'host.ts': 4815 }
+export const A6_LIMIT = { 'host.ts': 4405 }
 
 /** 递归列出 dir 下扩展名为 ext 的文件（确定性排序；Dirent 直接给答案，不 try/catch 猜目录） */
 function walk(dir, ext) {

@@ -1,10 +1,10 @@
 {
   "schema": 1,
-  "builtAt": "2026-11-13T18:43:04.406Z",
+  "builtAt": "2026-11-13T18:53:53.568Z",
   "node": "v22.23.2",
   "entry": "./lib/host.mjs",
-  "modules": 69,
-  "sourceHash": "d71089d439c22a7239379a5aec289599a079df431ee9e626f50f08aed042a600",
+  "modules": 70,
+  "sourceHash": "052dba4f040c84a9a611d28a0cef1433396d161a54e9088aca7b70d07839d54e",
   "clientFile": "client/client.js",
   "clientHash": "410add046bd3ce3ed628a9af29cac688b5ac3bc0a7bcd1de3d39c420434bfce7",
   "files": [
@@ -56,6 +56,7 @@
     "core/scheduler/wake.ts",
     "core/scheduler/waves.ts",
     "core/service.ts",
+    "core/tasks/batch-orchestration.ts",
     "core/tasks/diff.ts",
     "core/tasks/graph.ts",
     "core/tasks/readiness.ts",
