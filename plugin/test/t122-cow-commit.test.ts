@@ -95,7 +95,7 @@ function bootstrap(service: TeamService): void {
   commitOk(service, {
     actor: 'host',
     type: 'member.spawned',
-    payload: { teamId: 't1', memberId: 'm1', roleId: 'implementer', instanceName: 'dev', sessionId: 's1', status: 'active' },
+    payload: { teamId: 't1', memberId: 'm1', roleId: 'implementer', instanceName: 'dev', sessionId: 's1', status: 'active', parentMemberId: null, depth: 0, rootMemberId: 'm1' },
   })
   commitOk(service, { actor: 'lead', type: 'plan.staged', payload: { teamId: 't1', planId: 'p1' } })
   commitOk(service, { actor: 'lead', type: 'plan.approved', payload: { teamId: 't1', planId: 'p1' } })
@@ -130,7 +130,7 @@ test('t122-1: 连续提交后 —— 未触及集合保持引用，触及的换�
   commitOk(service, {
     actor: 'host',
     type: 'member.spawned',
-    payload: { teamId: 't1', memberId: 'm2', roleId: 'implementer', instanceName: 'dev2', sessionId: 's2', status: 'active' },
+    payload: { teamId: 't1', memberId: 'm2', roleId: 'implementer', instanceName: 'dev2', sessionId: 's2', status: 'active', parentMemberId: null, depth: 0, rootMemberId: 'm2' },
   })
   assert.notStrictEqual(service.projectionSnapshot.members, members0, 'members 被触及 → 换新引用')
   assert.strictEqual(service.projectionSnapshot.tasks, tasks1, 'tasks 未触及 → 保持上一步的引用')

@@ -71,7 +71,7 @@ const assigned = (taskId: string, over: Record<string, unknown> = {}): Draft => 
 const BASE: Draft[] = [
   { type: 'team.created', payload: { teamId: TEAM, name: 'T', goal: 'G' } },
   { type: 'plan.approved', payload: { teamId: TEAM, planId: 'p1' } },
-  { type: 'member.spawned', payload: { teamId: TEAM, memberId: 'm1', roleId: 'dev', sessionId: 's1', status: 'active' } },
+  { type: 'member.spawned', payload: { teamId: TEAM, memberId: 'm1', roleId: 'dev', sessionId: 's1', status: 'active', parentMemberId: null, depth: 0, rootMemberId: 'm1' } },
 ]
 
 /** 投影任务 → 阶段判定输入（`memberLive` 由调用方给：它是宿主事实，不在账本里） */

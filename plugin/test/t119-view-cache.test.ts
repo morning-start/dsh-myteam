@@ -52,7 +52,7 @@ function baseEvents(): LedgerEvent[] {
   return [
     ev('team.created', { teamId: 't1', name: '团队', goal: '目标' }),
     ev('plan.approved', { teamId: 't1', planId: 'p1' }),
-    ev('member.spawned', { teamId: 't1', memberId: 'm1', roleId: 'dev', sessionId: 's1', status: 'ok' }),
+    ev('member.spawned', { teamId: 't1', memberId: 'm1', roleId: 'dev', sessionId: 's1', status: 'ok', parentMemberId: null, depth: 0, rootMemberId: 'm1' }),
     ev('task.created', { teamId: 't1', taskId: 'k1', task: taskInput() }),
     ev('task.created', { teamId: 't1', taskId: 'k2', task: taskInput({ title: 'k2 标题', deps: ['k1'] }) }),
   ]
@@ -128,7 +128,7 @@ test('t119-3: members 变 → 旧缓存不可达（旧视图不被新事件改�
   const membersRef = proj.members
   assert.equal(view1.members.length, 1)
 
-  applyEvent(proj, ev('member.spawned', { teamId: 't1', memberId: 'm2', roleId: 'dev', sessionId: 's2', status: 'ok' }))
+  applyEvent(proj, ev('member.spawned', { teamId: 't1', memberId: 'm2', roleId: 'dev', sessionId: 's2', status: 'ok', parentMemberId: null, depth: 0, rootMemberId: 'm2' }))
   assert.notEqual(proj.members, membersRef, '成员事件必须换掉 members 引用')
 
   const view2 = boardOf(proj)
@@ -144,7 +144,7 @@ test('t119-4: 逐字段一致性——随机事件序列 20 轮，缓存视图 v
     const events: LedgerEvent[] = [
       ev('team.created', { teamId: 't1', name: `团队-${round}`, goal: '目标' }),
       ev('plan.approved', { teamId: 't1', planId: 'p1' }),
-      ev('member.spawned', { teamId: 't1', memberId: 'm1', roleId: 'dev', sessionId: 's1', status: 'ok' }),
+      ev('member.spawned', { teamId: 't1', memberId: 'm1', roleId: 'dev', sessionId: 's1', status: 'ok', parentMemberId: null, depth: 0, rootMemberId: 'm1' }),
       ev('task.created', { teamId: 't1', taskId: 'k1', task: taskInput() }),
       ev('task.created', { teamId: 't1', taskId: 'k2', task: taskInput({ title: 'k2', deps: ['k1'] }) }),
       ev('task.claimed', { teamId: 't1', taskId: 'k1', memberId: 'm1', attemptId: 'a1' }),

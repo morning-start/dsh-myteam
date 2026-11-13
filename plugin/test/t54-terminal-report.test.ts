@@ -56,7 +56,7 @@ function teamWithClaimedTask(service: TeamService, taskId = 'k1') {
   })
   step(service, {
     actor: 'host', type: 'member.spawned',
-    payload: { teamId: 't1', memberId: 'm1', roleId: 'implementer', instanceName: 'dev', sessionId: 's1', status: 'active' },
+    payload: { teamId: 't1', memberId: 'm1', roleId: 'implementer', instanceName: 'dev', sessionId: 's1', status: 'active', parentMemberId: null, depth: 0, rootMemberId: 'm1' },
   })
   step(service, { actor: 'lead', type: 'plan.staged', payload: { teamId: 't1', planId: 'p1' } })
   step(service, { actor: 'lead', type: 'task.created', payload: { teamId: 't1', taskId, task: task() } })

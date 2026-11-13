@@ -223,7 +223,7 @@ test('t124-7: fold 只从 payload 读 —— 载荷没给的四字段，投影�
   const base = [
     ev('team.created', { teamId: 't1', name: 'n', goal: 'g' }),
     ev('plan.approved', { teamId: 't1', planId: 'p1' }),
-    ev('member.spawned', { teamId: 't1', memberId: 'm1', roleId: 'dev', sessionId: 's1', status: 'active' }),
+    ev('member.spawned', { teamId: 't1', memberId: 'm1', roleId: 'dev', sessionId: 's1', status: 'active', parentMemberId: null, depth: 0, rootMemberId: 'm1' }),
     ev('task.created', {
       teamId: 't1',
       taskId: 'k1',

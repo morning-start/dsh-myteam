@@ -37,7 +37,7 @@ function teamLedger(teamId: string, goal: string): Array<Record<string, unknown>
   return [
     ev(0, 'team.created', { teamId, name: teamId, goal }),
     ev(1, 'plan.approved', { teamId, planId: 'p-1' }),
-    ev(2, 'member.spawned', { teamId, memberId: 'm-1', roleId: 'developer', sessionId: 's-1', status: 'active' }),
+    ev(2, 'member.spawned', { teamId, memberId: 'm-1', roleId: 'developer', sessionId: 's-1', status: 'active', parentMemberId: null, depth: 0, rootMemberId: 'm-1' }),
     ev(3, 'task.created', { teamId, taskId: 't-1', task: { title: 'A', requiredRole: 'developer', acceptanceCriteria: ['ok'] } }),
     ev(4, 'task.created', { teamId, taskId: 't-2', task: { title: 'B', requiredRole: 'developer', acceptanceCriteria: ['ok'] } }),
   ]

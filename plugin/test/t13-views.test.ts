@@ -17,7 +17,7 @@ function setup() {
   bootstrapTeam(service)
   service.commit({ actor: 'lead', type: 'team.created', payload: { teamId: 't1', name: 'demo', goal: 'g', roster: [{ roleId: 'captain' }, { roleId: 'implementer' }] } })
   service.commit({ actor: 'lead', type: 'plan.approved', payload: { teamId: 't1', planId: 'p1' } })
-  service.commit({ actor: 'lead', type: 'member.spawned', payload: { teamId: 't1', memberId: 'm1', roleId: 'implementer', sessionId: 's1', status: 'ok', instanceName: 'impl-1' } })
+  service.commit({ actor: 'lead', type: 'member.spawned', payload: { teamId: 't1', memberId: 'm1', roleId: 'implementer', sessionId: 's1', status: 'ok', instanceName: 'impl-1', parentMemberId: null, depth: 0, rootMemberId: 'm1' } })
   service.commit({ actor: 'lead', type: 'task.created', payload: { teamId: 't1', taskId: 'k1', task: { title: 'T1', description: 'd', acceptanceCriteria: ['ac'], deliverableSpec: { path: 'docs/x.md' }, deps: [], requiredRole: 'implementer', priority: 'P1', gateChain: ['review', 'archive'] } } })
   return service
 }

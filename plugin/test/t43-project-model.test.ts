@@ -130,8 +130,8 @@ test('t43-6: 多队员指派——assignees 落投影，assignee 保持主负责
   seq = 0
   const proj = foldEvents('t1', [
     ev('rules.version.adopted', { version: 1 }),
-    ev('member.spawned', { teamId: 't1', memberId: 'm1', roleId: 'implementer', sessionId: 's1', status: 'ok' }),
-    ev('member.spawned', { teamId: 't1', memberId: 'm2', roleId: 'reviewer', sessionId: 's2', status: 'ok' }),
+    ev('member.spawned', { teamId: 't1', memberId: 'm1', roleId: 'implementer', sessionId: 's1', status: 'ok', parentMemberId: null, depth: 0, rootMemberId: 'm1' }),
+    ev('member.spawned', { teamId: 't1', memberId: 'm2', roleId: 'reviewer', sessionId: 's2', status: 'ok', parentMemberId: null, depth: 0, rootMemberId: 'm2' }),
     ev('task.created', { teamId: 't1', taskId: 'k1', task: taskInput() }),
     ev('task.assigned', { teamId: 't1', taskId: 'k1', memberId: 'm1', memberIds: ['m1', 'm2'] }),
   ])
@@ -180,7 +180,7 @@ test('t43-9: 项目聚合——跨团队任务带参与团队、计数、角色�
   const alpha = foldEvents('alpha', [
     ev('rules.version.adopted', { version: 1 }),
     ev('team.created', { teamId: 'alpha', name: '结算页', goal: 'g' }),
-    ev('member.spawned', { teamId: 'alpha', memberId: 'm1', roleId: 'implementer', instanceName: 'impl-1', sessionId: 's1', status: 'ok' }),
+    ev('member.spawned', { teamId: 'alpha', memberId: 'm1', roleId: 'implementer', instanceName: 'impl-1', sessionId: 's1', status: 'ok', parentMemberId: null, depth: 0, rootMemberId: 'm1' }),
     ev('task.created', { teamId: 'alpha', taskId: 'k1', task: taskInput({ deps: [] }) }),
     ev('task.created', { teamId: 'alpha', taskId: 'k2', task: taskInput({ deps: ['k1'] }) }),
     ev('task.participate', { teamId: 'alpha', taskId: 'k1', participantTeamId: 'beta', role: 'coop' }),
@@ -188,7 +188,7 @@ test('t43-9: 项目聚合——跨团队任务带参与团队、计数、角色�
   const beta = foldEvents('beta', [
     ev('rules.version.adopted', { version: 1 }),
     ev('team.created', { teamId: 'beta', name: '接口评审', goal: 'g' }),
-    ev('member.spawned', { teamId: 'beta', memberId: 'm1', roleId: 'implementer', instanceName: 'impl-2', sessionId: 's2', status: 'ok' }),
+    ev('member.spawned', { teamId: 'beta', memberId: 'm1', roleId: 'implementer', instanceName: 'impl-2', sessionId: 's2', status: 'ok', parentMemberId: null, depth: 0, rootMemberId: 'm1' }),
   ])
   const cols = { backlog: ['backlog', 'ready'], doing: ['in_progress'], done: ['done'] }
   const boardA = buildBoardView({ projectionSnapshot: alpha }, cols, ['backlog', 'doing', 'done'])

@@ -70,7 +70,7 @@ test('T7: claim enforces role match + ready state (scenes 2/5)', () => {
   // spawn 后 role 不匹配的成员拒绝
   const { rolePaths } = { rolePaths: { projectRolesDir: join(dirname(service.ledgerPath), '..', '..', '..', '..') } }
   void rolePaths
-  const spawnOk = service.commit({ actor: 'lead', type: 'member.spawned', payload: { teamId: 't1', memberId: 'm1', roleId: 'implementer', sessionId: 's1', status: 'ok', instanceName: 'impl-1' } })
+  const spawnOk = service.commit({ actor: 'lead', type: 'member.spawned', payload: { teamId: 't1', memberId: 'm1', roleId: 'implementer', sessionId: 's1', status: 'ok', instanceName: 'impl-1', parentMemberId: null, depth: 0, rootMemberId: 'm1' } })
   assert.equal(spawnOk.ok, true)
   const claimed = service.commit({ actor: 'm1', type: 'task.claimed', payload: { teamId: 't1', taskId: 'k1', memberId: 'm1', attemptId: 'a1' } })
   assert.equal(claimed.ok, true, JSON.stringify(claimed))
@@ -86,7 +86,7 @@ test('T7: stale attemptId rejected; done without evidence rejected (scenes 3/8)'
   bootstrapTeam(service)
   service.commit({ actor: 'lead', type: 'team.created', payload: { teamId: 't1', name: 'n', goal: 'g', roster: [{ roleId: 'captain' }, { roleId: 'implementer' }] } })
   service.commit({ actor: 'lead', type: 'task.created', payload: { teamId: 't1', taskId: 'k1', task: taskInput() } })
-  service.commit({ actor: 'lead', type: 'member.spawned', payload: { teamId: 't1', memberId: 'm1', roleId: 'implementer', sessionId: 's1', status: 'ok', instanceName: 'impl-1' } })
+  service.commit({ actor: 'lead', type: 'member.spawned', payload: { teamId: 't1', memberId: 'm1', roleId: 'implementer', sessionId: 's1', status: 'ok', instanceName: 'impl-1', parentMemberId: null, depth: 0, rootMemberId: 'm1' } })
   service.commit({ actor: 'm1', type: 'task.claimed', payload: { teamId: 't1', taskId: 'k1', memberId: 'm1', attemptId: 'a1' } })
   // 陈旧 attemptId（FR-4.3）
   const stale = service.commit({ actor: 'm1', type: 'task.progress', payload: { teamId: 't1', taskId: 'k1', attemptId: 'a0', progress: 'half' } })
@@ -108,7 +108,7 @@ test('T7: escalate immediately revokes attempt and moves to re-scoping (scene 17
   bootstrapTeam(service)
   service.commit({ actor: 'lead', type: 'team.created', payload: { teamId: 't1', name: 'n', goal: 'g', roster: [{ roleId: 'captain' }, { roleId: 'implementer' }] } })
   service.commit({ actor: 'lead', type: 'task.created', payload: { teamId: 't1', taskId: 'k1', task: taskInput() } })
-  service.commit({ actor: 'lead', type: 'member.spawned', payload: { teamId: 't1', memberId: 'm1', roleId: 'implementer', sessionId: 's1', status: 'ok', instanceName: 'impl-1' } })
+  service.commit({ actor: 'lead', type: 'member.spawned', payload: { teamId: 't1', memberId: 'm1', roleId: 'implementer', sessionId: 's1', status: 'ok', instanceName: 'impl-1', parentMemberId: null, depth: 0, rootMemberId: 'm1' } })
   service.commit({ actor: 'm1', type: 'task.claimed', payload: { teamId: 't1', taskId: 'k1', memberId: 'm1', attemptId: 'a1' } })
   // 无 evidence 的 escalate 拒绝
   const noEv = service.commit({ actor: 'm1', type: 'task.escalated', payload: { teamId: 't1', taskId: 'k1', attemptId: 'a1', reason: 'r' } })
@@ -134,15 +134,15 @@ test('T7: member spawn enforces maxMembers + project-library role resolution', (
   bootstrapTeam(service)
   service.commit({ actor: 'lead', type: 'team.created', payload: { teamId: 't1', name: 'n', goal: 'g', roster: [{ roleId: 'captain' }, { roleId: 'implementer' }] } })
   // 项目库没有的角色拒绝
-  const noRole = service.commit({ actor: 'lead', type: 'member.spawned', payload: { teamId: 't1', memberId: 'mx', roleId: 'ghost', sessionId: 's', status: 'ok', instanceName: 'g' } })
+  const noRole = service.commit({ actor: 'lead', type: 'member.spawned', payload: { teamId: 't1', memberId: 'mx', roleId: 'ghost', sessionId: 's', status: 'ok', instanceName: 'g', parentMemberId: null, depth: 0, rootMemberId: 'mx' } })
   assert.equal(noRole.ok, false)
   assert.ok((noRole as { message: string }).message.includes('project library'))
   // 达上限拒绝（默认 maxMembers=6）
   for (let i = 1; i <= 6; i++) {
-    const r = service.commit({ actor: 'lead', type: 'member.spawned', payload: { teamId: 't1', memberId: `m${i}`, roleId: 'implementer', sessionId: `s${i}`, status: 'ok', instanceName: `i${i}` } })
+    const r = service.commit({ actor: 'lead', type: 'member.spawned', payload: { teamId: 't1', memberId: `m${i}`, roleId: 'implementer', sessionId: `s${i}`, status: 'ok', instanceName: `i${i}`, parentMemberId: null, depth: 0, rootMemberId: `m${i}` } })
     assert.equal(r.ok, true, `spawn ${i} failed: ${JSON.stringify(r)}`)
   }
-  const over = service.commit({ actor: 'lead', type: 'member.spawned', payload: { teamId: 't1', memberId: 'm7', roleId: 'implementer', sessionId: 's7', status: 'ok', instanceName: 'i7' } })
+  const over = service.commit({ actor: 'lead', type: 'member.spawned', payload: { teamId: 't1', memberId: 'm7', roleId: 'implementer', sessionId: 's7', status: 'ok', instanceName: 'i7', parentMemberId: null, depth: 0, rootMemberId: 'm7' } })
   assert.equal(over.ok, false)
   assert.equal((over as { code: string }).code, 'MT_MEMBER_LIMIT')
 })

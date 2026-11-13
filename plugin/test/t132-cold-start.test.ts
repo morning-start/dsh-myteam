@@ -118,7 +118,7 @@ function seedTeam(host: MyTeamHost, teamName: string) {
   assert.equal(svc.commit({
     actor: 'host',
     type: 'member.spawned',
-    payload: { teamId, memberId: 'm-failed', roleId: 'implementer', instanceName: 'failed', sessionId: 'mt-failed-1', status: 'failed' },
+    payload: { teamId, memberId: 'm-failed', roleId: 'implementer', instanceName: 'failed', sessionId: 'mt-failed-1', status: 'failed', parentMemberId: null, depth: 0, rootMemberId: 'm-failed' },
   }).ok, true)
   const proj = svc.projectionSnapshot
   const sessionOf = (memberId: string) => String(proj.members[memberId].sessionId ?? '')

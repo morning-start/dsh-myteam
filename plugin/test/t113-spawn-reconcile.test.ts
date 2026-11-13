@@ -255,7 +255,7 @@ test('t113-5: 同 memberId 重试（failed → provisioning → active）——�
     assert.equal(failed.status, 'error')
     // 重试：对同一个 memberId 再走一遍 provisioning → active（对账 / 重试的写入形状）
     const svc = host.service(teamId)
-    const retryPayload = { teamId, memberId, roleId: 'implementer', instanceName: 'retry', sessionId: String(failed.sessionId ?? 'retry-session') }
+    const retryPayload = { teamId, memberId, roleId: 'implementer', instanceName: 'retry', sessionId: String(failed.sessionId ?? 'retry-session'), parentMemberId: null, depth: 0, rootMemberId: memberId }
     assert.equal(svc.commit({ actor: 'host', type: 'member.spawned', payload: { ...retryPayload, status: 'provisioning' } }).ok, true)
     assert.equal(svc.commit({ actor: 'host', type: 'member.spawned', payload: { ...retryPayload, status: 'active' } }).ok, true)
 
@@ -283,7 +283,7 @@ test('t113-6: 启动对账 —— 崩溃残留的 provisioning 成员三条件�
     assert.equal(svc.commit({
       actor: 'lead',
       type: 'member.spawned',
-      payload: { teamId, memberId: 'm-crash', roleId: 'implementer', instanceName: 'crash', sessionId: 'sess-crash', status: 'provisioning' },
+      payload: { teamId, memberId: 'm-crash', roleId: 'implementer', instanceName: 'crash', sessionId: 'sess-crash', status: 'provisioning', parentMemberId: null, depth: 0, rootMemberId: 'm-crash' },
     }).ok, true)
 
     // 冷启动：agents.get 拿得到会话 + 会话里已有 user 消息（初始 prompt 已接受）→ 三条件全真
@@ -322,7 +322,7 @@ test('t113-6b: 启动对账 —— 探针判死 → failed + reason；坏团队�
     assert.equal(first.service(teamId).commit({
       actor: 'lead',
       type: 'member.spawned',
-      payload: { teamId, memberId: 'm-dead', roleId: 'implementer', instanceName: 'dead', sessionId: 'sess-dead', status: 'provisioning' },
+      payload: { teamId, memberId: 'm-dead', roleId: 'implementer', instanceName: 'dead', sessionId: 'sess-dead', status: 'provisioning', parentMemberId: null, depth: 0, rootMemberId: 'm-dead' },
     }).ok, true)
 
     const logs: LogEntry[] = []
@@ -363,7 +363,7 @@ test('t113-7: 相位更新不吃 maxMembers 配额 —— 第 N 名成员能 set
 
     for (let i = 0; i < limit; i += 1) {
       const memberId = `m-cap-${i}`
-      const payload = { teamId, memberId, roleId: 'implementer', instanceName: `cap-${i}`, sessionId: `sess-cap-${i}` }
+      const payload = { teamId, memberId, roleId: 'implementer', instanceName: `cap-${i}`, sessionId: `sess-cap-${i}`, parentMemberId: null, depth: 0, rootMemberId: memberId }
       assert.equal(svc.commit({ actor: 'lead', type: 'member.spawned', payload: { ...payload, status: 'provisioning' } }).ok, true)
       const settled = svc.commit({ actor: 'lead', type: 'member.spawned', payload: { ...payload, status: 'active' } })
       assert.equal(settled.ok, true, `第 ${i + 1} 名成员的 settle 不得被 maxMembers 误拒`)
@@ -372,7 +372,7 @@ test('t113-7: 相位更新不吃 maxMembers 配额 —— 第 N 名成员能 set
     const rejected = svc.commit({
       actor: 'lead',
       type: 'member.spawned',
-      payload: { teamId, memberId: 'm-over', roleId: 'implementer', instanceName: 'over', sessionId: 'sess-over', status: 'provisioning' },
+      payload: { teamId, memberId: 'm-over', roleId: 'implementer', instanceName: 'over', sessionId: 'sess-over', status: 'provisioning', parentMemberId: null, depth: 0, rootMemberId: 'm-over' },
     })
     assert.equal(rejected.ok, false)
     assert.equal(rejected.code, 'MT_MEMBER_LIMIT')

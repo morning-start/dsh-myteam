@@ -191,7 +191,7 @@ test('t78-8: drained.pending 如实记录 —— 成员收件箱有未消费消�
 function gatePrefix(gateChain: string[]) {
   return [
     { seq: 0, ts: 1, actor: 'human', type: 'team.created', payload: { teamId: 't1', name: 'T', goal: 'G' } },
-    { seq: 1, ts: 2, actor: 'lead', type: 'member.spawned', payload: { teamId: 't1', memberId: 'm1', roleId: 'implementer', sessionId: 's1', status: 'idle' } },
+    { seq: 1, ts: 2, actor: 'lead', type: 'member.spawned', payload: { teamId: 't1', memberId: 'm1', roleId: 'implementer', sessionId: 's1', status: 'idle', parentMemberId: null, depth: 0, rootMemberId: 'm1' } },
     { seq: 2, ts: 3, actor: 'lead', type: 'task.created', payload: { teamId: 't1', taskId: 'task-1', task: {
       title: 'x', description: 'd', acceptanceCriteria: ['AC'], deliverableSpec: { path: 'p' },
       deps: [], requiredRole: 'implementer', priority: 'P2', gateChain,

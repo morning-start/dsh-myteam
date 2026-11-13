@@ -3,7 +3,9 @@
  *
  * 判据分五段：
  *  ① 纯函数（深度 / 直接子 / 级联顺序 / 两个拒绝码）——深度、子数、顺序三条规则必须能脱离宿主单测；
- *  ② **旧账本可读**（t139-9）：`member.spawned` 只有原来 5 个字段时，投影默认成「一级成员」；
+ *  ② **旧账本一次性迁移**（t139-9/12/13/14）：`member.spawned` 只有原来 5 个字段时，**打开即迁移**
+ *     （补成「队长直接召唤的一级成员」并原子重写）；迁移幂等、失败大声且原账本零改动、
+ *     缺字段的写入被当场拒绝。fold 不再有第二套默认值（CHG-187b）；
  *  ③ **旧团队配置可读**（t139-10）：`team.config.json` 里已有的 `memberMaxDepth: 0` 保持 0；
  *  ④ 宿主写路径（t139-6/7/8）走**真实入口**（`executeLeadTool`），不用 `host.commit` 桩——
  *     接线断链正是「单测绕过入口」时最容易被漏掉的那类缺陷；
@@ -11,12 +13,15 @@
  */
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import { mkdtempSync, readFileSync, rmSync } from 'node:fs'
+import { mkdtempSync, readFileSync, rmSync, statSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { depthOf, childrenOf, cascadeOrder, assertSpawnAllowed } from '../src/core/members/hierarchy.ts'
+import { openLedger } from '../src/core/ledger/ledger.ts'
+import { migrateLedgerIfNeeded } from '../src/core/ledger/migrate.ts'
 import { foldEvents } from '../src/core/scheduler/fold.ts'
 import { DEFAULT_CONFIG, PATCH_CEILINGS, loadEffectiveConfig } from '../src/core/config/team-config.ts'
+import { copyToProject } from '../src/core/roles/role-store.ts'
 import { MyTeamHost, type HostRuntime } from '../src/host.ts'
 
 const m = (id: string, parent: string | null, depth: number) => ({
@@ -51,22 +56,137 @@ test('t139-5: 子数超限拒绝，错误码 MT_CHILDREN_LIMIT', () => {
   assert.equal((err as { code?: string }).code, 'MT_CHILDREN_LIMIT')
 })
 
-/* ── ② 旧账本可读（向后兼容：默认保守，不许让老项目崩）────────────── */
+/* ── ② 旧账本：打开即一次性迁移（CHG-187b：fold 不再猜默认）─────────── */
 
-test('t139-9: 旧载荷（只有原来 5 个字段）→ 投影默认成一级成员，不崩', () => {
-  // 老账本里的成员就是「队长直接召唤的一级成员」——这是唯一诚实的解释（不是猜）。
-  // 默认成 undefined 会让名册/面板的 parentMemberId 比较出现 undefined 分支。
-  const events = [
+/** 旧账本：`member.spawned` 只有原来 5 个字段（CHG-187 之前的写入形状） */
+function legacySpawnEvents() {
+  return [
     { seq: 1, ts: 1, actor: 'lead', type: 'member.spawned', payload: { teamId: 't1', memberId: 'm1', roleId: 'implementer', sessionId: 's1', status: 'active' } },
     { seq: 2, ts: 2, actor: 'lead', type: 'member.spawned', payload: { teamId: 't1', memberId: 'm2', roleId: 'implementer', sessionId: 's2', status: 'active' } },
-  ] as never
-  const proj = foldEvents('t1', events)
-  for (const id of ['m1', 'm2']) {
-    assert.equal(proj.members[id].parentMemberId, null, `${id} 的父成员必须是 null（一级成员）`)
-    assert.equal(proj.members[id].depth, 0, `${id} 的深度必须是 0`)
-    assert.equal(proj.members[id].rootMemberId, id, `${id} 的树根必须是它自己`)
+  ]
+}
+
+/** 老格式账本落盘（测试专用：生产写盘一律走 atomic-write） */
+function legacyLedgerFile(prefix: string): { ledgerPath: string; cleanup: () => void } {
+  const dir = mkdtempSync(join(tmpdir(), `${prefix}-`))
+  const ledgerPath = join(dir, 'ledger.jsonl')
+  writeFileSync(ledgerPath, `${legacySpawnEvents().map((event) => JSON.stringify(event)).join('\n')}\n`, 'utf8')
+  return { ledgerPath, cleanup: () => rmSync(dir, { recursive: true, force: true }) }
+}
+
+function eventsOf(ledgerPath: string): any[] {
+  return readFileSync(ledgerPath, 'utf8').split('\n').filter((line) => line.trim().length > 0).map((line) => JSON.parse(line))
+}
+
+test('t139-9: 旧账本（只有原来 5 个字段）→ 打开触发迁移，三字段显式落盘，投影与新版一致', () => {
+  const { ledgerPath, cleanup } = legacyLedgerFile('myteam-t139-legacy')
+  try {
+    // 前置：旧载荷确实缺三字段（否则这条用例证明不了任何事）
+    const before = readFileSync(ledgerPath, 'utf8')
+    assert.ok(!before.includes('parentMemberId'), `前置失败：旧账本不该已经带三字段：${before}`)
+
+    // 统一入口：打开即迁移（不在 fold 里猜默认值）
+    const opened = openLedger(ledgerPath)
+    assert.equal(opened.migrated, true, '打开旧账本必须触发一次性迁移')
+
+    // 迁移后：三字段**显式**存在于每一条 member.spawned（不是读时补的）
+    for (const event of eventsOf(ledgerPath)) {
+      assert.equal(event.type, 'member.spawned')
+      assert.equal(event.payload.parentMemberId, null, '旧账本里的成员 = 队长直接召唤的一级成员')
+      assert.equal(event.payload.depth, 0, '一级成员深度 0')
+      assert.equal(event.payload.rootMemberId, event.payload.memberId, '根成员的树根是它自己')
+    }
+
+    // 投影与「新账本显式带三字段」逐字段一致——迁移是把默认值写成**事实**，不是另一套语义
+    const projected = foldEvents('t1', opened.events)
+    const fresh = foldEvents('t1', [
+      { seq: 1, ts: 1, actor: 'lead', type: 'member.spawned', payload: { teamId: 't1', memberId: 'm1', roleId: 'implementer', sessionId: 's1', status: 'active', parentMemberId: null, depth: 0, rootMemberId: 'm1' } },
+      { seq: 2, ts: 2, actor: 'lead', type: 'member.spawned', payload: { teamId: 't1', memberId: 'm2', roleId: 'implementer', sessionId: 's2', status: 'active', parentMemberId: null, depth: 0, rootMemberId: 'm2' } },
+    ] as never)
+    assert.deepEqual(projected.members, fresh.members, '迁移后的投影必须与新账本完全一致')
+    assert.deepEqual(childrenOf([projected.members.m1, projected.members.m2], 'm1'), [], '旧账本不得凭空长出父子边')
+  } finally {
+    cleanup()
   }
-  assert.deepEqual(childrenOf([proj.members.m1, proj.members.m2], 'm1'), [], '旧账本不得凭空长出父子边')
+})
+
+test('t139-12: 迁移幂等——同一账本迁移两次，第二次不重写（字节与 mtime 都不动）', async () => {
+  const { ledgerPath, cleanup } = legacyLedgerFile('myteam-t139-idempotent')
+  try {
+    const first = migrateLedgerIfNeeded(ledgerPath)
+    assert.equal(first.migrated, true)
+    assert.equal(first.rewritten, 2, '两条 member.spawned 各补一次')
+    const bytes = readFileSync(ledgerPath, 'utf8')
+    const mtime = statSync(ledgerPath).mtimeMs
+
+    // 留出 mtime 分辨率：真重写必然可见，no-op 必须一动不动
+    await new Promise((resolve) => setTimeout(resolve, 20))
+    const second = migrateLedgerIfNeeded(ledgerPath)
+    assert.equal(second.migrated, false, '第二次必须是 no-op（不重写）')
+    assert.equal(second.rewritten, 0)
+    assert.equal(readFileSync(ledgerPath, 'utf8'), bytes, '字节必须逐字一致')
+    assert.equal(statSync(ledgerPath).mtimeMs, mtime, 'mtime 必须一致（no-op = 文件原样未动）')
+    // 打开入口同样幂等（openLedger 内联调迁移，不该产生第二次写）
+    assert.equal(openLedger(ledgerPath).migrated, false)
+  } finally {
+    cleanup()
+  }
+})
+
+test('t139-13: 迁移写盘失败大声 —— 抛 MT_SCHEMA_MIGRATION_FAILED，原账本一个字节没变', () => {
+  const { ledgerPath, cleanup } = legacyLedgerFile('myteam-t139-fail')
+  try {
+    const before = readFileSync(ledgerPath, 'utf8')
+    const err = (() => {
+      try {
+        // 注入写盘失败：真实磁盘故障（磁盘满 / 只读）在 CI 上不可移植，而「零改动」是
+        // **真实文件**的字节快照断言——这条性质来自 writeTextAtomic 的整份替换语义
+        migrateLedgerIfNeeded(ledgerPath, () => {
+          throw new Error('ENOSPC: no space left on device (injected)')
+        })
+      } catch (e) {
+        return e
+      }
+      return undefined
+    })()
+    assert.equal((err as { code?: string })?.code, 'MT_SCHEMA_MIGRATION_FAILED', '写盘失败必须大声（带稳定码）')
+    assert.match(String((err as Error).message), /ENOSPC/, '原始错误必须出现在消息里（不吞）')
+    assert.match(String((err as Error).message), /原账本未被修改/, '消息必须说清「没写坏」')
+
+    // 原账本零改动：字节逐字相同（没有半本账），旧载荷仍在
+    assert.equal(readFileSync(ledgerPath, 'utf8'), before, '写盘失败后原账本必须一个字节都没变')
+    assert.ok(!readFileSync(ledgerPath, 'utf8').includes('parentMemberId'), '失败不得留下半截迁移结果')
+
+    // 可重试：换回真实写盘口重跑，迁移仍然完成（失败不把账本变成一次性的）
+    assert.equal(migrateLedgerIfNeeded(ledgerPath).migrated, true)
+  } finally {
+    cleanup()
+  }
+})
+
+test('t139-14: member.spawned 缺 depth → 写入端当场拒绝（MT_LEDGER_MISSING_FIELD），账本零写入', () => {
+  const { root, cleanup } = tempWorkspace('myteam-t139-required')
+  try {
+    const { host, teamId } = approvedTeam(root)
+    // 领域校验只认项目库：先把 captain 复制进项目库（否则先被 MT_VALIDATION 拦下，测不到载荷校验）
+    copyToProject({ projectRolesDir: join(root, '.dsh-myteam', 'config', 'roles') }, 'captain', 'builtin')
+    const svc = host.service(teamId)
+    const ledgerPath = join(root, '.dsh-myteam', 'tasks', teamId, 'ledger.jsonl')
+    const before = readFileSync(ledgerPath, 'utf8')
+
+    const rejected = svc.commit({
+      actor: 'lead',
+      type: 'member.spawned',
+      // 故意缺 depth（CHG-187 之前的「只关心成员身份」写法）——必填后不许静默写入
+      payload: { teamId, memberId: 'm-legacy', roleId: 'captain', sessionId: 's-legacy', status: 'active', parentMemberId: null, rootMemberId: 'm-legacy' },
+    })
+    assert.equal(rejected.ok, false, '缺 depth 不得静默写入')
+    assert.equal((rejected as { code?: string }).code, 'MT_LEDGER_MISSING_FIELD')
+    assert.match(String((rejected as { message?: string }).message), /member\.spawned missing payload\.depth/)
+    assert.equal(readFileSync(ledgerPath, 'utf8'), before, '被拒事件不得落账本（账本零写入）')
+  } finally {
+    cleanup()
+  }
 })
 
 /* ── ③ 旧团队配置可读（默认值只对新建团队生效）───────────────────── */

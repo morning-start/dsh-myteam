@@ -24,7 +24,7 @@ test('T3 fold: full happy path — create → claim → evidence → complete �
     ev('team.created', { teamId: 't1', name: 'n', goal: 'g' }),
     ev('rules.version.adopted', { version: 1 }),
     ev('plan.approved', { teamId: 't1', planId: 'p1' }),
-    ev('member.spawned', { teamId: 't1', memberId: 'm1', roleId: 'dev', sessionId: 's1', status: 'ok' }),
+    ev('member.spawned', { teamId: 't1', memberId: 'm1', roleId: 'dev', sessionId: 's1', status: 'ok', parentMemberId: null, depth: 0, rootMemberId: 'm1' }),
     ev('task.created', { teamId: 't1', taskId: 'k1', task: taskInput() }),
     // backlog → ready 由调度层推导（deps 全 done）——fold 不承载，工具层创建后直接 ready 的场景：
     ev('task.claimed', { teamId: 't1', taskId: 'k1', memberId: 'm1', attemptId: 'a1' }),
@@ -50,7 +50,7 @@ test('T3 fold: escalate → re-scoping with attempt revoked + inbox entry (FR-11
   seq = 0
   const events = [
     ev('rules.version.adopted', { version: 1 }),
-    ev('member.spawned', { teamId: 't1', memberId: 'm1', roleId: 'dev', sessionId: 's1', status: 'ok' }),
+    ev('member.spawned', { teamId: 't1', memberId: 'm1', roleId: 'dev', sessionId: 's1', status: 'ok', parentMemberId: null, depth: 0, rootMemberId: 'm1' }),
     ev('task.created', { teamId: 't1', taskId: 'k1', task: taskInput() }),
     ev('task.claimed', { teamId: 't1', taskId: 'k1', memberId: 'm1', attemptId: 'a1' }),
     ev('task.escalated', { teamId: 't1', taskId: 'k1', attemptId: 'a1', reason: 'too hard', count: 1 }),
