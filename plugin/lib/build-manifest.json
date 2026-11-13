@@ -1,10 +1,10 @@
 {
   "schema": 1,
-  "builtAt": "2026-11-13T16:42:40.096Z",
+  "builtAt": "2026-11-13T16:52:08.223Z",
   "node": "v22.23.2",
   "entry": "./lib/host.mjs",
-  "modules": 66,
-  "sourceHash": "652563f2df1815e3a89e4b7d6f8ecc3a48c8d4ed98a4538f8b4caffd026355bf",
+  "modules": 67,
+  "sourceHash": "edf04a44bf72f36e63933a367b9fef93961f2f2a993821768a824b6020860ea4",
   "clientFile": "client/client.js",
   "clientHash": "7b983cd78f4220f2c2c4e1218af2492fb0cff74d6037e1b8965fe08ae9cfdc5a",
   "files": [
@@ -27,6 +27,7 @@
     "core/host/session-handoff.ts",
     "core/host/team-charter.ts",
     "core/index/offline-view.ts",
+    "core/index/project-board-index.ts",
     "core/index/team-index.ts",
     "core/index/views.ts",
     "core/knowledge/evidence-pointer.ts",

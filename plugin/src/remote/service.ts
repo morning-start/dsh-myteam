@@ -17,6 +17,8 @@ import { readFileSync as _readFileSync } from 'node:fs'
  * 为 `TeamService`，所以这里不再依赖 `ReturnType<MyTeamHost['service']>` 反推。 */
 import type { MyTeamHostContract } from '../core/host/contract.ts'
 import type { TeamService } from '../core/service.ts'
+/* CHG-188（T156）：全项目看板走派生索引 `state/index/tasks.json`（坏索引自动降级实时折叠） */
+import { readProjectBoardIndex } from '../core/index/project-board-index.ts'
 
 const readFs = () => ({ readFileSync: _readFileSync })
 
@@ -57,12 +59,24 @@ export class MyTeamRemote extends TypertRemoteService {
 
   /* ── 读（ADR-006：只读投影/侧车，绝不进模型上下文）── */
 
-  /** 活跃团队信息卡 + 看板（FR-14.4/9.2） */
+  /**
+   * 活跃团队信息卡 + 看板（FR-14.4/9.2）。
+   *
+   * CHG-188（T156）：**省略 teamId = 全项目看板**，走 `state/index/tasks.json` 派生索引
+   * （放在 `project` 字段；`teamId` / `board` / `config` 三个旧字段保持不变，客户端
+   * 会话视图不用改）。单团队（带 teamId）仍是实时折叠 —— 本来就只折一个账本，没有
+   * 索引化的必要，也避免多一层「索引过期」判定。
+   *
+   * 降级在 `readProjectBoardIndex` 内部完成（坏 JSON / `schema` 不符 / 账本比索引新
+   * 都回落实时折叠），所以这里不包 try/catch，也**不会**因为索引坏了返回空看板。
+   */
   async getBoard(args: { teamId?: string }) {
     const { teamId, service } = this.resolveTeam(args?.teamId)
     const svc = this.host.service(teamId)
     const board = buildBoard(service, svc.effectiveConfig.board.columnMapping, svc.effectiveConfig.board.columns)
-    return { teamId, board, config: this.boardConfig(teamId) }
+    const config = this.boardConfig(teamId)
+    if (args?.teamId) return { teamId, board, config }
+    return { teamId, board, config, project: await readProjectBoardIndex(this.host.workspaceRoot) }
   }
 
   /** 任务详情：时间线 + 证据块 + 沟通区（FR-8.1/12.2） */
