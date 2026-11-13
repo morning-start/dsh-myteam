@@ -89,7 +89,7 @@
     "limits": {
       "type": "object",
       "additionalProperties": false,
-      "description": "规模上限。maxMembers / memberMaxDepth 是 patch 硬上限：config 超过即钳制并告警（更严格者胜，R12）。",
+      "description": "规模上限。maxMembers / memberMaxDepth / maxChildren 是 patch 硬上限：config 超过即钳制并告警（更严格者胜，R12）。",
       "properties": {
         "maxMembers": {
           "type": "integer",
@@ -101,9 +101,16 @@
         "memberMaxDepth": {
           "type": "integer",
           "minimum": 0,
-          "maximum": 0,
-          "default": 0,
-          "description": "成员再派成员的深度（硬上限 0：成员不得嵌套委派，ADR-010）"
+          "maximum": 2,
+          "default": 1,
+          "description": "成员派生深度（FR-32 / CHG-187：默认 1 = 允许一层子成员，硬上限 2；老团队配置里已有的 0 原样保留）"
+        },
+        "maxChildren": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 5,
+          "default": 3,
+          "description": "单个成员最多直接子成员数（FR-32 / CHG-187：默认 3，硬上限 5）"
         },
         "maxTasks": { "type": "integer", "minimum": 1, "default": 20 }
       }

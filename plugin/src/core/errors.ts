@@ -99,6 +99,10 @@ export const MT_CODES = [
   'MT_SCOPE_PROJECT_ONLY',
 
   // ── 名册 ────────────────────────────────────────────────────
+  /* CHG-187（FR-32 支柱一）：成员派生树的三个拒绝码。规则在 `core/members/hierarchy.ts`。 */
+  'MT_DEPTH_EXCEEDED',
+  'MT_CHILDREN_LIMIT',
+  'MT_HAS_CHILDREN',
   'MT_ROSTER_DUAL_CAPTAIN',
   'MT_ROSTER_EMPTY',
   'MT_ROSTER_NO_CAPTAIN',
@@ -220,6 +224,12 @@ export const MT_CODE_DOCS: Record<MtCode, string> = {
   MT_SCOPE_PROJECT_ONLY: '该内容只能存在于项目级（任务账本 / 历史 / 状态 / 导出 / 成员实例）；全局只有角色 / 团队 / 技能 / 工具 / 知识。',
 
   // 名册
+  MT_DEPTH_EXCEEDED:
+    '成员派生深度超限：`myteam_spawn_member` 带 `parentMemberId` 时，父成员深度 +1 超过 `limits.memberMaxDepth`（硬上限 2）。**账本零写入**——被拒的派生不留 provisioning 残留。',
+  MT_CHILDREN_LIMIT:
+    '单个成员的子成员数已达 `limits.maxChildren`（硬上限 5），再派生被拒。先释放一个子成员，或调大团队配置里的 `limits.maxChildren`。',
+  MT_HAS_CHILDREN:
+    '释放的成员还有子成员（FR-32 排空纪律）：不传 `cascade:true` 时**账本零写入**——否则子成员会变成没有父的孤儿。传 `cascade:true` 按倒序（叶子先、父最后）级联释放。',
   MT_ROSTER_DUAL_CAPTAIN: '名册里有多个队长。',
   MT_ROSTER_EMPTY: '名册为空（FR-10.2）。',
   MT_ROSTER_NO_CAPTAIN: '名册里没有队长（FR-10.2）。',
@@ -261,4 +271,28 @@ export const MT_CODE_DOCS: Record<MtCode, string> = {
 /** 运行时守卫：外部字符串进系统前过一遍，把「拼错的码」挡在边界上。 */
 export function isMtCode(value: unknown): value is MtCode {
   return typeof value === 'string' && (MT_CODES as readonly string[]).includes(value)
+}
+
+/**
+ * 带**稳定错误码**的领域异常（CHG-187）。
+ *
+ * 为什么需要：`core/**` 是纯领域层，不能返回工具面的 `{status:'error'}` 结果（那是上层口径），
+ * 又必须让调用方拿到**机器可判**的码——解析中文消息分支是比没码更糟的假契约。
+ * 抛 `MTError` 是最小的面：`code` 由 `MtCode` 收窄，拼错在编译期就红。
+ *
+ * 边界：**只在 core 纯函数里抛**。宿主侧（`host.ts` / `host/members.ts`）负责把它翻译成
+ * `{status:'error', code, message}`，因为 `executeLeadTool` 的兜底 catch 会把任何异常压成
+ * `MT_INTERNAL`——码就丢了。
+ */
+export class MTError extends Error {
+  readonly code: MtCode
+  /** 出问题的字段名（与工具面的 `field` 槽同一含义，可省） */
+  readonly field?: string
+
+  constructor(code: MtCode, message: string, field?: string) {
+    super(message)
+    this.name = 'MTError'
+    this.code = code
+    if (field !== undefined) this.field = field
+  }
 }

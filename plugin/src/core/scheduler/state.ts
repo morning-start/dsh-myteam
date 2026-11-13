@@ -313,6 +313,14 @@ export interface MemberProjection {
   /** CHG-54：成员级技能/MCP 覆写（来自 member.spawned；空 = 继承角色） */
   skills?: string[]
   mcpAllowlist?: string[]
+  /**
+   * CHG-187（FR-32 支柱一）：派生树。
+   * `null` = 队长直接召唤的一级成员；`depth` 从 0 起；`rootMemberId` = 这棵树的根（根成员是它自己）。
+   * 旧账本没有这三个字段 → `fold.ts` 默认成「一级成员」，**不能是 undefined**（名册会崩）。
+   */
+  parentMemberId: string | null
+  depth: number
+  rootMemberId: string
 }
 
 export interface TeamProjection {

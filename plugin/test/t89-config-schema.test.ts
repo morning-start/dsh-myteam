@@ -144,7 +144,8 @@ test('t89-3: 最小校验器 —— DEFAULT_CONFIG 合法、坏样例被拒、�
     [{ views: { tabs: ['board', 'bogus'] } }, '不在枚举'],
     [{ views: { tabs: ['board', 'board'] } }, '重复项'],
     [{ limits: { maxMembers: 7 } }, '大于 maximum 6'],
-    [{ limits: { memberMaxDepth: 1 } }, '大于 maximum 0'],
+    [{ limits: { memberMaxDepth: 3 } }, '大于 maximum 2'],
+    [{ limits: { maxChildren: 6 } }, '大于 maximum 5'],
     [{ gates: { enabled: 'yes' } }, '期望 boolean'],
     [{ taskTypes: { dev: { gateChain: ['bogus'] } } }, '不在枚举'],
     [{ clarify: { maxRounds: -1 } }, '小于 minimum 0'],
@@ -159,8 +160,11 @@ test('t89-4: PATCH_CEILINGS 与 schema 的硬上限一致（更严格者胜的�
   const limits = schema.properties.limits.properties
   assert.equal(limits.maxMembers.maximum, PATCH_CEILINGS['limits.maxMembers'])
   assert.equal(limits.memberMaxDepth.maximum, PATCH_CEILINGS['limits.memberMaxDepth'])
+  assert.equal(limits.maxChildren.maximum, PATCH_CEILINGS['limits.maxChildren'])
   assert.equal(PATCH_CEILINGS['limits.maxMembers'], 6)
-  assert.equal(PATCH_CEILINGS['limits.memberMaxDepth'], 0)
+  // CHG-187（FR-32 支柱一）：默认允许一层子成员，硬上限 2 层
+  assert.equal(PATCH_CEILINGS['limits.memberMaxDepth'], 2)
+  assert.equal(PATCH_CEILINGS['limits.maxChildren'], 5)
 })
 
 test('t89-5: 角色 / 模板定义的必填字段与文档一致', () => {
@@ -187,7 +191,7 @@ test('t89-6: docs/18 提到每个配置字段 / 角色字段 / 模板字段（�
     pipeline: ['swimlaneBy', 'stages', 'layout'],
     dag: ['showModel', 'collapseGroups', 'direction'],
     views: ['default', 'tabs'],
-    limits: ['maxMembers', 'memberMaxDepth', 'maxTasks'],
+    limits: ['maxMembers', 'memberMaxDepth', 'maxChildren', 'maxTasks'],
     gates: ['enabled', 'commandTimeoutMs'],
     clarify: ['maxRounds'],
     memory: ['evidenceRequired'],

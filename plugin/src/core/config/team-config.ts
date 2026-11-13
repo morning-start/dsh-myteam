@@ -25,7 +25,7 @@ export interface TeamConfig {
   pipeline: { swimlaneBy: 'stage' | 'member' | 'priority'; stages: string[]; layout: 'serpentine' | 'linear' }
   dag: { showModel: boolean; collapseGroups: boolean; direction: 'LR' | 'TB' }
   views: { default: string; tabs: string[] }
-  limits: { maxMembers: number; memberMaxDepth: number; maxTasks: number }
+  limits: { maxMembers: number; memberMaxDepth: number; maxChildren: number; maxTasks: number }
   gates: { enabled: boolean; commandTimeoutMs: number }
   taskTypes: Record<string, { gateChain: string[] }>
   clarify: { maxRounds: number }
@@ -61,7 +61,18 @@ export const DEFAULT_CONFIG: TeamConfig = {
   pipeline: { swimlaneBy: 'stage', stages: ['plan', 'dev', 'gates', 'integrate'], layout: 'serpentine' },
   dag: { showModel: true, collapseGroups: true, direction: 'LR' },
   views: { default: 'board', tabs: ['board', 'swimlane', 'dag', 'roster'] },
-  limits: { maxMembers: 6, memberMaxDepth: 0, maxTasks: 20 },
+  /**
+   * CHG-187（FR-32 支柱一）：派生树配额。
+   *
+   * `memberMaxDepth` 默认 **1** = 允许一层子成员（队长召唤的成员可以再带一个子 Agent）；
+   * `maxChildren` 默认 **3** = 单个成员最多 3 个直接子成员。
+   *
+   * **向后兼容（老团队）**：这两个默认值只对**新建团队**（无 `team.config.json` 或配置里没写
+   * 这两项）生效。已有团队配置里显式写了 `memberMaxDepth: 0` 的，读时**原样保留 0**
+   * （`mergeConfig` 逐子键覆盖，`applyCeilings` 只在超硬上限时钳制）——不重写文件、不改行为。
+   * 证据：`t139-10`（老配置读到 0）。
+   */
+  limits: { maxMembers: 6, memberMaxDepth: 1, maxChildren: 3, maxTasks: 20 },
   gates: { enabled: true, commandTimeoutMs: 120000 },
   taskTypes: {
     default: { gateChain: ['review', 'archive'] },
@@ -79,7 +90,10 @@ export const DEFAULT_CONFIG: TeamConfig = {
 /** patch 层硬上限（升级存活；config 不得超过，冲突取更严格者） */
 export const PATCH_CEILINGS = {
   'limits.maxMembers': 6,
-  'limits.memberMaxDepth': 0,
+  // CHG-187（FR-32）：派生深度硬上限 2（默认 1）——再深就该拆团队，而不是继续套娃
+  'limits.memberMaxDepth': 2,
+  // CHG-187（FR-32）：单成员子数硬上限 5（默认 3）
+  'limits.maxChildren': 5,
 } as const
 
 export interface MergeResult {
@@ -154,6 +168,10 @@ export function applyCeilings(config: TeamConfig, warnings: string[]): TeamConfi
     warnings.push(`limits.memberMaxDepth ${out.limits.memberMaxDepth} exceeds patch ceiling ${PATCH_CEILINGS['limits.memberMaxDepth']}; clamped`)
     out.limits.memberMaxDepth = PATCH_CEILINGS['limits.memberMaxDepth']
   }
+  if (out.limits.maxChildren > PATCH_CEILINGS['limits.maxChildren']) {
+    warnings.push(`limits.maxChildren ${out.limits.maxChildren} exceeds patch ceiling ${PATCH_CEILINGS['limits.maxChildren']}; clamped`)
+    out.limits.maxChildren = PATCH_CEILINGS['limits.maxChildren']
+  }
   return out
 }
 
@@ -189,6 +207,7 @@ export function isStructurallyValidConfig(value: unknown): boolean {
       && (v.tabs === undefined || isStringList(v.tabs)),
     limits: (v) => (v.maxMembers === undefined || isFiniteNumber(v.maxMembers))
       && (v.memberMaxDepth === undefined || isFiniteNumber(v.memberMaxDepth))
+      && (v.maxChildren === undefined || isFiniteNumber(v.maxChildren))
       && (v.maxTasks === undefined || isFiniteNumber(v.maxTasks)),
     gates: (v) => (v.enabled === undefined || typeof v.enabled === 'boolean')
       && (v.commandTimeoutMs === undefined || isFiniteNumber(v.commandTimeoutMs)),

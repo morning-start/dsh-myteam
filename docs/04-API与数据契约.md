@@ -515,7 +515,7 @@ interface HandoffSessionRef {
 
 ## 错误码（`MT_*`）
 
-> **本表由 `tools/gen-error-docs.mjs` 从 `plugin/src/core/errors.ts` 生成，共 82 个。**
+> **本表由 `tools/gen-error-docs.mjs` 从 `plugin/src/core/errors.ts` 生成，共 85 个。**
 > 手改会被覆盖，且 `plugin/test/t81-error-codes.test.ts` 会判红。
 >
 > **加码流程**：① `errors.ts` 加一行（含说明）→ ② `node tools/gen-error-docs.mjs` → ③ `cd plugin && npm test`。
@@ -523,7 +523,7 @@ interface HandoffSessionRef {
 > 客户端按码分支的地方（`plugin/client/client.js`）必须只认本表里的码；
 > 服务端新增码时若客户端要分支，同步改客户端并在 CHG 里记一笔。
 
-### 跨域通用（14）
+### 跨域通用（17）
 
 | 码 | 什么时候会看到它 |
 |---|---|
@@ -540,6 +540,9 @@ interface HandoffSessionRef {
 | `MT_UNKNOWN_METHOD` | 方法名不在宿主方法表里（客户端与服务端版本不一致，或拼错了）。 |
 | `MT_SCOPE_INVALID` | 作用域只接受 `project` \| `global`（缺省 = 项目级）。 |
 | `MT_SCOPE_PROJECT_ONLY` | 该内容只能存在于项目级（任务账本 / 历史 / 状态 / 导出 / 成员实例）；全局只有角色 / 团队 / 技能 / 工具 / 知识。 |
+| `MT_DEPTH_EXCEEDED` | 成员派生深度超限：`myteam_spawn_member` 带 `parentMemberId` 时，父成员深度 +1 超过 `limits.memberMaxDepth`（硬上限 2）。**账本零写入**——被拒的派生不留 provisioning 残留。 |
+| `MT_CHILDREN_LIMIT` | 单个成员的子成员数已达 `limits.maxChildren`（硬上限 5），再派生被拒。先释放一个子成员，或调大团队配置里的 `limits.maxChildren`。 |
+| `MT_HAS_CHILDREN` | 释放的成员还有子成员（FR-32 排空纪律）：不传 `cascade:true` 时**账本零写入**——否则子成员会变成没有父的孤儿。传 `cascade:true` 按倒序（叶子先、父最后）级联释放。 |
 | `MT_HISTORY_FAILED` | 会话考古读取历史页失败（宿主 `SessionController.page` 抛错且没带稳定错误码）；**不返回空历史假装成功**。 |
 
 ### 账本（append-only JSONL）（6）

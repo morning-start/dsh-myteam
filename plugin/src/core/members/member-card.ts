@@ -32,6 +32,10 @@ export interface MemberCard {
   mcpAllowlist?: string[]
   status: 'active' | 'suspended' | 'released'
   currentTaskId?: string
+  /** CHG-187（FR-32 支柱一）：派生树（`null` = 队长直接召唤的一级成员） */
+  parentMemberId?: string | null
+  depth?: number
+  rootMemberId?: string
   createdAt: number
   updatedAt: number
 }
@@ -52,6 +56,16 @@ export function validateMemberCard(card: Partial<MemberCard> | undefined): { ok:
   }
   if (card.skills !== undefined && !Array.isArray(card.skills)) return { ok: false, field: 'skills', reason: 'skills 必须是字符串数组' }
   if (card.mcpAllowlist !== undefined && !Array.isArray(card.mcpAllowlist)) return { ok: false, field: 'mcpAllowlist', reason: 'mcpAllowlist 必须是字符串数组' }
+  // CHG-187：派生树（可选；写了就必须是合法形状——半截的父子边比没有更难查）
+  if (card.parentMemberId !== undefined && card.parentMemberId !== null && String(card.parentMemberId).trim().length === 0) {
+    return { ok: false, field: 'parentMemberId', reason: 'parentMemberId 为空串（一级成员请写 null 或省略）' }
+  }
+  if (card.depth !== undefined && (!Number.isInteger(card.depth) || card.depth < 0)) {
+    return { ok: false, field: 'depth', reason: 'depth 必须是非负整数' }
+  }
+  if (card.rootMemberId !== undefined && String(card.rootMemberId).trim().length === 0) {
+    return { ok: false, field: 'rootMemberId', reason: 'rootMemberId 不能为空串' }
+  }
   return { ok: true }
 }
 

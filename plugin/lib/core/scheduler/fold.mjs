@@ -124,6 +124,10 @@ export function applyEvent(proj                , event             )       {
         sessionId: p.sessionId,
         status: p.status === 'failed' ? 'spawn_failed' : 'active',
         spawnedAt: event.ts,
+        // CHG-187（FR-32）：派生树三字段——旧账本没有它们，缺省 = 「队长直接召唤的一级成员」
+        parentMemberId: typeof p.parentMemberId === 'string' ? p.parentMemberId : null,
+        depth: typeof p.depth === 'number' ? p.depth : 0,
+        rootMemberId: typeof p.rootMemberId === 'string' ? p.rootMemberId : p.memberId,
         ...(Array.isArray(p.skills) ? { skills: p.skills                        } : {}),
         ...(Array.isArray(p.mcpAllowlist) ? { mcpAllowlist: p.mcpAllowlist                        } : {}),
       }

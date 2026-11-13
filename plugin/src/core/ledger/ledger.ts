@@ -89,7 +89,15 @@ const PAYLOAD_REQUIRED: Partial<Record<EventType, string[]>> = {
   'plan.approved': ['teamId', 'planId'],
   'plan.discarded': ['teamId', 'planId'],
   'member.spawned': ['teamId', 'memberId', 'roleId', 'sessionId', 'status'],
-  'member.released': ['teamId', 'memberId', 'mode'],
+  /* CHG-187（FR-32 支柱一）：`member.spawned` 的派生树三字段（`parentMemberId` / `depth` /
+   * `rootMemberId`）**故意不进本表**——同 CHG-158 的理由：
+   *   ① 本表只服务写入端，重放不校验必填，老账本能重放；
+   *   ② 写成必填会让「只关心成员身份的既有写入方」（`t7` / `t13` / `t113` / `t122` 等十几处
+   *      `member.spawned` 提交）立刻变成非法事件；
+   *   ③ 缺省语义由 `fold.ts` 承担：`parentMemberId: null` / `depth: 0` / `rootMemberId: memberId`
+   *      —— 旧账本里的成员就是「队长直接召唤的一级成员」，这是唯一诚实的解释（t139-9 锁死）。
+   * 宿主写路径（`spawnMember`）**总是**写这三字段；对他们缺省的只有历史账本。 */
+  'member.released': ['teamId', 'memberId', 'mode', 'reason'],
   'member.archived': ['teamId', 'memberId'],
   'member.restored': ['teamId', 'memberId'],
   'task.created': ['teamId', 'taskId', 'task'],

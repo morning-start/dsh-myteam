@@ -50,6 +50,19 @@ export interface MemberInstance {
   skills?: string[]
   /** 团队模板/队长覆写的 MCP allowlist（空 = 继承角色） */
   mcpAllowlist?: string[]
+  /**
+   * CHG-187（FR-32 支柱一）：派生树。`parentMemberId` 缺省 = 队长直接召唤的一级成员；
+   * 三个字段都由 `core/members/hierarchy.ts` 的 `spawnTreeFields` 算，这里只做承载
+   * （成员卡和账本 payload 都从同一份实例取，避免两处各算一遍算歪）。
+   */
+  parentMemberId?: string | null
+  depth?: number
+  rootMemberId?: string
+}
+
+/** CHG-187：实例 → 派生树三字段（旧实例没有这三个字段 → 按「一级成员」缺省） */
+export function treeFieldsOf(member: MemberInstance): { parentMemberId: string | null; depth: number; rootMemberId: string } {
+  return { parentMemberId: member.parentMemberId ?? null, depth: member.depth ?? 0, rootMemberId: member.rootMemberId ?? member.memberId }
 }
 
 /**

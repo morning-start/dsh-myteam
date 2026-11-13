@@ -50,7 +50,20 @@ export const HOST_TEAM_TOOLS_TO_HIDE = [
                    
                                            
                          
+     
+                                                              
+                                                                    
+                                          
+     
+                                
+                
+                       
  
+
+/** CHG-187：实例 → 派生树三字段（旧实例没有这三个字段 → 按「一级成员」缺省） */
+export function treeFieldsOf(member                )                                                                         {
+  return { parentMemberId: member.parentMemberId ?? null, depth: member.depth ?? 0, rootMemberId: member.rootMemberId ?? member.memberId }
+}
 
 /**
  * 生成成员的 restrict 掩码（纯函数）。

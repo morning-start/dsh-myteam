@@ -9,7 +9,7 @@
 >
 > 关联：FR-9.1（配置驱动）、FR-14.3（设置页）、FR-18（create-team 章程）、FR-13.2（create-role 扩充）、R12（三层合并复杂度）、R4b（patch × config × 临时参数）、CHG-55/56/102（落盘与三层合并）、CHG-91（插件贡献契约 v1）、**CHG-178（v4.0 目标：角色 `delegation` / `memberMaxDepth` 1 / 硬上限 2 / `maxChildren`）**。
 >
-> **v4.0 目标（M3 待落，CHG-178）**：`limits.memberMaxDepth` 默认 0 → **1**、`PATCH_CEILINGS` 0 → **2**；新增 `limits.maxChildren`（默认 3）；角色 schema 新增 `delegation{canSpawn,allowedRoles,maxDepth,maxChildren}`。**在 M3-1 改完 `team-config.ts` / `team-config.schema.json` 之前，本节表格里的「v4.0 目标」列是目标值、不是当前生效值**——`t89` 三处同源门禁在 M3-1 一并更新。
+> **v4.0 目标（CHG-178 立项 → CHG-187 已实施）**：`limits.memberMaxDepth` 默认 0 → **1**、`PATCH_CEILINGS` 0 → **2**；新增 `limits.maxChildren`（默认 3、硬上限 5）。**这两项已在 CHG-187 落地**（`team-config.ts` / `team-config.schema.json` / `t89` 三处同源已同步，下表是当前生效值）。仍待 M3 后续落地的是角色 schema 的 `delegation{canSpawn,allowedRoles,maxDepth,maxChildren}`（FR-32 支柱一的能力侧）。
 
 ---
 
@@ -49,7 +49,7 @@
    - 结构校验 `isStructurallyValidConfig`：只拒「类型明显错误」（已知段落存在但不是对象、`board.columns` 不是字符串数组）；
    - 终态覆盖 `validateCoverage`：`done` / `failed` / `blocked` / `cancelled` 必须被 `board.columns ∪ board.columnMapping` 覆盖（看板不能有任务落不进任何列）。
    - 失败 → 该层整层忽略、`fellBack = true`、告警写进 `warnings`，**其余层保留**（拒绝式但不误伤）。
-6. **硬上限钳制**（`applyCeilings`，更严格者胜）：`limits.maxMembers ≤ 6`、`limits.memberMaxDepth ≤ 2`（**v4.0 目标**；v3.x 为 0）、`limits.maxChildren ≤ 6`（v4.0 新增），超出即钳制 + 告警（`PATCH_CEILINGS` 是 patch 层给不出更高值的硬顶）。
+6. **硬上限钳制**（`applyCeilings`，更严格者胜）：`limits.maxMembers ≤ 6`、`limits.memberMaxDepth ≤ 2`、`limits.maxChildren ≤ 5`（**CHG-187 已实施**），超出即钳制 + 告警（`PATCH_CEILINGS` 是 patch 层给不出更高值的硬顶）。
 7. **结果面**：`loadEffectiveConfig` 返回 `{ config, warnings, fellBack, applied: { project, team } }`；`getConfig` 的 `source ∈ default | project | team` 是**最后生效的层**，`mergeChain` 展示三层与各自是否生效。
 
 ---
@@ -95,8 +95,8 @@
 | 字段 | 类型 | 默认 | 校验 | 影响面 |
 |---|---|---|---|---|
 | `maxMembers` | `integer` | `6` | `1..6`（硬上限 6） | 团队最多成员数；超过即钳制 + 告警 |
-| `memberMaxDepth` | `integer` | `0`（**v4.0 目标 1**） | `0..0`（**v4.0 目标 `0..2`**） | 成员再派成员的深度；**v4.0 修订（CHG-178）**：授权角色可派生子成员，深度默认 1 / 硬上限 2，子成员能力 ⊆ 父成员（ADR-015） |
-| `maxChildren` | `integer` | `3`（**v4.0 新增**） | `1..6` | 单成员子 Agent 上限；角色 `delegation.maxChildren` 可覆写，不超过 6 |
+| `memberMaxDepth` | `integer` | `1` | `0..2`（硬上限 2） | 成员派生深度（**已实施，CHG-187**）：`1` = 允许一层子成员，`0` = 关闭派生（老团队配置里的 0 原样保留）；子成员能力 ⊆ 父成员（ADR-015/FR-32） |
+| `maxChildren` | `integer` | `3` | `0..5`（硬上限 5） | 单个成员最多直接子成员数（**已实施，CHG-187**）；超过即钳制 + 告警 |
 | `maxTasks` | `integer` | `20` | `≥1` | 单团队任务数上限 |
 
 ### 3.6 `gates` —— 门禁默认
