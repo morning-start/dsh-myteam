@@ -227,6 +227,18 @@ export const TOOL_OUTPUT_FIELDS                                 = {
       note: { type: 'string', description: '能力不可用时的说明' },
     },
   },
+  /* CHG-187（FR-32 支柱一）：名册只读面——成员 + 派生树事实（父 / 深度 / 树根 / 子成员数） */
+  myteam_list_members: {
+    properties: {
+      teamId: { type: 'string', description: '团队 id' },
+      total: { type: 'number', description: '成员数' },
+      members: {
+        type: 'array',
+        items: { type: 'object' },
+        description: '成员行（id/roleId/instanceName/status/parentMemberId/depth/rootMemberId/childCount）',
+      },
+    },
+  },
   myteam_get_task_graph: {
     properties: {
       teamId: { type: 'string', description: '团队 id' },

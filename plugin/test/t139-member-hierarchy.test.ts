@@ -8,15 +8,16 @@
  *  ④ 宿主写路径（t139-6/7/8）走**真实入口**（`executeLeadTool`），不用 `host.commit` 桩——
  *     接线断链正是「单测绕过入口」时最容易被漏掉的那类缺陷；
  *  ⑤ 名册只读面（t139-11）：`listMembers` 的 `childCount` 与派生树一致，读不到成员就返回空数组。
- *
- * 本文件的 ④⑤ 由「宿主写路径」那一批提交补上（`spawnMember` 记父 / `release` 级联 / 端点），
- * 当前这批只锁纯规则层 + 向后兼容（旧账本 / 旧配置）。
  */
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
+import { mkdtempSync, readFileSync, rmSync } from 'node:fs'
+import { tmpdir } from 'node:os'
+import { join } from 'node:path'
 import { depthOf, childrenOf, cascadeOrder, assertSpawnAllowed } from '../src/core/members/hierarchy.ts'
 import { foldEvents } from '../src/core/scheduler/fold.ts'
 import { DEFAULT_CONFIG, PATCH_CEILINGS, loadEffectiveConfig } from '../src/core/config/team-config.ts'
+import { MyTeamHost, type HostRuntime } from '../src/host.ts'
 
 const m = (id: string, parent: string | null, depth: number) => ({
   id, parentMemberId: parent, depth, rootMemberId: parent ? 'm1' : id,
@@ -82,4 +83,152 @@ test('t139-10: 老团队配置里已有的 memberMaxDepth: 0 保持 0（读时�
   assert.equal(clamped.config.limits.memberMaxDepth, PATCH_CEILINGS['limits.memberMaxDepth'])
   assert.equal(clamped.config.limits.maxChildren, PATCH_CEILINGS['limits.maxChildren'])
   assert.ok(clamped.warnings.some((w) => w.includes('memberMaxDepth 9 exceeds patch ceiling 2')), clamped.warnings.join(' / '))
+})
+
+/* ── ④ 宿主写路径（真实入口，禁止 host.commit 桩）────────────────── */
+
+function makeRuntime(root: string): HostRuntime {
+  return {
+    set: () => {},
+    tools: { register: () => {}, restrict: () => {}, schemas: () => [] },
+    agents: { create: () => ({ followup: () => {}, session: {}, dispose: () => {} }) },
+    logger: { info: () => {}, warn: () => {}, error: () => {} },
+    workspace: { root },
+  } as unknown as HostRuntime
+}
+
+function tempWorkspace(prefix: string) {
+  const root = mkdtempSync(join(tmpdir(), `${prefix}-`))
+  const home = mkdtempSync(join(tmpdir(), `${prefix}-home-`))
+  const previous = process.env.DSH_HOME
+  process.env.DSH_HOME = home
+  return {
+    root,
+    cleanup: () => {
+      if (previous === undefined) delete process.env.DSH_HOME
+      else process.env.DSH_HOME = previous
+      rmSync(root, { recursive: true, force: true })
+      rmSync(home, { recursive: true, force: true })
+    },
+  }
+}
+
+/** 已批准的空团队（roster 只有队长；任务为空——本用例只关心成员树） */
+function approvedTeam(root: string) {
+  const host = new MyTeamHost(makeRuntime(root), { dispatchTeamCooldownMs: 0, dispatchMemberCooldownMs: 0 })
+  host.initialize()
+  const sub = host.executeLeadTool('myteam_submit_plan', { teamName: 'T139', goal: '派生树', roster: [{ roleId: 'captain' }], tasks: [] }, {}) as any
+  host.executeLeadTool('myteam_approve_plan', { teamId: sub.teamId }, {}) as any
+  return { host, teamId: String(sub.teamId) }
+}
+
+function ledgerEventsOf(root: string, teamId: string): any[] {
+  const raw = readFileSync(join(root, '.dsh-myteam', 'tasks', teamId, 'ledger.jsonl'), 'utf8')
+  return raw.split('\n').filter((line) => line.trim().length > 0).map((line) => JSON.parse(line))
+}
+
+/** 父成员（一级）+ 子成员（深度 1）——派生树的最小形态 */
+function treeOf(host: MyTeamHost, teamId: string) {
+  const parent = host.executeLeadTool('myteam_spawn_member', { teamId, roleId: 'implementer', instanceName: 'parent' }, {}) as any
+  assert.ok(['spawned', 'ok'].includes(String(parent.status)), `父成员应召唤成功：${JSON.stringify(parent)}`)
+  const child = host.executeLeadTool('myteam_spawn_member', { teamId, roleId: 'implementer', instanceName: 'child', parentMemberId: parent.memberId }, {}) as any
+  assert.ok(['spawned', 'ok'].includes(String(child.status)), `子成员应召唤成功：${JSON.stringify(child)}`)
+  return { parent, child }
+}
+
+test('t139-6: 真实入口 spawn 子成员 → 账本落 parentMemberId/depth/rootMemberId', () => {
+  const { root, cleanup } = tempWorkspace('myteam-t139-spawn')
+  try {
+    const { host, teamId } = approvedTeam(root)
+    const parent = host.executeLeadTool('myteam_spawn_member', { teamId, roleId: 'implementer', instanceName: 'parent' }, {}) as any
+    assert.equal(parent.depth, 0, '一级成员深度 0')
+    assert.equal(parent.parentMemberId, null)
+    assert.equal(parent.rootMemberId, parent.memberId, '根成员的树根是它自己')
+
+    const child = host.executeLeadTool('myteam_spawn_member', { teamId, roleId: 'implementer', instanceName: 'child', parentMemberId: parent.memberId }, {}) as any
+    assert.equal(child.depth, 1)
+    assert.equal(child.parentMemberId, parent.memberId)
+    assert.equal(child.rootMemberId, parent.memberId, '子成员的树根是父成员所在树的根')
+
+    // 账本：**active 结算**那条必须是派生树事实（provisioning 那条也有，取最后一条 = 真实阶段）
+    const spawnEvents = ledgerEventsOf(root, teamId).filter((event) => event.type === 'member.spawned')
+    const lastOfChild = spawnEvents.filter((event) => event.payload.memberId === child.memberId).at(-1)!
+    assert.equal(lastOfChild.payload.parentMemberId, parent.memberId)
+    assert.equal(lastOfChild.payload.depth, 1)
+    assert.equal(lastOfChild.payload.rootMemberId, parent.memberId)
+    const lastOfParent = spawnEvents.filter((event) => event.payload.memberId === parent.memberId).at(-1)!
+    assert.equal(lastOfParent.payload.parentMemberId, null)
+    assert.equal(lastOfParent.payload.depth, 0)
+  } finally {
+    cleanup()
+  }
+})
+
+test('t139-7: 有子成员时 release 不带 cascade 被拒（MT_HAS_CHILDREN），且账本零写入', () => {
+  const { root, cleanup } = tempWorkspace('myteam-t139-haschildren')
+  try {
+    const { host, teamId } = approvedTeam(root)
+    const { parent } = treeOf(host, teamId)
+    const before = ledgerEventsOf(root, teamId)
+
+    const rejected = host.executeLeadTool('myteam_release_member', { teamId, memberId: parent.memberId, mode: 'suspend' }, {}) as any
+    assert.equal(rejected.status, 'error', JSON.stringify(rejected))
+    assert.equal(rejected.code, 'MT_HAS_CHILDREN')
+    assert.match(String(rejected.message), /cascade:true/)
+
+    const after = ledgerEventsOf(root, teamId)
+    assert.equal(after.length, before.length, '冲突时账本必须零写入（多一条释放事件 = 子成员变孤儿）')
+    assert.equal(host.service(teamId).projectionSnapshot.members[parent.memberId].status, 'active', '被拒后成员仍 active')
+  } finally {
+    cleanup()
+  }
+})
+
+test('t139-8: cascade 释放是倒序（子先、父后）', () => {
+  const { root, cleanup } = tempWorkspace('myteam-t139-cascade')
+  try {
+    const { host, teamId } = approvedTeam(root)
+    const { parent, child } = treeOf(host, teamId)
+
+    const released = host.executeLeadTool('myteam_release_member', { teamId, memberId: parent.memberId, mode: 'suspend', cascade: true }, {}) as any
+    assert.equal(released.status, 'suspend', JSON.stringify(released))
+
+    const releaseEvents = ledgerEventsOf(root, teamId).filter((event) => event.type === 'member.released')
+    assert.deepEqual(releaseEvents.map((event) => event.payload.memberId), [child.memberId, parent.memberId], '级联必须叶子先、父最后')
+    assert.deepEqual(releaseEvents.map((event) => event.payload.reason), ['cascade', 'cascade'], '级联释放要留痕（与手动释放区分）')
+    const proj = host.service(teamId).projectionSnapshot
+    assert.equal(proj.members[child.memberId].status, 'suspended')
+    assert.equal(proj.members[parent.memberId].status, 'suspended')
+  } finally {
+    cleanup()
+  }
+})
+
+/* ── ⑤ 名册只读面 ──────────────────────────────────────────────── */
+
+test('t139-11: listMembers 返回派生树事实（父 / 深度 / 树根 / childCount），读不到就是空数组', () => {
+  const { root, cleanup } = tempWorkspace('myteam-t139-list')
+  try {
+    const { host, teamId } = approvedTeam(root)
+    const { parent, child } = treeOf(host, teamId)
+
+    const listed = host.executeLeadTool('myteam_list_members', { teamId }, {}) as any
+    assert.equal(listed.status, 'ok', JSON.stringify(listed))
+    assert.equal(listed.teamId, teamId)
+    const byId = new Map<string, any>(listed.members.map((member: any) => [member.id, member]))
+    assert.equal(byId.get(parent.memberId).childCount, 1, '父成员有 1 个直接子成员')
+    assert.equal(byId.get(parent.memberId).depth, 0)
+    assert.equal(byId.get(child.memberId).parentMemberId, parent.memberId)
+    assert.equal(byId.get(child.memberId).depth, 1)
+    assert.equal(byId.get(child.memberId).rootMemberId, parent.memberId)
+    assert.equal(byId.get(child.memberId).childCount, 0)
+
+    // 零伪造：没有成员的服务（不存在的团队 id）→ 空数组，不编造
+    const empty = host.executeLeadTool('myteam_list_members', { teamId: 'no-such-team' }, {}) as any
+    assert.equal(empty.status, 'ok')
+    assert.deepEqual(empty.members, [])
+    assert.equal(empty.total, 0)
+  } finally {
+    cleanup()
+  }
 })

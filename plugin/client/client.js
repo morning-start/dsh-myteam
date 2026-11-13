@@ -1094,6 +1094,10 @@ window.__ModuleLoader__.load({
       'roster.gateNote': '等你定夺：重派 / 跳过 / 改期望',
       'roster.idleNote': '已排空，可接新任务',
       'roster.activeNote': '正在执行：{task}',
+      /* CHG-187（FR-32 支柱一）：派生树——深度 chip（有父成员才显示）+ 级联释放二次确认 */
+      'roster.depthChip': '深度 {n}',
+      'roster.parentHint': '父成员 {id}',
+      'roster.releaseCascadeConfirm': '该成员还有 {n} 个子成员，将一并释放（倒序：叶子先、父最后）。继续？',
       'roster.sameRoleOtherTeam': '同时在「{team}」在跑',
       'roster.limitNote': '团队规模上限 {n}（不含队长），当前在册 {active}。上限在设置页可调，但受插件硬上限约束。移除实例会删除其私有空间，归档只排空不删除。',
       'roster.summonCardHint': '从角色库挑一个，拉进来就能领任务；同名角色召唤多次自动编号',
@@ -1185,6 +1189,9 @@ window.__ModuleLoader__.load({
       'settings.teamSizeSub': '一个团队最多同时聘任多少个角色（不含队长）',
       'settings.delegateDepth': '委派深度',
       'settings.delegateDepthSub': '实例能否自己再拉一个角色进团队，0 表示禁止',
+      /* CHG-187（FR-32 支柱一）：单成员子成员上限（默认 3，硬上限 5） */
+      'settings.childrenLimit': '每个成员的子成员上限',
+      'settings.childrenLimitSub': '一个成员最多直接派生几个子成员；释放父成员会级联释放它们（倒序）',
       /* CHG-173（FR-1.3）：DAG 来源二选一 */
       'settings.taskPlanning': '任务来源（DAG）',
       'settings.taskPlanningSub': '开 = template：队长没拆活时按 pipeline.stages 生成模板任务组（AC 与交付物是占位，审批前请编辑）；关 = captain：任务组全由队长推导',
@@ -2354,6 +2361,10 @@ window.__ModuleLoader__.load({
       'roster.gateNote': 'Your call: reassign / skip / change expectation',
       'roster.idleNote': 'Drained, ready for new work',
       'roster.activeNote': 'Working on: {task}',
+      /* CHG-187（FR-32 支柱一）：derivation tree — depth chip + cascade release confirm (same order as zh) */
+      'roster.depthChip': 'Depth {n}',
+      'roster.parentHint': 'Parent member {id}',
+      'roster.releaseCascadeConfirm': 'This member still has {n} child member(s); they will be released too (children first, parent last). Continue?',
       'roster.sameRoleOtherTeam': 'Also running in "{team}"',
       'roster.limitNote': 'Team size limit {n} (captain excluded); {active} on the roster. The limit is adjustable in Settings but capped by the plugin hard limit. Removing an instance deletes its private space; archiving only drains.',
       'roster.summonCardHint': 'Pick a role from the library and it can claim tasks right away; summoning the same role twice auto-numbers it',
@@ -2445,6 +2456,9 @@ window.__ModuleLoader__.load({
       'settings.teamSizeSub': 'How many roles one team may appoint at once (the captain does not count)',
       'settings.delegateDepth': 'Delegation depth',
       'settings.delegateDepthSub': 'Whether an instance may pull another role into the team; 0 disables it',
+      /* CHG-187（FR-32 支柱一）：per-member children cap (default 3, hard max 5) */
+      'settings.childrenLimit': 'Children per member',
+      'settings.childrenLimitSub': 'How many direct child members one member may spawn; releasing the parent cascades to them (children first)',
       'settings.taskPlanning': 'Task source (DAG)',
       'settings.taskPlanningSub': 'On = template: when the captain provides no tasks, seed a template pipeline from pipeline.stages (AC & deliverables are placeholders — edit before approving); Off = captain: the captain derives all tasks',
       'settings.gatesSub': 'Type check and unit tests must pass before a task completes',
@@ -3285,6 +3299,8 @@ window.__ModuleLoader__.load({
         /* CHG-139a（docs/19 §M6/§M3）：依赖图谱 / 可复用技能清单（只读） */
         getTaskGraph: (query) => call('getTaskGraph', query),
         listSkills: (query) => call('listSkills', query),
+        /* CHG-187（FR-32 支柱一）：名册只读面——成员 + 派生树事实（父 / 深度 / 子成员数） */
+        listMembers: (query) => call('listMembers', query),
         /* CHG-139b（docs/19 §5.2/§5.3）：复制团队 / 发布团队（发布 = H 档两段确认） */
         copyTeam: (query) => call('copyTeam', query),
         publishTeam: (query) => call('publishTeam', query),
@@ -4961,9 +4977,15 @@ window.__ModuleLoader__.load({
       const instanceTaskTitle = (m) => taskTitle?.(m.currentTaskId) ?? (tasks ?? []).find((task) => task.id === m.currentTaskId)?.title
       const act = async (op, member) => {
         if (readOnly || busy || !api) return
+        /* CHG-187（FR-32 支柱一）：有子成员时先二次确认「将一并释放 N 个子成员」，再带 `cascade:true`
+         * 走倒序级联（叶子先、父最后）。不带 cascade 会被 host 以 MT_HAS_CHILDREN 拒（账本零写入）——
+         * 前端先问一句，比让用户点完看到错误更省事，也避免「以为只释放了一个」的误操作。 */
+        const children = Number(member.childCount ?? 0)
+        const cascade = op !== 'restore' && children > 0
+        if (cascade && !window.confirm(t('roster.releaseCascadeConfirm').replace('{n}', String(children)))) return
         setBusy(true)
         try {
-          let r = await api.memberOp({ teamId, memberId: member.id, op, confirm: op === 'remove' ? false : undefined })
+          let r = await api.memberOp({ teamId, memberId: member.id, op, confirm: op === 'remove' ? false : undefined, ...(cascade ? { cascade: true } : {}) })
           if (r?.status === 'confirm-required' && window.confirm(t('member.removeConfirm'))) {
             r = await api.memberOp({ teamId, memberId: member.id, op, confirm: true })
           }
@@ -5125,6 +5147,15 @@ window.__ModuleLoader__.load({
           ] }),
           ...rows.map((row) => js('div', { className: 'mt-inst-row', key: row.member.id, children: [
             j('span', { className: 'mt-iname', children: row.member.instanceName }),
+            /* CHG-187（FR-32 支柱一）：派生深度 chip——有父成员才显示（一级成员不显示，避免噪音）；
+             * `title` 给出父成员 id，面板上就能顺着树往回找。 */
+            row.member.parentMemberId
+              ? j('span', {
+                className: 'mt-mini-chip',
+                title: t('roster.parentHint').replace('{id}', String(row.member.parentMemberId)),
+                children: t('roster.depthChip').replace('{n}', String(row.member.depth ?? 0)),
+              })
+              : null,
             row.task
               ? j('button', {
                 className: 'mt-minichip' + (String(row.task.state ?? '').startsWith('gate') ? ' mt-minichip-gate' : ''),
@@ -7853,7 +7884,8 @@ window.__ModuleLoader__.load({
     }
 
     /* ── 团队设置（design/settings.html：配置来源三层合并链 + 行为配置硬上限 + 状态目录 + 生命周期）── */
-    const CONFIG_CEILINGS = { maxMembers: 6, memberMaxDepth: 0, commandTimeoutMs: 600000 }
+    /* CHG-187（FR-32 支柱一）：硬上限与 `PATCH_CEILINGS` 同源（memberMaxDepth 2 / maxChildren 5） */
+    const CONFIG_CEILINGS = { maxMembers: 6, memberMaxDepth: 2, maxChildren: 5, commandTimeoutMs: 600000 }
     const LAYER_ICONS = {
       builtin: ['M4.6 7.4V5.6a3.4 3.4 0 0 1 6.8 0v1.8', 'M3.4 7.4h9.2v5.4H3.4z'],
       global: ['M8 2.2a5.8 5.8 0 1 0 0 11.6A5.8 5.8 0 0 0 8 2.2z', 'M2.2 8h11.6', 'M8 2.2c2.5 3.4 2.5 8.2 0 11.6'],
@@ -8325,6 +8357,8 @@ window.__ModuleLoader__.load({
           js('div', { className: 'mt-setrows', children: [
             row('teamSize', t('settings.teamSize'), t('settings.teamSizeSub'), [ceiling(CONFIG_CEILINGS.maxMembers), numInput(limits.maxMembers, t('settings.teamSize'), (v) => editSection('limits', { maxMembers: v }), { min: 1, max: CONFIG_CEILINGS.maxMembers })]),
             row('depth', t('settings.delegateDepth'), t('settings.delegateDepthSub'), [ceiling(CONFIG_CEILINGS.memberMaxDepth), numInput(limits.memberMaxDepth, t('settings.delegateDepth'), (v) => editSection('limits', { memberMaxDepth: v }), { min: 0, max: CONFIG_CEILINGS.memberMaxDepth })]),
+            /* CHG-187（FR-32 支柱一）：单成员最多直接子成员数（默认 3，硬上限 5） */
+            row('childrenLimit', t('settings.childrenLimit'), t('settings.childrenLimitSub'), [ceiling(CONFIG_CEILINGS.maxChildren), numInput(limits.maxChildren, t('settings.childrenLimit'), (v) => editSection('limits', { maxChildren: v }), { min: 0, max: CONFIG_CEILINGS.maxChildren })]),
             /* CHG-173（FR-1.3）：DAG 来源——captain（默认，队长推导）/ template（按 pipeline.stages 生成模板任务组） */
             row('taskPlanning', t('settings.taskPlanning'), t('settings.taskPlanningSub'), [toggle((cfg.taskPlanning ?? 'captain') === 'template', t('settings.taskPlanning'), (v) => editTop({ taskPlanning: v ? 'template' : 'captain' }))]),
             row('gates', t('settings.gates'), t('settings.gatesSub'), [toggle(gates.enabled !== false, t('settings.gates'), (v) => editSection('gates', { enabled: v }))]),
@@ -12004,7 +12038,12 @@ window.__ModuleLoader__.load({
             })
           }
           const teamTasksAll = (pv.tasks ?? []).filter((task) => (task.participants ?? []).some((p) => p.teamId === team.teamId))
-          const members = team.members ?? []
+          /* CHG-187（FR-32 支柱一）：`childCount` 从**同一份名册**现算（与 `listMembers` 同源）：
+           * 释放按钮据此决定要不要二次确认「将一并释放 N 个子成员」。 */
+          const members = (team.members ?? []).map((member) => ({
+            ...member,
+            childCount: (team.members ?? []).filter((other) => other.parentMemberId === member.id).length,
+          }))
           const taskTitle = (id) => (teamTasksAll.find((task) => task.id === id)?.title)
           /* CHG-119：团队内 tab 增加「反馈」（FR-11.6 计划质量），排在审计后、设置前 */
           const tabs = ['members', 'participating', 'knowledge', 'audit', 'feedback', 'settings']

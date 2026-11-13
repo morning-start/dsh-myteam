@@ -158,6 +158,17 @@ export class MyTeamRemote extends TypertRemoteService {
     return { status: 'ok', roles: this.host.roleCatalogView() }
   }
 
+  /**
+   * CHG-187（FR-32 支柱一）：**名册只读端点**——成员 + 派生树事实（父 / 深度 / 树根 / 子成员数）。
+   *
+   * 只读：名册的权威是投影（`listMembers` 现算 `childCount`，不落第二份真相）。
+   * 面板据此显示「深度 N」chip 并在释放时二次确认「将一并释放 N 个子成员」。
+   */
+  async listMembers(args: { teamId?: string } = {}) {
+    const { teamId } = this.resolveTeam(args?.teamId)
+    return this.host.executeLeadTool('myteam_list_members', { teamId }, { actor: 'human' }) as Record<string, unknown>
+  }
+
   /** 知识库面板视图（FR-17.5 数据面，M2-0b）：条目 + 待审提案 + 演化时间线（读投影，不进模型上下文） */
   async getKnowledge(args: { teamId?: string } = {}) {
     return { status: 'ok', knowledge: this.host.knowledgeView() }
@@ -346,11 +357,14 @@ export class MyTeamRemote extends TypertRemoteService {
     confirm?: boolean
     content?: string
     taskId?: string
+    /** CHG-187（FR-32）：级联释放子成员（倒序：叶子先、父最后）；有子成员时不传会被 MT_HAS_CHILDREN 拒 */
+    cascade?: boolean
   }) {
     const { teamId } = this.resolveTeam(args?.teamId)
     return this.host.memberOp(teamId, String(args.memberId), String(args.op), args.confirm === true, {
       content: args.content,
       taskId: args.taskId,
+      cascade: args.cascade === true,
     })
   }
 
@@ -574,7 +588,7 @@ export class MyTeamRemote extends TypertRemoteService {
 }
 
 // 手动 Remote 标记（strip-only 环境等价装饰器）：gateway 按 method 名发现端点
-markRemoteMethods(MyTeamRemote.prototype, ['getBoard', 'getTaskDetail', 'getTokens', 'getInbox', 'getAudit', 'getConfig', 'saveTeamConfig', 'resetTeamConfig', 'getPlanFeedback', 'getTaskGraph', 'listSkills', 'copyTeam', 'publishTeam', 'exportTeam', 'importTeam', 'createSkill', 'createTool', 'readSessionHistory', 'getPresets', 'planAction', 'postComment', 'memberOp', 'disband', 'createTask', 'createTasks', 'updateTask', 'assignTask', 'participateTask', 'rescopeTask', 'cancelTask', 'batchTaskOp',
+markRemoteMethods(MyTeamRemote.prototype, ['getBoard', 'getTaskDetail', 'getTokens', 'getInbox', 'getAudit', 'getConfig', 'saveTeamConfig', 'resetTeamConfig', 'getPlanFeedback', 'getTaskGraph', 'listSkills', 'listMembers', 'copyTeam', 'publishTeam', 'exportTeam', 'importTeam', 'createSkill', 'createTool', 'readSessionHistory', 'getPresets', 'planAction', 'postComment', 'memberOp', 'disband', 'createTask', 'createTasks', 'updateTask', 'assignTask', 'participateTask', 'rescopeTask', 'cancelTask', 'batchTaskOp',
   // CHG-86：门禁裁决 / 归档快照 / 知识提案策展
   'reviewTask', 'getArchive', 'getArchives', 'adoptKnowledge',
   // CHG-87（FR-13.1/FR-16.1）：角色库统一写入口 + 单角色调用

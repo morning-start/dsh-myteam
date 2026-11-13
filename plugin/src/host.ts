@@ -26,7 +26,7 @@ import { ensureWorkplaceDirs, ensureGitignoreManagedBlock } from './host-workspa
 /* CHG-174：**唯一写盘出口**。host 不再直接 `writeFileSync` —— 那是「写一半」的唯一来源：
  * 没有 fsync 屏障、临时文件名固定、不拒符号链接。全部经 `writeTextAtomic`（八步写序），
  * 门禁 `tools/check-architecture.mjs` 的 A2 规则守着这条边界。 */
-import { writeTextAtomic } from './core/fs/write-log.ts'
+import { writeTextAtomic, runWithRollback, snapshotFor } from './core/fs/write-log.ts'
 import { resolveProjectRoot, storeLayout, teamLedgerPath as teamLedgerPathOf, scratchDir as scratchDirOf, memberIdentityDir as memberIdentityDirOf, displayPath, STORE_DIR } from './core/workspace/layout.ts'
 // CHG-103：作用域契约（全局 vs 项目级）——角色两级都可用，任务/历史/状态只能项目级
 import { normalizeScope } from './core/workspace/scope.ts'
@@ -38,7 +38,9 @@ import type { KnowledgeView, MyTeamConfig, MyTeamHostContract } from './core/hos
 export type { MyTeamConfig } from './core/host/contract.ts'
 /* CHG-186（T155b）：端点族适配层。本文件只留**装配 + 分发**（switch 里一行转发），
  * 族实现落在 `src/host/<族>.ts`——入口层只减不增（A6 棘轮）。 */
-import { createMembersHandlers } from './host/members.ts'
+import { createMembersHandlers, guardRule } from './host/members.ts'
+/* CHG-187（FR-32 支柱一）：成员派生树的纯规则（深度 / 子数 / 级联顺序） */
+import { releaseOrder, rosterOf, spawnLimitsOf, spawnTreeFields } from './core/members/hierarchy.ts'
 import { createMemberTaskHandlers, createTasksHandlers } from './host/tasks.ts'
 import { createPlanHandlers } from './host/plan.ts'
 import { createRolesHandlers } from './host/roles.ts'
@@ -56,7 +58,7 @@ import { TERMINAL_STATES, downstreamOf, GATE_REJECT_BUDGET } from './core/schedu
  * `readOfflineTeam` + `foldTolerant` 只读文件、坏行/坏事件各自跳过，正好是重连需要的容错面。 */
 import { foldTolerant, isSafeTeamId, readOfflineTeam } from './core/index/offline-view.ts'
 import { diffTaskInput } from './core/tasks/diff.ts'
-import { buildToolMask, memberPromptSection, memoryPromptSection, memberSessionId, HOST_TEAM_TOOLS_TO_HIDE, type MemberInstance } from './core/members/member-setup.ts'
+import { buildToolMask, memberPromptSection, memoryPromptSection, memberSessionId, treeFieldsOf, HOST_TEAM_TOOLS_TO_HIDE, type MemberInstance } from './core/members/member-setup.ts'
 import { applyCapabilityGuard, buildCapabilityBoundaryText, capabilitySummary, resolveCapabilities } from './core/members/capability-guard.ts'
 import { memoryDirFor, seedMemoryIfMissing, auditMemoryContent, type MemoryFinding } from './core/members/memory.ts'
 import { copyToProject, listRoleCatalog, readGlobalRole, readProjectRole, resolveRuntimeRole, saveGlobalRole, writeProjectRole, assertValidRole, deleteProjectRoleSafe, type RoleStorePaths } from './core/roles/role-store.ts'
@@ -620,11 +622,12 @@ export class MyTeamHost implements MyTeamHostContract {
   private readonly members = createMembersHandlers({
     commit: (teamId, draft) => this.commit(teamId, draft),
     spawnMember: (teamId, roleId, instanceName, overrides) => this.spawnMember(teamId, roleId, instanceName, overrides),
-    releaseMember: (teamId, memberId, mode, confirm) => this.releaseMember(teamId, memberId, mode, confirm),
+    releaseMember: (teamId, memberId, mode, confirm, actor, cascade) => this.releaseMember(teamId, memberId, mode, confirm, actor, cascade),
     deliverMemberMessage: (memberId, kind, content) => this.deliverMemberMessage(memberId, kind, content),
     agentOf: (handle) => this.agentOf(handle),
     memberHandle: (memberId) => this.memberHandles.get(memberId),
     noteGuardTurnEnd: (memberId) => this.noteGuardTurnEnd(memberId),
+    membersOf: (teamId) => Object.values(this.service(teamId).projectionSnapshot.members),
   })
   /**
    * CHG-186（T155b）：任务族端点适配层（`src/host/tasks.ts`）。
@@ -1443,6 +1446,9 @@ export class MyTeamHost implements MyTeamHostContract {
           return this.members.spawn(teamId, args)
         case 'myteam_release_member':
           return this.members.release(teamId, args)
+        /* CHG-187（FR-32 支柱一）：名册只读面——成员 + 派生树事实（父 / 深度 / 子成员数） */
+        case 'myteam_list_members':
+          return this.members.listMembers(teamId)
         case 'myteam_message':
           return this.members.message(teamId, args, actor)
         case 'myteam_interrupt':
@@ -3085,24 +3091,18 @@ export class MyTeamHost implements MyTeamHostContract {
   /* ── 成员 spawn（ADR-001：agents.create 直连 + setup 作用域）── */
 
   /**
-   * 两阶段 spawn（P0-1，docs/21 §6，来源官方 `types/roster.js:206-288`）。
+   * 两阶段 spawn（P0-1，docs/21 §6，来源官方 `types/roster.js:206-288`）：① 先落
+   * `member.spawned{status:'provisioning'}`（名字 / sessionId / `maxMembers` 在此占用）→
+   * ② 才 `agents.create` 建 child → ③ 拿到 handle 落 `status:'active'` 结算；④ 任何一步失败
+   * 落 `status:'failed'` + `reason`，**不留 provisioning 残留**。
    *
-   * 为什么必须先落 `provisioning` 再建 child：`agents.create` 是跨会话建 child 的动作，
-   * 宿主可能**在它执行中途崩掉**。旧实现「先建 child 后落账」在这种时刻没有任何记录——
-   * 下次启动不知道有这个成员，它就是一个永远不会被清理、也不会被唤醒的孤儿。
-   * 现在的顺序（每一段都必须在下一段开始前 durable）：
-   *   ① 持久化 `member.spawned{status:'provisioning'}`——名字 / sessionId 在此占用，
-   *      `maxMembers` 也在此判定（官方把名字预算放在 provisioning 段）；
-   *   ② 才 `agents.create` 建 child；
-   *   ③ 拿到 handle（child 真的起来了）→ 同 memberId 落 `status:'active'` 结算；
-   *   ④ 任何一步失败（create 抛错 / 初始 prompt 投递失败）→ 同 memberId 落
-   *      `status:'failed'` + `reason`，**不留 provisioning 残留**。
+   * 为什么先落账再建 child：宿主可能在建 child 中途崩掉，那一刻没有任何记录 = 永远不会被清理、
+   * 也不会被唤醒的孤儿。**全程只有一个 memberId**（同 id 的更新事件，fold 按 id 覆盖），所以
+   * 重试 / 对账重复结算都幂等——这是「崩溃后可按账本对账」的前提。
    *
-   * 为什么**全程只有一个 memberId**：结算事件是同一 memberId 的更新，fold 按 memberId
-   * 覆盖（`proj.members[id] = member`），所以重试 / 对账重复结算都是幂等的，不会长出第二个成员。
-   * 这也是「崩溃后可对账」的前提——账本里认得出「同一个成员停在了哪一段」。
+   * CHG-187（FR-32 支柱一）：派生准入（深度 / 子数）在**任何 commit 之前**，被拒 = 账本零写入。
    */
-  spawnMember(teamId: string, roleId: string, instanceName?: string, overrides: { skills?: string[]; mcpAllowlist?: string[] } = {}): Record<string, unknown> {
+  spawnMember(teamId: string, roleId: string, instanceName?: string, overrides: { skills?: string[]; mcpAllowlist?: string[]; parentMemberId?: string } = {}): Record<string, unknown> {
     if (!this.rt.agents) return { status: 'error', code: 'MT_NO_AGENTS_SERVICE', message: 'ctx.agents unavailable' }
     // P1-4 准入截止：卸载已开始 → 新成员一律拒绝（不往正在拆的运行时里写 provisioning 账）
     if (this.disposalGate.disposed) {
@@ -3119,12 +3119,17 @@ export class MyTeamHost implements MyTeamHostContract {
     const n = Object.keys(svc.projectionSnapshot.members).length + 1
     const memberId = `m${n}-${roleId}`
     const sessionId = memberSessionId(teamId, roleId, n)
+    // CHG-187（FR-32 支柱一）：派生准入（深度 / 子数）+ 算树字段——**任何 commit 之前**，
+    // 被拒 = 账本零写入（不留 provisioning 残留）
+    const tree = guardRule(() => spawnTreeFields(rosterOf(svc.projectionSnapshot.members), memberId, overrides.parentMemberId ?? null, spawnLimitsOf(svc.effectiveConfig.limits)))
+    if (!tree.ok) return tree.result
     const member: MemberInstance = {
       memberId,
       roleId,
       instanceName: instanceName ?? `${roleId}-${n}`,
       sessionId,
       teamId,
+      ...tree.value,
       ...(overrides.skills && overrides.skills.length > 0 ? { skills: overrides.skills } : {}),
       ...(overrides.mcpAllowlist && overrides.mcpAllowlist.length > 0 ? { mcpAllowlist: overrides.mcpAllowlist } : {}),
     }
@@ -3137,6 +3142,7 @@ export class MyTeamHost implements MyTeamHostContract {
       type: 'member.spawned',
       payload: {
         teamId, memberId, roleId, instanceName: member.instanceName, sessionId, status: 'provisioning',
+        ...treeFieldsOf(member),
         ...(member.skills ? { skills: member.skills } : {}),
         ...(member.mcpAllowlist ? { mcpAllowlist: member.mcpAllowlist } : {}),
       },
@@ -3159,11 +3165,9 @@ export class MyTeamHost implements MyTeamHostContract {
             execute: (toolArgs: Record<string, unknown>) => this.executeMemberTool(member, def.name, toolArgs),
           })
         }
-        // ② 角色工具策略收窄（C5：只收窄）
-        // restrict 只过滤「继承的全局工具」，且名单必须落在当前已知全局工具内——
-        // 成员自己的 9 个工具是作用域内注册、永远可见（CHG-58 实证），因此：
-        //   allow → 去掉 own-layer 成员工具后按全局已知名收窄（全被去掉 = deny 全部全局）；
-        //   deny  → 过滤未知名字（拼写错误只告警，不让整批拒绝）。
+        // ② 角色工具策略收窄（C5：只收窄）。restrict 只过滤「继承的全局工具」，成员自己的 9 个
+        //   工具是作用域内注册、永远可见（CHG-58 实证）：allow → 按全局已知名收窄（全被去掉 =
+        //   deny 全部全局）；deny → 过滤未知名字（拼写错误只告警，不让整批拒绝）。
         const mask = buildToolMask(roleDef)
         if (mask.mode !== 'none' && typeof agentCtx.tools.restrict !== 'function') {
           // A7：宿主没有 restrict API 时旧实现静默跳过——角色 toolPolicy 一个字都没生效，
@@ -3263,21 +3267,17 @@ export class MyTeamHost implements MyTeamHostContract {
     } else {
       this.settleSpawnActive(teamId, member, created)
     }
-    return { status: 'spawned', memberId, sessionId }
+    // 回显派生树三字段（CHG-187）：调用方（面板/队长）拿得到 depth 才能确认「子成员真的挂上了」
+    return { status: 'spawned', memberId, sessionId, ...treeFieldsOf(member) }
   }
 
   /**
-   * 两阶段 spawn 的 **active 结算段**（官方 `checkpointInitialPrompt` → `settleProvisioning(active)`
-   * 的落点）。
+   * 两阶段 spawn 的 **active 结算段**（官方 `checkpointInitialPrompt` → `settleProvisioning(active)`）。
    *
-   * 顺序是**先投递初始 prompt、再落 active**，不是反过来：
-   *  - 先落 active 再投递，一旦投递失败就留下「账本 active 但从不干活」的静默僵尸（CHG-77 那类
-   *    事故正是这么来的）；
-   *  - 先投递，崩溃窗口里的成员停在 provisioning，下次启动的三条件对账能自愈
-   *    （初始 prompt 已在会话里 → `initialPromptAccepted`）。
-   * 我们的 `followup` 没有「durable」回执（宿主不给），所以「投递没抛错」是这里能拿到的最强证据；
-   * 真正的 durability 判定留给启动对账。
-   *
+   * 顺序是**先投递初始 prompt、再落 active**：反过来一旦投递失败就留下「账本 active 但从不干活」
+   * 的静默僵尸（CHG-77）；先投递则崩溃窗口里的成员停在 provisioning，下次启动的三条件对账能自愈
+   * （初始 prompt 已在会话里 → `initialPromptAccepted`）。`followup` 没有 durable 回执（宿主不给），
+   * 所以「投递没抛错」是这里能拿到的最强证据，真正的 durability 判定留给启动对账。
    * 成员卡（CHG-135）与 handle 回填都在这里：只有真建成的成员才配拥有。
    */
   private settleSpawnActive(teamId: string, member: MemberInstance, handle: unknown): void {
@@ -3296,6 +3296,7 @@ export class MyTeamHost implements MyTeamHostContract {
       type: 'member.spawned',
       payload: {
         teamId, memberId: member.memberId, roleId: member.roleId, instanceName: member.instanceName, sessionId: member.sessionId, status: 'active',
+        ...treeFieldsOf(member),
         ...(member.skills ? { skills: member.skills } : {}),
         ...(member.mcpAllowlist ? { mcpAllowlist: member.mcpAllowlist } : {}),
       },
@@ -3318,6 +3319,7 @@ export class MyTeamHost implements MyTeamHostContract {
         ...(member.sessionId ? { sessionId: String(member.sessionId) } : {}),
         ...(member.skills ? { skills: member.skills.map((skill) => String(skill)) } : {}),
         ...(member.mcpAllowlist ? { mcpAllowlist: member.mcpAllowlist.map((item) => String(item)) } : {}),
+        ...treeFieldsOf(member),
         status: 'active',
         createdAt: Date.now(),
         updatedAt: Date.now(),
@@ -3329,26 +3331,24 @@ export class MyTeamHost implements MyTeamHostContract {
   }
 
   /**
-   * 两阶段 spawn 的 **failed 结算段**：同 memberId 落 `status:'failed'` + `reason`。
-   *
-   * 为什么失败也必须落终态：`provisioning` 只有两个合法出口（active / failed）——
-   * 失败不落账就留下**永久 provisioning**，成员既不能被重试、也不能被清理
-   * （docs/15 R1 的风险项正是这个）。结算本身被拒（例如角色已从项目库删除）只告警：
-   * 残留的 provisioning 交给下次启动对账，但这一次的失败原因必须同时进日志与工具返回，不能静默。
+   * 两阶段 spawn 的 **failed 结算段**：同 memberId 落 `status:'failed'` + `reason`（`provisioning`
+   * 只有 active / failed 两个合法出口，失败不落账会留下**永久 provisioning**——既不能重试也不能
+   * 清理，docs/15 R1）。结算被拒（如角色已从项目库删除）只告警：残留交给下次启动对账，但本次
+   * 失败原因必须同时进日志与工具返回，不能静默。
    */
   private settleSpawnFailure(teamId: string, member: MemberInstance, error: unknown): Record<string, unknown> {
     const reason = String((error as Error | undefined)?.message ?? error ?? 'unknown spawn failure')
     const settled = this.commit(teamId, {
       actor: 'host',
       type: 'member.spawned',
-      payload: { teamId, memberId: member.memberId, roleId: member.roleId, instanceName: member.instanceName, sessionId: member.sessionId, status: 'failed', reason },
+      payload: { teamId, memberId: member.memberId, roleId: member.roleId, instanceName: member.instanceName, sessionId: member.sessionId, status: 'failed', reason, ...treeFieldsOf(member) },
     })
     if (!settled.ok) {
       this.log('warn', `member ${member.memberId} spawn failed and settle(failed) rejected: ${settled.code} ${settled.message}`)
     }
     this.log('warn', `member ${member.memberId} spawn failed: ${reason}`)
     // 回显 memberId/sessionId：失败也已在账本里占了一个（failed）成员，调用方要能定位它
-    // （重试 / 面板排查 / 后续对账），而不是只拿到一句错误。
+    // （重试 / 面板排查 / 对账），而不是只拿到一句错误。
     return { status: 'error', code: 'MT_INTERNAL', message: `spawn member ${member.memberId} failed: ${reason}`, memberId: member.memberId, sessionId: member.sessionId }
   }
 
@@ -3358,12 +3358,9 @@ export class MyTeamHost implements MyTeamHostContract {
    * 启动对账（P0-1，docs/21 §6，来源官方 `types/roster.js:339-386`）。
    *
    * 为什么读**账本**而不是投影：`member.spawned{status:'provisioning'}` 在 fold 里被折叠成
-   * `active`（`fold.ts` 的 status 只有 failed / 其它两支，本任务改动面不含 fold），所以投影
-   * 区分不出「已结算」与「停在 provisioning」；账本是唯一权威〔I2〕——按 memberId 取**最后一条**
-   * `member.spawned` 的 status，才是这个成员的真实阶段。
-   *
-   * 纪律：**对账失败不得阻断启动**。单个团队账本坏了只告警、其它团队照常对账；
-   * 结算被拒只告警，残留的 provisioning 下次启动再对一次。
+   * `active`，投影区分不出「已结算」与「停在 provisioning」；账本是唯一权威〔I2〕——按 memberId
+   * 取**最后一条** `member.spawned` 的 status 才是真实阶段。
+   * 纪律：**对账失败不得阻断启动**（单个团队账本坏了只告警，残留 provisioning 下次再对）。
    */
   reconcileProvisioningOnBoot(): { settled: number; active: number; failed: number } {
     const summary = { settled: 0, active: 0, failed: 0 }
@@ -3475,14 +3472,10 @@ export class MyTeamHost implements MyTeamHostContract {
   }
 
   /**
-   * CHG-93（清 §7.4 遗留硬编码）：成员待处理消息数（`message.sent` 未消费条数）。
-   *
-   * 为什么需要它：`member.released` / `member.archived` 的 `drained.pending` 此前**硬编码为 0**——
-   * 账本上写「排空完成」，实际成员收件箱里还压着消息。释放是**不可逆**动作（`mode: 'remove'`
-   * 会删私有空间），它宣称的「排空」必须是**真的**，否则审计回看会得到错误结论。
-   *
-   * 口径：`message.sent` 里 `to === memberId` 且对应 `messageId` 尚未 `message.consumed` 的条数。
-   * 读账本（不是投影）——投影的 `inbox` 只为面板人工待办聚合，不带收件人。
+   * CHG-93（清 §7.4 遗留硬编码）：成员待处理消息数（`message.sent` 里 `to === memberId` 且对应
+   * `messageId` 尚未 `message.consumed` 的条数）。释放是**不可逆**动作（`mode:'remove'` 会删私有
+   * 空间），它宣称的「排空」必须是真的——硬编码 0 等于账本上写假结论。读**账本**而不是投影：
+   * 投影的 `inbox` 只为面板人工待办聚合，不带收件人。
    */
   private pendingMessagesFor(teamId: string, memberId: string): number {
     try {
@@ -3506,7 +3499,7 @@ export class MyTeamHost implements MyTeamHostContract {
     }
   }
 
-  releaseMember(teamId: string, memberId: string, mode: string, confirm: boolean, actor = 'lead'): Record<string, unknown> {
+  releaseMember(teamId: string, memberId: string, mode: string, confirm: boolean, actor = 'lead', cascade = false): Record<string, unknown> {
     const svc = this.service(teamId)
     const proj = svc.projectionSnapshot
     const member = proj.members[memberId]
@@ -3518,52 +3511,57 @@ export class MyTeamHost implements MyTeamHostContract {
     if (member.currentTaskId) {
       return { status: 'drain-pending', code: 'MT_DRAIN_PENDING', running: 1, note: `成员仍有在跑任务 ${member.currentTaskId}；先 revoke/reassign 或等完成` }
     }
-    // CHG-93：排空面**如实**记录（原实现硬编码 running:0/pending:0，「排空完成」是假的）
-    const drained = { running: 0, pending: this.pendingMessagesFor(teamId, memberId) }
-    // P1-5：释放 = 这一轮到此为止——同 interrupt，空转只能在「交出控制权」的入口补检查
-    this.noteGuardTurnEnd(memberId)
-    // 释放前记忆审计（T21：违规落 memory.audit，不阻断释放——M2 再议 hard 阻断）
-    const memAudit = this.auditMemberMemory(teamId, memberId)
-    const r = this.commit(teamId, { actor, type: mode === 'archive' ? 'member.archived' : 'member.released', payload: { teamId, memberId, mode, drained } })
-    if (!r.ok) return { status: 'error', code: r.code, message: r.message }
-    const handle = this.memberHandles.get(memberId)
-    if (handle) {
+    // CHG-187（FR-32 支柱一）：派生树排空——有子成员且未声明 cascade 时拒绝（**账本零写入**）
+    const plan = guardRule(() => releaseOrder(rosterOf(proj.members), memberId, cascade))
+    if (!plan.ok) return plan.result
+    let memAudit: { violations: number } | undefined
+    try {
+      // 级联释放**全有或全无**：写前给账本留档，中途失败按快照还原（再 reload 让内存跟着退）
+      runWithRollback('release-cascade', (log) => {
+        if (plan.value.length > 1) snapshotFor(log, svc.ledgerPath)
+        for (const id of plan.value) {
+          // CHG-93：排空面**如实**记录（原实现硬编码 running:0/pending:0，「排空完成」是假的）
+          const drained = { running: 0, pending: this.pendingMessagesFor(teamId, id) }
+          // P1-5：释放 = 这一轮到此为止——同 interrupt，空转只能在「交出控制权」的入口补检查
+          this.noteGuardTurnEnd(id)
+          // 释放前记忆审计（T21：违规落 memory.audit，不阻断释放——M2 再议 hard 阻断）
+          const audit = this.auditMemberMemory(teamId, id)
+          if (id === memberId) memAudit = audit
+          const r = this.commit(teamId, { actor, type: mode === 'archive' ? 'member.archived' : 'member.released', payload: { teamId, memberId: id, mode, reason: cascade ? 'cascade' : 'manual', drained } })
+          if (!r.ok) throw Object.assign(new Error(r.message), { code: r.code })
+        }
+      })
+    } catch (error) {
+      svc.reload() // 账本已还原 → 内存投影必须跟着退（磁盘没有、内存有 = 假成功）
+      const failed = guardRule(() => { throw error })
+      return failed.ok ? { status: 'error', code: 'MT_INTERNAL', message: String(error) } : failed.result
+    }
+    for (const id of plan.value) {
+      const handle = this.memberHandles.get(id)
+      if (!handle) continue
       if (mode === 'remove') {
         void handle.dispose?.()
-        this.memberHandles.delete(memberId)
+        this.memberHandles.delete(id)
         // 成员真的没了：护栏状态随之退休（留在 Map 里会让成员 id 复用时带着旧计数）
-        this.guardRecords.delete(memberId)
+        this.guardRecords.delete(id)
       }
       // suspend/archive：会话保留（宿主侧栏可见），仅停止领新任务
     }
-    return {
-      status: mode,
-      ...(memAudit && memAudit.violations > 0
-        ? { memoryAudit: { violations: memAudit.violations, note: '释放前审计发现无证据指针的记忆条目，已落账本 memory.audit（FR-6.2）' } }
-        : {}),
-    }
+    return { status: mode, ...(memAudit && memAudit.violations > 0 ? { memoryAudit: { violations: memAudit.violations, note: '释放前审计发现无证据指针的记忆条目，已落账本 memory.audit（FR-6.2）' } } : {}) }
   }
 
   /**
    * T27（CHG-48）：成员管理统一入口（面板 FR-14.2）——suspend/archive/remove/restore。
-   * 写路径与 Lead 工具同管线（member.released / member.archived / member.restored），
-   * actor 标注 human（面板操作），破坏性 remove 两段确认；restore 仅允许挂起/归档态。
+   * 写路径与 Lead 工具同管线，actor 标注 human（面板操作），破坏性 remove 两段确认。
    *
-   * A10（CHG-163）：补 `steer`（指导）档——此前 UI 有「指导」、写路径没有（docs/14 §6.5 ③），
-   * 点了只会弹一句说明。语义 = 给成员发一条 `kind:'steer'` 消息并**立刻投递**：
-   *  ① 落 `message.sent`（`actor:'human'` / `from:'human'`——面板操作是人发起的）；
-   *  ② 投递复用 `deliverMemberMessage`（与 `myteam_message` 同一份 followup 构造，不另造格式）；
-   *  ③ **账本与送达分开如实回报**：没有 handle（成员会话不在线）→ 账本照落、返回 `delivered:false`
-   *     + `reason`。把「记下来了」说成「送到了」就是假成功（项目纪律）。
-   *
-   * 边界：
-   *  - `content` 空 → `MT_VALIDATION`（field=content）；
-   *  - 成员不存在 → `MT_VALIDATION`；
-   *  - `removed` / `archived` 是终态 → 拒绝并说清状态（往已移除的成员会话投消息没有收件人，
-   *    静默成功会变成一条永远读不到的假账）；
-   *  - 成员正在跑任务（`currentTaskId`）时自动带上 `taskId`——成员要能对上「指导的是哪一单」。
+   * A10（CHG-163）：补 `steer`（指导）档——语义 = 发一条 `kind:'steer'` 消息并**立刻投递**：
+   * ① 落 `message.sent`（`actor/from = human`）；② 投递复用 `deliverMemberMessage`（不另造格式）；
+   * ③ **账本与送达分开如实回报**：没有 handle → 账本照落、`delivered:false` + `reason`
+   * （把「记下来了」说成「送到了」就是假成功）。边界：`content` 空 / 成员不存在 →
+   * `MT_VALIDATION`；`removed`/`archived` 是终态 → 拒绝（否则是一条永远读不到的假账）；
+   * 跑任务中自动带上 `taskId`——成员要能对上「指导的是哪一单」。
    */
-  memberOp(teamId: string, memberId: string, op: string, confirm: boolean, extra: { content?: unknown; taskId?: unknown } = {}): Record<string, unknown> {
+  memberOp(teamId: string, memberId: string, op: string, confirm: boolean, extra: { content?: unknown; taskId?: unknown; cascade?: unknown } = {}): Record<string, unknown> {
     const member = this.service(teamId).projectionSnapshot.members[memberId]
     if (!member) return { status: 'error', code: 'MT_VALIDATION', message: `member "${memberId}" not found` }
     switch (op) {
@@ -3613,7 +3611,7 @@ export class MyTeamHost implements MyTeamHostContract {
       case 'remove': {
         const already = op === 'suspend' ? 'suspended' : op === 'archive' ? 'archived' : 'removed'
         if (member.status === already) return { status: 'error', code: 'MT_VALIDATION', message: `member "${memberId}" is already ${already}` }
-        return this.releaseMember(teamId, memberId, op, confirm, 'human')
+        return this.releaseMember(teamId, memberId, op, confirm, 'human', extra.cascade === true)
       }
       case 'restore': {
         if (member.status !== 'suspended' && member.status !== 'archived') {

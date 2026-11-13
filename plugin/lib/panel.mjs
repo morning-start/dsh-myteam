@@ -154,6 +154,8 @@ import { isStoreInitialized, readManifest, storeLayout, ensureStore, rejectProje
                                                      
                                                                 
                                                               
+                                                                 
+                                                               
                                                                  
                                                             
                                                                
@@ -707,6 +709,21 @@ export class MyTeamPanelFacade extends TypertRemoteService {
       return { status: 'error', code: 'MT_UNAVAILABLE', message: '技能清单需要活动队长会话' }
     }
     return remote.listSkills(query ?? {})
+  }
+
+  /**
+   * CHG-187（FR-32 支柱一）：**名册只读端点**（面板名册的深度 chip + 释放二次确认的数据面）。
+   *
+   * 只读：`members[]` 每行带 `parentMemberId` / `depth` / `rootMemberId` / `childCount`；
+   * 离线团队（没有活动队长会话）→ `MT_UNAVAILABLE`，与 `getTaskGraph` 同口径——名册要投影，
+   * 离线不 fold。
+   */
+  async listMembers(agent           , query                         ) {
+    const remote = this.remoteFor(agent)
+    if (!remote || typeof remote.listMembers !== 'function') {
+      return { status: 'error', code: 'MT_UNAVAILABLE', message: '名册需要活动队长会话（离线团队不 fold 投影）' }
+    }
+    return remote.listMembers(query ?? {})
   }
 
   /**
@@ -1333,6 +1350,8 @@ markRemoteMethods(MyTeamPanelFacade.prototype, ['batch', 'describe', 'watch', 'l
   'readSessionHistory',
   // CHG-139a（docs/19 §M6/§M3）：依赖图谱 / 可复用技能清单（只读）
   'getTaskGraph', 'listSkills',
+  // CHG-187（FR-32 支柱一）：名册只读面（成员 + 派生树事实）
+  'listMembers',
   // CHG-139b（docs/19 §5.2/§5.3）：复制团队 / 发布团队（发布 = H 档人类专属）
   'copyTeam', 'publishTeam',
   // CHG-139c（docs/20 §8）：导出 / 导入团队快照

@@ -24,6 +24,27 @@
  */
                                                                   
                                                           
+                                                                  
+import { childrenOf } from '../core/members/hierarchy.mjs'
+
+/**
+ * 纯规则层（`core/**`）只抛 `MTError`，工具面必须**返回**错误结果。
+ *
+ * 为什么需要这层翻译：`executeLeadTool` 的兜底 `catch` 会把任何异常压成
+ * `{code:'MT_INTERNAL'}`——`MT_HAS_CHILDREN` / `MT_DEPTH_EXCEEDED` 这些**可分支的码**就丢了，
+ * 面板只能显示一句「内部错误」。这是「错误码是契约」的边界。
+ */
+export function guardRule   (rule         )                                                                          {
+  try {
+    return { ok: true, value: rule() }
+  } catch (error) {
+    const code = String((error                             )?.code ?? '')
+    return {
+      ok: false,
+      result: { status: 'error', code: code.startsWith('MT_') ? code : 'MT_INTERNAL', message: String((error                     )?.message ?? error) },
+    }
+  }
+}
 
 /**
  * 成员族用到的宿主面（**只列用到的成员**，不做全能门面）。
@@ -36,16 +57,16 @@
                                 
                                                                                
 
-                                                                   
+                                                                                   
               
                    
                    
                           
-                                                               
+                                                                                        
                             
 
-                                                          
-                                                                                                          
+                                                                                
+                                                                                                                                             
 
                                         
                                                                                 
@@ -58,21 +79,26 @@
 
                                                
                                                               
+
+                                                          
+                                               
  
 
 export function createMembersHandlers(host                    ) {
   return {
-    /** `myteam_spawn_member`：skills / mcpAllowlist 只保留字符串项（JSON 面收窄） */
+    /** `myteam_spawn_member`：skills / mcpAllowlist 只保留字符串项（JSON 面收窄）；`parentMemberId` 走派生树 */
     spawn(teamId        , args                         )                          {
       return host.spawnMember(teamId, String(args.roleId), args.instanceName ? String(args.instanceName) : undefined, {
         skills: Array.isArray(args.skills) ? args.skills.filter((skill)                  => typeof skill === 'string') : undefined,
         mcpAllowlist: Array.isArray(args.mcpAllowlist) ? args.mcpAllowlist.filter((name)                 => typeof name === 'string') : undefined,
+        // CHG-187（FR-32）：父成员 id（缺省 = 队长直接召唤的一级成员）
+        parentMemberId: typeof args.parentMemberId === 'string' && args.parentMemberId.length > 0 ? args.parentMemberId : undefined,
       })
     },
 
-    /** `myteam_release_member`：`confirm` 两段确认由 `releaseMember` 自己判 */
+    /** `myteam_release_member`：`confirm` 两段确认由 `releaseMember` 自己判；`cascade` 走倒序级联 */
     release(teamId        , args                         )                          {
-      return host.releaseMember(teamId, String(args.memberId), String(args.mode), args.confirm === true)
+      return host.releaseMember(teamId, String(args.memberId), String(args.mode), args.confirm === true, 'lead', args.cascade === true)
     },
 
     /** `myteam_message`：队长 → 成员消息（落账在前，投递在后） */
@@ -100,6 +126,24 @@ export function createMembersHandlers(host                    ) {
         return { status: 'interrupted', note: 'interrupt 只停当前轮；会话保留' }
       }
       return { status: 'not-running' }
+    },
+
+    /**
+     * `myteam_list_members`（CHG-187 / FR-32 支柱一，**A 档只读**）：名册 + 派生树事实。
+     *
+     * `childCount` 由**同一份名册**现算（不落第二份真相）：面板据此决定释放按钮要不要
+     * 二次确认「将一并释放 N 个子成员」。读不到成员 → `members: []`（**不返回假成员**）。
+     */
+    listMembers(teamId        )                          {
+      let roster                     = []
+      try {
+        roster = host.membersOf(teamId)
+      } catch {
+        // 读不到名册（账本损坏 / 团队不存在）→ 空数组：**不编造成员**，也不让面板整体炸
+        roster = []
+      }
+      const members = roster.map((member) => ({ ...member, childCount: childrenOf(roster, member.id).length }))
+      return { status: 'ok', teamId, total: members.length, members }
     },
   }
 }

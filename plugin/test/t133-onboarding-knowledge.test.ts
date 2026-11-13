@@ -75,8 +75,8 @@ test('t133-1: 新工具三表一致 —— leadToolDefs() / TOOL_TIERS / describ
     [],
   )
   // 数量断言写死（不许放宽成 >=）：加/删工具必须同步改这里与 t121 / t7b
-  assert.equal(lead.length, 54, 'Lead 工具数必须是 54')
-  assert.equal(lead.length + memberToolDefs().length, 63, '工具总数必须是 63')
+  assert.equal(lead.length, 55, 'Lead 工具数必须是 55')
+  assert.equal(lead.length + memberToolDefs().length, 64, '工具总数必须是 64')
 
   // 档位：C（仅队长）—— 写面走团队账本，成员不能替团队立「团队级理解」
   assert.equal(TOOL_TIERS[TOOL], 'C', `${TOOL} 必须是 C 档（仅队长）`)

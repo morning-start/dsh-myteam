@@ -38,6 +38,8 @@ export const TOOL_TIERS: Record<string, ToolTier> = {
   myteam_read_knowledge: 'A',
   myteam_list_roles: 'A',
   myteam_list_teams: 'A',
+  /* CHG-187（FR-32 支柱一）：名册只读面——成员 + 派生树事实（父 / 深度 / 子成员数） */
+  myteam_list_members: 'A',
   myteam_get_team: 'A',
   myteam_list_skills: 'A',
   myteam_list_presets: 'A',

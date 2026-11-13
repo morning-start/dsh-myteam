@@ -452,6 +452,9 @@ function buildBoardViewUncached(proj: TeamProjection, columnMapping: Record<stri
     goal: proj.goal,
     members: Object.values(proj.members).map((m) => ({
       id: m.id, roleId: m.roleId, instanceName: m.instanceName, status: m.status, currentTaskId: m.currentTaskId,
+      /* CHG-187（FR-32 支柱一）：派生树事实随名册一起出去——面板的深度 chip 与「级联释放」确认
+       * 都用它，不必再单独拉一次 listMembers（`childCount` 由客户端按 parentMemberId 现算）。 */
+      parentMemberId: m.parentMemberId ?? null, depth: m.depth ?? 0, rootMemberId: m.rootMemberId ?? m.id,
       ...(m.skills ? { skills: m.skills } : {}),
       ...(m.mcpAllowlist ? { mcpAllowlist: m.mcpAllowlist } : {}),
     })),

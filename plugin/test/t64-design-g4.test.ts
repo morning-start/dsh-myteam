@@ -168,11 +168,11 @@ test('t64-3: 团队设置（settings.html）—— 三层合并链 + 行为配�
   assert.ok(!source.includes("'mt-win'") && !source.includes('mt-win '), '不占用 .win（design-notes §五点五 的坑）')
   assert.ok(source.includes("'settings.mergeNote'"), '数组整条替换说明')
   // 行为配置 + 硬上限只读列
-  assert.ok(source.includes('const CONFIG_CEILINGS = { maxMembers: 6, memberMaxDepth: 0, commandTimeoutMs: 600000 }'), '硬上限口径（与 PATCH_CEILINGS 一致）')
+  assert.ok(source.includes('const CONFIG_CEILINGS = { maxMembers: 6, memberMaxDepth: 2, maxChildren: 5, commandTimeoutMs: 600000 }'), '硬上限口径（与 PATCH_CEILINGS 一致；CHG-187 起 memberMaxDepth 2 / maxChildren 5）')
   assert.ok(source.includes('mt-setrows') && source.includes('mt-setrow') && source.includes('mt-setrow-main') && source.includes('mt-setrow-act'), '行式配置')
   assert.ok(source.includes('mt-readonly-val') && source.includes("t('settings.ceiling')"), '硬上限只读列')
   assert.ok(source.includes('mt-input-num') && source.includes('mt-toggle'), '数值输入 + 开关')
-  for (const key of ["'settings.teamSize'", "'settings.delegateDepth'", "'settings.gateTimeoutLabel'", "'settings.hideTools'", "'settings.evidenceLabel'"]) {
+  for (const key of ["'settings.teamSize'", "'settings.delegateDepth'", "'settings.childrenLimit'", "'settings.gateTimeoutLabel'", "'settings.hideTools'", "'settings.evidenceLabel'"]) {
     assert.ok(source.includes(key), `行为配置项 ${key}`)
   }
   // 状态目录 + gitignore 托管块
@@ -354,14 +354,14 @@ test('t64-10: 审计视图渲染——任务轨 2 条、attempt 分组、事件�
   assert.equal(countClass(byMember, 'mt-evrow'), 4, '全部事件都在')
 })
 
-test('t64-11: 设置页渲染——三层 + 生效层高亮（mt-cur）+ 6 行行为配置 + 硬上限 + 生命周期', () => {
+test('t64-11: 设置页渲染——三层 + 生效层高亮（mt-cur）+ 7 行行为配置 + 硬上限 + 生命周期', () => {
   const { SettingsTab } = G4()
   const config = {
     status: 'ok',
     source: 'project',
     chain: [{ layer: 'default', active: false }, { layer: 'project', active: true }, { layer: 'team', active: false }],
     config: {
-      limits: { maxMembers: 6, memberMaxDepth: 0, maxTasks: 20 },
+      limits: { maxMembers: 6, memberMaxDepth: 1, maxChildren: 3, maxTasks: 20 },
       gates: { enabled: true, commandTimeoutMs: 120000 },
       memory: { evidenceRequired: true },
       views: {}, board: {}, pipeline: {}, taskTypes: {}, clarify: {},
@@ -375,9 +375,9 @@ test('t64-11: 设置页渲染——三层 + 生效层高亮（mt-cur）+ 6 行�
   assert.equal(cur.length, 1, '只有一层生效')
   assert.ok(textOf(cur[0]).startsWith('settings.layer.project'), '生效层 = 项目配置')
   assert.ok(textOf(cur[0]).includes('settings.layer.effective'), '设计稿的「（生效）」后缀')
-  assert.equal(countClass(tree, 'mt-setrow'), 10, '七行行为配置（CHG-173 增任务来源）+ 三行生命周期（归档 / 移交到新会话 / 解散）')
+  assert.equal(countClass(tree, 'mt-setrow'), 11, '八行行为配置（CHG-173 增任务来源 + CHG-187 增子成员上限）+ 三行生命周期（归档 / 移交到新会话 / 解散）')
   assert.equal(countClass(tree, 'mt-toggle'), 3, '三个开关（门禁 / 任务来源 CHG-173 / 记忆证据）；内置工具隐藏改只读事实展示（CHG-170，假开关已删）')
-  assert.equal(countClass(tree, 'mt-readonly-val'), 4, '三个硬上限只读列 + 内置工具隐藏状态列（无 runtime 显示 —，不编 0）')
+  assert.equal(countClass(tree, 'mt-readonly-val'), 5, '四个硬上限只读列（CHG-187 增 maxChildren）+ 内置工具隐藏状态列（无 runtime 显示 —，不编 0）')
   assert.ok(textOf(tree).includes('settings.ceiling'), '硬上限文案')
   assert.ok(textOf(tree).includes('settings.disbandSub'), '解散影响面')
   assert.ok(hasClass(tree, 'mt-note-box'), '改配置不重跑已派发任务')

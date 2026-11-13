@@ -1,12 +1,12 @@
-﻿/**
+/**
  * T121 · P1-6（docs/21 §6）：**工具输出契约（`jsonOutput` 双声明）**。
  *
  * 为什么必须有：此前 63 个工具的 `output.schema` 只有 `{ status: string }` ——
  * 一个字段的「契约」等于没有契约：宿主校验器（`validateJsonSchemaValue`）过不去任何东西，
  * 面板和模型都不知道能拿到什么。本测试守的是「声明是真的」：
  *
- *  ① **覆盖度**：63 个工具**一个不少**地走 `jsonOutput`（与 `TOOL_TIERS` 双向锁死，
- *    与 `defs.ts` 的 63 个名字一致，无重复）；
+ *  ① **覆盖度**：64 个工具**一个不少**地走 `jsonOutput`（与 `TOOL_TIERS` 双向锁死，
+ *    与 `defs.ts` 的 64 个名字一致，无重复）；
  *  ② **合法性**：每个 schema 都是 `type:'object'` + `properties.status` + `required` 含 status；
  *  ③ **不丢字段**：`render` 输出是可 `JSON.parse` 的**紧凑** JSON（不 pretty-print、不筛选）；
  *  ④ **合并语义**：就地补的字段进得来、`status` 的必填减不掉；
@@ -34,21 +34,21 @@ import {
 import { leadToolDefs, memberToolDefs, toolOutput } from '../src/tools/defs.ts'
 import { TOOL_TIERS } from '../src/core/tools/tool-tiers.ts'
 
-const TOOL_COUNT = 63
+const TOOL_COUNT = 64
 
-/** 63 个真实工具名（defs 侧）——契约清单必须与它一一对应 */
+/** 64 个真实工具名（defs 侧）——契约清单必须与它一一对应 */
 const defNames = [...leadToolDefs(), ...memberToolDefs()].map((def) => def.name).sort()
 
-/* ── ① 覆盖度：63 个一个不能少，且与单一事实源双向锁死 ─────────────── */
+/* ── ① 覆盖度：64 个一个不能少，且与单一事实源双向锁死 ─────────────── */
 
-test('t121-1: 63 个工具全部有契约 —— 与 TOOL_TIERS / defs 双向锁死，无重复', () => {
+test('t121-1: 64 个工具全部有契约 —— 与 TOOL_TIERS / defs 双向锁死，无重复', () => {
   const entries = describeContract()
   const names = entries.map((entry) => entry.name)
 
   assert.equal(names.length, TOOL_COUNT, `契约数量必须是 ${TOOL_COUNT}`)
   assert.equal(new Set(names).size, names.length, '契约清单里有重复工具名')
   assert.deepEqual([...names].sort(), [...Object.keys(TOOL_TIERS)].sort(), '契约清单 ≠ 档位表（工具有哪些的单一事实源）')
-  assert.deepEqual([...names].sort(), defNames, '契约清单 ≠ defs 里真实注册的 63 个工具名')
+  assert.deepEqual([...names].sort(), defNames, '契约清单 ≠ defs 里真实注册的 64 个工具名')
   // 每个条目都带档位（面板按档位决定「谁能看到这条契约」）
   for (const entry of entries) assert.ok(['A', 'C', 'CM', 'H'].includes(entry.tier), `${entry.name} 档位非法：${entry.tier}`)
 })
