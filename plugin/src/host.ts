@@ -42,6 +42,7 @@ import { createMembersHandlers } from './host/members.ts'
 import { createMemberTaskHandlers, createTasksHandlers } from './host/tasks.ts'
 import { createPlanHandlers } from './host/plan.ts'
 import { createRolesHandlers } from './host/roles.ts'
+import { createTeamsHandlers } from './host/teams.ts'
 import { leadToolDefs, memberToolDefs, type ToolDef } from './tools/defs.ts'
 // CHG-148（P1-6）：按工具名取完整结果契约（jsonOutput 双声明），不再用统一空 schema
 import { outputForTool } from './core/tools/output-contract.ts'
@@ -684,6 +685,29 @@ export class MyTeamHost implements MyTeamHostContract {
     createRole: (args) => this.createRole(args),
     updateRole: (args) => this.updateRole(args),
     applyRoles: (teamId, args, actor) => this.applyRoles(teamId, args, actor),
+  })
+  /**
+   * CHG-186（T155c）：团队族端点适配层（`src/host/teams.ts`）。
+   *
+   * 宿主面只声明这族**用到的**成员——私有方法改名 → 装配处编译报错。`workspaceRoot`
+   * 同样是**惰性 getter**，以方法形式接出来（构造期取不到项目根）。这一族**同步与
+   * 异步并存**（`exportTeamTool` 同步、`importTeamTool` 等本来 async），原样保留。
+   */
+  private readonly teams = createTeamsHandlers({
+    commit: (teamId, draft) => this.commit(teamId, draft),
+    service: (teamId) => this.service(teamId),
+    syncTokens: (teamId) => this.syncTokens(teamId),
+    workspaceRoot: () => this.workspaceRoot,
+    log: (level, msg) => this.log(level, msg),
+    dispose: () => this.dispose(),
+    exportTeamTool: (args) => this.exportTeamTool(args),
+    importTeamTool: (args) => this.importTeamTool(args),
+    publishTeamTool: (args) => this.publishTeamTool(args),
+    copyTeamTool: (args) => this.copyTeamTool(args),
+    saveTeamConfigTool: (args) => this.saveTeamConfigTool(args),
+    resetTeamConfig: (teamId, args) => this.resetTeamConfig(teamId, args),
+    handoffTeam: (args) => this.handoffTeam(args),
+    readSessionHistory: (args) => this.readSessionHistory(args),
   })
   /** CHG-186（T155b）：任务族**成员侧**适配层（同一文件的另一半，见上） */
   private readonly memberTasks = createMemberTaskHandlers({
@@ -1345,15 +1369,11 @@ export class MyTeamHost implements MyTeamHostContract {
           return this.tasks.edit(teamId, args, actor)
         case 'myteam_review_task':
           return this.tasks.review(teamId, args, actor)
-        case 'myteam_update_team': {
-          const payload: Record<string, unknown> = { teamId }
-          if (args.name !== undefined) payload.name = String(args.name).trim()
-          if (args.goal !== undefined) payload.goal = String(args.goal).trim()
-          const r = this.commit(teamId, { actor, type: 'team.updated', payload })
-          return r.ok
-            ? { status: 'updated', teamId, ...(args.name !== undefined ? { name: String(args.name).trim() } : {}), ...(args.goal !== undefined ? { goal: String(args.goal).trim() } : {}) }
-            : { status: 'error', code: r.code, message: r.message }
-        }
+        /* CHG-186（T155c）：团队族（编辑 / 解散 / 导出 / 导入 / 发布 / 复制 / 团队配置 /
+         * 会话移交 / 考古）实现已搬到 `src/host/teams.ts`。这里只转发——逻辑/顺序/默认值
+         * 一个都没改（纯结构重构，行为零变化）。 */
+        case 'myteam_update_team':
+          return this.teams.updateTeam(teamId, args, actor)
         /* ── CHG-73：执行期编辑闭环（重规划 / 取消 / 批量编排 / 角色删除）── */
         case 'myteam_rescope_task':
           return this.tasks.rescope(teamId, args, actor)
@@ -1380,56 +1400,8 @@ export class MyTeamHost implements MyTeamHostContract {
           return this.members.message(teamId, args, actor)
         case 'myteam_interrupt':
           return this.members.interrupt(teamId, args, actor)
-        case 'myteam_disband': {
-          if (args.confirm !== true) return { status: 'confirm-required', message: '解散是两段确认操作（影响面：成员排空/未完成任务转 blocked/账本归档），请带 confirm=true 重调' }
-          const svc = this.service(teamId)
-          const proj = svc.projectionSnapshot
-          const memberCount = Object.keys(proj.members).length
-          const taskCount = Object.keys(proj.tasks).length
-          // CHG-86（P0-2）：归档必须**真的落盘**。旧实现只往账本写一条 team.disbanded
-          // （payload 里带个路径字符串），没有任何文件 IO——面板归档视图渲染的
-          // archive/<id>/{team.json,tokens.json,members/,artifacts/} 永远不存在，整套是空壳。
-          // 顺序：先落账本（状态变 archived）→ 再按归档态快照写文件 → 最后释放成员。
-          const disbanded = this.commit(teamId, { actor, type: 'team.disbanded', payload: { teamId, archivedPaths: [`${STORE_DIR}/history/archive/${teamId}`] } })
-          if (!disbanded.ok) {
-            return { status: 'error', code: disbanded.code, message: disbanded.message }
-          }
-          let archived: { dir: string; relativeDir: string; files: string[] } | undefined
-          try {
-            const after = this.service(teamId).projectionSnapshot
-            const tokens = this.syncTokens(teamId)
-            const snapshot = buildArchiveSnapshot({
-              team: after,
-              tokens,
-              archivedAt: Date.now(),
-              archivedBy: actor,
-              ledgerPath: svc.ledgerPath,
-              eventCount: after.revision,
-            })
-            archived = writeArchive(this.workspaceRoot, snapshot)
-          } catch (e) {
-            // 归档写失败不静默：账本已记 disbanded，但必须让调用方知道文件没落盘
-            this.log('error', `archive write for ${teamId} failed: ${String(e)}`)
-            this.dispose()
-            return {
-              status: 'error',
-              code: 'MT_ARCHIVE_FAILED',
-              // A2：旧文案在这里引用了一个**全仓无定义**的归档列表工具（幽灵引用）。
-              // 归档的真实落点：`<STORE_DIR>/history/archive/<teamId>/`（MANIFEST.json 是完整性
-              // 判据，缺它即视为未归档）；真实可做的事：账本里 team.disbanded 已落，用
-              // myteam_get_audit 复核，用 myteam_list_teams 的 archived.ids 看目录是否被登记。
-              message: `团队已解散但归档落盘失败：${String(e)}（账本仍完整：team.disbanded 已落账，可用 myteam_get_audit 复核；归档目录 ${STORE_DIR}/history/archive/${teamId}/ 可能只有部分文件——MANIFEST.json 缺失即视为未归档，可用 myteam_list_teams 的 archived.ids 核对是否被登记）`,
-              impact: { members: memberCount, tasks: taskCount },
-            }
-          }
-          this.dispose()
-          return {
-            status: 'disbanded',
-            impact: { members: memberCount, tasks: taskCount },
-            archive: archived,
-            note: `归档已落盘：${archived.relativeDir}（${archived.files.length} 个文件，只读可查）`,
-          }
-        }
+        case 'myteam_disband':
+          return this.teams.disband(teamId, args, actor)
         case 'myteam_resolve_proposal':
           return this.plan.resolveProposal(teamId, args, actor)
         case 'myteam_adopt_knowledge': {
@@ -1619,22 +1591,22 @@ export class MyTeamHost implements MyTeamHostContract {
           return this.createToolTool(args)
         /* CHG-133（docs/20 §8）：导出 / 导入团队快照（仅队长） */
         case 'myteam_export_team':
-          return this.exportTeamTool(args)
+          return this.teams.exportTeam(args)
         case 'myteam_import_team':
-          return this.importTeamTool(args)
+          return this.teams.importTeam(args)
         /* CHG-132（docs/20 §3/§5.1）：发布团队定义到全局团队库（人类专属） */
         case 'myteam_publish_team':
-          return this.publishTeamTool(args)
+          return this.teams.publishTeam(args)
         /* CHG-131（docs/19 §5.2）：复制团队定义 → 新草稿（仅队长） */
         case 'myteam_copy_team':
-          return this.copyTeamTool(args)
+          return this.teams.copyTeam(args)
         /* CHG-130（docs/19 §M9/§M10）：审计查询 + 会话面（移交 / 考古） */
         case 'myteam_get_audit':
           return this.getAuditTool(args)
         case 'myteam_handoff':
-          return this.handoffTeam(args)
+          return this.teams.handoff(args)
         case 'myteam_read_session':
-          return this.readSessionHistory(args)
+          return this.teams.readSession(args)
         /* CHG-129（docs/19 §M10）：token / 成本只读查询（全员可读） */
         case 'myteam_get_tokens':
           return this.getTokensTool(args)
@@ -1649,7 +1621,7 @@ export class MyTeamHost implements MyTeamHostContract {
           return this.roles.copyRole(args)
         /* CHG-125（docs/19 §M2）：写团队配置（仅队长；校验先于写 + 两段确认） */
         case 'myteam_save_team_config':
-          return this.saveTeamConfigTool(args)
+          return this.teams.saveTeamConfig(args)
         /* CHG-124（docs/19 §M6）：任务依赖图谱只读查询（全员可读） */
         case 'myteam_get_task_graph':
           return this.getTaskGraphTool(args)
@@ -1682,7 +1654,7 @@ export class MyTeamHost implements MyTeamHostContract {
         case 'myteam_delete_preset':
           return this.deletePreset(args)
         case 'myteam_reset_team_config':
-          return this.resetTeamConfig(teamId, args)
+          return this.teams.resetTeamConfig(teamId, args)
         default:
           return { status: 'error', code: 'MT_UNKNOWN_TOOL', message: `unknown lead tool: ${name}` }
       }

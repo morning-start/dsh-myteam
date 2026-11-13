@@ -1,10 +1,10 @@
 {
   "schema": 1,
-  "builtAt": "2026-11-13T15:20:39.561Z",
+  "builtAt": "2026-11-13T15:26:00.702Z",
   "node": "v22.23.2",
   "entry": "./lib/host.mjs",
-  "modules": 61,
-  "sourceHash": "85e055a7913193d150b2b68a1a73288fe8126b23a2c735ef971ccdfc8db5c0cc",
+  "modules": 62,
+  "sourceHash": "e68dd554209e96b23535f9e6a07eea4256e96e7ee2786aa5b97adbce3bf91722",
   "clientFile": "client/client.js",
   "clientHash": "67c601e3864c4bd529a73b317d86a1135914d8e5f4b36602c19ba68e148c823e",
   "files": [
@@ -64,6 +64,7 @@
     "host/plan.ts",
     "host/roles.ts",
     "host/tasks.ts",
+    "host/teams.ts",
     "panel.ts",
     "remote/plan-feedback.ts",
     "remote/service.ts",

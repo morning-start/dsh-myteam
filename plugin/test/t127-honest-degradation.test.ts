@@ -107,7 +107,12 @@ test('t127-2: session-handoff.ts 源文件全文的 myteam_* 名字同样全部�
 
 test('t127-3: MT_ARCHIVE_FAILED 文案不再引用幽灵工具，且给出真实归档落点', () => {
   const real = realToolNames()
-  const source = readFileSync(join(here, '..', 'src', 'host.ts'), 'utf8')
+  /* CHG-186（T155c）：`myteam_disband`（MT_ARCHIVE_FAILED 分支）已随团队族搬到
+   * `src/host/teams.ts`。**扫描面不缩**：入口层 + 团队族两处一起拼，幽灵名在任何一处
+   * 出现都仍然失败（断言本身一个都没改）。 */
+  const source = ['host.ts', join('host', 'teams.ts')]
+    .map((path) => readFileSync(join(here, '..', 'src', path), 'utf8'))
+    .join('\n')
 
   assert.ok(!source.includes('myteam_list_archives'), 'myteam_list_archives 全仓无定义，任何位置（含注释）都不该出现')
 
