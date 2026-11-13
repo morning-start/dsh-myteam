@@ -44,6 +44,7 @@ import { createPlanHandlers } from './host/plan.mjs'
 import { createRolesHandlers } from './host/roles.mjs'
 import { createTeamsHandlers } from './host/teams.mjs'
 import { createKnowledgeHandlers, createMemberKnowledgeHandlers } from './host/knowledge.mjs'
+import { createQueryHandlers } from './host/query.mjs'
 import { leadToolDefs, memberToolDefs,              } from './tools/defs.mjs'
 // CHG-148（P1-6）：按工具名取完整结果契约（jsonOutput 双声明），不再用统一空 schema
 import { outputForTool } from './core/tools/output-contract.mjs'
@@ -731,6 +732,29 @@ export class MyTeamHost                               {
    */
                    memberKnowledge = createMemberKnowledgeHandlers({
     workspaceRoot: () => this.workspaceRoot,
+  })
+  /**
+   * CHG-186（T155c）：查询族端点适配层（`src/host/query.ts`，只读）。
+   *
+   * 宿主面只声明这族**用到的**成员——成员改名 → 装配处编译报错（`listContributionsTool`
+   * 是私有方法，其余是公开方法）。
+   */
+                   query = createQueryHandlers({
+    getAuditTool: (args) => this.getAuditTool(args),
+    getTokensTool: (args) => this.getTokensTool(args),
+    listSkillsTool: (args) => this.listSkillsTool(args),
+    getTaskGraphTool: (args) => this.getTaskGraphTool(args),
+    listTeamsTool: (args) => this.listTeamsTool(args),
+    getTeamTool: (args) => this.getTeamTool(args),
+    listRolesTool: (args) => this.listRolesTool(args),
+    listPresetsTool: () => this.listPresetsTool(),
+    listContributionsTool: (catalog) => this.listContributionsTool(catalog),
+    reloadContributions: () => this.reloadContributions(),
+    savePreset: (args) => this.savePreset(args),
+    copyPreset: (args) => this.copyPreset(args),
+    deletePreset: (args) => this.deletePreset(args),
+    createSkillTool: (args) => this.createSkillTool(args),
+    createToolTool: (args) => this.createToolTool(args),
   })
   /** CHG-186（T155b）：任务族**成员侧**适配层（同一文件的另一半，见上） */
                    memberTasks = createMemberTaskHandlers({
@@ -1443,10 +1467,13 @@ export class MyTeamHost                               {
         case 'myteam_set_project_role':
           return this.roles.setProjectRole(teamId, args, actor)
         /* CHG-134（docs/20 §5.4）：技能 / 工具资产（只写 myteam 队长预设） */
+        /* CHG-186（T155c）：查询族（审计 / token / 技能 / 依赖图谱 / 团队目录 / 角色目录 /
+         * 团队模板 / 插件贡献）实现已搬到 `src/host/query.ts`。这里只转发——逻辑/顺序/默认值
+         * 一个都没改（纯结构重构，行为零变化）。 */
         case 'myteam_create_skill':
-          return this.createSkillTool(args)
+          return this.query.createSkill(args)
         case 'myteam_create_tool':
-          return this.createToolTool(args)
+          return this.query.createTool(args)
         /* CHG-133（docs/20 §8）：导出 / 导入团队快照（仅队长） */
         case 'myteam_export_team':
           return this.teams.exportTeam(args)
@@ -1460,17 +1487,17 @@ export class MyTeamHost                               {
           return this.teams.copyTeam(args)
         /* CHG-130（docs/19 §M9/§M10）：审计查询 + 会话面（移交 / 考古） */
         case 'myteam_get_audit':
-          return this.getAuditTool(args)
+          return this.query.getAudit(args)
         case 'myteam_handoff':
           return this.teams.handoff(args)
         case 'myteam_read_session':
           return this.teams.readSession(args)
         /* CHG-129（docs/19 §M10）：token / 成本只读查询（全员可读） */
         case 'myteam_get_tokens':
-          return this.getTokensTool(args)
+          return this.query.getTokens(args)
         /* CHG-128（docs/19 §M3）：可复用技能清单（全员可读） */
         case 'myteam_list_skills':
-          return this.listSkillsTool(args)
+          return this.query.listSkills(args)
         /* CHG-127（docs/19 §5.3）：发布角色到全局（人类专属；单向不可逆） */
         case 'myteam_publish_role':
           return this.roles.publishRole(args)
@@ -1482,15 +1509,15 @@ export class MyTeamHost                               {
           return this.teams.saveTeamConfig(args)
         /* CHG-124（docs/19 §M6）：任务依赖图谱只读查询（全员可读） */
         case 'myteam_get_task_graph':
-          return this.getTaskGraphTool(args)
+          return this.query.getTaskGraph(args)
         /* CHG-123（docs/19 §M0/M2）：团队目录 + 详情（全员可读） */
         case 'myteam_list_teams':
-          return this.listTeamsTool(args)
+          return this.query.listTeams(args)
         case 'myteam_get_team':
-          return this.getTeamTool(args)
+          return this.query.getTeam(args)
         /* CHG-122（docs/19 §M1）：角色目录只读视图（全员可读） */
         case 'myteam_list_roles':
-          return this.listRolesTool(args)
+          return this.query.listRoles(args)
         case 'myteam_create_role':
           return this.roles.createRole(args)
         case 'myteam_update_role':
@@ -1499,18 +1526,18 @@ export class MyTeamHost                               {
           // CHG-87（FR-16.1）：单角色调用——只写 config/roles/session-defaults.json，不碰团队账本
           return this.roles.applyRoles(teamId, args, actor)
         case 'myteam_list_presets':
-          return this.listPresetsTool()
+          return this.query.listPresets()
         // CHG-91（插件团队贡献契约 v1）：插件贡献的只读视图 + 显式重载
         case 'myteam_list_contributions':
-          return this.listContributionsTool()
+          return this.query.listContributions()
         case 'myteam_reload_contributions':
-          return this.listContributionsTool(this.reloadContributions())
+          return this.query.reloadContributions()
         case 'myteam_save_preset':
-          return this.savePreset(args)
+          return this.query.savePreset(args)
         case 'myteam_copy_preset':
-          return this.copyPreset(args)
+          return this.query.copyPreset(args)
         case 'myteam_delete_preset':
-          return this.deletePreset(args)
+          return this.query.deletePreset(args)
         case 'myteam_reset_team_config':
           return this.teams.resetTeamConfig(teamId, args)
         default:

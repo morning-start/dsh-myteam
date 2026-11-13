@@ -82,10 +82,16 @@ export const FROZEN_A2 = []
  * **6,160** → 再搬走任务族（`src/host/tasks.ts`）后 **5,961** → T155c 搬走计划族
  * （`src/host/plan.ts`）后 **5,715** → 再搬走角色族（`src/host/roles.ts`）后 **5,710** →
  * 再搬走团队族（`src/host/teams.ts`）后 **5,682** → 再搬走知识族
- * （`src/host/knowledge.ts`）后 **5,536**。棘轮直接钉在**拆完的实测值**上
- * （不留余量：入口层再加一行注释都该红）。每搬完一族就把数字往下压。
+ * （`src/host/knowledge.ts`）后 **5,536** → 再搬走查询族（`src/host/query.ts`）后
+ * **5,563**。棘轮直接钉在**拆完的实测值**上（不留余量：入口层再加一行注释都该红）。
+ *
+ * ⚠️ 查询族是**唯一会让入口层变高**的一族（+27）：它的 15 个 case 本来就只有两行
+ * （`case` + 一行转发），没有内联逻辑可减。搬它换来的是**形状统一**——`executeLeadTool`
+ * 的 switch 现在纯是「工具名 → 适配层」路由表。所以这一族的 +27 是口径成本，不是回潮；
+ * 下一刀该切的是**行为边界**（`spawnMember` / `reviewTask` / `batchTaskOp` /
+ * `scopeAuditFor` 下沉 `core/**`），不是继续按端点切。
  */
-export const A6_LIMIT = { 'host.ts': 5536 }
+export const A6_LIMIT = { 'host.ts': 5563 }
 
 /** 递归列出 dir 下扩展名为 ext 的文件（确定性排序；Dirent 直接给答案，不 try/catch 猜目录） */
 function walk(dir, ext) {
