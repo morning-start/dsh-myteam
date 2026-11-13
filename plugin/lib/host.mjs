@@ -41,6 +41,7 @@ import { TeamService, bootstrapTeam,                  } from './core/service.mjs
 import { createMembersHandlers } from './host/members.mjs'
 import { createMemberTaskHandlers, createTasksHandlers } from './host/tasks.mjs'
 import { createPlanHandlers } from './host/plan.mjs'
+import { createRolesHandlers } from './host/roles.mjs'
 import { leadToolDefs, memberToolDefs,              } from './tools/defs.mjs'
 // CHG-148（P1-6）：按工具名取完整结果契约（jsonOutput 双声明），不再用统一空 schema
 import { outputForTool } from './core/tools/output-contract.mjs'
@@ -666,6 +667,23 @@ export class MyTeamHost                               {
     taskWithGateChain: (teamId, task) => this.taskWithGateChain(teamId, task),
     resolveProposal: (teamId, args, actor) => this.resolveProposal(teamId, args, actor),
     readLedgerEvents: (ledgerPath) => readLedgerEvents(ledgerPath),
+  })
+  /**
+   * CHG-186（T155c）：角色族端点适配层（`src/host/roles.ts`）。
+   *
+   * 宿主面只声明这族**用到的**私有成员——私有方法改名 → 装配处编译报错。`rolePaths`
+   * 同样是**惰性 getter**，以方法形式接出来（构造期取不到项目级角色目录）。
+   */
+                   roles = createRolesHandlers({
+    rolePaths: () => this.rolePaths,
+    roleCatalog: () => this.roleCatalog(),
+    roleError: (e) => this.roleError(e),
+    deleteRoleTool: (roleId, confirm) => this.deleteRoleTool(roleId, confirm),
+    publishRoleTool: (args) => this.publishRoleTool(args),
+    copyRoleTool: (args) => this.copyRoleTool(args),
+    createRole: (args) => this.createRole(args),
+    updateRole: (args) => this.updateRole(args),
+    applyRoles: (teamId, args, actor) => this.applyRoles(teamId, args, actor),
   })
   /** CHG-186（T155b）：任务族**成员侧**适配层（同一文件的另一半，见上） */
                    memberTasks = createMemberTaskHandlers({
@@ -1347,7 +1365,7 @@ export class MyTeamHost                               {
         case 'myteam_create_tasks':
           return this.tasks.createBatch(teamId, args, actor)
         case 'myteam_delete_role':
-          return this.deleteRoleTool(String(args.roleId ?? ''), args.confirm === true)
+          return this.roles.deleteRole(args)
         case 'myteam_reassign_task':
         case 'myteam_revoke_attempt':
           // CHG-158（报告 A5）：撤权 vs 重派共用一段实现，由工具名分叉（见 tasks.ts）
@@ -1589,34 +1607,11 @@ export class MyTeamHost                               {
             ? { status: 'assigned', taskId: args.taskId, memberIds: ids, note: '负责队员已标注；执行仍按角色 claim（指派不改变调度）' }
             : { status: 'error', code: r.code, message: r.message }
         }
-        case 'myteam_set_project_role': {
-          if (args.clear === true) {
-            if (args.confirm !== true) return { status: 'confirm-required', message: '取消项目自身角色是两段确认操作，请带 confirm=true 重调' }
-            clearProjectRoleCard(this.rolePaths)
-            return { status: 'cleared', note: '项目自身角色已取消（不影响任何团队）' }
-          }
-          const roleId = String(args.roleId ?? '')
-          const entry = this.roleCatalog().find((item) => item.definition.id === roleId)
-          if (!entry) return { status: 'error', code: 'MT_ROLE_NOT_FOUND', message: `role "${roleId}" not found in any library` }
-          if (args.confirm !== true) {
-            return {
-              status: 'confirm-required',
-              role: { id: entry.definition.id, name: entry.definition.name, origin: entry.origin },
-              message: `把「${entry.definition.name}」设为项目自身角色？它不属于任何团队，可被本项目各团队聘任。带 confirm=true 落盘`,
-            }
-          }
-          try {
-            const written = writeProjectRoleCard(this.rolePaths, structuredClone(entry.definition))
-            return {
-              status: 'set',
-              roleId,
-              filePath: written.filePath,
-              note: '项目自身角色已写入 config/project-role.json；团队组队时可直接聘任该角色',
-            }
-          } catch (e) {
-            return this.roleError(e)
-          }
-        }
+        /* CHG-186（T155c）：角色族（新建 / 编辑 / 删除 / 发布 / 复制 / 应用 / 项目自身角色）
+         * 实现已搬到 `src/host/roles.ts`。这里只转发——逻辑/顺序/默认值一个都没改
+         * （纯结构重构，行为零变化）。 */
+        case 'myteam_set_project_role':
+          return this.roles.setProjectRole(teamId, args, actor)
         /* CHG-134（docs/20 §5.4）：技能 / 工具资产（只写 myteam 队长预设） */
         case 'myteam_create_skill':
           return this.createSkillTool(args)
@@ -1648,10 +1643,10 @@ export class MyTeamHost                               {
           return this.listSkillsTool(args)
         /* CHG-127（docs/19 §5.3）：发布角色到全局（人类专属；单向不可逆） */
         case 'myteam_publish_role':
-          return this.publishRoleTool(args)
+          return this.roles.publishRole(args)
         /* CHG-126（docs/19 §5.1）：复制角色到项目（fork；仅队长） */
         case 'myteam_copy_role':
-          return this.copyRoleTool(args)
+          return this.roles.copyRole(args)
         /* CHG-125（docs/19 §M2）：写团队配置（仅队长；校验先于写 + 两段确认） */
         case 'myteam_save_team_config':
           return this.saveTeamConfigTool(args)
@@ -1667,12 +1662,12 @@ export class MyTeamHost                               {
         case 'myteam_list_roles':
           return this.listRolesTool(args)
         case 'myteam_create_role':
-          return this.createRole(args)
+          return this.roles.createRole(args)
         case 'myteam_update_role':
-          return this.updateRole(args)
+          return this.roles.updateRole(args)
         case 'myteam_apply_roles':
           // CHG-87（FR-16.1）：单角色调用——只写 config/roles/session-defaults.json，不碰团队账本
-          return this.applyRoles(teamId, args, actor)
+          return this.roles.applyRoles(teamId, args, actor)
         case 'myteam_list_presets':
           return this.listPresetsTool()
         // CHG-91（插件团队贡献契约 v1）：插件贡献的只读视图 + 显式重载

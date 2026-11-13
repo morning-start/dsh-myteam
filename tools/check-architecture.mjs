@@ -80,10 +80,11 @@ export const FROZEN_A2 = []
  * 基线演进：CHG-186 动手前 6,210 → 契约下沉（`MyTeamConfig` / `KnowledgeView` 搬到
  * `core/host/contract.ts`）后 **6,163** → T155b 搬走成员族（`src/host/members.ts`）后
  * **6,160** → 再搬走任务族（`src/host/tasks.ts`）后 **5,961** → T155c 搬走计划族
- * （`src/host/plan.ts`）后 **5,715**。棘轮直接钉在**拆完的实测值**上（不留余量：入口层
- * 再加一行注释都该红）。每搬完一族就把数字往下压。
+ * （`src/host/plan.ts`）后 **5,715** → 再搬走角色族（`src/host/roles.ts`）后 **5,710**。
+ * 棘轮直接钉在**拆完的实测值**上（不留余量：入口层再加一行注释都该红）。每搬完一族
+ * 就把数字往下压。
  */
-export const A6_LIMIT = { 'host.ts': 5715 }
+export const A6_LIMIT = { 'host.ts': 5710 }
 
 /** 递归列出 dir 下扩展名为 ext 的文件（确定性排序；Dirent 直接给答案，不 try/catch 猜目录） */
 function walk(dir, ext) {
