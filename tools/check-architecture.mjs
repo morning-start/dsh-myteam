@@ -16,6 +16,10 @@
  *   A3 子进程    `core/**` 不得出现 `child_process`
  *   A4 记账本    只有 `core/fs/write-log.ts` 可以 `new WriteLog(` / 持有 `activeLog`
  *   A5 打印边界  `core/**` 不得 `console.log` / `process.stdout.write`（warn/error 允许）
+ *   A6 行数棘轮  `host.ts` 行数只减不增（上限见 {@link A6_LIMIT}）
+ *
+ * A1–A5 是**行级**规则（一行一条违规，带 line 号）；A6 是**文件级**（判整份文件的行数，
+ * 没有「第几行」可言），所以它在扫描后统一算，不塞进 RULES。
  *
  * ── 冻结清单（FROZEN_A2）──────────────────────────────────────────────────────
  * CHG-174 的写盘迁移是分批做的，A2 在迁完之前**必然有存量违规**。门禁的价值是「拦住新增」，
@@ -36,7 +40,7 @@
  * 运行：node tools/check-architecture.mjs
  *   退出码：ARCH_VIOLATIONS 为 0 时 0，否则 1（可直接当 CI 门禁）
  */
-import { readdirSync, readFileSync, realpathSync } from 'node:fs'
+import { existsSync, readdirSync, readFileSync, realpathSync } from 'node:fs'
 import { dirname, join, relative, sep } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
@@ -58,6 +62,26 @@ const WRITE_LOG = 'core/fs/write-log.ts'
  * 明确分期的迁移还没做完，且条目会随迁移一起被删。
  */
 export const FROZEN_A2 = []
+
+/**
+ * A6 入口层行数棘轮：`host.ts` 只减不增（拆薄是持续动作，不是一次性运动）。
+ *
+ * 为什么单独成**文件级**检查而不在 RULES 里：RULES 每条都是「一行一条违规」，A6 判的是
+ * 整份文件的行数（没有第几行可言），混进去只会让 line 号失去意义。所以它在扫描后统一算。
+ *
+ * 上限写在 A6_LIMIT 里，**每次拆完手动下调**；CI 上只要涨就红。
+ *
+ * 行数口径 = `code.split('\n').length`，与 `tools/arch-report.mjs` 的 `loc` 完全一致，
+ * 也就是计划 §4 写的「`host.ts` 6,210 行」。**不要**用
+ * `(Get-Content src/host.ts | Measure-Object -Line).Lines`：本仓源码是 UTF-8 无 BOM +
+ * 大量中文注释，Windows 下 `Get-Content` 会按错误编码解码而少报约 900 行（实测报 5,319，
+ * 真实 6,209 行 / 6,210 个 split 元素）——拿它当基线，棘轮会凭空多出 900 行余量。
+ *
+ * 基线演进：CHG-186 动手前 6,210 → 契约下沉（`MyTeamConfig` / `KnowledgeView` 搬到
+ * `core/host/contract.ts`）后 **6,163**。棘轮直接钉在**拆完的实测值**上（不留余量：
+ * 入口层再加一行注释都该红）。T155b 每搬完一族就把数字往下压，最终 4,000。
+ */
+export const A6_LIMIT = { 'host.ts': 6163 }
 
 /** 递归列出 dir 下扩展名为 ext 的文件（确定性排序；Dirent 直接给答案，不 try/catch 猜目录） */
 function walk(dir, ext) {
@@ -193,15 +217,17 @@ const RULES = [
  * @param {string} [options.rootDir] 插件根目录（含 `src/`）；默认本仓 `plugin/`
  * @param {string} [options.srcDir] 要扫的源码目录；默认 `join(rootDir, 'src')`
  * @param {string[]} [options.frozen] A2 存量清单；默认 {@link FROZEN_A2}
+ * @param {Record<string, number>} [options.a6Limit] A6 行数棘轮；默认 {@link A6_LIMIT}
  * @returns {{
  *   total: number,
  *   violations: Array<{ rule: string, file: string, line: number, message: string, fix: string }>,
  *   frozen: number,
  *   frozenFiles: string[],
+ *   a6: Array<{ file: string, lines: number, limit: number }>,
  * }}
  */
 export function runArchitectureCheck(options = {}) {
-  const { rootDir = PLUGIN_ROOT, srcDir = join(rootDir, 'src'), frozen = FROZEN_A2 } = options
+  const { rootDir = PLUGIN_ROOT, srcDir = join(rootDir, 'src'), frozen = FROZEN_A2, a6Limit = A6_LIMIT } = options
   const files = walk(srcDir, '.ts')
   const frozenSet = new Set(frozen)
   /** 本次**确实还在违规**的冻结条目：只有它算「仍在迁移」，没命中的要报 STALE */
@@ -240,8 +266,31 @@ export function runArchitectureCheck(options = {}) {
     })
   }
 
+  // A6 入口层行数棘轮：文件级（没有「第几行」的概念，line 记 0，与 A2-STALE-FROZEN 同形）。
+  // 文件不在扫描结果里就跳过——临时树（t137 的样例）与「端点族已搬空后改名」都不该凭空报错。
+  const a6 = []
+  for (const rel of Object.keys(a6Limit).sort((a, b) => a.localeCompare(b))) {
+    const full = join(srcDir, ...rel.split('/'))
+    if (!existsSync(full)) continue
+    const lines = readFileSync(full, 'utf8').split('\n').length
+    a6.push({ file: rel, lines, limit: a6Limit[rel] })
+    if (lines > a6Limit[rel]) {
+      violations.push({
+        rule: 'A6',
+        file: rel,
+        line: 0,
+        message:
+          `入口层 ${rel} 已 ${lines} 行，超出棘轮上限 ${a6Limit[rel]} 行：入口层只减不增，` +
+          '新代码请落到 src/host/<族>.ts（端点族适配器），不要继续堆进 host.ts',
+        fix:
+          `把该族端点实现搬到 src/host/<族>.ts 转发；拆完把 tools/check-architecture.mjs 的 ` +
+          `A6_LIMIT['${rel}'] 下调到新的实测行数（${lines}）`,
+      })
+    }
+  }
+
   const frozenFiles = [...frozenHit].sort((a, b) => a.localeCompare(b))
-  return { total: files.length, violations, frozen: frozenFiles.length, frozenFiles }
+  return { total: files.length, violations, frozen: frozenFiles.length, frozenFiles, a6 }
 }
 
 /**
@@ -257,6 +306,10 @@ export function formatArchitectureReport(result) {
     lines.push(` - ${location} ${violation.rule} ${violation.message}（修法：${violation.fix}）`)
   }
   lines.push(`frozen (A2 存量，迁移中): ${result.frozen}`)
+  // A6：入口层行数棘轮（文件级；临时树里没有入口层文件时为空 → 不打印）
+  for (const entry of result.a6 ?? []) {
+    lines.push(`A6 入口层行数棘轮: ${entry.file} ${entry.lines} 行 / 上限 ${entry.limit}`)
+  }
   return lines
 }
 

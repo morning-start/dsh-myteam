@@ -31,6 +31,11 @@ import { resolveProjectRoot, storeLayout, teamLedgerPath as teamLedgerPathOf, sc
 // CHG-103：作用域契约（全局 vs 项目级）——角色两级都可用，任务/历史/状态只能项目级
 import { normalizeScope } from './core/workspace/scope.mjs'
 import { TeamService, bootstrapTeam,                  } from './core/service.mjs'
+/* CHG-186（T155a）：宿主契约下沉 `core/host/contract.ts` —— 解 `host.ts ⇄ remote/service.ts`
+ * 的 type 环（arch-report 里唯一那条）。这里只 `import type`（擦除后无运行时依赖、无装载环）；
+ * `MyTeamConfig` 仍从本文件 re-export，既有 import 点（如 `test/t123`）一个都不用改。 */
+                                                                                              
+                                                           
 import { leadToolDefs, memberToolDefs,              } from './tools/defs.mjs'
 // CHG-148（P1-6）：按工具名取完整结果契约（jsonOutput 双声明），不再用统一空 schema
 import { outputForTool } from './core/tools/output-contract.mjs'
@@ -197,56 +202,8 @@ function sessionCwdOf(rt         )                     {
   }
 }
 
-/** 行 config（cordis.patch.yml myteam-host.config；全部可省） */
-                               
-                                                          
-                                
-     
-                           
-    
-                                                       
-                                         
-     
-                        
-                                                                 
-                         
-                                                                       
-                          
-     
-                                                        
-                                                            
-                                                                
-                                                                
-                                                    
-                                                       
-     
-                   
-     
-                          
-                                                 
-                                                
-                               
-     
-                                 
-                                   
-     
-                                                      
-    
-                                                            
-                                                     
-                                                    
-     
-                            
-     
-                                                                       
-                                                               
-    
-                                             
-                                                  
-                                 
-     
-                             
- 
+/* CHG-186：行 config 的类型 `MyTeamConfig` 已下沉到 `core/host/contract.ts`（见文件头 import）——
+ * 契约里的 `config` 成员要用它，而 `core/**` 不许 import 入口层（A1 门禁）。本文件 re-export。 */
 
 /* ── 纯函数域（无 ctx 依赖，便于单测 J1）────────────────────────── */
 
@@ -555,11 +512,7 @@ export function findKnowledgeProposal(ledgerPath        , draftId        )      
  * - proposals：各团队账本 knowledge.proposed 减去已裁决（knowledge.adopted 同 draftId，含 rejected）→ 待审队列
  * - timeline：knowledge.revised 按 entryId 归组 → 条目详情演化时间线（Hindsight 溯源思想的账本版）
  */
-export function buildKnowledgeView(workspaceRoot        )   
-                                                                                                                                                                                                                                                                                          
-                                                                                                                                                                                                                                
-                                                                                                                
-  {
+export function buildKnowledgeView(workspaceRoot        )                {
   const kbDir = knowledgeDirOf(workspaceRoot)
   const entries = listKnowledge(kbDir).map((e) => ({
     id: e.id,
@@ -646,7 +599,7 @@ export function pickDefaultTeamId(workspaceRoot        )         {
   }
 }
 
-export class MyTeamHost {
+export class MyTeamHost                               {
           rt             
           services = new Map                     ()
           memberHandles = new Map             () // memberId → AgentHandle

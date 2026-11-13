@@ -12,7 +12,11 @@
  */
 import { TypertRemoteService, Remote } from '@deepseek-ai/dsh-typert-protocol'
 import { readFileSync as _readFileSync } from 'node:fs'
-import type { MyTeamHost } from '../host.ts'
+/* CHG-186（T155a）：契约从 `core/host/contract.ts` 取（原来从 `../host.ts` 取，形成
+ * `host.ts ⇄ remote/service.ts` 的 type 环）。`service()` 的返回类型在契约里**显式声明**
+ * 为 `TeamService`，所以这里不再依赖 `ReturnType<MyTeamHost['service']>` 反推。 */
+import type { MyTeamHostContract } from '../core/host/contract.ts'
+import type { TeamService } from '../core/service.ts'
 
 const readFs = () => ({ readFileSync: _readFileSync })
 
@@ -41,9 +45,9 @@ export function markRemoteMethods(prototype: object, methods: string[]): void {
 }
 
 export class MyTeamRemote extends TypertRemoteService {
-  private host: MyTeamHost
+  private host: MyTeamHostContract
 
-  constructor(ctx: unknown, host: MyTeamHost) {
+  constructor(ctx: unknown, host: MyTeamHostContract) {
     // serviceKey/namespace = "myteam" → 客户端 ctx.remote.myteam.*
     // ctx 必须是真 Cordis Context（Service 基类要 ctx.reflect.provide）；否则降级为
     // 自建最小 ctx 面（reflect.provide 记录自引用），保证单测/非 Cordis 宿主可构造。
@@ -544,7 +548,7 @@ export class MyTeamRemote extends TypertRemoteService {
     }
   }
 
-  private resolveTeam(teamId?: string): { teamId: string; service: ReturnType<MyTeamHost['service']>; events: () => Record<string, unknown>[] } {
+  private resolveTeam(teamId?: string): { teamId: string; service: TeamService; events: () => Record<string, unknown>[] } {
     const svc = this.host.service(teamId ?? this.host.defaultTeamId())
     const ledgerPath = svc.ledgerPath
     const events = () => {
@@ -584,10 +588,10 @@ markRemoteMethods(MyTeamRemote.prototype, ['getBoard', 'getTaskDetail', 'getToke
 import { buildAuditView, buildBoardView, buildConfigView, buildTaskDetailView, buildTokensView } from '../core/index/views.ts'
 /* CHG-119（FR-11.6）：计划质量反馈投影（纯函数） */
 import { buildPlanFeedback } from './plan-feedback.ts'
-function buildDetail(service: ReturnType<MyTeamHost['service']>, events: Record<string, unknown>[], taskId: string) {
+function buildDetail(service: TeamService, events: Record<string, unknown>[], taskId: string) {
   return buildTaskDetailView(service, taskId, events as never)
 }
-function buildBoard(service: ReturnType<MyTeamHost['service']>, columnMapping: Record<string, string[]>, columns: string[]) {
+function buildBoard(service: TeamService, columnMapping: Record<string, string[]>, columns: string[]) {
   return buildBoardView(service, columnMapping, columns)
 }
 function buildTokens(file: Parameters<typeof buildTokensView>[0]) {

@@ -1,10 +1,10 @@
 {
   "schema": 1,
-  "builtAt": "2026-11-13T14:46:58.659Z",
+  "builtAt": "2026-11-13T14:55:32.607Z",
   "node": "v22.23.2",
   "entry": "./lib/host.mjs",
-  "modules": 56,
-  "sourceHash": "d318d2a45785dfe751d2a24c671a598554fe11da5d82b36ed9f62b07181b8da0",
+  "modules": 57,
+  "sourceHash": "3aaa405e409df5f7cd8ce9339b9a416467d97c42d8894cb427ab3d1bb6d50cff",
   "clientFile": "client/client.js",
   "clientHash": "67c601e3864c4bd529a73b317d86a1135914d8e5f4b36602c19ba68e148c823e",
   "files": [
@@ -22,6 +22,7 @@
     "core/gates/command-gate.ts",
     "core/gates/delivery-verdict.ts",
     "core/gates/scope-audit.ts",
+    "core/host/contract.ts",
     "core/host/session-archaeology.ts",
     "core/host/session-handoff.ts",
     "core/host/team-charter.ts",

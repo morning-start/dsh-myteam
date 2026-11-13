@@ -12,7 +12,11 @@
  */
 import { TypertRemoteService, Remote } from '@deepseek-ai/dsh-typert-protocol'
 import { readFileSync as _readFileSync } from 'node:fs'
-                                            
+/* CHG-186（T155a）：契约从 `core/host/contract.ts` 取（原来从 `../host.ts` 取，形成
+ * `host.ts ⇄ remote/service.ts` 的 type 环）。`service()` 的返回类型在契约里**显式声明**
+ * 为 `TeamService`，所以这里不再依赖 `ReturnType<MyTeamHost['service']>` 反推。 */
+                                                                  
+                                                     
 
 const readFs = () => ({ readFileSync: _readFileSync })
 
@@ -41,9 +45,9 @@ export function markRemoteMethods(prototype        , methods          )       {
 }
 
 export class MyTeamRemote extends TypertRemoteService {
-          host            
+          host                    
 
-  constructor(ctx         , host            ) {
+  constructor(ctx         , host                    ) {
     // serviceKey/namespace = "myteam" → 客户端 ctx.remote.myteam.*
     // ctx 必须是真 Cordis Context（Service 基类要 ctx.reflect.provide）；否则降级为
     // 自建最小 ctx 面（reflect.provide 记录自引用），保证单测/非 Cordis 宿主可构造。
@@ -544,7 +548,7 @@ export class MyTeamRemote extends TypertRemoteService {
     }
   }
 
-          resolveTeam(teamId         )                                                                                                          {
+          resolveTeam(teamId         )                                                                                    {
     const svc = this.host.service(teamId ?? this.host.defaultTeamId())
     const ledgerPath = svc.ledgerPath
     const events = () => {
@@ -584,10 +588,10 @@ markRemoteMethods(MyTeamRemote.prototype, ['getBoard', 'getTaskDetail', 'getToke
 import { buildAuditView, buildBoardView, buildConfigView, buildTaskDetailView, buildTokensView } from '../core/index/views.mjs'
 /* CHG-119（FR-11.6）：计划质量反馈投影（纯函数） */
 import { buildPlanFeedback } from './plan-feedback.mjs'
-function buildDetail(service                                   , events                           , taskId        ) {
+function buildDetail(service             , events                           , taskId        ) {
   return buildTaskDetailView(service, taskId, events         )
 }
-function buildBoard(service                                   , columnMapping                          , columns          ) {
+function buildBoard(service             , columnMapping                          , columns          ) {
   return buildBoardView(service, columnMapping, columns)
 }
 function buildTokens(file                                       ) {

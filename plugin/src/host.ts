@@ -31,6 +31,11 @@ import { resolveProjectRoot, storeLayout, teamLedgerPath as teamLedgerPathOf, sc
 // CHG-103：作用域契约（全局 vs 项目级）——角色两级都可用，任务/历史/状态只能项目级
 import { normalizeScope } from './core/workspace/scope.ts'
 import { TeamService, bootstrapTeam, type CommitDraft } from './core/service.ts'
+/* CHG-186（T155a）：宿主契约下沉 `core/host/contract.ts` —— 解 `host.ts ⇄ remote/service.ts`
+ * 的 type 环（arch-report 里唯一那条）。这里只 `import type`（擦除后无运行时依赖、无装载环）；
+ * `MyTeamConfig` 仍从本文件 re-export，既有 import 点（如 `test/t123`）一个都不用改。 */
+import type { KnowledgeView, MyTeamConfig, MyTeamHostContract } from './core/host/contract.ts'
+export type { MyTeamConfig } from './core/host/contract.ts'
 import { leadToolDefs, memberToolDefs, type ToolDef } from './tools/defs.ts'
 // CHG-148（P1-6）：按工具名取完整结果契约（jsonOutput 双声明），不再用统一空 schema
 import { outputForTool } from './core/tools/output-contract.ts'
@@ -197,56 +202,8 @@ function sessionCwdOf(rt: unknown): string | undefined {
   }
 }
 
-/** 行 config（cordis.patch.yml myteam-host.config；全部可省） */
-export interface MyTeamConfig {
-  /** 隐藏宿主内置团队工具（PRD §2.4 hideBuiltinTeamTools），默认 true */
-  hideBuiltinTeamTools?: boolean
-  /**
-   * CHG-102：项目根显式覆盖（绝对路径）。
-   *
-   * 真实宿主不配这一项——项目根从**会话工作目录**解析（见 `sessionCwdOf`）。只有两种
-   * 场景需要它：单测的临时工作区、以及宿主拿不到会话 cwd 时的运维兜底。
-   */
-  workspaceRoot?: string
-  /** 全局角色库目录覆盖（默认 <workspaceRoot>/../.dsh/myteam/roles，CHG-5） */
-  globalRolesDir?: string
-  /** TeamService effectiveConfig 覆盖（透传 loadEffectiveConfig；缺省走默认配置） */
-  configOverride?: unknown
-  /**
-   * 客户端载体挂载标记（dsh-client-modules 组图约定）：profile 顶层必须存在一个
-   * 以「裸包名」命名的 loader 行（exactPackageSpecifier 拒绝含 `/` 的子路径行，
-   * dsh-client-modules/lib/index.js:83-89），否则插件的 client.js 不会进入
-   * window.__DSH_BOOT__ 图 → 面板/侧栏 UI 整体不可见。顶层载体行传 carrier:true，
-   * apply 直接返回（不做工具注册/不做远程挂载——服务仍只在队长 preset 作用域激活，
-   * NFR-7.4；也避免 root 侧再 provide 'myteam' 与门面造成网关端点歧义）。
-   */
-  carrier?: boolean
-  /**
-   * CHG-71：派单唤醒的节流参数（毫秒）。
-   * - team 级：同一团队的两次 dispatch 扫描间隔（合并一次操作产生的多事件）
-   * - member 级：同一成员两次 dispatch 唤醒间隔（防止重复打扰空闲成员）
-   * 默认 400 / 3000；测试可设 0 关闭节流。
-   */
-  dispatchTeamCooldownMs?: number
-  dispatchMemberCooldownMs?: number
-  /**
-   * P1-4（docs/21 §6）：`dispose()` 有界结算的超时（毫秒；缺省 5000）。
-   *
-   * 为什么要有上界：宿主 effect disposer 不 await（`dispose()` 必须同步返回），
-   * 成员的 `dispose()` 可能等事件循环 / 子进程退出——没有上界就只能在「卡住宿主」和
-   * 「被宿主砍掉且无人知道」之间二选一。超时只告警（`timedOut` 名单进日志），不再等待。
-   */
-  disposalTimeoutMs?: number
-  /**
-   * P1-5（docs/21 §6）：单调用护栏的阈值覆盖（`repeatThreshold` / `stuckThreshold` /
-   * `stuckTimeoutMs` / `envThreshold` / `emptyTurnThreshold`）。
-   *
-   * 为什么允许按行配置：不同档位/不同团队的「打转」成本不同（纯文档团队应更早提醒，
-   * 长任务团队需要更宽的时间窗）。非法值由 `guard.ts` 归一回落默认——配置写错不得
-   * 静默变成「永不触发」，也不得让护栏自己抛错打断成员调用。
-   */
-  guardOptions?: GuardOptions
-}
+/* CHG-186：行 config 的类型 `MyTeamConfig` 已下沉到 `core/host/contract.ts`（见文件头 import）——
+ * 契约里的 `config` 成员要用它，而 `core/**` 不许 import 入口层（A1 门禁）。本文件 re-export。 */
 
 /* ── 纯函数域（无 ctx 依赖，便于单测 J1）────────────────────────── */
 
@@ -555,11 +512,7 @@ export function findKnowledgeProposal(ledgerPath: string, draftId: string): Reco
  * - proposals：各团队账本 knowledge.proposed 减去已裁决（knowledge.adopted 同 draftId，含 rejected）→ 待审队列
  * - timeline：knowledge.revised 按 entryId 归组 → 条目详情演化时间线（Hindsight 溯源思想的账本版）
  */
-export function buildKnowledgeView(workspaceRoot: string): {
-  entries: Array<{ id: string; title: string; tags: string[]; audience: string[]; evidence: string[]; evidenceRefs: ReturnType<typeof evidenceRefsOf>; proofCount: number; staleSince?: string; unverified: boolean; core: boolean; contributor?: string; updated: string; body: string }>
-  proposals: Array<{ teamId: string; draftId: string; title: string; tags: string[]; relation: string; targetId?: string; proposedBy: string; at: string; evidence: string[]; evidenceRefs: ReturnType<typeof evidenceRefsOf> }>
-  timeline: Record<string, Array<{ teamId: string; ts: string; relation: string; diff: string; actor: string }>>
-} {
+export function buildKnowledgeView(workspaceRoot: string): KnowledgeView {
   const kbDir = knowledgeDirOf(workspaceRoot)
   const entries = listKnowledge(kbDir).map((e) => ({
     id: e.id,
@@ -646,7 +599,7 @@ export function pickDefaultTeamId(workspaceRoot: string): string {
   }
 }
 
-export class MyTeamHost {
+export class MyTeamHost implements MyTeamHostContract {
   private rt: HostRuntime
   private services = new Map<string, TeamService>()
   private memberHandles = new Map<string, any>() // memberId → AgentHandle

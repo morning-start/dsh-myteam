@@ -6,7 +6,7 @@
  * `--no-verify` 绕过，最后整条 CI 被删掉。所以这里锁的是**规则本身的判定口径**，
  * 不是仓库当前状态（CHG-174 的写盘迁移会让 A2 存量数一路变到 0，锁数量等于每天改测试）：
  *
- *  ① 五条规则各自都能抓到自己构造的**最小样例**（A1–A5 每条一个）；
+ *  ① 六条规则各自都能抓到自己构造的**最小样例**（A1–A5 行级每条一个，A6 文件级一个）；
  *  ② 每条豁免**只**豁免该豁免的：`atomic-write.ts` 豁免 A2 但 `write-log.ts` 不豁免；
  *     `console.warn` / `error` / `debug` 放行而 `console.log` 不放行；`core` 内部的
  *     相对 import 不误报；名字里带 `remote` 的文件不构成违规（A1 判的是**解析后的
@@ -233,4 +233,31 @@ test('t137-15: FROZEN_A2 是排好序、去重、相对 posix 路径（清单要
     assert.ok(!path.includes('\\'), `必须用 posix 分隔符：${path}`)
     assert.ok(!path.startsWith('/') && !path.startsWith('./'), `必须是相对 src 的路径：${path}`)
   }
+})
+
+/* ── 7. A6 入口层行数棘轮（CHG-186）────────────────────────────── */
+
+test('t137-16: A6 入口层行数棘轮 —— 刚好不超放行，超一行才红，且输出带实测行数', (t) => {
+  const dir = makeSrcTree(t, {
+    // split('\n').length === 3（末尾换行算一个空元素）——行数口径与 arch-report 的 loc 一致
+    'host.ts': 'export const a = 1\nexport const b = 2\n',
+    'core/x.ts': 'export const x = 1\n',
+  })
+  // 上限 3：刚好等于实测 → 绿（棘轮是「只减不增」，不是「必须小于」）
+  assert.deepEqual(runArchitectureCheck({ srcDir: dir, frozen: [], a6Limit: { 'host.ts': 3 } }).violations, [])
+  // 上限 2：超一行 → 红；line 记 0（文件级规则没有「第几行」，与 A2-STALE-FROZEN 同形）
+  const result = runArchitectureCheck({ srcDir: dir, frozen: [], a6Limit: { 'host.ts': 2 } })
+  assert.deepEqual(located(result), ['A6 host.ts:0'])
+  assert.match(result.violations[0].message, /已 3 行/, '说明必须带实测行数，否则没法照它下调')
+  assert.match(result.violations[0].fix, /A6_LIMIT/, '修法必须指向常量本身')
+  // 摘要必须能读到实测行数（CI 靠 grep 这一行判进度）
+  assert.deepEqual(result.a6, [{ file: 'host.ts', lines: 3, limit: 2 }])
+  const lines = formatArchitectureReport(result)
+  assert.ok(
+    lines.includes('A6 入口层行数棘轮: host.ts 3 行 / 上限 2'),
+    `输出必须带 A6 实测行数，实际：${JSON.stringify(lines)}`,
+  )
+  // 入口层文件不在树里（临时树 / 族已搬空后改名）→ 跳过，不凭空报违规
+  const bare = makeSrcTree(t, { 'core/x.ts': 'export const x = 1\n' })
+  assert.deepEqual(runArchitectureCheck({ srcDir: bare, frozen: [], a6Limit: { 'host.ts': 0 } }).violations, [])
 })
