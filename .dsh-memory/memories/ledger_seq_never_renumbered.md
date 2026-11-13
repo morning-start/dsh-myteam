@@ -4,26 +4,31 @@ title: "账本重写时刻意不重编号 seq，坏行留永久空洞"
 kind: "decision"
 about: "为什么 ledger 压缩/重写后 seq 会出现空洞，以及为什么不能靠数组下标取事件"
 confidence: "verified"
-provenance: "file-derived"
+provenance: "measured"
+authority: "observed"
 status: "active"
 actionRisk: "R1"
 createdAt: "2026-11-07T10:46:58Z"
-modifiedAt: "2026-11-07T10:46:58Z"
-lastVerifiedAt: "2026-11-07T10:46:58Z"
+modifiedAt: "2026-11-13T14:04:36Z"
+lastVerifiedAt: "2026-11-13T14:04:36Z"
 reviewBy: null
 expiresAt: null
 pinned: null
 scope: ["repo:dsh-myteam"]
 triggers: ["账本", "seq", "ledger", "坏行", "corrupted", "重编号"]
-supersedes: []
+supersedes: ["ledger_seq_never_renumbered"]
 evidence:
   - kind: "file"
     ref: "plugin/src/core/ledger/ledger.ts"
-    hash: "9c84f722be3bee0414b09f1f6be296935d6b2ac44f81af126b0f5d2e5ff4939c"
+    hash: "1ba8bfedd66b104b71c67158095e1a5a7ba8d9838b8a7d26d800633d754573c9"
   - kind: "test"
     ref: "plugin/test/t70-ledger-integrity.test.ts"
 relations: []
-claims: []
+claims:
+  - kind: "ticket"
+    ref: "CHG-183"
+    state: "unverified"
+    evidence: "层（projection 是按 seq 建的 Map，不是数组）。 <!-- CHG-183：重锚（2026-11-13）。ledger.ts 重构（写入出口迁到 core/fs/atomic-write.ts）后 锚点切片漂移，结论未变：seq 仍不重编号、坏行仍是空洞。"
 ---
 
 ## 功能名
@@ -46,8 +51,11 @@ claims: []
 
 ## 验证方式
 
-`plugin/test/t70-ledger-integrity.test.ts` 覆盖坏行跳过与断点接受；全量 `cd plugin && npm test` 522 条绿。
+`plugin/test/t70-ledger-integrity.test.ts` 覆盖坏行跳过与断点接受；全量 `cd plugin && npm test` 917 条绿。
 
 ## 不适用条件
 
 不适用于投影层（projection 是按 seq 建的 Map，不是数组）。
+
+<!-- CHG-183：重锚（2026-11-13）。ledger.ts 重构（写入出口迁到 core/fs/atomic-write.ts）后
+     锚点切片漂移，结论未变：seq 仍不重编号、坏行仍是空洞。测试计数同步到 917。 -->

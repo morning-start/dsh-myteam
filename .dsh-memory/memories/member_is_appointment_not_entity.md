@@ -5,10 +5,11 @@ kind: "decision"
 about: "实体模型的边界判据：什么该建实体，什么该做关系字段"
 confidence: "inferred"
 provenance: "file-derived"
-status: "active"
+authority: null
+status: "deprecated"
 actionRisk: "R5"
 createdAt: "2026-11-07T10:48:10Z"
-modifiedAt: "2026-11-07T10:48:10Z"
+modifiedAt: "2026-11-13T14:05:42Z"
 lastVerifiedAt: "2026-11-07T10:48:10Z"
 reviewBy: null
 expiresAt: null

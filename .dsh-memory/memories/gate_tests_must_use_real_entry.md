@@ -4,27 +4,32 @@ title: "门禁与调度测试必须走真实入口，禁止 host.commit 桩"
 kind: "convention"
 about: "为什么 359 条全绿单测没抓到门禁链死锁，以及测试替身的正确边界"
 confidence: "inferred"
-provenance: "file-derived"
+provenance: "measured"
+authority: "observed"
 status: "active"
 actionRisk: "R2"
 createdAt: "2026-11-07T10:47:30Z"
-modifiedAt: "2026-11-07T10:47:30Z"
-lastVerifiedAt: "2026-11-07T10:47:30Z"
+modifiedAt: "2026-11-13T14:04:09Z"
+lastVerifiedAt: "2026-11-13T14:04:09Z"
 reviewBy: null
 expiresAt: null
 pinned: null
 scope: ["repo:dsh-myteam"]
 triggers: ["测试替身", "host.commit", "executeLeadTool", "门禁测试", "死锁"]
-supersedes: []
+supersedes: ["gate_tests_must_use_real_entry"]
 evidence:
   - kind: "file"
     ref: "plugin/test/t71-m2-remaining.test.ts"
-    hash: "2276ea61b8e0622aae27ac473cb35f31de8a963c3535a413f40294cc6fd6370b"
+    hash: "6104ea8a2e13c462d77196564e8fec107d08b7f987d7dc05d36a90bcbfbb52bb"
   - kind: "file"
     ref: "plugin/src/tools/defs.ts"
-    hash: "e7063275db04f0752e6796d63b071416d4e2c72ba69b7503dd65dd8980578e40"
+    hash: "f3229163ab77f8dc5bed2da78dc609884b1f7838e9e2a08d6e92c354d45b4f23"
 relations: []
-claims: []
+claims:
+  - kind: "ticket"
+    ref: "CHG-183"
+    state: "unverified"
+    evidence: "）—— 它们没有宿主依赖。 <!-- CHG-183：重锚（2026-11-13）。代码重构后锚点切片漂移，正文结论未变； 锚点重签到当前文件：test 仍走 executeLeadTool 真实入口，tools/defs.ts 仍是"
 ---
 
 ## 功能名
@@ -51,4 +56,7 @@ claims: []
 
 ## 不适用条件
 
-不适用于纯函数层（`core/tasks/graph.ts`、`remote/views.ts`、`core/scheduler/fold.ts`）—— 它们没有宿主依赖。
+不适用于纯函数层（`core/tasks/graph.ts`、`core/index/views.ts`、`core/scheduler/fold.ts`）—— 它们没有宿主依赖。
+
+<!-- CHG-183：重锚（2026-11-13）。代码重构后锚点切片漂移，正文结论未变；
+     锚点重签到当前文件：test 仍走 executeLeadTool 真实入口，tools/defs.ts 仍是工具定义正本。 -->
