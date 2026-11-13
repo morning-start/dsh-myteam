@@ -75,16 +75,25 @@ test('T101 ③ 根上不再有满宽 padding 的旧写法（任何一处回潮�
   assert.doesNotMatch(occurrences[0], /padding:14px 16px/, '满宽 padding 不得回潮')
 })
 
-test('T101 ④ 空态居中（CHG-180）：空态不是文档，窄列居中 + 标题/命令/计数一起居中', () => {
+test('T101 ④ 空态居中（CHG-180/181）：面板铺满会话区，内容收窄居中且上下居中', () => {
   /* 空态只有「一句话 + 一个命令 + 四个 0」。跟着 1400px 阅读列左对齐时右侧留 700+px 空白，
-   * 整页看起来像「只写了一半」——所以空态单独走居中窄列（760px），与有数据时的阅读列分工明确。 */
+   * 整页看起来像「只写了一半」。
+   * CHG-181（用户：「扩大范围，如红框范围」）：**根节点不能再收窄**——面板要铺满会话区
+   * （红框范围），只有内容收窄到 760px 居中；整块空态在面板里上下也居中。 */
   const rule = ruleOf('.mt-conv-empty')
-  assert.ok(rule, '`.mt-conv-empty` 规则必须存在（空态居中根）')
-  assert.match(rule, /max-width:760px/, '空态窄列 760px')
-  assert.match(rule, /margin-inline:auto/, '空态窄列水平居中')
+  assert.ok(rule, '`.mt-conv-empty` 规则必须存在（空态修饰根）')
+  assert.match(rule, /justify-content:center/, '空态整块在面板里上下居中')
   assert.match(rule, /text-align:center/, '空态文字居中')
+  assert.doesNotMatch(rule, /max-width:760px/, '面板根不得收窄（用户要的是「红框那么大」）')
+  assert.doesNotMatch(rule, /margin-inline:auto/, '面板根不再靠 margin 收窄')
   for (const sel of ['.mt-conv-empty .mt-conv-head', '.mt-conv-empty .mt-conv-body', '.mt-conv-empty .mt-conv-cmd', '.mt-conv-empty .mt-conv-stats']) {
     assert.ok(ruleOf(sel), `${sel} 必须有居中规则`)
+  }
+  /* 内容收窄在 head / body 上（而不是根上），且两者都水平居中 */
+  for (const sel of ['.mt-conv-empty .mt-conv-head', '.mt-conv-empty .mt-conv-body']) {
+    const content = ruleOf(sel)
+    assert.match(content, /max-width:760px/, `${sel} 内容列 760px`)
+    assert.match(content, /margin-inline:auto/, `${sel} 水平居中`)
   }
   /* 只有空态那个分支挂 `.mt-conv-empty`；有数据的团队视图仍走阅读列左对齐 */
   const emptyHits = source.match(/className: 'mt-conv mt-conv-empty'/g) ?? []

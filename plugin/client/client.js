@@ -4719,12 +4719,16 @@ window.__ModuleLoader__.load({
       '.mt-team-mark{width:26px;height:26px;border-radius:8px;display:inline-flex;place-items:center;background:var(--dsw-alias-bg-layer-2);color:var(--dsw-alias-label-emphasis, var(--dsw-alias-label-primary));flex:none;align-items:center;justify-content:center;border:.5px solid var(--dsw-alias-border-l2);font-size:12px}',
       /* CHG-180（U4）：**空态居中**。
        * 空态不是文档——它只有「一句话 + 一个命令 + 四个 0」。原来跟着 1400px 阅读列**左对齐**，
-       * 右侧留 700+px 空白，整页看起来像「只写了一半」。空态改成居中的窄列（760px），
-       * 标题行 / 命令 / 计数一起居中；有数据时仍走阅读列左对齐（那是文档，不该居中）。 */
-      '.mt-conv-empty{max-width:760px;margin-inline:auto;text-align:center}',
-      '.mt-conv-empty .mt-conv-head{justify-content:center;border-bottom:0;padding-bottom:0}',
+       * 右侧留 700+px 空白，整页看起来像「只写了一半」。
+       *
+       * CHG-181（用户：「扩大范围，如红框范围」）：上一版把**根节点**收窄到 760px，
+       * 于是整个面板只占中间一条（红框那么大的一片被浪费）。改成：
+       * **面板根仍然铺满会话区**（红框范围 = `.mt-conv`），只有**内容**收窄居中（760px），
+       * 并且整块空态在面板里**上下也居中**——空态就该占满画布、内容落在正中间。 */
+      '.mt-conv-empty{justify-content:center;text-align:center}',
+      '.mt-conv-empty .mt-conv-head{justify-content:center;border-bottom:0;padding-bottom:0;width:100%;max-width:760px;margin-inline:auto}',
       '.mt-conv-empty .mt-conv-title{justify-content:center;text-align:center}',
-      '.mt-conv-empty .mt-conv-body{align-items:center;gap:14px;text-align:center}',
+      '.mt-conv-empty .mt-conv-body{align-items:center;gap:14px;text-align:center;width:100%;max-width:760px;margin-inline:auto}',
       '.mt-conv-empty .mt-conv-cmd{justify-content:center}',
       '.mt-conv-empty .mt-conv-stats{justify-content:center}',
       /* CHG-107：会话页团队视图的真实数据面（概览计数 / 空态 / 成员名册 / 命令提示） */
