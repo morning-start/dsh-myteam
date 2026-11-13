@@ -14,8 +14,14 @@
  * 本任务（T155a）**只解环、不搬实现**（纯类型搬家，行为零变化）。契约下沉本身已把
  * `host.ts` 从 6,210 行减到 **6,163 行**（`MyTeamConfig` 48 行 + `KnowledgeView` 4 行
  * 换成 1 行 import，净 -47），棘轮直接钉在**拆完的实测值**上——不留余量：入口层再加一行
- * 注释都该红。T155b 每搬完一族（members → tasks → plan → roles → teams → audit）就把
- * `HOST_LINES_LIMIT` 往下压一档，**保证只减不增**，最终 4,000 行。
+ * 注释都该红。T155b/T155c 每搬完一族（members → tasks → plan → roles → teams →
+ * knowledge → query）就把 `HOST_LINES_LIMIT` 压到**实测值**。
+ *
+ * ⚠️ **「只减不增」有一个已声明的例外**：查询族（15 个 case 本来就只有两行、没有内联
+ * 逻辑可减）搬完是 **+27**——它换来的是入口层 switch 形状统一（纯「工具名 → 适配层」
+ * 路由表）。这是口径成本，不是回潮；除此之外每族都必须减。
+ * **4,000 行的目标未达成**（收口在 5,563，差 1,563）：剩余全是私有方法体，拆它们要
+ * 以「行为边界」下沉 `core/**`，不是继续按端点切——不为凑数硬拆。
  * 同一常量在 `tools/check-architecture.mjs` 的 `A6_LIMIT` 里（两处必须一起改）。
  *
  * T155b 进度：成员族（`src/host/members.ts`）搬完 → 6,160；任务族（`src/host/tasks.ts`）

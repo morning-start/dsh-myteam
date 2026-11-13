@@ -49,27 +49,27 @@ import { leadToolDefs, memberToolDefs, type ToolDef } from './tools/defs.ts'
 // CHG-148（P1-6）：按工具名取完整结果契约（jsonOutput 双声明），不再用统一空 schema
 import { outputForTool } from './core/tools/output-contract.ts'
 import { wakeDecisionsFor, changeSince, type WakeDecision } from './core/scheduler/wake.ts'
-import { validatePlan, TERMINAL_STATES, downstreamOf, GATE_REJECT_BUDGET, type TaskProjection } from './core/scheduler/state.ts'
+import { TERMINAL_STATES, downstreamOf, GATE_REJECT_BUDGET } from './core/scheduler/state.ts'
 /* A9（报告 KI-5 / CHG-163 冷启动重连）：只读折叠口径。
  * 为什么不用 `this.service(teamId).projectionSnapshot`：`service()` 构造 TeamService 时会
  * `bootstrapTeam` 落 `rules.version.adopted`——重连就成了**写账本**，违反「重连不改账本」不变量。
  * `readOfflineTeam` + `foldTolerant` 只读文件、坏行/坏事件各自跳过，正好是重连需要的容错面。 */
 import { foldTolerant, isSafeTeamId, readOfflineTeam } from './core/index/offline-view.ts'
-import { diffTaskInput, structuralFieldsOf } from './core/tasks/diff.ts'
+import { diffTaskInput } from './core/tasks/diff.ts'
 import { buildToolMask, memberPromptSection, memoryPromptSection, memberSessionId, HOST_TEAM_TOOLS_TO_HIDE, type MemberInstance } from './core/members/member-setup.ts'
 import { applyCapabilityGuard, buildCapabilityBoundaryText, capabilitySummary, resolveCapabilities } from './core/members/capability-guard.ts'
 import { memoryDirFor, seedMemoryIfMissing, auditMemoryContent, type MemoryFinding } from './core/members/memory.ts'
-import { copyToProject, listRoleCatalog, readGlobalRole, readProjectRole, resolveRuntimeRole, saveGlobalRole, writeProjectRole, assertValidRole, readProjectRoleCard, writeProjectRoleCard, clearProjectRoleCard, deleteProjectRoleSafe, type RoleStorePaths } from './core/roles/role-store.ts'
+import { copyToProject, listRoleCatalog, readGlobalRole, readProjectRole, resolveRuntimeRole, saveGlobalRole, writeProjectRole, assertValidRole, deleteProjectRoleSafe, type RoleStorePaths } from './core/roles/role-store.ts'
 // CHG-87（docs/04 §2 承诺的 roleOp 端点）：host 与面板共用同一份实现
 import { roleOp as roleOpImpl } from './core/roles/role-ops.ts'
-import { presetTeamRoster, type RoleDefinition } from './core/roles/builtin-roles.ts'
+import type { RoleDefinition } from './core/roles/builtin-roles.ts'
 import { CAPTAIN_SKILLS } from './core/roles/captain-skills.ts'
 import { readPresetCatalog, readProjectPreset, writeProjectPreset, deleteProjectPreset, validatePresetDefinition, BUILTIN_PRESET_IDS, type PresetCatalog } from './core/presets/preset-store.ts'
-import { configOverrideFromPreset, isStructurallyValidConfig, loadEffectiveConfig, readProjectConfigRaw, teamConfigPath, writeTeamConfigRaw } from './core/config/team-config.ts'
-import { listKnowledge, renderIndexSection, readKnowledgeEntry, adoptDraft, reviseEntry, writeKnowledgeEntry, knowledgeDirOf, validateDraft, type KnowledgeDraft } from './core/knowledge/knowledge.ts'
+import { isStructurallyValidConfig, loadEffectiveConfig, readProjectConfigRaw, teamConfigPath, writeTeamConfigRaw } from './core/config/team-config.ts'
+import { listKnowledge, renderIndexSection, knowledgeDirOf } from './core/knowledge/knowledge.ts'
 import { zeroBuckets, dayKeyOf, accumulate, emptyTokensFile, type TokensFile, type MemberMeterState } from './core/ledger/token-sidecar.ts'
 // CHG-86（P0-2）：归档落盘（disband 时写快照；面板归档视图读快照）
-import { buildArchiveSnapshot, writeArchive, readArchive, listArchives, archiveRootOf } from './core/archive/archive-store.ts'
+import { readArchive, listArchives, archiveRootOf } from './core/archive/archive-store.ts'
 // CHG-87（M2-C 剩余，FR-5.3/FR-5.4）：command 门禁 + scope 完成审计
 import { runVerifyCommand, validateVerifyCommand, classifyVerifyResult, resolveTimeoutMs, truncateOutput, type VerifyCommand } from './core/gates/command-gate.ts'
 /* P1-5 接线（docs/21 §6，CHG-147 的纯函数模块）：成员单调用护栏四类检测 */
@@ -130,7 +130,7 @@ import { contributionsRoot } from './core/contributions/discover.ts'
 import { CONTRIBUTION_CODES, emptyContributionCatalog, type ContributionCatalog } from './core/contributions/contract.ts'
 // CHG-93（FR-18 职责③ F8）：团队章程注入队长 system prompt
 import { readTeamCharter, TEAM_CHARTER_SECTION, TEAM_CHARTER_VARIABLE } from './core/host/team-charter.ts'
-import { roleUsage, projectRolePaths } from './core/index/offline-view.ts'
+import { roleUsage } from './core/index/offline-view.ts'
 
 /* 宿主编译辅助（T0 实证：register 前必须编译成完整 JSON Schema）。
  * 导出仅供单测（t7b 编译产物审计）；运行时语义不变。 */
