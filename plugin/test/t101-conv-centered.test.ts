@@ -75,27 +75,29 @@ test('T101 ③ 根上不再有满宽 padding 的旧写法（任何一处回潮�
   assert.doesNotMatch(occurrences[0], /padding:14px 16px/, '满宽 padding 不得回潮')
 })
 
-test('T101 ④ 空态内容列（CHG-180~182）：面板铺满会话区，内容列**居中** 1080px', () => {
+test('T101 ④ 空态**不得改列宽**（CHG-180~182c）：有任务 / 没任务必须是同一个窗口', () => {
   /* 四轮收敛（每轮都是用户看真机截图提的）：
-   *   CHG-180 内容跟阅读列一样左对齐 → 右侧 700+px 空白，像「只写了一半」；
-   *   CHG-181 把根收窄到 760px 居中 → 面板只占中间一条（红框那片被浪费）；
-   *   CHG-182 面板铺满 + 内容左对齐 1080px → 宽屏下 1877 视口实测内容列偏左 160px（「UI 又偏了」）；
-   *   **本版：面板铺满 + 内容列 `margin-inline:auto` 居中**（「记忆」页的做法），文字仍左对齐。 */
+   *   CHG-180 跟阅读列一样左对齐 → 右侧 700+px 空白，像「只写了一半」；
+   *   CHG-181 根收窄到 760 居中 → 面板只占中间一条；
+   *   CHG-182 内容列 1080 居中 → 宽屏偏左 160px（「又偏了」）；
+   *   **CHG-182c（用户：「有任务和无任务两种状态为什么宽度不一样？这个 UI 要保持，
+   *   在用户看来这就是一个窗口」）：空态**不设任何列宽**，继承 `.mt-conv` 的
+   *   `padding-inline: max(28px, calc((100% - 1400px)/2))`——切状态不许跳宽度。 */
   const rule = ruleOf('.mt-conv-empty')
   assert.ok(rule, '`.mt-conv-empty` 规则必须存在（空态修饰根）')
-  assert.match(rule, /text-align:left/, '空态文字左对齐（不是整块居中）')
-  assert.doesNotMatch(rule, /justify-content:center/, '不做整块垂直居中（跟「记忆」页一致的顶对齐）')
-  assert.doesNotMatch(rule, /max-width:/, '面板根不得收窄（面板要铺满会话区）')
-  assert.doesNotMatch(rule, /margin-inline:auto/, '面板根不再靠 margin 收窄')
-  /* 内容列宽落在 head / body 上：1080px 且水平居中（否则宽屏左偏） */
-  for (const sel of ['.mt-conv-empty .mt-conv-head', '.mt-conv-empty .mt-conv-body']) {
+  assert.match(rule, /text-align:left/, '空态文字左对齐')
+  assert.doesNotMatch(rule, /justify-content:center/, '不做整块垂直居中')
+  assert.doesNotMatch(rule, /max-width:/, '空态根不得设列宽（切状态会跳宽度）')
+  assert.doesNotMatch(rule, /margin-inline:auto/, '空态根不得靠 margin 收窄')
+  /* 任何一个 `.mt-conv-empty ...` 子规则都不许出现 max-width / margin-inline ——
+   * 那是「有任务 / 没任务宽度不一样」的唯一来源。 */
+  for (const sel of ['.mt-conv-empty .mt-conv-head', '.mt-conv-empty .mt-conv-body', '.mt-conv-empty .mt-conv-stats']) {
     const content = ruleOf(sel)
-    assert.match(content, /max-width:1080px/, `${sel} 内容列 1080px`)
-    assert.match(content, /margin-inline:auto/, `${sel} 必须水平居中（宽屏左偏 = 用户报的「又偏了」）`)
+    assert.ok(content, `${sel} 规则必须存在`)
+    assert.doesNotMatch(content, /max-width:/, `${sel} 不得设列宽（继承 .mt-conv 的阅读列）`)
+    assert.doesNotMatch(content, /margin-inline:auto/, `${sel} 不得靠 margin 收窄`)
   }
-  /* 计数卡等分铺满整列（「记忆」页四张卡的口径），不是挤在左边一小撮 */
-  assert.match(ruleOf('.mt-conv-empty .mt-conv-stats'), /grid-template-columns:repeat\(4,minmax\(0,1fr\)\)/, '四张计数卡等分铺满列宽')
-  /* 只有空态那个分支挂 `.mt-conv-empty`；有数据的团队视图仍走阅读列 */
+  /* 只有空态那个分支挂 `.mt-conv-empty`；有数据的团队视图仍走同一个 `.mt-conv` 根 */
   const emptyHits = source.match(/className: 'mt-conv mt-conv-empty'/g) ?? []
   assert.equal(emptyHits.length, 1, '空态根必须**恰好一处**带 mt-conv-empty')
 })
