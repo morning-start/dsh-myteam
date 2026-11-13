@@ -2,16 +2,19 @@
   "receipts": [
     {
       "actionRisk": "R1",
+      "authority": "observed",
       "change": {
         "baseContentHash": null,
         "mode": "import"
       },
-      "contentHash": "b5e0793953d6394647ea33ba3f636b164759848c804ca98ac42c668b3b18c98f",
+      "contentHash": "b02c01212feee332fc66f10bf754028e2cc09bd1c12055d2715e0060a78388a7",
       "evidenceRoot": "70e5229087f0295aa16a5b8944d4ceaab7390f784f0633196387b156ae3a791a",
-      "hashVersion": 2,
+      "hashVersion": 3,
       "issuedAt": "2026-11-07T10:47:05Z",
       "lifecycle": "active",
       "memoryId": "verify_gate_runs_real_command",
+      "resealedAt": "2026-11-13T16:57:43Z",
+      "resealedFrom": 2,
       "rollback": {
         "previousContentHash": null,
         "previousEvidenceRoot": null
@@ -26,16 +29,19 @@
     },
     {
       "actionRisk": "R1",
+      "authority": "observed",
       "change": {
         "baseContentHash": null,
         "mode": "import"
       },
-      "contentHash": "dc46f50e312347a599303b912b075161e18cb8694d7a633868d1717957243813",
+      "contentHash": "4656954b2f4f4eb940df6f8070390efd4b7292d27a48de03d21dc7c892a1b4fc",
       "evidenceRoot": "41a986183c6e9d22d71634bd9c65da0b58b9683a20bdbf507620be1c3a8132f0",
-      "hashVersion": 2,
+      "hashVersion": 3,
       "issuedAt": "2026-11-07T10:47:11Z",
       "lifecycle": "active",
       "memoryId": "write_scopes_undeclared_means_no_audit",
+      "resealedAt": "2026-11-13T16:57:43Z",
+      "resealedFrom": 2,
       "rollback": {
         "previousContentHash": null,
         "previousEvidenceRoot": null
@@ -50,16 +56,19 @@
     },
     {
       "actionRisk": "R2",
+      "authority": "observed",
       "change": {
         "baseContentHash": null,
         "mode": "import"
       },
-      "contentHash": "c67e307d26b68a34adf3ae81158964bbc381c5401c3e1eeec0ba58db744c7208",
+      "contentHash": "8a7d2e96020c238120acc800bb0ba92eb6c1709f7a89ce5c4d744834f2e1d3ff",
       "evidenceRoot": "43a0cf5968834977428783fa3481d28d3323337e57df3724c99147686b52d8bf",
-      "hashVersion": 2,
+      "hashVersion": 3,
       "issuedAt": "2026-11-07T10:47:36Z",
       "lifecycle": "active",
       "memoryId": "bundle_required_after_src_change",
+      "resealedAt": "2026-11-13T16:57:43Z",
+      "resealedFrom": 2,
       "rollback": {
         "previousContentHash": null,
         "previousEvidenceRoot": null
@@ -74,16 +83,19 @@
     },
     {
       "actionRisk": "R2",
+      "authority": "observed",
       "change": {
         "baseContentHash": null,
         "mode": "import"
       },
-      "contentHash": "29bf7e3122fff24bb56af813441b7a7f88b5bb71c9f34d9dae23646513c1b346",
+      "contentHash": "c2c883ff5cdb5d759e94751d2c32bf7a5373361f85d48424f61589008973dd8f",
       "evidenceRoot": "fa2114ef1f8bbc4a5ea100c77f435d58d10fbdce524755c727dba99c5a2cc386",
-      "hashVersion": 2,
+      "hashVersion": 3,
       "issuedAt": "2026-11-07T10:47:43Z",
       "lifecycle": "active",
       "memoryId": "line_ending_lf_crlf_split",
+      "resealedAt": "2026-11-13T16:57:43Z",
+      "resealedFrom": 2,
       "rollback": {
         "previousContentHash": null,
         "previousEvidenceRoot": null
@@ -98,16 +110,19 @@
     },
     {
       "actionRisk": "R1",
+      "authority": "observed",
       "change": {
         "baseContentHash": null,
         "mode": "import"
       },
-      "contentHash": "6f8b8beae8ff53bd84e1bb6b917f3edbf615e4efe347f1c386b2645dfed7aee0",
+      "contentHash": "b0cbbb380b7f47c63d026456b4246ded261e5a3e14c4e0db612b9b62e1b48c01",
       "evidenceRoot": "1b461aae5d0e6b9676cc9b8a749143f6a415ea2e8486673c100b30865f51c17d",
-      "hashVersion": 2,
+      "hashVersion": 3,
       "issuedAt": "2026-11-07T10:47:49Z",
       "lifecycle": "active",
       "memoryId": "powershell_encoding_traps",
+      "resealedAt": "2026-11-13T16:57:43Z",
+      "resealedFrom": 2,
       "rollback": {
         "previousContentHash": null,
         "previousEvidenceRoot": null
@@ -122,16 +137,19 @@
     },
     {
       "actionRisk": "R3",
+      "authority": "observed",
       "change": {
         "baseContentHash": null,
         "mode": "import"
       },
-      "contentHash": "82061fbdd8bc855b3c286a3c0252593a49d2369ffeb5a6efbd03b5c1faf9bd94",
+      "contentHash": "f1fef89667d7cd1e38a8d6f8b7f5a1101b60d71effcc3085a95d4711e52d8f54",
       "evidenceRoot": "1192ca9d95c59e89e26408ef75707b262edc3634765f7fe922b28565c443aa49",
-      "hashVersion": 2,
+      "hashVersion": 3,
       "issuedAt": "2026-11-07T10:48:03Z",
       "lifecycle": "active",
       "memoryId": "only_dsw_alias_tokens_no_hex",
+      "resealedAt": "2026-11-13T16:57:43Z",
+      "resealedFrom": 2,
       "rollback": {
         "previousContentHash": null,
         "previousEvidenceRoot": null
@@ -146,16 +164,19 @@
     },
     {
       "actionRisk": "R5",
+      "authority": "observed",
       "change": {
         "baseContentHash": null,
         "mode": "import"
       },
-      "contentHash": "5b07cdd639bdc59a91af58cc3aed1d6be49db0c4abf66f88483b4089daaf930f",
+      "contentHash": "b4af649eaea07659bf316cd05db277f46c5a92d64d82086851cc6e07f3a551cb",
       "evidenceRoot": "a0bfe67778f39df38120199bdefa9047fa4cad79811f25c79569b294b87904a5",
-      "hashVersion": 2,
+      "hashVersion": 3,
       "issuedAt": "2026-11-07T10:48:10Z",
-      "lifecycle": "active",
+      "lifecycle": "deprecated",
       "memoryId": "member_is_appointment_not_entity",
+      "resealedAt": "2026-11-13T16:57:43Z",
+      "resealedFrom": 2,
       "rollback": {
         "previousContentHash": null,
         "previousEvidenceRoot": null
