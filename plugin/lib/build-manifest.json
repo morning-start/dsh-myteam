@@ -1,12 +1,12 @@
 {
   "schema": 1,
-  "builtAt": "2026-11-12T15:36:27.633Z",
+  "builtAt": "2026-11-13T12:57:04.442Z",
   "node": "v22.23.2",
   "entry": "./lib/host.mjs",
   "modules": 56,
   "sourceHash": "d318d2a45785dfe751d2a24c671a598554fe11da5d82b36ed9f62b07181b8da0",
   "clientFile": "client/client.js",
-  "clientHash": "c2d0fc1774f7b929bbb4de6d27410a2f62d8e088e5a6c85a70bf3060afe02ddd",
+  "clientHash": "66d3c1edaf2ccf41980b277fea49174ac1afa7e709164255b51942ee5d1a5452",
   "files": [
     "core/agent/guard.ts",
     "core/archive/archive-store.ts",

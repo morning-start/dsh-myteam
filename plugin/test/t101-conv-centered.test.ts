@@ -74,3 +74,19 @@ test('T101 ③ 根上不再有满宽 padding 的旧写法（任何一处回潮�
   assert.equal(occurrences.length, 1, '`.mt-conv` 只应有一条根规则')
   assert.doesNotMatch(occurrences[0], /padding:14px 16px/, '满宽 padding 不得回潮')
 })
+
+test('T101 ④ 空态居中（CHG-180）：空态不是文档，窄列居中 + 标题/命令/计数一起居中', () => {
+  /* 空态只有「一句话 + 一个命令 + 四个 0」。跟着 1400px 阅读列左对齐时右侧留 700+px 空白，
+   * 整页看起来像「只写了一半」——所以空态单独走居中窄列（760px），与有数据时的阅读列分工明确。 */
+  const rule = ruleOf('.mt-conv-empty')
+  assert.ok(rule, '`.mt-conv-empty` 规则必须存在（空态居中根）')
+  assert.match(rule, /max-width:760px/, '空态窄列 760px')
+  assert.match(rule, /margin-inline:auto/, '空态窄列水平居中')
+  assert.match(rule, /text-align:center/, '空态文字居中')
+  for (const sel of ['.mt-conv-empty .mt-conv-head', '.mt-conv-empty .mt-conv-body', '.mt-conv-empty .mt-conv-cmd', '.mt-conv-empty .mt-conv-stats']) {
+    assert.ok(ruleOf(sel), `${sel} 必须有居中规则`)
+  }
+  /* 只有空态那个分支挂 `.mt-conv-empty`；有数据的团队视图仍走阅读列左对齐 */
+  const emptyHits = source.match(/className: 'mt-conv mt-conv-empty'/g) ?? []
+  assert.equal(emptyHits.length, 1, '空态根必须**恰好一处**带 mt-conv-empty')
+})

@@ -4717,6 +4717,16 @@ window.__ModuleLoader__.load({
       '.mt-conv-title b{font-size:13px;font-weight:600}',
       '.mt-conv-title span{display:block;font-size:11px;color:var(--dsw-alias-label-tertiary)}',
       '.mt-team-mark{width:26px;height:26px;border-radius:8px;display:inline-flex;place-items:center;background:var(--dsw-alias-bg-layer-2);color:var(--dsw-alias-label-emphasis, var(--dsw-alias-label-primary));flex:none;align-items:center;justify-content:center;border:.5px solid var(--dsw-alias-border-l2);font-size:12px}',
+      /* CHG-180（U4）：**空态居中**。
+       * 空态不是文档——它只有「一句话 + 一个命令 + 四个 0」。原来跟着 1400px 阅读列**左对齐**，
+       * 右侧留 700+px 空白，整页看起来像「只写了一半」。空态改成居中的窄列（760px），
+       * 标题行 / 命令 / 计数一起居中；有数据时仍走阅读列左对齐（那是文档，不该居中）。 */
+      '.mt-conv-empty{max-width:760px;margin-inline:auto;text-align:center}',
+      '.mt-conv-empty .mt-conv-head{justify-content:center;border-bottom:0;padding-bottom:0}',
+      '.mt-conv-empty .mt-conv-title{justify-content:center;text-align:center}',
+      '.mt-conv-empty .mt-conv-body{align-items:center;gap:14px;text-align:center}',
+      '.mt-conv-empty .mt-conv-cmd{justify-content:center}',
+      '.mt-conv-empty .mt-conv-stats{justify-content:center}',
       /* CHG-107：会话页团队视图的真实数据面（概览计数 / 空态 / 成员名册 / 命令提示） */
       '.mt-conv-stats{display:flex;flex-wrap:wrap;gap:8px;padding:12px 0}',
       /* CHG-157：团队总览卡（对齐 AgentTeams 样例）——卡片容器 + 元信息/队长汇总/分段条/图例/叙述行 */
@@ -13440,7 +13450,8 @@ window.__ModuleLoader__.load({
 
       /* 空态：这个会话还没进团队模式 —— 明确说清楚，不画任何假数据 */
       if (!team) {
-        return js('div', { className: 'mt-conv', ...themeAttr, children: [
+        /* CHG-180：整块空态居中（`.mt-conv-empty`）——空态不是文档，左对齐会显得只写了一半 */
+        return js('div', { className: 'mt-conv mt-conv-empty', ...themeAttr, children: [
           head(t('conv.emptyTitle'), t('conv.emptySub')),
           js('div', { className: 'mt-conv-body', children: [
             j('p', { className: 'mt-hint', children: board.loaded ? t('conv.emptyBody') : t('state.loading') }),
