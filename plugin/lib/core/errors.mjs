@@ -44,6 +44,8 @@ export const MT_CODES = [
   'MT_LEDGER_MISSING_FIELD',
   'MT_LEDGER_MISSING_RULES_VERSION',
   'MT_LEDGER_UNKNOWN_TYPE',
+  /* CHG-187b（FR-32 支柱一）：一次性账本迁移写盘失败——**原账本保持原样**，不谎称已迁移。 */
+  'MT_SCHEMA_MIGRATION_FAILED',
 
   // ── 任务与状态机 ────────────────────────────────────────────
   'MT_ATTEMPT_STALE',
@@ -169,6 +171,8 @@ export const MT_CODE_DOCS                         = {
   MT_LEDGER_MISSING_FIELD: '事件缺 `seq` / `type` / `at` / `actor` / `payload` 之一。',
   MT_LEDGER_MISSING_RULES_VERSION: '新账本的首事件不是 `rules.version.adopted`（I3 前提）。',
   MT_LEDGER_UNKNOWN_TYPE: '事件 `type` 不在 `EVENT_TYPES` 白名单里（旧版本写的账本用新代码打开时会看到）。',
+  MT_SCHEMA_MIGRATION_FAILED:
+    '账本一次性迁移（`member.spawned` 派生树三字段必填化）写盘失败：**原账本一个字节都没变**（整份替换），旧账本仍可读、可重跑迁移；先确认该路径可写 / 磁盘没满。',
 
   // 任务与状态机
   MT_ATTEMPT_STALE: '针对的 attempt 已被撤销或已结束（并发重试、或成员被 interrupt 后回写）。',

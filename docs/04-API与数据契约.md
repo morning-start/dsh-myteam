@@ -8,7 +8,7 @@
 > | 契约 | 变化 | 关联 |
 > |---|---|---|
 > | `role.delegation` | 角色 schema 新增 `{canSpawn, allowedRoles[], maxDepth?, maxChildren?}` | FR-32 / docs/18 |
-> | `member.spawned` | 载荷 +`parentMemberId?` / `depth` / `rootMemberId?`（**不新增事件型**，仍 40 型） | FR-32 |
+> | `member.spawned` | 载荷 +`parentMemberId` / `depth` / `rootMemberId`（**必填**，CHG-187b：旧账本在 `openLedger` 里一次性迁移；不新增事件型，仍 40 型） | FR-32 |
 > | `myteam_spawn_member` / `myteam_release_member` | 档位 **C → CM**（成员需角色授权可见）；release 增 `cascade?: boolean` | FR-32 |
 > | `myteam_list_members` | **新增**（A 档，只读成员树） | FR-32 |
 > | `getProjectBoard` / `getProjectSummary` | **新增**两个 Remote 端点（项目级看板聚合 / 五指标汇总）；Remote 40 → 42、门面 58 → 60 | FR-33 |
@@ -393,7 +393,7 @@ interface HandoffSessionRef {
 | `team.created` | teamId, name, goal | Lead 工具 |
 | `plan.clarify` | questions[{id,type,text,assumption}], round | Lead（硬终止计数在此累计） |
 | `plan.staged / plan.revised / plan.approved / plan.discarded` | planId, roster, tasks 快照 | Lead 工具 |
-| `member.spawned` | memberId, roleId, instanceName, sessionId, snapshotRef, status:'provisioning'\|'active'\|'failed', reason?（CHG-142 两阶段 spawn 的相位事件：**同一 memberId 的相位更新不吃 maxMembers 配额**）, skills?, mcpAllowlist?（CHG-54：成员级覆写时记录） | Lead 工具 |
+| `member.spawned` | memberId, roleId, instanceName, sessionId, snapshotRef, status:'provisioning'\|'active'\|'failed', reason?（CHG-142 两阶段 spawn 的相位事件：**同一 memberId 的相位更新不吃 maxMembers 配额**）, **parentMemberId, depth, rootMemberId**（CHG-187b：派生树三字段**必填**，缺一个即 `MT_LEDGER_MISSING_FIELD`；历史账本由 `openLedger` 一次性迁移补成一级成员）, skills?, mcpAllowlist?（CHG-54：成员级覆写时记录） | Lead 工具 |
 | `member.interrupted` | memberId, reason | Lead 工具（myteam_interrupt；QA-2 勘误补行） |
 | `member.released / member.archived / member.restored` | memberId, mode, drained | Lead 工具 |
 | `task.created` | taskId, task(TaskInput), createdBy；task.gateChain 可为 host 按 taskTypes 展开后的链（CHG-55） | Lead 工具 |
@@ -515,7 +515,7 @@ interface HandoffSessionRef {
 
 ## 错误码（`MT_*`）
 
-> **本表由 `tools/gen-error-docs.mjs` 从 `plugin/src/core/errors.ts` 生成，共 85 个。**
+> **本表由 `tools/gen-error-docs.mjs` 从 `plugin/src/core/errors.ts` 生成，共 86 个。**
 > 手改会被覆盖，且 `plugin/test/t81-error-codes.test.ts` 会判红。
 >
 > **加码流程**：① `errors.ts` 加一行（含说明）→ ② `node tools/gen-error-docs.mjs` → ③ `cd plugin && npm test`。
@@ -523,7 +523,7 @@ interface HandoffSessionRef {
 > 客户端按码分支的地方（`plugin/client/client.js`）必须只认本表里的码；
 > 服务端新增码时若客户端要分支，同步改客户端并在 CHG 里记一笔。
 
-### 跨域通用（17）
+### 跨域通用（18）
 
 | 码 | 什么时候会看到它 |
 |---|---|
@@ -535,6 +535,7 @@ interface HandoffSessionRef {
 | `MT_EXTERNAL_FAILURE` | 门禁里跑的外部命令自身失败（非零退出、被信号杀），不是门禁判定为 fail。 |
 | `MT_TOOL_CONTRACT` | 工具返回值违反结果契约（缺 `status` / `status` 不在结果状态词表 / `code`·`message` 类型不符）。**返回**而不是抛出，调用方决定记日志还是阻断。 |
 | `MT_ENV_UNAVAILABLE` | 成员护栏判定**执行环境不可用**（命令不存在 / `command not found` / `ENOENT` / 权限不足）。重试、换命令、换参数都修不好环境——交付判定转人工，**禁止自动重试**（P1-5）。 |
+| `MT_SCHEMA_MIGRATION_FAILED` | 账本一次性迁移（`member.spawned` 派生树三字段必填化）写盘失败：**原账本一个字节都没变**（整份替换），旧账本仍可读、可重跑迁移；先确认该路径可写 / 磁盘没满。 |
 | `MT_NOT_CLAIMABLE` | 任务当前状态不允许 claim（不满足就绪条件：依赖未完成 / 已被占用 / 非 ready）。 |
 | `MT_BATCH_NOT_ROOT` | 批量调用只支持根级方法（形参只有 query）；agent 作用域的方法请单独调用。 |
 | `MT_UNKNOWN_METHOD` | 方法名不在宿主方法表里（客户端与服务端版本不一致，或拼错了）。 |

@@ -34,7 +34,7 @@ ok(svc.commit({
 
 const spawn = (id, roleId, instanceName) => ok(svc.commit({
   actor: 'host', type: 'member.spawned',
-  payload: { teamId: 'demo', memberId: id, roleId, instanceName, sessionId: `mt-demo-${id}`, status: 'active', skills: [], mcpAllowlist: [] },
+  payload: { teamId: 'demo', memberId: id, roleId, instanceName, sessionId: `mt-demo-${id}`, status: 'active', skills: [], mcpAllowlist: [], parentMemberId: null, depth: 0, rootMemberId: id },
 }), `spawn ${id}`)
 spawn('m1', 'req-validator', '需求验证员')
 spawn('m2', 'developer', '开发')

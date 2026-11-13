@@ -51,18 +51,22 @@ export const HOST_TEAM_TOOLS_TO_HIDE = [
                                            
                          
      
-                                                              
-                                                                    
-                                          
+                                                                
+                                                        
+                 
+    
+                                                                
+                                                    
+                                                       
      
-                                
-                
-                       
+                               
+               
+                      
  
 
-/** CHG-187：实例 → 派生树三字段（旧实例没有这三个字段 → 按「一级成员」缺省） */
+/** CHG-187：实例 → 派生树三字段（**纯投影**：缺省值只存在于迁移里，这里不猜） */
 export function treeFieldsOf(member                )                                                                         {
-  return { parentMemberId: member.parentMemberId ?? null, depth: member.depth ?? 0, rootMemberId: member.rootMemberId ?? member.memberId }
+  return { parentMemberId: member.parentMemberId, depth: member.depth, rootMemberId: member.rootMemberId }
 }
 
 /**

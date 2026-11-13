@@ -8,8 +8,16 @@
  * - rules.version：校验规则演进标记〔I3〕，账本首事件必须是 rules.version.adopted。
  * - 纯函数 fold 与 IO 分离（〔J1〕），投影在 D2/T3 实现。
  */
-import { readFileSync, statSync } from 'node:fs'
+import { statSync } from 'node:fs'
 import { appendText, writeTextAtomic } from '../fs/write-log.ts'
+import { migrateLedgerIfNeeded } from './migrate.ts'
+
+/**
+ * CHG-187b（FR-32 支柱一）：当前账本 schema（2 = 派生树三字段必填）。定义在 `./migrate.ts`
+ * （迁移逻辑与版本号必须在一起：版本就是「内容形状」），这里 re-export 供调用方引用。
+ */
+export { LEDGER_SCHEMA } from './migrate.ts'
+export type { LedgerMigrationResult } from './migrate.ts'
 
 /** 账本事件类型全集（PRD §7.2 + CHG-16 增补），payload 校验器见 validatePayload */
 export const EVENT_TYPES = [
@@ -88,15 +96,17 @@ const PAYLOAD_REQUIRED: Partial<Record<EventType, string[]>> = {
   'plan.revised': ['teamId', 'planId', 'note'],
   'plan.approved': ['teamId', 'planId'],
   'plan.discarded': ['teamId', 'planId'],
-  'member.spawned': ['teamId', 'memberId', 'roleId', 'sessionId', 'status'],
-  /* CHG-187（FR-32 支柱一）：`member.spawned` 的派生树三字段（`parentMemberId` / `depth` /
-   * `rootMemberId`）**故意不进本表**——同 CHG-158 的理由：
-   *   ① 本表只服务写入端，重放不校验必填，老账本能重放；
-   *   ② 写成必填会让「只关心成员身份的既有写入方」（`t7` / `t13` / `t113` / `t122` 等十几处
-   *      `member.spawned` 提交）立刻变成非法事件；
-   *   ③ 缺省语义由 `fold.ts` 承担：`parentMemberId: null` / `depth: 0` / `rootMemberId: memberId`
-   *      —— 旧账本里的成员就是「队长直接召唤的一级成员」，这是唯一诚实的解释（t139-9 锁死）。
-   * 宿主写路径（`spawnMember`）**总是**写这三字段；对他们缺省的只有历史账本。 */
+  /* CHG-187b（FR-32 支柱一）：`member.spawned` 的派生树三字段是**必填**。
+   * CHG-187 曾把它们做成可选、把缺省语义放在 `fold.ts`（`?? null` / `?? 0` / `?? memberId`），
+   * 那是**两份真相**：载荷说「可能没有」，折叠层说「没有就是一级成员」。现在按用户口径
+   * 「不必向后兼容，保证能力最重要」收干净：
+   *   ① 写入端（`spawnMember` / 启动对账）**必须显式带**，缺一个就是 `MT_LEDGER_MISSING_FIELD`
+   *      ——「只关心成员身份」的写入方不再被容忍（测试里的手工载荷已逐个补齐）；
+   *   ② 历史账本由 `openLedger` 里**唯一**的一次性迁移（`./migrate.ts`）补齐成一级成员，
+   *      迁移后三字段显式存在（`t139-9` 锁死），所以 fold 不需要、也不允许再猜；
+   *   ③ 代价如实登记：升级后第一次打开老账本会**改写**该文件（原子重写、幂等；写失败大声
+   *      `MT_SCHEMA_MIGRATION_FAILED` 且原账本零改动）。 */
+  'member.spawned': ['teamId', 'memberId', 'roleId', 'sessionId', 'status', 'parentMemberId', 'depth', 'rootMemberId'],
   'member.released': ['teamId', 'memberId', 'mode', 'reason'],
   'member.archived': ['teamId', 'memberId'],
   'member.restored': ['teamId', 'memberId'],
@@ -214,11 +224,22 @@ export interface LedgerOpenResult {
   corrupted?: number
   /** 本次打开是否重写了账本（剔除坏行 / 补行尾换行）；false = 文件原样未动 */
   compacted?: boolean
+  /**
+   * CHG-187b：本次打开是否**触发了一次性迁移**（旧账本补齐 `member.spawned` 派生树三字段）。
+   * `false` = 已是当前 schema（`LEDGER_SCHEMA`），文件原样未动。
+   */
+  migrated?: boolean
 }
 
 /**
  * 打开账本：全量重放 + 崩溃残留截断 + 中部坏行跳过（QA-1）。
  * 语义（FR-4.6 有序恢复的账本侧前提）：重放必须无损，残留行截断后 nextSeq 连续。
+ *
+ * CHG-187b：**迁移的唯一入口**。打开前先跑一次 `migrateLedgerIfNeeded`（幂等：已是当前
+ * schema 时连 mtime 都不动），保证下面解析出来的事件**一定带**派生树三字段——`fold` 因此
+ * 不需要第二套默认值。为什么不放到各调用点：`TeamService.reload` / 启动对账 / 面板只读
+ * 路径都经过这里，散开调用必然漏一处，而漏掉的那处会拿缺字段的载荷去 commit（被
+ * `MT_LEDGER_MISSING_FIELD` 拒）或 fold（得到 `undefined` 深度）。
  *
  * 坏行的两种处置（旧实现一律 break + 只砍最后一行，中部坏行会静默带走其后全部合法事件）：
  * - 尾部残行（其后没有任何内容）→ 截断该行，计入 `truncated`（语义不变）。
@@ -226,11 +247,11 @@ export interface LedgerOpenResult {
  * 重写账本时只保留能完整解析的事件行（原样保留），保证重写后可完整重放。
  */
 export function openLedger(filePath: string): LedgerOpenResult {
-  let raw: string
-  try {
-    raw = readFileSync(filePath, 'utf8')
-  } catch {
-    return { events: [], nextSeq: 0, truncated: 0, corrupted: 0, compacted: false }
+  const migration = migrateLedgerIfNeeded(filePath)
+  const raw = migration.text
+  if (raw === undefined) {
+    // 账本还不存在（ENOENT）：没有历史可迁，按空账本返回
+    return { events: [], nextSeq: 0, truncated: 0, corrupted: 0, compacted: false, migrated: false }
   }
   const events: LedgerEvent[] = []
   /** 能完整解析的事件行原文（重写时原样保留：payload 内可能含任意串，不能重新序列化） */
@@ -285,7 +306,7 @@ export function openLedger(filePath: string): LedgerOpenResult {
     writeTextAtomic(filePath, contentToWrite)
   }
   const nextSeq = events.length > 0 ? events[events.length - 1].seq + 1 : 0
-  return { events, nextSeq, truncated, corrupted, compacted: dirty }
+  return { events, nextSeq, truncated, corrupted, compacted: dirty, migrated: migration.migrated }
 }
 
 /** 追加单事件（含 fsync 持久化屏障）。seq 由本函数按账本尾部分配。 */

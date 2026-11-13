@@ -3375,7 +3375,8 @@ export class MyTeamHost                               {
     }
     for (const teamId of teamIds) {
       try {
-        const { events } = readLedgerEvents(join(teamsDir, teamId, 'ledger.jsonl'))
+        // CHG-187b：先让服务打开账本（openLedger = 迁移的唯一入口），再按迁移后的载荷对账
+        const { events } = readLedgerEvents(this.service(teamId).ledgerPath)
         // 每个 memberId 只认最后一条 member.spawned（同 memberId 的更新事件 = 阶段推进）
         const latest = new Map                                 ()
         for (const event of events) {
@@ -3405,6 +3406,7 @@ export class MyTeamHost                               {
               sessionId: payload.sessionId,
               status,
               reason: settlement.reason,
+              ...treeFieldsOf(payload                             ), // CHG-187b：派生树三字段随身份原样搬（迁移保证一定在）
             },
           })
           if (!result.ok) {

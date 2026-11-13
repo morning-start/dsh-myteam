@@ -124,10 +124,13 @@ export function applyEvent(proj                , event             )       {
         sessionId: p.sessionId,
         status: p.status === 'failed' ? 'spawn_failed' : 'active',
         spawnedAt: event.ts,
-        // CHG-187（FR-32）：派生树三字段——旧账本没有它们，缺省 = 「队长直接召唤的一级成员」
-        parentMemberId: typeof p.parentMemberId === 'string' ? p.parentMemberId : null,
-        depth: typeof p.depth === 'number' ? p.depth : 0,
-        rootMemberId: typeof p.rootMemberId === 'string' ? p.rootMemberId : p.memberId,
+        // CHG-187b（FR-32 支柱一）：派生树三字段是**必填**载荷——历史账本在 `openLedger`
+        // 里一次性迁移（补成「队长直接召唤的一级成员」），所以这里**直接取**，不再有第二套
+        // 默认值。`?? null / ?? 0 / ?? memberId` 一旦留在这里，就是「载荷说可能没有、
+        // 折叠层说没有就是一级成员」的两份真相（重放结果取决于哪边先改）。
+        parentMemberId: p.parentMemberId,
+        depth: p.depth,
+        rootMemberId: p.rootMemberId,
         ...(Array.isArray(p.skills) ? { skills: p.skills                        } : {}),
         ...(Array.isArray(p.mcpAllowlist) ? { mcpAllowlist: p.mcpAllowlist                        } : {}),
       }

@@ -51,18 +51,22 @@ export interface MemberInstance {
   /** 团队模板/队长覆写的 MCP allowlist（空 = 继承角色） */
   mcpAllowlist?: string[]
   /**
-   * CHG-187（FR-32 支柱一）：派生树。`parentMemberId` 缺省 = 队长直接召唤的一级成员；
-   * 三个字段都由 `core/members/hierarchy.ts` 的 `spawnTreeFields` 算，这里只做承载
-   * （成员卡和账本 payload 都从同一份实例取，避免两处各算一遍算歪）。
+   * CHG-187（FR-32 支柱一）：派生树。三个字段都由 `core/members/hierarchy.ts` 的
+   * `spawnTreeFields` 算，这里只做承载（成员卡和账本 payload 都从同一份实例取，
+   * 避免两处各算一遍算歪）。
+   *
+   * CHG-187b：**必填**——`spawnMember` 在任何 commit 之前就算好了三字段，缺省只可能来自
+   * 「忘了接线的写入方」，那应该在编译期/写入端当场红，而不是在 `treeFieldsOf` 里
+   * 悄悄补成「一级成员」（第二套默认值，见 `core/ledger/migrate.ts` 头注释）。
    */
-  parentMemberId?: string | null
-  depth?: number
-  rootMemberId?: string
+  parentMemberId: string | null
+  depth: number
+  rootMemberId: string
 }
 
-/** CHG-187：实例 → 派生树三字段（旧实例没有这三个字段 → 按「一级成员」缺省） */
+/** CHG-187：实例 → 派生树三字段（**纯投影**：缺省值只存在于迁移里，这里不猜） */
 export function treeFieldsOf(member: MemberInstance): { parentMemberId: string | null; depth: number; rootMemberId: string } {
-  return { parentMemberId: member.parentMemberId ?? null, depth: member.depth ?? 0, rootMemberId: member.rootMemberId ?? member.memberId }
+  return { parentMemberId: member.parentMemberId, depth: member.depth, rootMemberId: member.rootMemberId }
 }
 
 /**

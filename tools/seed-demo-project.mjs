@@ -58,7 +58,7 @@ const team = (teamId, name, goal, members) => {
   for (const m of members) {
     ok(svc.commit({
       actor: 'host', type: 'member.spawned',
-      payload: { teamId, memberId: m.id, roleId: m.roleId, instanceName: m.instanceName, sessionId: `mt-${teamId}-${m.id}`, status: 'active' },
+      payload: { teamId, memberId: m.id, roleId: m.roleId, instanceName: m.instanceName, sessionId: `mt-${teamId}-${m.id}`, status: 'active', parentMemberId: null, depth: 0, rootMemberId: m.id },
     }), `${teamId} spawn ${m.id}`)
   }
   ok(svc.commit({ actor: 'human', type: 'plan.approved', payload: { teamId, planId: 'p1' } }), `${teamId} approved`)

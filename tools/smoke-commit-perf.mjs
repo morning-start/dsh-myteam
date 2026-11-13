@@ -25,7 +25,7 @@ const must = (r, label) => {
 }
 bootstrapTeam(svc)
 must(svc.commit({ actor: 'lead', type: 'team.created', payload: { teamId: 'perf', name: 'perf', goal: 'perf', roster: [{ roleId: 'captain' }, { roleId: 'implementer' }] } }), 'team.created')
-must(svc.commit({ actor: 'host', type: 'member.spawned', payload: { teamId: 'perf', memberId: 'm1', roleId: 'implementer', instanceName: 'dev', sessionId: 's1', status: 'active' } }), 'member.spawned')
+must(svc.commit({ actor: 'host', type: 'member.spawned', payload: { teamId: 'perf', memberId: 'm1', roleId: 'implementer', instanceName: 'dev', sessionId: 's1', status: 'active', parentMemberId: null, depth: 0, rootMemberId: 'm1' } }), 'member.spawned')
 must(svc.commit({ actor: 'lead', type: 'plan.staged', payload: { teamId: 'perf', planId: 'p1' } }), 'plan.staged')
 must(svc.commit({ actor: 'lead', type: 'task.created', payload: { teamId: 'perf', taskId: 'k1', task: { title: 't', description: 'd', acceptanceCriteria: ['ac'], deliverableSpec: { path: 'docs/x.md' }, deps: [], requiredRole: 'implementer', priority: 'P2', gateChain: ['review'] } } }), 'task.created')
 must(svc.commit({ actor: 'human', type: 'plan.approved', payload: { teamId: 'perf', planId: 'p1' } }), 'plan.approved')

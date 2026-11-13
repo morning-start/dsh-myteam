@@ -69,7 +69,7 @@ ok(svc.commit({ actor: 'lead', type: 'plan.staged', payload: { teamId: 'panel-ch
 for (const [memberId, roleId, instanceName] of [['m-pc1', 'implementer', 'impl-a'], ['m-pc2', 'implementer', 'impl-b'], ['m-pc3', 'reviewer', 'reviewer']]) {
   ok(svc.commit({
     actor: 'host', type: 'member.spawned',
-    payload: { teamId: 'panel-check', memberId, roleId, instanceName, sessionId: `mt-panel-check-${memberId}`, status: 'active' },
+    payload: { teamId: 'panel-check', memberId, roleId, instanceName, sessionId: `mt-panel-check-${memberId}`, status: 'active', parentMemberId: null, depth: 0, rootMemberId: memberId },
   }), `spawn ${memberId}`)
 }
 ok(svc.commit({ actor: 'human', type: 'plan.approved', payload: { teamId: 'panel-check', planId: 'p1' } }), 'approved')
