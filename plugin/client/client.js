@@ -8624,6 +8624,61 @@ window.__ModuleLoader__.load({
       deps: (task.deps ?? []).map((dep) => `${task.ownerTeamId}/${dep}`),
     }))
 
+    /**
+     * CHG-193（T160 · M3-7）：面板「任务」tab 的**数据源归一** —— 派生索引优先、`getProject` 兜底。
+     *
+     * 为什么需要这一步：`getBoard({}).project`（`state/index/tasks.json` 派生索引）是项目级任务的
+     * 唯一派生面，但它**刻意不存** `ownerOnline` / `ownerSessionId` —— 那是机器相关字段
+     * （索引要能换机器/换工作区副本复用，绝对路径与 sessionId 一换就废，见
+     * `core/index/project-board-index.ts` 的字段清单）。而面板的写入口（详情抽屉的
+     * 重新规划 / 取消 / 编辑）必须知道「这个任务属于哪个团队的哪个会话」——所以这里把
+     * 索引里的**业务字段**与**实时团队名册**（`getProject().teams`）的**会话绑定**按
+     * `ownerTeamId` 拼回去：任务只认索引、会话只认名册，两边都是唯一真源，谁也不当第二份。
+     *
+     * 降级（三条，缺一条就白屏）：
+     *  ① 索引未加载（`undefined`）或不可用（`null`，`getBoard` 抛错 / 没 `project` 字段
+     *     / `tasks` 不是数组）→ 回落 `getProject().tasks`；
+     *  ② 索引在手但 `tasks` 为空 → 同样回落实时折叠（两条路折的是**同一份账本**，结果一致，
+     *     不存在「哪个更新」的问题；用回落而不是空数组，是因为「读不到」不该被说成
+     *     「这个项目没有任务」——那是谎报）；
+     *  ③ 任务找不到所属团队（团队刚被删、索引还没重算）→ 原样保留，`ownerOnline` 缺失
+     *     即按只读渲染（`readOnly: !openTask.online`），不给不存在的团队开写路径。
+     */
+    function resolveProjectTasks(boardIndex, projectTeams, fallbackTasks) {
+      const indexTasks = boardIndex && Array.isArray(boardIndex.tasks) ? boardIndex.tasks : null
+      const source = indexTasks && indexTasks.length > 0 ? indexTasks : (Array.isArray(fallbackTasks) ? fallbackTasks : [])
+      return source.map((task) => {
+        const owner = (projectTeams ?? []).find((team) => team.teamId === task.ownerTeamId)
+        if (!owner) return task
+        return {
+          ...task,
+          ownerOnline: owner.online === true,
+          ...(owner.sessionId ? { ownerSessionId: owner.sessionId } : {}),
+          ...(owner.name ? { ownerTeamName: owner.name } : {}),
+        }
+      })
+    }
+
+    /**
+     * CHG-193（T160）：任务详情的**复合键**打开目标 —— `{ teamId, taskId }`。
+     *
+     * 为什么不能只传 taskId：项目级看板是**跨团队聚合**的，而每个团队的账本都从 `task-1`
+     * 开始编号——只传 taskId 就会打开另一个团队的同名任务，写操作（重新规划 / 取消 / 编辑）
+     * 也会落到错误的团队账本。所以打开详情一律带团队 id，`TaskDetail` 用它取**任务所属团队**
+     * 的 service（`makeApi(connection, target.sessionId)`），不是当前选中/默认团队。
+     *
+     * 空 id 返回 `null`（不制造假任务）；`sessionId` 缺失 = 该团队不在线 → 只读。
+     */
+    function taskOpenTarget(task) {
+      if (!task || task.id === undefined || task.id === null || task.id === '') return null
+      return {
+        teamId: String(task.ownerTeamId ?? ''),
+        taskId: String(task.id),
+        online: task.ownerOnline === true,
+        ...(task.ownerSessionId ? { sessionId: String(task.ownerSessionId) } : {}),
+      }
+    }
+
     /** CHG-82 G2：角色卡按 design/roles.html 的 .card 结构——
      *  圆形头像 + 角色名/ID + 来源 chip + 描述 + 兴趣词 + 模型路由/Skill/MCP + 复制来源 + 脚（实例 / 用它单干 / 复制进项目）。
      *  CHG-74：同名副本要能一眼分辨——被压过的那份标「同名 X 副本（以此为准）」。 */
@@ -11261,6 +11316,10 @@ window.__ModuleLoader__.load({
       const [taskPrio, setTaskPrio] = react.useState('all')
       const [taskMember, setTaskMember] = react.useState('all')
       const [openTask, setOpenTask] = react.useState(null)        // { key, teamId, taskId, online, sessionId }
+      /* CHG-193（T160 · M3-7）：项目看板**派生索引**（`getBoard({}).project`）——面板「任务」tab 的数据源。
+       * `undefined` = 未加载（首屏）；`null` = 不可用（降级 `getProject`）；对象 = 索引在手。
+       * 索引是**派生数据**：这里只存「这次拉到的那份」，不做第二真源、不写回、不参与任何计算。 */
+      const [boardIndex, setBoardIndex] = react.useState(undefined)
       const [openRole, setOpenRole] = react.useState(null)
       const [roleDetail, setRoleDetail] = react.useState(null)
       const [kb, setKb] = react.useState(undefined)
@@ -11442,6 +11501,35 @@ window.__ModuleLoader__.load({
         if (!projectRoot || !rootCandidates.includes(projectRoot)) setProjectRoot(rootCandidates[0])
       }, [rootCandidates, projectRoot])
       react.useEffect(() => { loadProject(projectRoot) }, [projectRoot, loadProject])
+      /**
+       * CHG-193（T160 · M3-7）：拉项目看板**派生索引**（`getBoard({})` 的 `project` 字段）。
+       *
+       * 为什么面板要它：项目级看板此前是「每次读时全量折叠」（`getProject` 扫全部团队账本
+       * → 折 → 归并），团队一多首屏就慢；索引把这次折叠落盘，读路径变成一次 JSON 读。
+       *
+       * 三条纪律：
+       *  - **要会话载体**：`getBoard` 是 agent 作用域端点（首参 `agent` 由网关按 `agentId` 解析），
+       *    所以借本项目**第一个在线团队**的会话去读——索引是项目级的，谁的会话读都同一份；
+       *    项目里一个在线团队都没有（全离线）→ 不白试，直接 `null` 走 `getProject` 的实时折叠。
+       *  - **失败即降级**：抛错 / 没有 `project` / `tasks` 不是数组 → `null`（渲染侧回落），
+       *    **绝不**因为索引坏了把「读不到」画成「这个项目没有任务」（那是谎报，比慢更糟）。
+       *  - **派生数据不缓存**：每次 `project` 刷新（写后重载 / `watch` 追平）都重新拉一次，
+       *    不在客户端留一份会过期的副本——索引自己是盘上那份，客户端只做一次性投影。
+       */
+      react.useEffect(() => {
+        if (!projectRoot) { setBoardIndex(undefined); return undefined }
+        const carrier = (project?.teams ?? []).find((team) => team.online && team.sessionId)
+        if (!carrier) { setBoardIndex(null); return undefined }
+        let alive = true
+        makeApi(connection, carrier.sessionId).getBoard({})
+          .then((r) => {
+            if (!alive) return
+            const index = r && typeof r === 'object' ? r.project : undefined
+            setBoardIndex(index && Array.isArray(index.tasks) ? index : null)
+          })
+          .catch(() => { if (alive) setBoardIndex(null) })
+        return () => { alive = false }
+      }, [projectRoot, project, connection])
       /* CHG-102 / CHG-104：项目存储状态。
        * 纪律：**读取失败绝不阻塞面板**——失败/方法缺失/加载中一律视为「未知」(undefined)，
        * 照常渲染面板；只有明确拿到 `initialized:false` 才显示引导横幅（不替换整屏）。
@@ -11854,11 +11942,15 @@ window.__ModuleLoader__.load({
 
       /* ── 项目页 ── */
       const pv = project
+      /* CHG-193（T160 · M3-7）：任务区的数据源 = 项目看板派生索引（`getBoard({}).project`），
+       * 索引未加载/不可用/为空时回落到 `getProject().tasks` 的实时折叠（详见 `resolveProjectTasks`）。
+       * 会话绑定（online / sessionId）按 `ownerTeamId` 从实时名册补齐——索引刻意不存这两个字段。 */
+      const projectTasks = resolveProjectTasks(boardIndex, pv?.teams, pv?.tasks)
       const rolesCount = (pv?.roles ?? []).length + (pv?.projectRole ? 1 : 0)
       const projectTabs = js('div', { className: 'mt-subtabs', role: 'tablist', children: [
         j('button', { className: projectTab === 'roles' ? 'mt-tab mt-tab-active' : 'mt-tab', role: 'tab', 'aria-selected': projectTab === 'roles', onClick: () => { setProjectTab('roles'); setSelectedTeamId(null); exitSelect() }, children: `${t('project.tabs.roles')}（${rolesCount}）` }),
         j('button', { className: projectTab === 'teams' ? 'mt-tab mt-tab-active' : 'mt-tab', role: 'tab', 'aria-selected': projectTab === 'teams', onClick: () => { setProjectTab('teams'); exitSelect() }, children: `${t('project.tabs.teams')}（${(pv?.teams ?? []).length}）` }),
-        j('button', { className: projectTab === 'tasks' ? 'mt-tab mt-tab-active' : 'mt-tab', role: 'tab', 'aria-selected': projectTab === 'tasks', onClick: () => { setProjectTab('tasks'); setSelectedTeamId(null) }, children: `${t('project.tabs.tasks')}（${(pv?.tasks ?? []).length}）` }),
+        j('button', { className: projectTab === 'tasks' ? 'mt-tab mt-tab-active' : 'mt-tab', role: 'tab', 'aria-selected': projectTab === 'tasks', onClick: () => { setProjectTab('tasks'); setSelectedTeamId(null) }, children: `${t('project.tabs.tasks')}（${projectTasks.length}）` }),
       ] })
 
       if (!projectRoot) {
@@ -12390,7 +12482,9 @@ window.__ModuleLoader__.load({
         })
 
       /* 任务页：左参与团队轨 + 视图条 + 四视图 + 详情抽屉 */
-      const allProjectTasks = pv.tasks ?? []
+      /* CHG-193（T160）：四视图（列表 / 看板 / 流程 / 依赖图）统一吃 `projectTasks`——
+       * 派生索引优先、`getProject` 兜底；这里不再直接读 `pv.tasks`（团队页那几处仍读，见文档）。 */
+      const allProjectTasks = projectTasks
       const matches = (task) => {
         if (railTeam !== 'all' && !(task.participants ?? []).some((p) => p.teamId === railTeam)) return false
         if (taskPrio !== 'all' && String(task.priority) !== taskPrio) return false
@@ -12494,7 +12588,11 @@ window.__ModuleLoader__.load({
         }),
       ] })
 
-      const openTaskOf = (task) => setOpenTask({ teamId: task.ownerTeamId, taskId: task.id, online: task.ownerOnline, sessionId: task.ownerSessionId })
+      /* CHG-193（T160）：打开任务详情一律带**复合键**（`teamId` + `taskId`）——
+       * 项目级看板跨团队聚合后 `task-N` 会撞（每团队都从 task-1 编号），只传 taskId 会打开
+       * 另一个团队的同名任务，写操作也会落到错误的团队。`taskOpenTarget` 是唯一入口，
+       * 写路径的 service 由 `TaskDetail` 用 `openTask.sessionId`（**任务所属团队**）取。 */
+      const openTaskOf = (task) => { const target = taskOpenTarget(task); if (target) setOpenTask(target) }
 
       /* CHG-82：拖拽流转（design/dragging.html）—— 落点由状态机判定；非法落点抖动 + 弹回 + 左下角回执 */
       /** attempt 失效（门禁未过 / 已取消）的卡锁住不可拖 */
@@ -13930,6 +14028,12 @@ window.__ModuleLoader__.load({
      * 能在 mock loader 下真断言，而不是只 grep 源码字符串。 */
     const __testResilience = { MyTeamRenderBoundary, withRenderBoundary }
 
-    return { apply, inject, __test, __testG4, __testG6, __testG89, __testEntry, __testResilience }
+    /* 测试专用出口（t143-chg193）：**面板任务 tab 的消费方**——数据源归一（索引 → 兜底）与
+     * 复合键打开目标。生产路径只看 apply/inject 与 Panel 内部调用；导出它们是为了让
+     * 「跨团队聚合出几条」「两个 task-1 会不会互相覆盖」「索引坏了降级到哪条路」
+     * 能在 mock loader 下**真渲染断言**，而不是只 grep 源码字符串。 */
+    const __testBoard = { resolveProjectTasks, taskOpenTarget, makeApi }
+
+    return { apply, inject, __test, __testG4, __testG6, __testG89, __testEntry, __testResilience, __testBoard }
   },
 })
