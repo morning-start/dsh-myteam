@@ -78,10 +78,11 @@ export const FROZEN_A2 = []
  * 真实 6,209 行 / 6,210 个 split 元素）——拿它当基线，棘轮会凭空多出 900 行余量。
  *
  * 基线演进：CHG-186 动手前 6,210 → 契约下沉（`MyTeamConfig` / `KnowledgeView` 搬到
- * `core/host/contract.ts`）后 **6,163**。棘轮直接钉在**拆完的实测值**上（不留余量：
- * 入口层再加一行注释都该红）。T155b 每搬完一族就把数字往下压，最终 4,000。
+ * `core/host/contract.ts`）后 **6,163** → T155b 搬走成员族（`src/host/members.ts`）后
+ * **6,160**。棘轮直接钉在**拆完的实测值**上（不留余量：入口层再加一行注释都该红）。
+ * T155b 每搬完一族就把数字往下压，最终 4,000。
  */
-export const A6_LIMIT = { 'host.ts': 6163 }
+export const A6_LIMIT = { 'host.ts': 6160 }
 
 /** 递归列出 dir 下扩展名为 ext 的文件（确定性排序；Dirent 直接给答案，不 try/catch 猜目录） */
 function walk(dir, ext) {

@@ -36,6 +36,9 @@ import { TeamService, bootstrapTeam,                  } from './core/service.mjs
  * `MyTeamConfig` 仍从本文件 re-export，既有 import 点（如 `test/t123`）一个都不用改。 */
                                                                                               
                                                            
+/* CHG-186（T155b）：端点族适配层。本文件只留**装配 + 分发**（switch 里一行转发），
+ * 族实现落在 `src/host/<族>.ts`——入口层只减不增（A6 棘轮）。 */
+import { createMembersHandlers } from './host/members.mjs'
 import { leadToolDefs, memberToolDefs,              } from './tools/defs.mjs'
 // CHG-148（P1-6）：按工具名取完整结果契约（jsonOutput 双声明），不再用统一空 schema
 import { outputForTool } from './core/tools/output-contract.mjs'
@@ -603,6 +606,22 @@ export class MyTeamHost                               {
           rt             
           services = new Map                     ()
           memberHandles = new Map             () // memberId → AgentHandle
+  /**
+   * CHG-186（T155b）：成员族端点适配层（`src/host/members.ts`）。
+   *
+   * 宿主面只声明这族**用到的**成员（全部是私有成员，TS 私有不参与结构化赋值，所以在这里
+   * 用闭包逐个接出来）：私有方法改名 → 装配处编译报错，不会靠 `as` 蒙混过去。闭包只捕获
+   * `this`、构造期不调用任何方法，字段初始化顺序无影响。
+   */
+                   members = createMembersHandlers({
+    commit: (teamId, draft) => this.commit(teamId, draft),
+    spawnMember: (teamId, roleId, instanceName, overrides) => this.spawnMember(teamId, roleId, instanceName, overrides),
+    releaseMember: (teamId, memberId, mode, confirm) => this.releaseMember(teamId, memberId, mode, confirm),
+    deliverMemberMessage: (memberId, kind, content) => this.deliverMemberMessage(memberId, kind, content),
+    agentOf: (handle) => this.agentOf(handle),
+    memberHandle: (memberId) => this.memberHandles.get(memberId),
+    noteGuardTurnEnd: (memberId) => this.noteGuardTurnEnd(memberId),
+  })
   /**
    * P1-4（docs/21 §6）：运行时准入闸门——`dispose()` 关闸后，新起的成员操作立即被拒，
    * 在飞操作在 `disposalTimeoutMs` 内有界结算（非预期失败聚合成一条 warn）。
@@ -1612,38 +1631,16 @@ export class MyTeamHost                               {
           }
           return { status: 'revoked' }
         }
-        case 'myteam_spawn_member': {
-          return this.spawnMember(teamId, String(args.roleId), args.instanceName ? String(args.instanceName) : undefined, {
-            skills: Array.isArray(args.skills) ? args.skills.filter((skill)                  => typeof skill === 'string') : undefined,
-            mcpAllowlist: Array.isArray(args.mcpAllowlist) ? args.mcpAllowlist.filter((name)                 => typeof name === 'string') : undefined,
-          })
-        }
-        case 'myteam_release_member': {
-          return this.releaseMember(teamId, String(args.memberId), String(args.mode), args.confirm === true)
-        }
-        case 'myteam_message': {
-          const to = String(args.to)
-          const kind = String(args.kind ?? 'notify')
-          const r = this.commit(teamId, { actor, type: 'message.sent', payload: { teamId, messageId: `msg-${Date.now()}`, from: 'lead', to, taskId: args.taskId, kind, content: args.content } })
-          if (!r.ok) return { status: 'error', code: r.code, message: r.message }
-          // A10：投递口径收敛到 `deliverMemberMessage`（与面板 `memberOp(op:'steer')` 同一份构造）。
-          // 投不进去不抛：消息已落账，收件人下次上线读账本仍能拿到；抛错只会把「已记账」变成「失败」。
-          if (to !== 'inbox') this.deliverMemberMessage(to, kind, String(args.content))
-          return { status: 'sent' }
-        }
-        case 'myteam_interrupt': {
-          const memberId = String(args.memberId)
-          const interruptAgent = this.agentOf(this.memberHandles.get(memberId))
-          if (interruptAgent?.cancel) {
-            interruptAgent.cancel({ kind: 'user' })
-            // P1-5：中断 = 这一轮到此为止——宿主没有 turn 结束回调，这里的空转检查是
-            // 「只说不做、被队长打断」的成员唯一会被记到的位置（结论只进 warn 日志）。
-            this.noteGuardTurnEnd(memberId)
-            this.commit(teamId, { actor, type: 'member.interrupted', payload: { teamId, memberId, reason: args.reason } })
-            return { status: 'interrupted', note: 'interrupt 只停当前轮；会话保留' }
-          }
-          return { status: 'not-running' }
-        }
+        /* CHG-186（T155b）：成员族实现已搬到 `src/host/members.ts`。这里只转发——
+         * 逻辑/顺序/默认值一个都没改（纯结构重构，行为零变化）。 */
+        case 'myteam_spawn_member':
+          return this.members.spawn(teamId, args)
+        case 'myteam_release_member':
+          return this.members.release(teamId, args)
+        case 'myteam_message':
+          return this.members.message(teamId, args, actor)
+        case 'myteam_interrupt':
+          return this.members.interrupt(teamId, args, actor)
         case 'myteam_disband': {
           if (args.confirm !== true) return { status: 'confirm-required', message: '解散是两段确认操作（影响面：成员排空/未完成任务转 blocked/账本归档），请带 confirm=true 重调' }
           const svc = this.service(teamId)
