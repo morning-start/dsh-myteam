@@ -90,8 +90,15 @@ export const FROZEN_A2 = []
  * 的 switch 现在纯是「工具名 → 适配层」路由表。所以这一族的 +27 是口径成本，不是回潮；
  * 下一刀该切的是**行为边界**（`spawnMember` / `reviewTask` / `batchTaskOp` /
  * `scopeAuditFor` 下沉 `core/**`），不是继续按端点切。
+ *
+ * ── CHG-189（T159a）──────────────────────────────────────────────────────────
+ * 第一刀已落：spawn 生命周期 5 个私有方法（`spawnMember` / `settleSpawnActive` /
+ * `settleSpawnFailure` / `probeProvisionedSession` / `pendingMessagesFor`）**逐字**搬进
+ * `core/members/spawn-lifecycle.ts` → 5,563 → **5,311**（-252 行，入口占比 35.5% → 34.2%）。
+ * 逐字核验 281/281 逻辑行一致；下一刀照同样口径切 `reviewTask` / `batchTaskOp` /
+ * `scopeAuditFor`（剩下的私有方法体）。
  */
-export const A6_LIMIT = { 'host.ts': 5563 }
+export const A6_LIMIT = { 'host.ts': 5311 }
 
 /** 递归列出 dir 下扩展名为 ext 的文件（确定性排序；Dirent 直接给答案，不 try/catch 猜目录） */
 function walk(dir, ext) {

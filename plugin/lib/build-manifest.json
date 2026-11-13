@@ -1,10 +1,10 @@
 {
   "schema": 1,
-  "builtAt": "2026-11-13T16:52:08.223Z",
+  "builtAt": "2026-11-13T17:17:27.282Z",
   "node": "v22.23.2",
   "entry": "./lib/host.mjs",
-  "modules": 67,
-  "sourceHash": "edf04a44bf72f36e63933a367b9fef93961f2f2a993821768a824b6020860ea4",
+  "modules": 68,
+  "sourceHash": "492d49a836def060e7c07407b660ef55a7bd9195caddf0bc23d0e1d43a9551d5",
   "clientFile": "client/client.js",
   "clientHash": "7b983cd78f4220f2c2c4e1218af2492fb0cff74d6037e1b8965fe08ae9cfdc5a",
   "files": [
@@ -41,6 +41,7 @@
     "core/members/member-card.ts",
     "core/members/member-setup.ts",
     "core/members/memory.ts",
+    "core/members/spawn-lifecycle.ts",
     "core/presets/preset-store.ts",
     "core/roles/builtin-roles.ts",
     "core/roles/captain-skills.ts",
