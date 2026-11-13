@@ -363,6 +363,31 @@
         "id": "mrp-v1",
         "kind": "gate"
       }
+    },
+    {
+      "actionRisk": "R4",
+      "authority": "observed",
+      "change": {
+        "baseContentHash": null,
+        "mode": "import"
+      },
+      "contentHash": "ebaa4d86b464e4a7269aad51e8342e0e28ff9397a648930b85edcde7142a3d9e",
+      "evidenceRoot": "f5fef92562928f14ca9523a5ca7ce853382dc2d0a77da3463667f5a1955a6938",
+      "hashVersion": 3,
+      "issuedAt": "2026-11-13T19:18:41Z",
+      "lifecycle": "active",
+      "memoryId": "v4_closure_delivered_state",
+      "rollback": {
+        "previousContentHash": null,
+        "previousEvidenceRoot": null
+      },
+      "scopes": [
+        "repo:dsh-myteam"
+      ],
+      "verifier": {
+        "id": "mrp-v1",
+        "kind": "gate"
+      }
     }
   ],
   "schema": "dsh-memory.trust/v1"
