@@ -39,6 +39,7 @@ export type { MyTeamConfig } from './core/host/contract.ts'
 /* CHG-186（T155b）：端点族适配层。本文件只留**装配 + 分发**（switch 里一行转发），
  * 族实现落在 `src/host/<族>.ts`——入口层只减不增（A6 棘轮）。 */
 import { createMembersHandlers } from './host/members.ts'
+import { createMemberTaskHandlers, createTasksHandlers } from './host/tasks.ts'
 import { leadToolDefs, memberToolDefs, type ToolDef } from './tools/defs.ts'
 // CHG-148（P1-6）：按工具名取完整结果契约（jsonOutput 双声明），不再用统一空 schema
 import { outputForTool } from './core/tools/output-contract.ts'
@@ -49,8 +50,6 @@ import { validatePlan, TERMINAL_STATES, downstreamOf, GATE_REJECT_BUDGET, type T
  * `bootstrapTeam` 落 `rules.version.adopted`——重连就成了**写账本**，违反「重连不改账本」不变量。
  * `readOfflineTeam` + `foldTolerant` 只读文件、坏行/坏事件各自跳过，正好是重连需要的容错面。 */
 import { foldTolerant, isSafeTeamId, readOfflineTeam } from './core/index/offline-view.ts'
-// CHG-159（报告 A6）：领取前的写范围闸门（纯函数；与 scope-audit/waves 同一套路径语义）
-import { claimScopeVerdict } from './core/scheduler/waves.ts'
 import { diffTaskInput, structuralFieldsOf } from './core/tasks/diff.ts'
 import { buildToolMask, memberPromptSection, memoryPromptSection, memberSessionId, HOST_TEAM_TOOLS_TO_HIDE, type MemberInstance } from './core/members/member-setup.ts'
 import { applyCapabilityGuard, buildCapabilityBoundaryText, capabilitySummary, resolveCapabilities } from './core/members/capability-guard.ts'
@@ -62,7 +61,7 @@ import { presetTeamRoster, type RoleDefinition } from './core/roles/builtin-role
 import { CAPTAIN_SKILLS } from './core/roles/captain-skills.ts'
 import { readPresetCatalog, readProjectPreset, writeProjectPreset, deleteProjectPreset, validatePresetDefinition, BUILTIN_PRESET_IDS, type PresetCatalog } from './core/presets/preset-store.ts'
 import { configOverrideFromPreset, isStructurallyValidConfig, loadEffectiveConfig, readProjectConfigRaw, teamConfigPath, writeTeamConfigRaw } from './core/config/team-config.ts'
-import { listKnowledge, renderIndexSection, readKnowledgeEntry, adoptDraft, reviseEntry, touchStale, candidatesForDraft, writeKnowledgeEntry, knowledgeDirOf, validateDraft, type KnowledgeDraft } from './core/knowledge/knowledge.ts'
+import { listKnowledge, renderIndexSection, readKnowledgeEntry, adoptDraft, reviseEntry, writeKnowledgeEntry, knowledgeDirOf, validateDraft, type KnowledgeDraft } from './core/knowledge/knowledge.ts'
 import { zeroBuckets, dayKeyOf, accumulate, emptyTokensFile, type TokensFile, type MemberMeterState } from './core/ledger/token-sidecar.ts'
 // CHG-86（P0-2）：归档落盘（disband 时写快照；面板归档视图读快照）
 import { buildArchiveSnapshot, writeArchive, readArchive, listArchives, archiveRootOf } from './core/archive/archive-store.ts'
@@ -81,8 +80,8 @@ import {
   type GuardVerdict,
 } from './core/agent/guard.ts'
 import { auditWriteScopes, filesTouchedOf, type ScopeAudit } from './core/gates/scope-audit.ts'
-// CHG-87（M2-D 剩余，FR-16.4③）：证据指针三类解析（task/file/session）
-import { evidenceRefsOf, parseEvidencePointer } from './core/knowledge/evidence-pointer.ts'
+// CHG-87（M2-D 剩余，FR-16.4③）：证据指针投影（task/file/session 三类；解析原语已随任务族搬到 src/host/tasks.ts）
+import { evidenceRefsOf } from './core/knowledge/evidence-pointer.ts'
 // CHG-87（FR-16.1 单角色调用）：sessionDefaults 跨重启恢复 + 提示词 section
 import { readSessionDefaults, writeSessionDefaults, buildRolePromptSection } from './core/roles/session-defaults.ts'
 // CHG-88（M2-E / FR-16.3）：会话移交（摘要提取 + 新团队预设会话注入）
@@ -621,6 +620,40 @@ export class MyTeamHost implements MyTeamHostContract {
     agentOf: (handle) => this.agentOf(handle),
     memberHandle: (memberId) => this.memberHandles.get(memberId),
     noteGuardTurnEnd: (memberId) => this.noteGuardTurnEnd(memberId),
+  })
+  /**
+   * CHG-186（T155b）：任务族端点适配层（`src/host/tasks.ts`）。
+   *
+   * 任务族横跨**两个通道**（队长侧 `executeLeadTool` / 成员侧 `executeMemberToolInner`），
+   * 返回口径不同，所以两个工厂、两个宿主面。宿主面只声明这族用到的私有成员——私有方法
+   * 改名 → 装配处编译报错。注意 `workspaceRoot` 在这里是**方法**（惰性 getter 不能在构造期
+   * 取值快照：那会把「首次访问才解析项目根」提前到 host 构造期，日志顺序会变）。
+   */
+  private readonly tasks = createTasksHandlers({
+    service: (teamId) => this.service(teamId),
+    commit: (teamId, draft) => this.commit(teamId, draft),
+    commitGuarded: (teamId, args, draft) => this.commitGuarded(teamId, args, draft),
+    taskWithGateChain: (teamId, task) => this.taskWithGateChain(teamId, task),
+    applyTaskRelations: (teamId, taskId, args, actor) => this.applyTaskRelations(teamId, taskId, args, actor),
+    rescopeTask: (teamId, args, actor) => this.rescopeTask(teamId, args, actor),
+    reviewTask: (teamId, args, actor) => this.reviewTask(teamId, args, actor),
+    cancelTask: (teamId, args, actor) => this.cancelTask(teamId, args, actor),
+    batchTaskOp: (teamId, args, actor) => this.batchTaskOp(teamId, args, actor),
+    createTasksBatch: (teamId, args, actor) => this.createTasksBatch(teamId, args, actor),
+  })
+  /** CHG-186（T155b）：任务族**成员侧**适配层（同一文件的另一半，见上） */
+  private readonly memberTasks = createMemberTaskHandlers({
+    service: (teamId) => this.service(teamId),
+    commit: (teamId, draft) => this.commit(teamId, draft),
+    captureArtifactBaseline: (teamId, taskId) => this.captureArtifactBaseline(teamId, taskId),
+    scopeAuditFor: (teamId, taskId) => this.scopeAuditFor(teamId, taskId),
+    evaluateArchiveGate: (teamId, taskId, actor, declaredPaths) => this.evaluateArchiveGate(teamId, taskId, actor, declaredPaths),
+    auditMemberMemory: (teamId, memberId, taskId) => this.auditMemberMemory(teamId, memberId, taskId),
+    waitForChange: (args) => this.waitForChange(args),
+    agentOf: (handle) => this.agentOf(handle),
+    memberHandle: (memberId) => this.memberHandles.get(memberId),
+    followupMessage: (text) => this.followupMessage(text),
+    workspaceRoot: () => this.workspaceRoot,
   })
   /**
    * P1-4（docs/21 §6）：运行时准入闸门——`dispose()` 关闸后，新起的成员操作立即被拒，
@@ -1531,45 +1564,14 @@ export class MyTeamHost implements MyTeamHostContract {
           const r = this.commit(teamId, { actor, type: 'plan.discarded', payload: { teamId, planId: String(args.planId ?? 'plan-latest') } })
           return r.ok ? { status: 'discarded' } : { status: 'error', code: r.code, message: r.message }
         }
-        case 'myteam_create_task': {
-          // taskId 由 host 分配（契约 docs/04 §1.1）；取投影中 task-N 最大 N + 1（重放幂等）
-          const proj0 = this.service(teamId).projectionSnapshot.tasks
-          let maxN = 0
-          for (const id of Object.keys(proj0)) {
-            const m = /^task-(\d+)$/.exec(id)
-            if (m) maxN = Math.max(maxN, Number(m[1]))
-          }
-          const taskId = args.taskId ? String(args.taskId) : `task-${maxN + 1}`
-          const r = this.commit(teamId, { actor, type: 'task.created', payload: { teamId, taskId, task: this.taskWithGateChain(teamId, (args.task ?? {}) as Record<string, unknown>) } })
-          if (!r.ok) return { status: 'error', code: r.code, message: r.message }
-          // CHG-73（FR-29）：一次写入负责队员与参与团队——创建任务时人已经知道"谁做/谁协作"，
-          // 不该让面板/队长再串三次调用（部分失败不撤销任务本身，按 warnings 显性化）
-          const created = this.applyTaskRelations(teamId, taskId, args, actor)
-          return { status: 'created', taskId, ...created }
-        }
-        /* CHG-86（P0-4）：队长侧工具改名 myteam_edit_task（原 myteam_update_task 与成员作用域重名，
-         * 同名跨层注册时解析顺序决定谁生效——若队长侧生效，成员可绕过 attemptId 校验改任务结构） */
-        case 'myteam_edit_task': {
-          const taskIdArg = String(args.taskId ?? '')
-          const patch = (isPlainObject(args.patch) ? args.patch : {}) as Record<string, unknown>
-          const rescope = args.rescope as { reason?: string } | undefined
-          // CHG-73：rescope 走统一的"一键重新规划"管线（撤 attempt → 回 ready/backlog → 可选重派）
-          if (rescope) {
-            return this.rescopeTask(teamId, { teamId, taskId: taskIdArg, reason: rescope.reason, patch, memberIds: args.memberIds }, actor)
-          }
-          // CHG-70：普通编辑走 task.updated（补丁合并，**不改状态/attempt/证据**）；
-          // CHG-73：把字段级 diff 一起落账——详情页「改动记录」与证据过期判定都读它
-          const task = this.service(teamId).projectionSnapshot.tasks[taskIdArg]
-          const changes = task ? diffTaskInput(task.input as unknown as Record<string, unknown>, patch) : []
-          const r = this.commitGuarded(teamId, args, { actor, type: 'task.updated', payload: { teamId, taskId: taskIdArg, patch, changes } })
-          return r.ok
-            ? { status: 'updated', taskId: taskIdArg, changes }
-            : { status: 'error', code: r.code, message: r.message, ...(r.currentRevision !== undefined ? { currentRevision: r.currentRevision } : {}) }
-        }
-        /* CHG-86（M2-C / FR-5.1~5.2）：门禁裁决入口——修复前无任何入口能提交 task.gate.result，
-         * 默认链 ['review','archive'] 下任务 done 后停在 gate:review 永远到不了 done。 */
+        /* CHG-186（T155b）：任务族**队长侧**实现已搬到 `src/host/tasks.ts`。这里只转发——
+         * 逻辑/顺序/默认值一个都没改（纯结构重构，行为零变化）。 */
+        case 'myteam_create_task':
+          return this.tasks.create(teamId, args, actor)
+        case 'myteam_edit_task':
+          return this.tasks.edit(teamId, args, actor)
         case 'myteam_review_task':
-          return this.reviewTask(teamId, args, actor)
+          return this.tasks.review(teamId, args, actor)
         case 'myteam_update_team': {
           const payload: Record<string, unknown> = { teamId }
           if (args.name !== undefined) payload.name = String(args.name).trim()
@@ -1581,56 +1583,20 @@ export class MyTeamHost implements MyTeamHostContract {
         }
         /* ── CHG-73：执行期编辑闭环（重规划 / 取消 / 批量编排 / 角色删除）── */
         case 'myteam_rescope_task':
-          return this.rescopeTask(teamId, args, actor)
+          return this.tasks.rescope(teamId, args, actor)
         case 'myteam_cancel_task':
-          return this.cancelTask(teamId, args, actor)
+          return this.tasks.cancel(teamId, args, actor)
         case 'myteam_batch_task_op':
-          return this.batchTaskOp(teamId, args, actor)
+          return this.tasks.batchOp(teamId, args, actor)
         /* ── CHG-76：批量建任务（从目标出草稿 → 预览 → 一次创建）── */
         case 'myteam_create_tasks':
-          return this.createTasksBatch(teamId, args, actor)
+          return this.tasks.createBatch(teamId, args, actor)
         case 'myteam_delete_role':
           return this.deleteRoleTool(String(args.roleId ?? ''), args.confirm === true)
         case 'myteam_reassign_task':
-        case 'myteam_revoke_attempt': {          const svc = this.service(teamId)
-          const proj = svc.projectionSnapshot
-          const task = proj.tasks[String(args.taskId)]
-          const prevAttempt = task?.attemptId
-          // CHG-158（报告 A5）：撤权 vs 重派要分开表达——
-          //  - 重派（`myteam_reassign_task`）= **交接**：`reassign: true` + 交接票据（旧持有人排空、
-          //    新 attempt 接手），fold 置 `reassigning` 并记票据；
-          //  - 撤权（`myteam_revoke_attempt`）= **停放**：fold 把 `{attemptId: reason}` 并入
-          //    `parkedAttempts`（每次撤销都留痕，供恢复/看板回答「这个 attempt 为什么停」）。
-          // 票据由**写入方**生成（值随事件落账 → 重放读到同一个值，确定）：显式传就用调用方给的
-          // （会话移交返回的 ticket），否则发一个不透明票号。
-          const reassign = name === 'myteam_reassign_task'
-          const handoffId = typeof args.handoffId === 'string' && args.handoffId.trim().length > 0
-            ? args.handoffId.trim()
-            : `ho-${prevAttempt ?? 'none'}-${Date.now()}`
-          const r1 = this.commitGuarded(teamId, args, {
-            actor,
-            type: 'task.attempt.revoked',
-            payload: {
-              teamId,
-              taskId: args.taskId,
-              attemptId: prevAttempt ?? 'none',
-              reason: args.reason,
-              prevAssignee: task?.assignee,
-              ...(reassign ? { reassign: true, handoffId } : {}),
-            },
-          })
-          if (!r1.ok) {
-            return { status: 'error', code: r1.code, message: r1.message, ...(r1.currentRevision !== undefined ? { currentRevision: r1.currentRevision } : {}) }
-          }
-          if (name === 'myteam_reassign_task') {
-            // CHG-87（QA-4）：重派也吃乐观锁（先撤 attempt 再指派，冲突时两步都不落账）
-            const r2 = this.commitGuarded(teamId, args, { actor, type: 'task.assigned', payload: { teamId, taskId: args.taskId, memberId: args.toMemberId } })
-            return r2.ok
-              ? { status: 'reassigned', note: '等待目标成员 claim（原子 claim 语义保留）' }
-              : { status: 'error', code: r2.code, message: r2.message, ...(r2.currentRevision !== undefined ? { currentRevision: r2.currentRevision } : {}) }
-          }
-          return { status: 'revoked' }
-        }
+        case 'myteam_revoke_attempt':
+          // CHG-158（报告 A5）：撤权 vs 重派共用一段实现，由工具名分叉（见 tasks.ts）
+          return this.tasks.revokeOrReassign(name, teamId, args, actor)
         /* CHG-186（T155b）：成员族实现已搬到 `src/host/members.ts`。这里只转发——
          * 逻辑/顺序/默认值一个都没改（纯结构重构，行为零变化）。 */
         case 'myteam_spawn_member':
@@ -4161,195 +4127,30 @@ export class MyTeamHost implements MyTeamHostContract {
       }
     }
     try {
+      /* CHG-186（T155b）：任务族实现已搬到 `src/host/tasks.ts`（下面每个 case 只剩一行转发）。
+       * 这行 `service(teamId)` **必须留着**：它是每次成员工具调用「惰性建 TeamService +
+       * 冷启动重放 + 首次 bootstrap」的唯一入口——含 `myteam_read_knowledge` 与未知工具名
+       * （那些 case 不读 `svc`，但侧效应照旧）。挪进各 handler 会改变 read_knowledge 的行为。 */
       const svc = this.service(teamId)
       switch (name) {
-        case 'myteam_get_task': {
-          const t = svc.projectionSnapshot.tasks[String(args.taskId)]
-          if (!t) return { status: 'error', code: 'MT_VALIDATION', message: `task "${args.taskId}" not found` }
-          // 修订：attemptId 只发给当前持有人（原实现 t.attemptId === t.attemptId 恒真，泄漏给任意成员）
-          const ownAttempt = t.assignee === member.memberId ? t.attemptId : undefined
-          return { status: 'ok', task: { id: t.id, title: t.input.title, description: t.input.description, acceptanceCriteria: t.input.acceptanceCriteria, deliverableSpec: t.input.deliverableSpec, deps: t.input.deps, requiredRole: t.input.requiredRole, priority: t.input.priority, state: t.state, attemptId: ownAttempt, escalateCount: t.escalateCount } }
-        }
-        case 'myteam_list_tasks': {
-          const filter = String(args.filter ?? 'claimable')
-          const limit = Number(args.limit ?? 20)
-          const proj = svc.projectionSnapshot
-          let tasks = Object.values(proj.tasks)
-          if (filter === 'claimable') {
-            tasks = svc.claimableTasks(member.roleId)
-          } else if (filter === 'mine') {
-            tasks = tasks.filter((t) => t.assignee === member.memberId && !['done', 'failed', 'cancelled'].includes(t.state))
-          }
-          const rows = tasks.slice(0, limit).map((t) => ({ id: t.id, title: t.input.title, state: t.state, priority: t.input.priority, requiredRole: t.input.requiredRole }))
-          return { status: 'ok', tasks: rows, returnedCount: rows.length, note: `返回 ${rows.length} 行 ≠ 已读全部内容（NFR-7.6）` }
-        }
-        case 'myteam_claim_task': {
-          const claimTaskId = String(args.taskId)
-          const claimProj = svc.projectionSnapshot
-          const claimTarget = claimProj.tasks[claimTaskId]
-          // CHG-159（报告 A6）：**领取前的写范围闸门**——两个任务 writeScopes 有交集时必须串行。
-          // 为什么必须在这里拦：claim 抢占只解决「同一任务被两个人领」，解决不了「两个不同任务
-          // 改同一批文件」；scope-audit 只在完成时事后留痕，不拦截，于是后写静默覆盖先写。
-          // 职责边界：依赖「上游未完成」不归这里管（service 层 canClaim 已判），这里只判写范围。
-          // 放行条件：任一方未声明 writeScopes（未声明 = 不参与串行，否则存量团队全部死锁）。
-          if (claimTarget) {
-            const scopeVerdict = claimScopeVerdict(claimProj, claimTaskId)
-            if (!scopeVerdict.ok) return { status: 'error', code: scopeVerdict.code, message: scopeVerdict.message }
-          }
-          // CHG-158（报告 A5）：世代号由 **host** 按「上一世代 + 1」算好塞进 payload——fold 只赋值，
-          // 绝不自增/生成（同一本账本两次重放必须得出同一投影）。
-          const previousGeneration = Number.isInteger(claimTarget?.attempt) ? Number(claimTarget?.attempt) : 0
-          // 交接票据：由**会话移交**写入方给（`myteam_handoff` 按设计不写团队账本——见 handoffTeam
-          // 的纪律 ②，所以票据只能由承接方在 claim 时带进来）。缺省不带：只有真的做过移交才落账。
-          // 注意 payload 与投影的区别：账本里的 `handoffId` 是「这次 claim 承接了哪次移交」的
-          // **审计留痕**；投影的 `handoffId` 是「待落地」槽位（`attemptPhase` ③ 的 handoff 态），
-          // 由 claim 本身清除——保留会让正在执行的任务永远显示「交接中」。
-          const handoffTicket = typeof args.handoffId === 'string' && args.handoffId.trim().length > 0 ? args.handoffId.trim() : undefined
-          const r = this.commit(teamId, {
-            actor,
-            type: 'task.claimed',
-            payload: {
-              teamId,
-              taskId: args.taskId,
-              memberId: member.memberId,
-              attemptId: `at-${Date.now()}`,
-              attempt: previousGeneration + 1,
-              ...(handoffTicket ? { handoffId: handoffTicket } : {}),
-            },
-          })
-          if (!r.ok) return { status: 'error', code: r.code, message: r.message }
-          const t = svc.projectionSnapshot.tasks[String(args.taskId)]
-          // P1-1 接线：claim 成功 = 任务进入 in_progress = **阶段起点**，在这里拍产物基线。
-          // 拍完之后「产物指纹变了」才等于「本阶段真的写过它」（否则上游越界写的文件会被当交付）。
-          this.captureArtifactBaseline(teamId, String(args.taskId))
-          return { status: 'claimed', attemptId: t.attemptId, task: { id: t.id, title: t.input.title, acceptanceCriteria: t.input.acceptanceCriteria, deliverableSpec: t.input.deliverableSpec } }
-        }
-        case 'myteam_update_task': {
-          const status = String(args.status)
-          const attemptId = String(args.attemptId)
-          const taskId = String(args.taskId)
-          const eventType = status === 'in_progress' ? 'task.progress' : status === 'done' ? 'task.completed' : 'task.failed'
-          const payload: Record<string, unknown> = { teamId, taskId, attemptId }
-          if (status === 'in_progress') payload.progress = args.progress
-          if (status === 'done') payload.summary = args.summary
-          if (status === 'failed') { payload.reason = args.reason; payload.summary = args.summary }
-          if (args.evidence) payload.evidence = args.evidence
-          // 证据块先落存证（FR-5.0：completed 前必须有同 attemptId 的 task.evidence 事件）
-          if (status === 'done' && args.evidence) {
-            const ev = this.commit(teamId, { actor, type: 'task.evidence', payload: { teamId, taskId, attemptId, evidence: args.evidence } })
-            if (!ev.ok) return { status: 'error', code: ev.code, message: ev.message }
-          }
-          // CHG-87（FR-5.4）：完成时 scope 审计——证据块申报的文件 × 任务声明的 writeScopes。
-          // 必须在上面 task.evidence 落账**之后**算（审计输入就是那条证据事件）。
-          // 越界只留痕不阻断（FR-5.4「诚实声明不拦截 bash」）。
-          if (status === 'done') {
-            const scopeAudit = this.scopeAuditFor(teamId, taskId)
-            if (scopeAudit) payload.scopeAudit = scopeAudit
-          }
-          const r = this.commit(teamId, { actor, type: eventType as CommitDraft['type'], payload })
-          if (!r.ok) return { status: 'error', code: r.code, message: r.message }
-          // P1-1 接线：`in_progress` 申报 = 阶段仍在进行，补拍基线（只补缺失键——
-          // 首次基线固定，见 captureArtifactBaseline 的注释）。
-          if (status === 'in_progress') this.captureArtifactBaseline(teamId, taskId)
-          // FIX-10（KI-2 实弹）+ CHG-86：archive gate 落位校验接线。
-          // 修复前的断链：这里只判 `state === 'gate:archive'`，而默认门禁链是
-          // `['review','archive']` —— 任务 done 后进的是 `gate:review`，条件永不成立；
-          // 加上没有任何 Lead 工具/面板端点能提交 review 裁决，任务永远到不了 done。
-          // 现在：门禁链第一道是 archive → host 立即落位校验；是 review/verify → 提示等队长裁决。
-          let gateNote: string | undefined
-          // P1-5：环境不可用 latch 让交付判定转人工——此时**不能**把申报当 completed 放行
-          let gateNeedsHuman = false
-          if (status === 'done') {
-            const tAfter = svc.projectionSnapshot.tasks[taskId]
-            const declared = (args.deliverablePaths as string[] | undefined) ?? []
-            if (tAfter?.state === 'gate:archive') {
-              const evaluated = this.evaluateArchiveGate(teamId, taskId, actor, declared)
-              gateNote = evaluated.note || undefined
-              gateNeedsHuman = evaluated.needsHuman === true
-            } else if (tAfter?.state.startsWith('gate:')) {
-              const gate = tAfter.state.slice('gate:'.length)
-              gateNote = `已进入 gate:${gate}，等待队长裁决（myteam_review_task / 面板「门禁裁决」）`
-            }
-          }
-          // 知识提案（FR-17.4）：done 时随申报 → knowledge.proposed（队长审）；
-          // v2.7（M2-0c）：① 任务 tags 触达知识库条目 → staleSince 写入（staleness 提示，R27 缓解）
-          // ② host 依提案 tags 匹配既有条目给候选（"自动找靶、人来定夺"），随 completed 非阻塞返回
-          const draft = args.knowledgeDraft as KnowledgeDraft | undefined
-          if (status === 'done' && draft) {
-            const check = validateDraft({ ...draft, evidence: draft.evidence || taskId })
-            if (!check.ok) {
-              return { status: 'completed', knowledgeDraftError: `${check.code}: ${check.message}` }
-            }
-            const resolvedDraft = { ...draft, evidence: draft.evidence || taskId }
-            // CHG-87（FR-16.4③）：跨会话引用留痕——证据指针是 `session:<id>` 时落一条
-            // session.read 审计（边界：读取即留痕，不整段注入；成员默认不开放跨读，C5）
-            const pointer = parseEvidencePointer(resolvedDraft.evidence)
-            if (pointer.kind === 'session') {
-              this.commit(teamId, {
-                actor,
-                type: 'session.read',
-                payload: { teamId, sessionId: pointer.value, pointer: pointer.raw, by: member.memberId, taskId },
-              })
-            }
-            const kbDir = knowledgeDirOf(this.workspaceRoot)
-            const kbEntries = listKnowledge(kbDir)
-            const now = new Date().toISOString()
-            // staleness 触达：任务 input.tags × 条目 tags 交集 → staleSince=当天（结构性提示）
-            const taskTags = svc.projectionSnapshot.tasks[taskId]?.input.tags ?? []
-            const touched = touchStale(kbEntries, taskTags, now)
-            for (const t of touched) writeKnowledgeEntry(kbDir, t)
-            // 半自动巩固候选（FR-17.4）：仅提示，不改变提案流
-            const candidates = candidatesForDraft(kbEntries, resolvedDraft.tags ?? [])
-            this.commit(teamId, { actor, type: 'knowledge.proposed', payload: { teamId, draftId: draft.id, draft: resolvedDraft, proposedBy: member.memberId } })
-            const knowledgeHint = candidates.length > 0
-              ? `知识库存在 tags 相交条目，供队长复核时参考关系：${candidates.map((c) => `${c.id}(${c.shared.join('/')})`).join('、')}`
-              : undefined
-            return {
-              status: gateNeedsHuman ? 'needs-human' : 'completed',
-              ...(gateNeedsHuman ? { code: 'MT_ENV_UNAVAILABLE' } : {}),
-              note: gateNote ?? '已进入门禁链；知识提案待队长审',
-              ...(knowledgeHint ? { knowledgeHint } : {}),
-              ...(touched.length > 0
-                ? { staleMarked: touched.map((t) => t.id), note2: `任务主题触及 ${touched.length} 条知识条目，已标记待复核（staleSince=${now.slice(0, 10)}）` }
-                : {}),
-            }
-          }
-          // 记忆审计（T21：任务收口后扫描，违规落 memory.audit；R28：不阻塞主流程）
-          const audit = this.auditMemberMemory(teamId, member.memberId, taskId)
-          return {
-            status: gateNeedsHuman ? 'needs-human' : status === 'done' ? 'completed' : status,
-            ...(gateNeedsHuman ? { code: 'MT_ENV_UNAVAILABLE' } : {}),
-            note: status === 'done' ? (gateNote ?? '已进入门禁链；知识提案（如有）待队长审') : undefined,
-            ...(audit && audit.violations > 0
-              ? { memoryAudit: { violations: audit.violations, note: '私有记忆存在无证据指针条目，已落账本 memory.audit（FR-6.2）' } }
-              : {}),
-          }
-        }
-        case 'myteam_peer_message': {
-          const r = this.commit(teamId, { actor, type: 'message.sent', payload: { teamId, messageId: `msg-${Date.now()}`, from: member.memberId, to: args.toMemberId, taskId: args.taskId, content: args.content } })
-          if (!r.ok) return { status: 'error', code: r.code, message: r.message }
-          this.agentOf(this.memberHandles.get(String(args.toMemberId)))?.followup?.(this.followupMessage(`[myteam] 来自 ${member.instanceName} 的消息：${String(args.content)}`))
-          return { status: 'sent' }
-        }
-        case 'myteam_wait_for_change': {
-          // 成员侧等待：与 Lead 侧同一异步长轮询实现（工具 execute 返回 Promise，
-          // 宿主工具管线 await 之；不再阻塞事件循环）。
-          // P2-1：把「本人」传进去——活跃 peer 判定要排除自己（自己等自己必然空转）
-          return this.waitForChange({ ...args, teamId, memberId: member.memberId }) as unknown as Record<string, unknown>
-        }
-        case 'myteam_propose_task_change': {
-          const proposalId = `prop-${Date.now()}`
-          const r = this.commit(teamId, { actor, type: 'task.proposal', payload: { teamId, taskId: args.taskId, proposalId, type: args.type, payload: args.payload ?? {}, reason: args.reason, proposedBy: member.memberId } })
-          return r.ok ? { status: 'proposed', proposalId, note: '提案进队长队列；批准才生效（FR-11.4）' } : { status: 'error', code: r.code, message: r.message }
-        }
-        case 'myteam_escalate_task': {
-          const svc2 = this.service(teamId)
-          const t = svc2.projectionSnapshot.tasks[String(args.taskId)]
-          const count = (t?.escalateCount ?? 0) + 1
-          const r = this.commit(teamId, { actor, type: 'task.escalated', payload: { teamId, taskId: args.taskId, attemptId: args.attemptId ?? t?.attemptId, reason: args.reason, evidence: args.evidence, suggestion: args.suggestion, count } })
-          if (!r.ok) return { status: 'error', code: r.code, message: r.message }
-          return { status: 'escalated', count, note: count > 2 ? 'escalate 计数 >2：裁决面建议人工介入（FR-11.7）' : '任务已入 re-scoping，等待队长裁决' }
-        }
+        /* CHG-186（T155b）：任务族**成员侧**实现已搬到 `src/host/tasks.ts`。这里只转发——
+         * 逻辑/顺序/默认值一个都没改（纯结构重构，行为零变化）。 */
+        case 'myteam_get_task':
+          return this.memberTasks.get(teamId, member, args, actor)
+        case 'myteam_list_tasks':
+          return this.memberTasks.list(teamId, member, args, actor)
+        case 'myteam_claim_task':
+          return this.memberTasks.claim(teamId, member, args, actor)
+        case 'myteam_update_task':
+          return this.memberTasks.update(teamId, member, args, actor)
+        case 'myteam_peer_message':
+          return this.memberTasks.peerMessage(teamId, member, args, actor)
+        case 'myteam_wait_for_change':
+          return this.memberTasks.waitForChange(teamId, member, args, actor)
+        case 'myteam_propose_task_change':
+          return this.memberTasks.propose(teamId, member, args, actor)
+        case 'myteam_escalate_task':
+          return this.memberTasks.escalate(teamId, member, args, actor)
         case 'myteam_read_knowledge': {
           const entry = readKnowledgeEntry(knowledgeDirOf(this.workspaceRoot), String(args.id))
           if (!entry) return { status: 'error', code: 'MT_KB_NOT_FOUND', message: `knowledge entry "${args.id}" not found（索引见提示词）` }

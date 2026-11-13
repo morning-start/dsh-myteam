@@ -18,7 +18,8 @@
  * `HOST_LINES_LIMIT` 往下压一档，**保证只减不增**，最终 4,000 行。
  * 同一常量在 `tools/check-architecture.mjs` 的 `A6_LIMIT` 里（两处必须一起改）。
  *
- * T155b 进度：成员族（`src/host/members.ts`）搬完 → **6,160**（本次压到 6,160）。
+ * T155b 进度：成员族（`src/host/members.ts`）搬完 → 6,160；任务族（`src/host/tasks.ts`）
+ * 搬完 → **5,961**（本次压到 5,961，净减 202 行）。
  */
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
@@ -30,7 +31,7 @@ const here = dirname(fileURLToPath(import.meta.url))
 const read = (p: string) => readFileSync(join(here, '..', p), 'utf8')
 
 /** 入口层行数棘轮基线（CHG-186 拆完实测；只减不增） */
-const HOST_LINES_LIMIT = 6160
+const HOST_LINES_LIMIT = 5961
 
 test('t142-1: 契约独立成文件，remote/service.ts 不再 import host.ts', () => {
   const service = read('src/remote/service.ts')
