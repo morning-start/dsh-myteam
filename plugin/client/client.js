@@ -4749,10 +4749,10 @@ window.__ModuleLoader__.load({
        *   面板铺满 + **内容左对齐**（不是居中），列宽按「记忆」页那种通用插件页口径给到
        *   **1080px**（比 760 宽，比 1400 窄），标题行左对齐、操作按钮贴右，四张计数卡等分铺满整列。 */
       '.mt-conv-empty{text-align:left}',
-      '.mt-conv-empty .mt-conv-head{justify-content:flex-start;border-bottom:0;padding-bottom:0;width:100%;max-width:1080px}',
+      '.mt-conv-empty .mt-conv-head{justify-content:flex-start;border-bottom:0;padding-bottom:0;width:100%;max-width:1080px;margin-inline:auto}',
       '.mt-conv-empty .mt-conv-head > .mt-btn{margin-left:auto}',
       '.mt-conv-empty .mt-conv-title{justify-content:flex-start;text-align:left}',
-      '.mt-conv-empty .mt-conv-body{align-items:stretch;gap:14px;text-align:left;width:100%;max-width:1080px}',
+      '.mt-conv-empty .mt-conv-body{align-items:stretch;gap:14px;text-align:left;width:100%;max-width:1080px;margin-inline:auto}',
       '.mt-conv-empty .mt-conv-cmd{justify-content:flex-start}',
       '.mt-conv-empty .mt-conv-stats{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px}',
       /* CHG-107：会话页团队视图的真实数据面（概览计数 / 空态 / 成员名册 / 命令提示） */
