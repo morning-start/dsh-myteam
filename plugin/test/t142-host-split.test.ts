@@ -20,7 +20,7 @@
  * ⚠️ **「只减不增」有一个已声明的例外**：查询族（15 个 case 本来就只有两行、没有内联
  * 逻辑可减）搬完是 **+27**——它换来的是入口层 switch 形状统一（纯「工具名 → 适配层」
  * 路由表）。这是口径成本，不是回潮；除此之外每族都必须减。
- * **4,000 行的目标未达成**（收口在 5,563，差 1,563）：剩余全是私有方法体，拆它们要
+ * **4,000 行的目标未达成**（收口在 4,815，差 815）：剩余全是私有方法体，拆它们要
  * 以「行为边界」下沉 `core/**`，不是继续按端点切——不为凑数硬拆。
  * 同一常量在 `tools/check-architecture.mjs` 的 `A6_LIMIT` 里（两处必须一起改）。
  *
@@ -32,6 +32,9 @@
  * 知识族（`src/host/knowledge.ts`）搬完 → **5,536**（本次压到 5,536，再净减 146 行）；
  * 查询族（`src/host/query.ts`）搬完 → **5,563**（**唯一 +27 的一族**：15 个 case 本来
  * 就只有两行、无内联逻辑，搬它是为了 switch 形状统一；口径成本已写进 A6_LIMIT 注释）。
+ * T159 进度（按**行为边界**切）：CHG-189 spawn 生命周期（`core/members/spawn-lifecycle.ts`）
+ * 搬完 → **5,311**；CHG-190 门禁执行（`core/gates/gate-execution.ts`）搬完 → **4,815**
+ * （入口占比 34.2% → **31.9%**，逐字核验 443/443 逻辑行）。
  */
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
@@ -42,8 +45,8 @@ import { fileURLToPath } from 'node:url'
 const here = dirname(fileURLToPath(import.meta.url))
 const read = (p: string) => readFileSync(join(here, '..', p), 'utf8')
 
-/** 入口层行数棘轮基线（CHG-186 拆完实测；CHG-189 下沉 spawn 生命周期后 5,563 → 5,311；只减不增） */
-const HOST_LINES_LIMIT = 5311
+/** 入口层行数棘轮基线（CHG-186 拆完实测；CHG-189 下沉 spawn 生命周期后 5,563 → 5,311；CHG-190 下沉门禁执行后 5,311 → 4,815；只减不增） */
+const HOST_LINES_LIMIT = 4815
 
 test('t142-1: 契约独立成文件，remote/service.ts 不再 import host.ts', () => {
   const service = read('src/remote/service.ts')

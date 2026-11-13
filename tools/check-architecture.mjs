@@ -97,8 +97,18 @@ export const FROZEN_A2 = []
  * `core/members/spawn-lifecycle.ts` → 5,563 → **5,311**（-252 行，入口占比 35.5% → 34.2%）。
  * 逐字核验 281/281 逻辑行一致；下一刀照同样口径切 `reviewTask` / `batchTaskOp` /
  * `scopeAuditFor`（剩下的私有方法体）。
+ *
+ * ── CHG-190（T159b）──────────────────────────────────────────────────────────
+ * 第二刀已落：门禁执行 12 个私有方法（`taskWithGateChain` / `reviewTask` /
+ * `expectedRevisionOf` / `scopeAuditFor` / `runVerifyGate` / `captureArtifactBaseline` /
+ * `artifactFreshnessFor` / `artifactTextOf` / `completionReplyOf` / `deliveryJudgementFor` /
+ * `evaluateArchiveGate` / `autoEvaluateGateChain`）**逐字**搬进
+ * `core/gates/gate-execution.ts` → 5,311 → **4,815**（-496 行，入口占比 34.2% → **31.9%**）。
+ * 逐字核验 **443/443 逻辑行一致**；`GateExecutionDeps` 17 个成员。
+ * 下一刀切剩下的私有方法体：`batchTaskOp` / `createTasksBatch` / `materializeSplitProposal`
+ * （都是「批量 / 物化」这类**行为边界**，不是端点）。
  */
-export const A6_LIMIT = { 'host.ts': 5311 }
+export const A6_LIMIT = { 'host.ts': 4815 }
 
 /** 递归列出 dir 下扩展名为 ext 的文件（确定性排序；Dirent 直接给答案，不 try/catch 猜目录） */
 function walk(dir, ext) {

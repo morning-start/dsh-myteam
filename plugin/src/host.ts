@@ -51,7 +51,7 @@ import { leadToolDefs, memberToolDefs, type ToolDef } from './tools/defs.ts'
 // CHG-148（P1-6）：按工具名取完整结果契约（jsonOutput 双声明），不再用统一空 schema
 import { outputForTool } from './core/tools/output-contract.ts'
 import { wakeDecisionsFor, changeSince, type WakeDecision } from './core/scheduler/wake.ts'
-import { TERMINAL_STATES, downstreamOf, GATE_REJECT_BUDGET } from './core/scheduler/state.ts'
+import { TERMINAL_STATES, downstreamOf } from './core/scheduler/state.ts'
 /* A9（报告 KI-5 / CHG-163 冷启动重连）：只读折叠口径。
  * 为什么不用 `this.service(teamId).projectionSnapshot`：`service()` 构造 TeamService 时会
  * `bootstrapTeam` 落 `rules.version.adopted`——重连就成了**写账本**，违反「重连不改账本」不变量。
@@ -72,10 +72,9 @@ import { zeroBuckets, dayKeyOf, accumulate, emptyTokensFile, type TokensFile, ty
 // CHG-86（P0-2）：归档落盘（disband 时写快照；面板归档视图读快照）
 import { readArchive, listArchives, archiveRootOf } from './core/archive/archive-store.ts'
 // CHG-87（M2-C 剩余，FR-5.3/FR-5.4）：command 门禁 + scope 完成审计
-import { runVerifyCommand, validateVerifyCommand, classifyVerifyResult, resolveTimeoutMs, truncateOutput, type VerifyCommand } from './core/gates/command-gate.ts'
+import { truncateOutput } from './core/gates/command-gate.ts'
 /* P1-5 接线（docs/21 §6，CHG-147 的纯函数模块）：成员单调用护栏四类检测 */
 import {
-  blocksCompletion,
   createGuardState,
   guardReminder,
   observeCall,
@@ -85,7 +84,7 @@ import {
   type GuardState,
   type GuardVerdict,
 } from './core/agent/guard.ts'
-import { auditWriteScopes, filesTouchedOf, type ScopeAudit } from './core/gates/scope-audit.ts'
+import type { ScopeAudit } from './core/gates/scope-audit.ts'
 // CHG-87（M2-D 剩余，FR-16.4③）：证据指针投影（task/file/session 三类；解析原语已随任务族搬到 src/host/tasks.ts）
 import { evidenceRefsOf } from './core/knowledge/evidence-pointer.ts'
 // CHG-87（FR-16.1 单角色调用）：sessionDefaults 跨重启恢复 + 提示词 section
@@ -105,10 +104,10 @@ import {
   summarizeSessionRecords,
   type SessionRecordView,
 } from './core/host/session-archaeology.ts'
-import { recoveryAction, checkArchiveGate, reconcileProvisioning, type ProvisioningMember, type ProvisioningProbeResult, type ProvisioningSettlement } from './core/scheduler/recovery.ts'
+import { recoveryAction, reconcileProvisioning, type ProvisioningMember, type ProvisioningProbeResult, type ProvisioningSettlement } from './core/scheduler/recovery.ts'
 /* P1-1/P1-2 接线（docs/21 §6，CHG-144 的纯函数模块）：产物新鲜度指纹 + 交付判定三级信号 */
-import { artifactBaseline, artifactIsStale, mergeBaseline, type ArtifactBaseline, type ArtifactStat } from './core/gates/artifact-freshness.ts'
-import { extractEvidenceBlock, judgeDeliverable, type DeliveryJudgement } from './core/gates/delivery-verdict.ts'
+import type { ArtifactBaseline, ArtifactStat } from './core/gates/artifact-freshness.ts'
+import type { DeliveryJudgement } from './core/gates/delivery-verdict.ts'
 /* P1-4（docs/21 §6）：dispose 有界结算（准入截止 + allSettled + 超时 + 预期取消识别） */
 import {
   createAdmissionGate,
@@ -122,6 +121,8 @@ import {
  * `core/members/member-card.ts` 的调用点 → `core/members/spawn-lifecycle.ts`。 */
 /* CHG-189（T159a）：spawn 生命周期状态机（行为边界下沉——私有方法体搬进 core/members/**） */
 import { createSpawnLifecycle } from './core/members/spawn-lifecycle.ts'
+/* CHG-190（T159b）：门禁执行（行为边界下沉——审查 / 验证 / 交付裁决 / 归档门禁 / 自动推进的私有方法体搬进 core/gates/**） */
+import { createGateExecution } from './core/gates/gate-execution.ts'
 /* CHG-137/138（docs/19 §3）：工具权限档位（单一事实源 + 运行时门禁） */
 import { canCall, tierOf, type ToolCaller } from './core/tools/tool-tiers.ts'
 /* CHG-124（docs/19 §M6）：任务依赖图谱纯函数（Kahn 分层 + 环检测） */
@@ -807,6 +808,39 @@ export class MyTeamHost implements MyTeamHostContract {
     isThenable,
   })
   /**
+   * CHG-190（T159b）：**门禁执行**（`src/core/gates/gate-execution.ts`）——入口层下沉三刀里的
+   * 第二刀。12 个私有方法（`reviewTask` / `runVerifyGate` / `scopeAuditFor` /
+   * `evaluateArchiveGate` / `autoEvaluateGateChain` / `captureArtifactBaseline` /
+   * `artifactFreshnessFor` / `artifactTextOf` / `completionReplyOf` / `deliveryJudgementFor` /
+   * `expectedRevisionOf` / `taskWithGateChain`）**逐字**搬进 core，这里只声明宿主面
+   * （惰性字段一律以**方法**接出来，构造期取值会把「首次访问才解析」提前）。
+   *
+   * 为什么不能靠 import：`deliverablePathsOf` / `readArtifactBaselineRecord` /
+   * `writeArtifactBaselineRecord` / `readLedgerEvents` / `deliverableMinLength` / `guardPayloadOf`
+   * 与 `ABSENT_PATH_FINGERPRINT` / `ARTIFACT_TEXT_READ_LIMIT` 是 `host.ts` 的**模块级**标识符，
+   * `core/**` import 入口层会红 A1 门禁、并把 arch-report 的逆向 value 边从 0 抬起来。
+   * 逐字核验与依赖边界见该文件头。
+   */
+  private readonly gates = createGateExecution({
+    service: (teamId) => this.service(teamId),
+    commit: (teamId, draft) => this.commit(teamId, draft),
+    log: (level, msg) => this.log(level, msg),
+    workspaceRoot: () => this.workspaceRoot,
+    rt: () => this.rt,
+    artifactBaselinePath: (teamId, taskId) => this.artifactBaselinePath(teamId, taskId),
+    resolveArtifactPath: (path) => this.resolveArtifactPath(path),
+    statArtifact: (path) => this.statArtifact(path),
+    guardVerdict: (memberId) => this.guardVerdict(memberId),
+    deliverablePathsOf,
+    readArtifactBaselineRecord,
+    writeArtifactBaselineRecord,
+    absentPathFingerprint: ABSENT_PATH_FINGERPRINT,
+    artifactTextReadLimit: ARTIFACT_TEXT_READ_LIMIT,
+    readLedgerEvents,
+    deliverableMinLength,
+    guardPayloadOf,
+  })
+  /**
    * P1-4（docs/21 §6）：运行时准入闸门——`dispose()` 关闸后，新起的成员操作立即被拒，
    * 在飞操作在 `disposalTimeoutMs` 内有界结算（非预期失败聚合成一条 warn）。
    * 在 constructor 里用行 config 构造（字段初始化早于 constructor body，拿不到 this.config）。
@@ -1211,20 +1245,9 @@ export class MyTeamHost implements MyTeamHostContract {
     return svc
   }
 
-  /**
-   * CHG-55：任务类型 → 门禁链展开（团队模板 taskTypes 生效）。
-   * 显式 gateChain 优先；否则按生效配置 taskTypes[taskType] → taskTypes.default 展开。
-   * 都不命中时原样返回（fold 兜底 review/archive）。
-   */
+  /** CHG-55 门禁链展开 → **逐字**下沉 `core/gates/gate-execution.ts`（CHG-190；语义见该文件同名函数头）。 */
   private taskWithGateChain(teamId: string, task: Record<string, unknown>): Record<string, unknown> {
-    const explicit = Array.isArray(task.gateChain)
-      ? (task.gateChain as unknown[]).filter((gate): gate is string => typeof gate === 'string' && gate.length > 0)
-      : []
-    if (explicit.length > 0) return task
-    const types = this.service(teamId).effectiveConfig.taskTypes
-    const type = typeof task.taskType === 'string' && task.taskType ? task.taskType : 'default'
-    const chain = types[type]?.gateChain ?? types.default?.gateChain
-    return chain && chain.length > 0 ? { ...task, gateChain: [...chain] } : task
+    return this.gates.taskWithGateChain(teamId, task)
   }
 
   /** 统一提交入口：成功后触发唤醒（不阻塞提交本身） */
@@ -1691,325 +1714,35 @@ export class MyTeamHost implements MyTeamHostContract {
   }
 
   /**
-   * CHG-86（M2-C / FR-5.1~5.2）：门禁裁决入口（队长工具 + 面板 reviewTask 共用）。
-   *
-   * 修复的断链：`task.gate.result` 此前**只有**成员 `update_task` 的 archive 分支会写，
-   * 而默认门禁链是 `['review','archive']`——任务 done 后进的是 `gate:review` 不是
-   * `gate:archive`，条件永不成立；且任何 Lead 工具 / 面板端点都没有裁决入口。
-   * 结果：任务永远到不了 `done`，下游依赖永不解锁，归档与成本管线全部悬空。
-   *
-   * 裁决口径：
-   *  - `gate:review` / `gate:verify` → 只认显式结论行（verdict 必填），**强制交叉审查**
-   *    （reviewerMemberId 必填且 ≠ 实现者；同成员拒绝 `MT_CROSS_REVIEW`，FR-5.1）；
-   *  - `gate:archive` → 不是人工裁决门：host 按 `deliverableSpec` 约定路径做落位校验
-   *    （FR-10.4），verdict 参数只用于"再校验一次"，**绝不采信模型自述"已归档"**；
-   *  - 打回预算（FR-5.2）：单门 fail 轮数 ≥ `GATE_REJECT_BUDGET` 后，队长侧 pass 被拒
-   *    （`MT_REJECT_BUDGET` → needs-human），只有人工（actor='human' 且 confirm=true）能放行。
+   * CHG-86 门禁裁决入口（review / verify / archive）→ **逐字**下沉 `core/gates/gate-execution.ts`
+   * （CHG-190）。裁决口径 / 强制交叉审查 / 打回预算的语义见该文件同名函数头。
    */
   private reviewTask(
     teamId: string,
     args: Record<string, unknown>,
     actor: string,
   ): Record<string, unknown> | Promise<Record<string, unknown>> {
-    const taskId = String(args.taskId ?? '')
-    if (!taskId) return { status: 'error', code: 'MT_VALIDATION', message: 'taskId is required' }
-    const verdict = args.verdict === 'pass' ? 'pass' : args.verdict === 'fail' ? 'fail' : undefined
-    if (!verdict) {
-      return {
-        status: 'error',
-        code: 'MT_VALIDATION',
-        message: 'verdict must be "pass" or "fail"（只认显式结论行；无结论 = needs-human，不回退解析自由文本 FR-5.1）',
-      }
-    }
-    const task = this.service(teamId).projectionSnapshot.tasks[taskId]
-    if (!task) return { status: 'error', code: 'MT_VALIDATION', message: `task "${taskId}" not found` }
-    if (!task.state.startsWith('gate:')) {
-      return {
-        status: 'error',
-        code: 'MT_VALIDATION',
-        message: `task "${taskId}" is ${task.state}, not in a gate state（门禁裁决只对 gate:* 任务有效；先由实现者申报 done）`,
-      }
-    }
-    const gate = task.state.slice('gate:'.length)
-
-    // ① archive 门：结论由文件事实决定
-    if (gate === 'archive') {
-      const evaluated = this.evaluateArchiveGate(teamId, taskId, actor)
-      return {
-        // P1-5：环境不可用 latch → needs-human（人工裁决入口），既不是 pass 也不是可自动重试的 fail
-        status: evaluated.needsHuman === true ? 'needs-human' : evaluated.pass ? 'gate-pass' : 'gate-fail',
-        gate,
-        ...(evaluated.needsHuman === true ? { code: 'MT_ENV_UNAVAILABLE' } : {}),
-        taskState: this.service(teamId).projectionSnapshot.tasks[taskId]?.state ?? task.state,
-        note: evaluated.note,
-        ...(evaluated.reason ? { reason: evaluated.reason } : {}),
-        note2: 'archive 门由 host 按 deliverableSpec 约定路径做落位校验（FR-10.4），不接受模型自述「已归档」',
-      }
-    }
-
-    // ①b verify 门：**不接受人工 verdict** —— host 跑命令取真实退出码（FR-5.3）
-    // 「绝不采信模型自述『测试通过』」：连人工点了 pass 都不算，只有进程退出码算。
-    // （人工强制放行是独立的 confirm 通道，会留痕 forcedBy:'human'。）
-    if (gate === 'verify') {
-      return this.runVerifyGate(teamId, taskId, args, actor)
-    }
-
-    // ② review 门：强制交叉审查（FR-5.1）
-    const reviewer = String(args.reviewerMemberId ?? '').trim()
-    if (!reviewer) {
-      return {
-        status: 'error',
-        code: 'MT_CROSS_REVIEW',
-        message: `gate "${gate}" requires reviewerMemberId（强制交叉审查 FR-5.1：审查者必须是另一名成员）`,
-      }
-    }
-    const reviewerMember = this.service(teamId).projectionSnapshot.members[reviewer]
-    if (!reviewerMember) return { status: 'error', code: 'MT_VALIDATION', message: `reviewer "${reviewer}" not found in this team` }
-    const implementer = task.assignee
-    if (implementer && reviewer === implementer) {
-      return {
-        status: 'error',
-        code: 'MT_CROSS_REVIEW',
-        message: `reviewer "${reviewer}" is the implementer of "${taskId}"; 强制交叉审查要求审查者不同于实现者（FR-5.1）`,
-      }
-    }
-
-    const reason = typeof args.reason === 'string' ? args.reason.trim() : ''
-    if (verdict === 'fail' && !reason) {
-      return { status: 'error', code: 'MT_VALIDATION', message: 'verdict=fail requires a non-empty reason（打回必须写清要改什么）' }
-    }
-    const rejectCount = task.gateRejects?.[gate] ?? 0
-    // ③ 打回预算（FR-5.2）：超预算后只有人工能放行
-    if (verdict === 'pass' && rejectCount >= GATE_REJECT_BUDGET && !(actor === 'human' && args.confirm === true)) {
-      return {
-        status: 'needs-human',
-        code: 'MT_REJECT_BUDGET',
-        gate,
-        taskState: task.state,
-        rejectCount,
-        message: `gate "${gate}" 已打回 ${rejectCount} 轮，达到复验预算上限（≤${GATE_REJECT_BUDGET}）；需人工裁决（面板带 confirm=true 可放行）`,
-      }
-    }
-    const scopeAudit = this.scopeAuditFor(teamId, taskId)
-    // P1-2 接线（review 门）：交付判定**只留痕不否决** —— review 门是人 / 队长的显式裁决
-    // （FR-5.1 强制交叉审查），交付判定的否决权在 archive 门（host 事实面）。
-    // 记进同一份 `task.gate.result` 载荷，账本里能看出「这次裁决时交付信号是什么」。
-    const delivery = this.deliveryJudgementFor(teamId, taskId).payload
-    const r = this.commit(teamId, {
-      actor,
-      type: 'task.gate.result',
-      payload: {
-        teamId, taskId, gate, verdict,
-        ...(reason ? { reason } : {}),
-        reviewerMemberId: reviewer,
-        ...(scopeAudit ? { scopeAudit } : {}),
-        delivery,
-      },
-      ...(this.expectedRevisionOf(args) !== undefined ? { expectedRevision: this.expectedRevisionOf(args) } : {}),
-    })
-    if (!r.ok) return { status: 'error', code: r.code, message: r.message, ...(r.currentRevision !== undefined ? { currentRevision: r.currentRevision } : {}) }
-
-    if (verdict === 'fail') {
-      return {
-        status: 'gate-fail',
-        gate,
-        taskState: task.state,
-        rejectCount: rejectCount + 1,
-        delivery,
-        note: `已打回（第 ${rejectCount + 1} 轮）；任务留在 ${task.state}，实现者修复后重新提交 done 再复验`,
-      }
-    }
-    // ④ pass 后：下一道若是 archive 门，host 立即做落位校验（archive 不是人工裁决门）
-    const auto = this.autoEvaluateGateChain(teamId, taskId, actor)
-    return {
-      status: 'gate-pass',
-      gate,
-      taskState: this.service(teamId).projectionSnapshot.tasks[taskId]?.state ?? 'done',
-      delivery,
-      ...(auto.note ? { note: auto.note } : {}),
-    }
+    return this.gates.review(teamId, args, actor)
   }
 
-  /**
-   * CHG-87（QA-4 乐观锁）：把工具入参里的 `expectedRevision` 收敛成 `number | undefined`。
-   * 非数字字符串 → NaN（service 侧 `Number.isInteger` 判定为 `MT_VALIDATION`），
-   * 这样"给了个坏值"不会被静默当成"没给"。
-   */
+  /** CHG-87 乐观锁版本收敛 → **逐字**下沉 `core/gates/gate-execution.ts`（CHG-190）。 */
   private expectedRevisionOf(args: Record<string, unknown>): number | undefined {
-    const raw = args?.expectedRevision
-    if (raw === undefined || raw === null) return undefined
-    if (typeof raw === 'number') return raw
-    const parsed = Number(raw)
-    return Number.isFinite(parsed) ? parsed : Number.NaN
+    return this.gates.expectedRevision(args)
   }
 
-  /**
-   * CHG-87（FR-5.4）：为某任务算一次 scope 完成审计。
-   *
-   * 输入 = 任务声明的 `writeScopes` × 当前 attempt 的证据块申报的 `filesTouched`。
-   * 未声明 writeScopes（或配置 `audit.writeScopes=false`）→ `undefined`（不落审计载荷，
-   * 不制造"未越界"的空噪音）。
-   *
-   * 为什么从**证据事件**取申报文件而不是从投影：投影只存 seq，申报内容的权威在账本里
-   * （`task.evidence` 事件的 `evidence.commands[].filesTouched`）。取**最后一个属于当前
-   * attempt** 的证据——历史 attempt 的文件不该算进这次交付。
-   */
+  /** CHG-87 写范围审计 → **逐字**下沉 `core/gates/gate-execution.ts`（CHG-190；只认当前 attempt 的证据事件）。 */
   private scopeAuditFor(teamId: string, taskId: string): ScopeAudit | undefined {
-    const svc = this.service(teamId)
-    if (svc.effectiveConfig.audit?.writeScopes === false) return undefined
-    const task = svc.projectionSnapshot.tasks[taskId]
-    if (!task) return undefined
-    const scopes = task.input.writeScopes ?? []
-    if (scopes.length === 0) return undefined
-    const attemptId = task.attemptId
-    let declared: string[] = []
-    for (let i = task.evidenceRefs.length - 1; i >= 0; i--) {
-      const payload = svc.eventBySeq(task.evidenceRefs[i])?.payload
-      if (!payload) continue
-      // 只认当前 attempt 的证据（历史 attempt 的文件不算这次交付）；旧账本无 attemptId 时放行
-      if (attemptId && payload.attemptId && payload.attemptId !== attemptId) continue
-      declared = filesTouchedOf(payload.evidence as Record<string, unknown> | undefined)
-      break
-    }
-    return auditWriteScopes(declared, scopes)
+    return this.gates.scopeAudit(teamId, taskId)
   }
 
-  /**
-   * CHG-87（FR-5.3）：`gate:verify` 的 host 执行路径。
-   *
-   * 语义（严格对齐 FR-5.3「绝不采信模型自述"测试通过"」）：
-   *  - **普通调用（actor=lead / 未 confirm）**：忽略 verdict 参数，跑 `task.input.verifyCommand`，
-   *    以**真实退出码**定 pass/fail，结果（命令 / exitCode / signal / durationMs / 输出尾部 /
-   *    scope 审计）落账本；
-   *  - **人工强制放行（actor=human 且 confirm=true）**：不跑命令，落 pass 并标
-   *    `forcedBy:'human'` + 必填 reason——这是"宿主没有 subprocess 服务"时的唯一出口，
-   *    且留痕（谁在什么时候放过了哪道门）；
-   *  - 任务没声明 verifyCommand → `MT_VERIFY_NO_COMMAND`（不是静默 pass）；
-   *  - 宿主没 subprocess 服务 → `MT_UNAVAILABLE`（**不静默降级成人工点通过**）。
-   */
+  /** CHG-87 `gate:verify` 执行路径 → **逐字**下沉 `core/gates/gate-execution.ts`（CHG-190；只认真实退出码）。 */
   private async runVerifyGate(
     teamId: string,
     taskId: string,
     args: Record<string, unknown>,
     actor: string,
   ): Promise<Record<string, unknown>> {
-    const svc = this.service(teamId)
-    const task = svc.projectionSnapshot.tasks[taskId]
-    if (!task) return { status: 'error', code: 'MT_VALIDATION', message: `task "${taskId}" not found` }
-    const command = task.input.verifyCommand as VerifyCommand | undefined
-    const reason = typeof args.reason === 'string' ? args.reason.trim() : ''
-
-    // 人工强制放行（唯一不跑命令的出口；必须留下理由）
-    if (actor === 'human' && args.confirm === true) {
-      if (!reason) {
-        return { status: 'error', code: 'MT_VALIDATION', message: '人工强制放行必须写清理由（reason 非空；这是唯一绕过命令执行的出口，要能审计）' }
-      }
-      const scopeAudit = this.scopeAuditFor(teamId, taskId)
-      const forced = this.commit(teamId, {
-        actor,
-        type: 'task.gate.result',
-        payload: {
-          teamId,
-          taskId,
-          gate: 'verify',
-          verdict: 'pass',
-          forcedBy: 'human',
-          reason,
-          ...(scopeAudit ? { scopeAudit } : {}),
-        },
-        ...(this.expectedRevisionOf(args) !== undefined ? { expectedRevision: this.expectedRevisionOf(args) } : {}),
-      })
-      if (!forced.ok) {
-        return { status: 'error', code: forced.code, message: forced.message, ...(forced.currentRevision !== undefined ? { currentRevision: forced.currentRevision } : {}) }
-      }
-      const auto = this.autoEvaluateGateChain(teamId, taskId, actor)
-      return {
-        status: 'gate-pass',
-        gate: 'verify',
-        forcedBy: 'human',
-        taskState: this.service(teamId).projectionSnapshot.tasks[taskId]?.state ?? 'done',
-        note: `人工强制放行已留痕（reason: ${reason}）；${auto.note ?? '已推进门禁链'}`,
-        ...(scopeAudit ? { scopeAudit } : {}),
-      }
-    }
-
-    // 普通路径：必须有命令
-    const commandError = validateVerifyCommand(command)
-    if (commandError) return { status: 'error', code: commandError.code, message: commandError.message }
-    if (!command) {
-      return {
-        status: 'error',
-        code: 'MT_VERIFY_NO_COMMAND',
-        message: `gate "verify" 要求任务声明 verifyCommand（argv 数组）；task "${taskId}" 未声明，无法执行 command 门禁（FR-5.3）。请用 myteam_edit_task 补 verifyCommand 后重试`,
-      }
-    }
-    const workdir = command.cwd ? join(this.workspaceRoot, command.cwd) : this.workspaceRoot
-    const timeoutMs = resolveTimeoutMs(command.timeoutMs, svc.effectiveConfig.gates?.commandTimeoutMs)
-    const run = await runVerifyCommand({ command, workdir, timeoutMs, subprocess: this.rt.subprocess })
-    if (!run.ok) return { status: 'error', code: run.code, message: run.message }
-
-    const verdict = classifyVerifyResult(run.result)
-    const scopeAudit = this.scopeAuditFor(teamId, taskId)
-    const rejectCount = task.gateRejects?.verify ?? 0
-    if (verdict === 'pass' && rejectCount >= GATE_REJECT_BUDGET && !(actor === 'human' && args.confirm === true)) {
-      return {
-        status: 'needs-human',
-        code: 'MT_REJECT_BUDGET',
-        gate: 'verify',
-        taskState: task.state,
-        rejectCount,
-        exitCode: run.result.exitCode,
-        command: { argv: [...command.argv], ...(command.cwd ? { cwd: command.cwd } : {}) },
-        message: `verify 门已打回 ${rejectCount} 轮，达到复验预算上限（≤${GATE_REJECT_BUDGET}）；需人工裁决（面板带 confirm=true 可放行）`,
-      }
-    }
-    const committed = this.commit(teamId, {
-      actor,
-      type: 'task.gate.result',
-      payload: {
-        teamId,
-        taskId,
-        gate: 'verify',
-        verdict,
-        command: { argv: [...command.argv], ...(command.cwd ? { cwd: command.cwd } : {}) },
-        exitCode: run.result.exitCode,
-        signal: run.result.signal,
-        durationMs: run.result.durationMs,
-        outputTail: run.result.outputTail,
-        executedBy: 'host',
-        ...(reason ? { reason } : {}),
-        ...(scopeAudit ? { scopeAudit } : {}),
-      },
-      ...(this.expectedRevisionOf(args) !== undefined ? { expectedRevision: this.expectedRevisionOf(args) } : {}),
-    })
-    if (!committed.ok) {
-      return { status: 'error', code: committed.code, message: committed.message, ...(committed.currentRevision !== undefined ? { currentRevision: committed.currentRevision } : {}) }
-    }
-    const base = {
-      gate: 'verify',
-      command: { argv: [...command.argv], ...(command.cwd ? { cwd: command.cwd } : {}) },
-      exitCode: run.result.exitCode,
-      signal: run.result.signal,
-      durationMs: run.result.durationMs,
-      outputTail: run.result.outputTail,
-      ...(scopeAudit ? { scopeAudit } : {}),
-    }
-    if (verdict === 'fail') {
-      return {
-        status: 'gate-fail',
-        ...base,
-        taskState: this.service(teamId).projectionSnapshot.tasks[taskId]?.state ?? 'gate:verify',
-        rejectCount: rejectCount + 1,
-        note: `verify 门 fail（exit ${run.result.exitCode ?? run.result.signal ?? '?'}）；任务已回到修复队列，修完重新申报 done 再跑`,
-      }
-    }
-    const auto = this.autoEvaluateGateChain(teamId, taskId, actor)
-    return {
-      status: 'gate-pass',
-      ...base,
-      taskState: this.service(teamId).projectionSnapshot.tasks[taskId]?.state ?? 'done',
-      ...(auto.note ? { note: auto.note } : { note: 'verify 门 pass（exit 0）' }),
-    }
+    return this.gates.runVerifyGate(teamId, taskId, args, actor)
   }
 
   /* ── P1-1 / P1-2 接线：产物基线 + 交付判定 ───────────────────────── */
@@ -2037,277 +1770,48 @@ export class MyTeamHost implements MyTeamHostContract {
     }
   }
 
-  /**
-   * P1-1 接线：任务进入 `in_progress`（claim 成功 / 申报 in_progress / 重规划）时拍产物基线。
-   *
-   * 为什么必须在**阶段开始**拍：基线语义是「本阶段开始时这些文件长什么样」，
-   * 只有它固定在阶段起点，「指纹变了」才等于「本阶段真的写过它」。
-   *
-   * 为什么给「拍基线时不存在」的路径写哨兵：见 `ABSENT_PATH_FINGERPRINT`。
-   *
-   * 续跑 / 重试只补缺失键（`mergeBaseline`）：重拍若能覆盖，「第一轮写了、第二轮没写」
-   * 会把第一轮的写入洗成基线，第二轮反而凭第一轮的文件被判新鲜 —— 正是要防的假绿。
-   */
+  /** P1-1 产物基线快照 → **逐字**下沉 `core/gates/gate-execution.ts`（CHG-190；续跑只补缺失键）。 */
   private captureArtifactBaseline(teamId: string, taskId: string): ArtifactBaseline {
-    try {
-      const task = this.service(teamId).projectionSnapshot.tasks[taskId]
-      if (!task) return {}
-      const paths = deliverablePathsOf(task.input.deliverableSpec)
-      if (paths.length === 0) return {}
-      const filePath = this.artifactBaselinePath(teamId, taskId)
-      const previous = readArtifactBaselineRecord(filePath)
-      const next = artifactBaseline(paths, (path) => this.statArtifact(path))
-      for (const path of paths) {
-        if (!Object.prototype.hasOwnProperty.call(next, path)) next[path] = ABSENT_PATH_FINGERPRINT
-      }
-      const baseline = previous ? mergeBaseline(previous.baseline, next) : next
-      writeArtifactBaselineRecord(filePath, {
-        version: 1,
-        teamId: String(teamId),
-        taskId: String(taskId),
-        capturedAt: previous?.capturedAt ?? new Date().toISOString(),
-        baseline,
-      })
-      return baseline
-    } catch (e) {
-      // 基线是「判交付的客观凭据」：拍不下来只告警（archive 门会按「没拍过基线」兼容放行）
-      this.log('warn', `artifact baseline capture failed (${teamId}/${taskId}): ${String(e)}`)
-      return {}
-    }
+    return this.gates.captureBaseline(teamId, taskId)
   }
 
-  /**
-   * P1-1：产物新鲜度过滤（**stale 的当不存在**）。
-   *
-   * 兼容口径（旧账本 / 未领取过的任务）：**没有基线记录** → 不过滤（全部当新鲜）。
-   * 理由：接线之前入库的任务从没拍过基线，按「缺键 = 陈旧」判会把历史任务全拒掉；
-   * 而假绿的防线仍在 —— 这类任务拿不到「空收尾用产物内容顶替」的交付兜底
-   * （见 `deliveryJudgementFor` 的 docText），且归档结果里会带 `freshness: 'baseline-missing'`
-   * 供审计区分「真的新鲜」与「没拍过基线」。
-   *
-   * `enforced` 只是为了留痕：判定本身已经把 stale 的路径从新鲜集合里剔除了。
-   */
+  /** P1-1 新鲜度判定 → **逐字**下沉 `core/gates/gate-execution.ts`（CHG-190；stale 的当不存在）。 */
   private artifactFreshnessFor(
     teamId: string,
     taskId: string,
     declaredPaths: readonly string[] = [],
   ): { fresh: string[]; stale: string[]; enforced: boolean } {
-    const task = this.service(teamId).projectionSnapshot.tasks[taskId]
-    const paths = deliverablePathsOf(task?.input.deliverableSpec, declaredPaths)
-    const record = readArtifactBaselineRecord(this.artifactBaselinePath(teamId, taskId))
-    if (!record) return { fresh: [...paths], stale: [], enforced: false }
-    const fresh: string[] = []
-    const stale: string[] = []
-    for (const path of paths) {
-      // 定义变更（rescope 加的新产物）在基线上没有这个键 —— 那不是「本阶段没写」，
-      // 而是「拍基线时还没这条要求」：放行并留痕，不当陈旧（否则重规划后永远过不了门）。
-      if (!Object.prototype.hasOwnProperty.call(record.baseline, path)) {
-        fresh.push(path)
-        continue
-      }
-      if (artifactIsStale(record.baseline, path, this.statArtifact(path))) stale.push(path)
-      else fresh.push(path)
-    }
-    return { fresh, stale, enforced: true }
+    return this.gates.artifactFreshness(teamId, taskId, declaredPaths)
   }
 
-  /**
-   * 读产物内容（P1-2 空收尾兜底用的 `docText`）：**只读新鲜产物**，空文件不贡献内容。
-   *
-   * 为什么空文件要单独跳过（而不是让空串参与长度比较）：`docText` 会喂给
-   * `judgeDeliverable` 的「空文件不算交付」判据，一个 0 字节文件在这里留下空块，
-   * 只会让「产物存在」和「产物为空」在判定里长得一样。跳过 = 空文件等价于不存在。
-   */
+  /** 产物取文（空收尾兜底的 `docText`）→ **逐字**下沉 `core/gates/gate-execution.ts`（CHG-190；空文件跳过）。 */
   private artifactTextOf(paths: readonly string[]): string {
-    const chunks: string[] = []
-    for (const path of paths) {
-      try {
-        const text = readFileSync(this.resolveArtifactPath(path), 'utf8')
-        const trimmed = text.trim()
-        if (trimmed.length === 0) continue
-        chunks.push(trimmed.slice(0, ARTIFACT_TEXT_READ_LIMIT))
-      } catch {
-        // 读不到 = 没有内容可顶替（陈旧判定已在 artifactFreshnessFor 里做过）
-      }
-    }
-    return chunks.join('\n')
+    return this.gates.artifactText(paths)
   }
 
-  /**
-   * 取「申报 done 时的回复正文」（P1-2 的 `text` / `stopReason` 来源）。
-   *
-   * 为什么从账本取而不是再存一份：`task.completed` 的 `summary` 就是成员的回复正文，
-   * 账本已经持久化它；再存一份必然两份漂移（而且重启后只剩账本）。
-   * 找不到 completed 事件 → **不传** stopReason：空收尾分支只在真正确认过正常收尾时才该生效，
-   * 凭空造 `completed` 会让「短正文 + 产物凑长度」被误判成交付。
-   */
+  /** 完成回执（`task.completed.summary`）→ **逐字**下沉 `core/gates/gate-execution.ts`（CHG-190）。 */
   private completionReplyOf(teamId: string, taskId: string): { text: string; stopReason?: string } {
-    try {
-      const events = readLedgerEvents(this.service(teamId).ledgerPath).events
-      for (let i = events.length - 1; i >= 0; i -= 1) {
-        const event = events[i]
-        if (event?.type !== 'task.completed') continue
-        if (String(event.payload?.taskId ?? '') !== String(taskId)) continue
-        return { text: typeof event.payload?.summary === 'string' ? event.payload.summary : '', stopReason: 'completed' }
-      }
-      return { text: '' }
-    } catch {
-      return { text: '' }
-    }
+    return this.gates.completionReply(teamId, taskId)
   }
 
-  /**
-   * P1-2 交付判定（review 门留痕 / archive 门否决共用同一口径）。
-   *
-   * `hasEvidence` 取**客观事实**：账本里有 `task.evidence` 事件（FR-5.0 的要求：
-   * 申报 done 前必须有同 attempt 的证据事件），或回复正文里带 `[Verification evidence]` 块。
-   * 为什么结构化证据也算：成员的证据是 `myteam_update_task` 的结构化参数、落的是
-   * `task.evidence` 事件 —— 它比「正文里有没有那行标记」更硬（正文可能被摘要截断）。
-   *
-   * `docText` 只取**新鲜**产物的内容：陈旧文件是上游写的，不能当本阶段的交付顶替。
-   *
-   * P1-5 接线（docs/21 §6）：如果该任务的实现者已经 latch 了 `env-unavailable`，
-   * 交付判定**直接** `needs-human`——`blocksCompletion` 的语义是「环境根本不可用，
-   * 任何『完成』声明都一定是假的」：此时重试、换命令、换参数都修不好环境，
-   * 自动重试只会继续烧 token（P1-5 的整个存在理由）。
-   */
+  /** P1-2 交付判定 → **逐字**下沉 `core/gates/gate-execution.ts`（CHG-190；review 门留痕 / archive 门否决共用）。 */
   private deliveryJudgementFor(teamId: string, taskId: string): { judgement: DeliveryJudgement; payload: Record<string, unknown> } {
-    const task = this.service(teamId).projectionSnapshot.tasks[taskId]
-    const reply = this.completionReplyOf(teamId, taskId)
-    const freshness = this.artifactFreshnessFor(teamId, taskId)
-    const hasEvidence = extractEvidenceBlock(reply.text) !== undefined || (task?.evidenceRefs?.length ?? 0) > 0
-    const minLength = deliverableMinLength(task?.input.taskType)
-    const docText = this.artifactTextOf(freshness.fresh)
-    const judged = judgeDeliverable({
-      ...(reply.stopReason ? { stopReason: reply.stopReason } : {}),
-      text: reply.text,
-      minLength,
-      docText,
-      hasEvidence,
-    })
-    // P1-5：环境不可用 latch 优先于一切交付信号（含证据块）——它证伪的是「能不能跑」，
-    // 不是「跑得对不对」，所以不能走 evidence 分支放行。
-    const guard = this.guardVerdict(String(task?.assignee ?? ''))
-    const blocked = blocksCompletion(guard)
-    const judgement: DeliveryJudgement = blocked && guard
-      ? {
-          verdict: 'needs-human',
-          signal: 'none',
-          reason: `环境不可用（guard:${guard.kind}）：${guard.message} —— 转人工；重试/换命令/换参数都修不好环境，禁止自动重试`,
-        }
-      : judged
-    return {
-      judgement,
-      payload: {
-        verdict: judgement.verdict,
-        signal: judgement.signal,
-        reason: judgement.reason,
-        minLength,
-        hasEvidence,
-        docLength: docText.trim().length,
-        freshArtifacts: freshness.fresh,
-        staleArtifacts: freshness.stale,
-        // 区分「真的新鲜」与「没拍过基线」：兼容分支不该看起来像一次成功的新鲜度校验
-        ...(freshness.enforced ? {} : { freshness: 'baseline-missing' }),
-        // P1-5：护栏结论进同一份 gate 载荷（不新增事件型）
-        ...(blocked && guard ? { guardBlocked: true, guard: guardPayloadOf(guard) } : {}),
-      },
-    }
+    return this.gates.deliveryJudgement(teamId, taskId)
   }
 
-  /**
-   * archive 门落位校验（FR-10.4）：按 `deliverableSpec` 约定路径检查产物是否真实存在。
-   * pass → 补写 `task.deliverable`（实存路径）再落 `task.gate.result` pass（fold 推进 done）；
-   * fail → 落 `task.gate.result` fail 留档（repair 流转 M2），调用方从返回 note 可见。
-   * 抽取自 FIX-10 的成员 `update_task` 分支：CHG-86 起队长工具 / 面板 / 成员三处共用同一判定。
-   *
-   * P1-1/P1-2 接线后（docs/21 §6）：两道判据**同时**成立才算 pass——
-   *  ① **落位**：新鲜产物里至少有一个真实存在（stale 的不算数）；
-   *  ② **交付判定**：`judgeDeliverable` 判 delivered（空文件 / 无证据 + 无正文 / 有拒绝词 = 不算交付）。
-   * 判定结论（verdict / signal / 新鲜与陈旧清单）随 `task.gate.result` 载荷落账本，
-   * **不新增事件型**（保持 40 型）。这样「产物在但没人写过它」这类假绿在账本里可查。
-   *
-   * P1-5：`guardBlocked`（环境不可用 latch）**不落 gate.result fail**，而是返回
-   * `needsHuman` —— fail 会被 fold 放回 `ready`（自动重试），而环境不可用时重试只会继续烧
-   * token。任务停在 `gate:archive` 等人工裁决，这才是「禁止自动重试」的实现面。
-   */
+  /** archive 门落位校验（FR-10.4）→ **逐字**下沉 `core/gates/gate-execution.ts`（CHG-190；环境不可用转人工）。 */
   private evaluateArchiveGate(
     teamId: string,
     taskId: string,
     actor: string,
     declaredPaths: string[] = [],
   ): { pass: boolean; note: string; reason?: string; needsHuman?: boolean } {
-    const task = this.service(teamId).projectionSnapshot.tasks[taskId]
-    if (!task || task.state !== 'gate:archive') {
-      return { pass: false, note: '', reason: `task "${taskId}" is not at gate:archive` }
-    }
-    const existsUnderWorkspace = (p: string) => (isAbsolute(p) ? existsSync(p) : existsSync(join(this.workspaceRoot, p)))
-    // ① P1-1：只把**新鲜**产物交给落位校验（stale 的当不存在）
-    const freshness = this.artifactFreshnessFor(teamId, taskId, declaredPaths)
-    const placement = checkArchiveGate(
-      task.input.deliverableSpec as { path: string } | undefined,
-      freshness.fresh.map((path) => ({ path })),
-      existsUnderWorkspace,
-    )
-    // ② P1-2 + P1-5：交付判定（产物陈旧 / 空文件 / 无证据 / 命中拒绝词 / 环境不可用 都不算交付）
-    const { judgement, payload } = this.deliveryJudgementFor(teamId, taskId)
-    const delivered = placement.pass && judgement.verdict === 'delivered'
-    if (delivered) {
-      for (const c of placement.checks) {
-        if (c.exists) this.commit(teamId, { actor, type: 'task.deliverable', payload: { teamId, taskId, path: c.path } })
-      }
-      const gr = this.commit(teamId, {
-        actor,
-        type: 'task.gate.result',
-        payload: { teamId, taskId, gate: 'archive', verdict: 'pass', delivery: payload },
-      })
-      return gr.ok
-        ? { pass: true, note: `archive gate pass（落位校验通过 + 交付判定 ${judgement.verdict}），任务已归档` }
-        : { pass: false, note: '', reason: gr.message ?? 'gate.result commit failed' }
-    }
-    const reason = placement.pass
-      ? `交付判定未通过（${judgement.signal}）：${judgement.reason}`
-      : (placement.reason ?? 'deliverable 未落位')
-    // P1-5：环境不可用 → 转人工，**不落 fail**（fail 会被 fold 放回 ready = 自动重试）
-    if (payload.guardBlocked === true) {
-      this.log('warn', `archive gate blocked by guard for ${teamId}/${taskId}: ${reason}`)
-      return {
-        pass: false,
-        needsHuman: true,
-        note: `archive gate 转人工：${reason}（任务停在 gate:archive，禁止自动重试；请人工确认环境后强制放行）`,
-        reason,
-      }
-    }
-    this.commit(teamId, {
-      actor,
-      type: 'task.gate.result',
-      payload: { teamId, taskId, gate: 'archive', verdict: 'fail', reason, delivery: payload },
-    })
-    return {
-      pass: false,
-      note: `archive gate fail：${reason}（repair 流转 M2；请补交付物后 escalate 或联系队长）`,
-      reason,
-    }
+    return this.gates.evaluateArchive(teamId, taskId, actor, declaredPaths)
   }
 
-  /**
-   * 门禁自动推进（CHG-86）：review/verify 裁决通过后，若下一道是 archive 门则立即
-   * 做落位校验并推进到 done（archive 不是人工裁决门，不该让人再点一次）。
-   * 循环上限 = 门禁链长度 + 1：自定义链里 archive 出现在中间时不会死循环。
-   */
+  /** 门禁自动推进（CHG-86）→ **逐字**下沉 `core/gates/gate-execution.ts`（CHG-190；archive 不是人工裁决门）。 */
   private autoEvaluateGateChain(teamId: string, taskId: string, actor: string): { advanced: boolean; note?: string } {
-    const chain = this.service(teamId).projectionSnapshot.tasks[taskId]?.gates ?? []
-    let note: string | undefined
-    let advanced = false
-    for (let i = 0; i <= chain.length; i++) {
-      const task = this.service(teamId).projectionSnapshot.tasks[taskId]
-      if (!task || task.state !== 'gate:archive') break
-      const evaluated = this.evaluateArchiveGate(teamId, taskId, actor)
-      note = evaluated.note
-      if (!evaluated.pass) break
-      advanced = true
-    }
-    return { advanced, ...(note ? { note } : {}) }
+    return this.gates.autoEvaluate(teamId, taskId, actor)
   }
 
   /**
