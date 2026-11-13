@@ -43,6 +43,7 @@ import { createMemberTaskHandlers, createTasksHandlers } from './host/tasks.ts'
 import { createPlanHandlers } from './host/plan.ts'
 import { createRolesHandlers } from './host/roles.ts'
 import { createTeamsHandlers } from './host/teams.ts'
+import { createKnowledgeHandlers, createMemberKnowledgeHandlers } from './host/knowledge.ts'
 import { leadToolDefs, memberToolDefs, type ToolDef } from './tools/defs.ts'
 // CHG-148（P1-6）：按工具名取完整结果契约（jsonOutput 双声明），不再用统一空 schema
 import { outputForTool } from './core/tools/output-contract.ts'
@@ -708,6 +709,28 @@ export class MyTeamHost implements MyTeamHostContract {
     resetTeamConfig: (teamId, args) => this.resetTeamConfig(teamId, args),
     handoffTeam: (args) => this.handoffTeam(args),
     readSessionHistory: (args) => this.readSessionHistory(args),
+  })
+  /**
+   * CHG-186（T155c）：知识族端点适配层（`src/host/knowledge.ts`）。
+   *
+   * 宿主面只声明这族**用到的**成员——私有方法改名 → 装配处编译报错。`workspaceRoot`
+   * 同样是**惰性 getter**，以方法形式接出来。`findKnowledgeProposal` 是模块级函数透传
+   * （knowledge.ts 直接 import 回来会与 `host.ts` 成 value 环）。
+   */
+  private readonly knowledge = createKnowledgeHandlers({
+    commit: (teamId, draft) => this.commit(teamId, draft),
+    service: (teamId) => this.service(teamId),
+    workspaceRoot: () => this.workspaceRoot,
+    findKnowledgeProposal: (ledgerPath, draftId) => findKnowledgeProposal(ledgerPath, draftId),
+  })
+  /**
+   * CHG-186（T155c）：知识族**成员侧**适配层（同一文件的另一半，见上）。
+   *
+   * 只读：成员无知识写入口是策展制的运行时保证（TF ADR-0009）。这条通道**不碰**
+   * `service(teamId)`——那行必须留在 `executeMemberToolInner`（见知识族文件头 ⚠️）。
+   */
+  private readonly memberKnowledge = createMemberKnowledgeHandlers({
+    workspaceRoot: () => this.workspaceRoot,
   })
   /** CHG-186（T155b）：任务族**成员侧**适配层（同一文件的另一半，见上） */
   private readonly memberTasks = createMemberTaskHandlers({
@@ -1404,181 +1427,16 @@ export class MyTeamHost implements MyTeamHostContract {
           return this.teams.disband(teamId, args, actor)
         case 'myteam_resolve_proposal':
           return this.plan.resolveProposal(teamId, args, actor)
-        case 'myteam_adopt_knowledge': {
-          // 策展门（FR-17.4）：提案必须存在账本；adopted 落库带归因
-          const draftId = String(args.draftId)
-          const decision = String(args.decision)
-          if (decision === 'rejected') {
-            const r = this.commit(teamId, { actor, type: 'knowledge.adopted', payload: { teamId, draftId, decision: 'rejected', note: args.note } })
-            return r.ok ? { status: 'rejected', note: '提案已留痕驳回；不入库' } : { status: 'error', code: r.code, message: r.message }
-          }
-          const svc = this.service(teamId)
-          const proposedEvent = findKnowledgeProposal(svc.ledgerPath, draftId)
-          if (!proposedEvent) return { status: 'error', code: 'MT_VALIDATION', message: `knowledge proposal "${draftId}" not found in ledger` }
-          const draft = proposedEvent.payload.draft as KnowledgeDraft
-          const now = new Date().toISOString()
-          const kbDir = knowledgeDirOf(this.workspaceRoot)
-          const existingEntries = listKnowledge(kbDir)
-          const proposer = String(proposedEvent.payload.proposedBy ?? 'unknown')
-          // v2.7（M2-0c，FR-17.4）：refine/contradict 走演化式修订（reviseEntry）；
-          // refine = 精炼既有条目（staleSince 清除），contradict = 矛盾记录轨迹（标 staleSince 待复核）。
-          if (draft.relation === 'refine' || draft.relation === 'contradict') {
-            const targetId = draft.targetId ?? draft.id
-            const target = existingEntries.find((e) => e.id === targetId)
-            if (!target) return { status: 'error', code: 'MT_VALIDATION', message: `${draft.relation} proposal targets unknown entry "${targetId}"` }
-            const { entry, diffSummary } = reviseEntry(target, draft, proposer, now)
-            const written = writeKnowledgeEntry(kbDir, entry)
-            const r = this.commit(teamId, { actor, type: 'knowledge.revised', payload: { teamId, entryId: entry.id, relation: draft.relation, diff: diffSummary } })
-            return r.ok
-              ? { status: 'revised', entryPath: written.filePath, diff: diffSummary, note: draft.relation === 'refine' ? '条目已精炼（演化节留轨迹）；成员索引下轮 spawn/重启生效' : '矛盾证据已记录轨迹并标记待复核（原断言未改写）；请安排复核' }
-              : { status: 'error', code: r.code, message: r.message }
-          }
-          const existing = new Set(existingEntries.map((e) => e.id))
-          const entry = adoptDraft(draft, proposer, existing, now)
-          const written = writeKnowledgeEntry(kbDir, entry)
-          const r = this.commit(teamId, { actor, type: 'knowledge.adopted', payload: { teamId, draftId, entryPath: written.filePath, note: args.note } })
-          return r.ok
-            ? { status: 'adopted', entryPath: written.filePath, note: '知识条目已入库（config/knowledge/，带 evidence+contributor 归因）；成员索引下轮 spawn/重启生效' }
-            : { status: 'error', code: r.code, message: r.message }
-        }
-        case 'myteam_propose_knowledge': {
-          /*
-           * CHG-163（docs/10 KI-9 / FR-17.4 沉淀时机①）：**队长侧提案入口**。
-           *
-           * 为什么需要它：知识库的写入口一直只有成员 `myteam_update_task` 的 knowledgeDraft
-           * （任务验收后提案）。「onboarding 采集」是规划轮的动作——那时还没有任何任务，
-           * 成员侧这条路物理上走不通，所以队长侧必须有独立的提案入口。
-           *
-           * 三条纪律（越界即破坏策展制）：
-           *  ① **只提案不写库**：只落 `knowledge.proposed`，绝不写 config/knowledge/——
-           *     入库必须随后 `myteam_adopt_knowledge` 采纳（TF ADR-0009 先例）。
-           *  ② **证据先行**（E8）：无证据直接拒绝且**账本零写入**（不消耗 seq）。
-           *  ③ 草案形状与成员侧完全同构（`KnowledgeDraft` + 同一 payload 形状），
-           *     否则队长审阅队列会出现两种草案，面板与采纳管线要分叉。
-           */
-
-          // ① 证据归一化：`{kind, ref}` → 账本里的 `kind:ref` 指针字符串。
-          //    kind 限定已知四类（这是**入参**不是历史账本，没有兼容包袱：未知类型放行只会
-          //    让「证据」变成自由文本，E8 就形同虚设）。
-          const evidenceIn = Array.isArray(args.evidence) ? (args.evidence as Array<Record<string, unknown>>) : []
-          const pointers: string[] = []
-          for (const item of evidenceIn) {
-            const kind = String(item?.kind ?? '').trim().toLowerCase()
-            const ref = String(item?.ref ?? '').trim()
-            if (!['task', 'file', 'session', 'seq'].includes(kind)) {
-              return {
-                status: 'error',
-                code: 'MT_KB_INVALID',
-                message: `evidence.kind 必须是 task|file|session|seq，实际 "${kind}"（证据指针是有类型的，不是自由文本）`,
-              }
-            }
-            if (ref.length === 0) {
-              return { status: 'error', code: 'MT_KB_EVIDENCE_REQUIRED', message: `证据指针 "${kind}:" 后缺少内容（ref 为空 = 没有证据）` }
-            }
-            pointers.push(`${kind}:${ref}`)
-          }
-          // ② 证据纪律（E8）：空数组 = 没证据 = 拒绝。必须在任何 commit 之前——
-          //    「先落账再校验」会给账本留下一条空证提案（成员侧分支的历史坑，此处不重演）。
-          if (pointers.length === 0) {
-            return {
-              status: 'error',
-              code: 'MT_KB_EVIDENCE_REQUIRED',
-              message: '知识提案必须带证据指针（task:<id> / file:<path> / session:<id> / seq:<n>）；没有证据就不要提（E8）',
-            }
-          }
-          // ③ 草案 id 由标题派生：KnowledgeDraft.id 受 ID_RE 约束（小写/数字/连字符），
-          //    中文标题派生不出合法 id → 哈希兜底（确定性，同一标题重复提案落在同一 id，
-          //    便于采纳时判重）。
-          const title = String(args.title ?? '').trim()
-          const slug = title.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 48)
-          const draftId = /^[a-z0-9][a-z0-9-]{1,63}$/.test(slug)
-            ? slug
-            : `kb-${createHash('sha1').update(title).digest('hex').slice(0, 8)}`
-          const relationIn = args.relation === undefined ? 'new' : String(args.relation)
-          const draft: KnowledgeDraft = {
-            id: draftId,
-            title,
-            body: String(args.body ?? ''),
-            tags: Array.isArray(args.tags) ? (args.tags as unknown[]).map(String).filter((t) => t.length > 0) : [],
-            // 条目证据是**单指针**（KnowledgeEntry.evidence 是数组，但 adoptDraft 只取一条）：
-            // 多条证据时取第一条，其余靠 relation:'refine' 逐条巩固（v2.7 演化式修订口径）。
-            evidence: pointers[0]!,
-            relation: relationIn as KnowledgeDraft['relation'],
-            ...(typeof args.targetId === 'string' && args.targetId.trim().length > 0 ? { targetId: args.targetId.trim() } : {}),
-          }
-          const check = validateDraft(draft)
-          if (!check.ok) return { status: 'error', code: check.code, message: check.message }
-          // ④ refine/contradict 的目标必须是**显式给的既有条目**。
-          //    为什么不能靠 validateDraft 兜：它允许 `targetId ?? draft.id` 的回落，
-          //    而本工具的 draft.id 是**新派生**的（slug/哈希），回落等于「指向一个刚编出来的 id」——
-          //    到采纳那一刻才炸（MT_KB_TARGET_MISMATCH），提案却白占了队长队列。
-          if (draft.relation === 'refine' || draft.relation === 'contradict') {
-            if (!draft.targetId) {
-              return {
-                status: 'error',
-                code: 'MT_KB_TARGET_REQUIRED',
-                message: `${draft.relation} 提案必须给 targetId（要精炼/矛盾的既有条目 id；新条目请用 relation:"new"）`,
-              }
-            }
-            if (!readKnowledgeEntry(knowledgeDirOf(this.workspaceRoot), draft.targetId)) {
-              return {
-                status: 'error',
-                code: 'MT_KB_NOT_FOUND',
-                message: `${draft.relation} 提案的目标条目 "${draft.targetId}" 不在知识库；先提 new 提案并采纳，或改用正确的 targetId`,
-              }
-            }
-          }
-          // ⑤ 落账（形状与成员侧 knowledgeDraft 分支一致：teamId/draftId/draft/proposedBy）
-          const proposed = this.commit(teamId, {
-            actor,
-            type: 'knowledge.proposed',
-            payload: { teamId, draftId, draft, proposedBy: actor },
-          })
-          return proposed.ok
-            ? {
-                status: 'proposed',
-                draftId,
-                relation: draft.relation ?? 'new',
-                ...(draft.targetId ? { targetId: draft.targetId } : {}),
-                evidence: pointers,
-                note: '提案已进队长队列（**未入库**）；用户确认后 myteam_adopt_knowledge({ draftId, decision:"adopted" }) 才写进 config/knowledge/',
-              }
-            : { status: 'error', code: proposed.code, message: proposed.message }
-        }
-        case 'myteam_participate_task': {
-          const role = args.role === 'lead' ? 'lead' : 'coop'
-          const memberIds = Array.isArray(args.memberIds)
-            ? args.memberIds.filter((id): id is string => typeof id === 'string' && id.length > 0)
-            : []
-          const r = this.commit(teamId, {
-            actor,
-            type: 'task.participate',
-            payload: {
-              teamId,
-              taskId: args.taskId,
-              participantTeamId: args.participantTeamId,
-              role,
-              ...(memberIds.length > 0 ? { memberIds } : {}),
-            },
-          })
-          return r.ok
-            ? { status: 'participating', note: `任务 ${String(args.taskId)} 已登记参与团队 ${String(args.participantTeamId)}（${role}）` }
-            : { status: 'error', code: r.code, message: r.message }
-        }
-        case 'myteam_assign_task': {
-          const ids = Array.isArray(args.memberIds)
-            ? args.memberIds.filter((id): id is string => typeof id === 'string' && id.length > 0)
-            : []
-          if (ids.length === 0) return { status: 'error', code: 'MT_VALIDATION', message: 'memberIds requires at least 1 member' }
-          const r = this.commit(teamId, {
-            actor,
-            type: 'task.assigned',
-            payload: { teamId, taskId: args.taskId, memberId: ids[0], memberIds: ids },
-          })
-          return r.ok
-            ? { status: 'assigned', taskId: args.taskId, memberIds: ids, note: '负责队员已标注；执行仍按角色 claim（指派不改变调度）' }
-            : { status: 'error', code: r.code, message: r.message }
-        }
+        /* CHG-186（T155c）：知识族（采纳 / 提案 / 参与 / 指派）实现已搬到 `src/host/knowledge.ts`。
+         * 这里只转发——逻辑/顺序/默认值一个都没改（纯结构重构，行为零变化）。 */
+        case 'myteam_adopt_knowledge':
+          return this.knowledge.adopt(teamId, args, actor)
+        case 'myteam_propose_knowledge':
+          return this.knowledge.propose(teamId, args, actor)
+        case 'myteam_participate_task':
+          return this.knowledge.participate(teamId, args, actor)
+        case 'myteam_assign_task':
+          return this.knowledge.assign(teamId, args, actor)
         /* CHG-186（T155c）：角色族（新建 / 编辑 / 删除 / 发布 / 复制 / 应用 / 项目自身角色）
          * 实现已搬到 `src/host/roles.ts`。这里只转发——逻辑/顺序/默认值一个都没改
          * （纯结构重构，行为零变化）。 */
@@ -3872,12 +3730,8 @@ export class MyTeamHost implements MyTeamHostContract {
           return this.memberTasks.propose(teamId, member, args, actor)
         case 'myteam_escalate_task':
           return this.memberTasks.escalate(teamId, member, args, actor)
-        case 'myteam_read_knowledge': {
-          const entry = readKnowledgeEntry(knowledgeDirOf(this.workspaceRoot), String(args.id))
-          if (!entry) return { status: 'error', code: 'MT_KB_NOT_FOUND', message: `knowledge entry "${args.id}" not found（索引见提示词）` }
-          const body = entry.staleSince ? `[stale 待复核] 该条目已被主题相近任务触及，请勿盲信，注意交叉核对。\n\n${entry.body}` : entry.body
-          return { status: 'ok', entry: { id: entry.id, title: entry.title, tags: entry.tags, unverified: entry.unverified, staleSince: entry.staleSince, proofCount: entry.proofCount, body } }
-        }
+        case 'myteam_read_knowledge':
+          return this.memberKnowledge.read(args)
         default:
           return { status: 'error', code: 'MT_UNKNOWN_TOOL', message: `unknown member tool: ${name}` }
       }
