@@ -29,9 +29,13 @@ const posix = (p) => p.split(sep).join('/')
 
 /* ── 分层口径（与 docs/03 §分层 对齐；改这里就要改文档）──────────────────── */
 
-/** 层的判定顺序即优先级：先命中先归属。 */
+/** 层的判定顺序即优先级：先命中先归属。
+ *  CHG-188b：T155 把端点族拆进 `src/host/*.ts` 后，这一层必须一起归到「入口层」——
+ *  否则分类器把它们落进 `other`（深度 9），「入口层 → 领域」这种**正常**边会被算成
+ *  16 条「逆向依赖」，报告直接失真。口径：入口层 = 顶层 `host|panel|smoke|host-workspace.ts`
+ *  **加上** `host/` 目录下的所有文件。 */
 const LAYERS = [
-  { id: 'entry', label: '入口层', test: (rel) => /^(host|panel|smoke|host-workspace)\.ts$/.test(rel) },
+  { id: 'entry', label: '入口层', test: (rel) => /^(host|panel|smoke|host-workspace)\.ts$/.test(rel) || rel.startsWith('host/') },
   { id: 'remote', label: '远程面', test: (rel) => rel.startsWith('remote/') },
   { id: 'tools', label: '工具声明', test: (rel) => rel.startsWith('tools/') },
   { id: 'shared', label: '共享内核', test: (rel) => rel === 'core/errors.ts' },
