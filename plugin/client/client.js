@@ -4717,20 +4717,20 @@ window.__ModuleLoader__.load({
       '.mt-conv-title b{font-size:13px;font-weight:600}',
       '.mt-conv-title span{display:block;font-size:11px;color:var(--dsw-alias-label-tertiary)}',
       '.mt-team-mark{width:26px;height:26px;border-radius:8px;display:inline-flex;place-items:center;background:var(--dsw-alias-bg-layer-2);color:var(--dsw-alias-label-emphasis, var(--dsw-alias-label-primary));flex:none;align-items:center;justify-content:center;border:.5px solid var(--dsw-alias-border-l2);font-size:12px}',
-      /* CHG-180（U4）：**空态居中**。
-       * 空态不是文档——它只有「一句话 + 一个命令 + 四个 0」。原来跟着 1400px 阅读列**左对齐**，
-       * 右侧留 700+px 空白，整页看起来像「只写了一半」。
-       *
-       * CHG-181（用户：「扩大范围，如红框范围」）：上一版把**根节点**收窄到 760px，
-       * 于是整个面板只占中间一条（红框那么大的一片被浪费）。改成：
-       * **面板根仍然铺满会话区**（红框范围 = `.mt-conv`），只有**内容**收窄居中（760px），
-       * 并且整块空态在面板里**上下也居中**——空态就该占满画布、内容落在正中间。 */
-      '.mt-conv-empty{justify-content:center;text-align:center}',
-      '.mt-conv-empty .mt-conv-head{justify-content:center;border-bottom:0;padding-bottom:0;width:100%;max-width:760px;margin-inline:auto}',
-      '.mt-conv-empty .mt-conv-title{justify-content:center;text-align:center}',
-      '.mt-conv-empty .mt-conv-body{align-items:center;gap:14px;text-align:center;width:100%;max-width:760px;margin-inline:auto}',
-      '.mt-conv-empty .mt-conv-cmd{justify-content:center}',
-      '.mt-conv-empty .mt-conv-stats{justify-content:center}',
+      /* CHG-180/181/182：**空态的内容列**。
+       * 三轮收敛（每轮都是用户看真机截图提的）：
+       *   CHG-180 内容和阅读列一样左对齐 → 右侧 700+px 空白，像「只写了一半」；
+       *   CHG-181 把根收窄到 760px 居中 → 面板只占中间一条（红框那片被浪费）；
+       *   **CHG-182（用户：「不是完全居中，是类似（记忆页）这样的方式，但是优化一下宽度，要更宽」）**：
+       *   面板铺满 + **内容左对齐**（不是居中），列宽按「记忆」页那种通用插件页口径给到
+       *   **1080px**（比 760 宽，比 1400 窄），标题行左对齐、操作按钮贴右，四张计数卡等分铺满整列。 */
+      '.mt-conv-empty{text-align:left}',
+      '.mt-conv-empty .mt-conv-head{justify-content:flex-start;border-bottom:0;padding-bottom:0;width:100%;max-width:1080px}',
+      '.mt-conv-empty .mt-conv-head > .mt-btn{margin-left:auto}',
+      '.mt-conv-empty .mt-conv-title{justify-content:flex-start;text-align:left}',
+      '.mt-conv-empty .mt-conv-body{align-items:stretch;gap:14px;text-align:left;width:100%;max-width:1080px}',
+      '.mt-conv-empty .mt-conv-cmd{justify-content:flex-start}',
+      '.mt-conv-empty .mt-conv-stats{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px}',
       /* CHG-107：会话页团队视图的真实数据面（概览计数 / 空态 / 成员名册 / 命令提示） */
       '.mt-conv-stats{display:flex;flex-wrap:wrap;gap:8px;padding:12px 0}',
       /* CHG-157：团队总览卡（对齐 AgentTeams 样例）——卡片容器 + 元信息/队长汇总/分段条/图例/叙述行 */
