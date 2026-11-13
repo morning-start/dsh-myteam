@@ -40,6 +40,7 @@ export type { MyTeamConfig } from './core/host/contract.ts'
  * 族实现落在 `src/host/<族>.ts`——入口层只减不增（A6 棘轮）。 */
 import { createMembersHandlers } from './host/members.ts'
 import { createMemberTaskHandlers, createTasksHandlers } from './host/tasks.ts'
+import { createPlanHandlers } from './host/plan.ts'
 import { leadToolDefs, memberToolDefs, type ToolDef } from './tools/defs.ts'
 // CHG-148（P1-6）：按工具名取完整结果契约（jsonOutput 双声明），不再用统一空 schema
 import { outputForTool } from './core/tools/output-contract.ts'
@@ -640,6 +641,31 @@ export class MyTeamHost implements MyTeamHostContract {
     cancelTask: (teamId, args, actor) => this.cancelTask(teamId, args, actor),
     batchTaskOp: (teamId, args, actor) => this.batchTaskOp(teamId, args, actor),
     createTasksBatch: (teamId, args, actor) => this.createTasksBatch(teamId, args, actor),
+  })
+  /**
+   * CHG-186（T155c）：计划族端点适配层（`src/host/plan.ts`）。
+   *
+   * 宿主面只声明这族**用到的**私有成员——私有方法改名 → 装配处编译报错。两个惰性 getter
+   * （`workspaceRoot` / `rolePaths`）在这里是**方法**：构造期取值会把「首次访问才解析」
+   * 提前，日志顺序会变。`services.has` / `contributionCatalog.roles` 是私有字段的只读
+   * 取值口；`readLedgerEvents` 是模块级函数透传（plan.ts 直接 import 回来会与 `host.ts`
+   * 成 value 环，arch-report 的 value 环会从 0 变 1）。
+   */
+  private readonly plan = createPlanHandlers({
+    commit: (teamId, draft) => this.commit(teamId, draft),
+    service: (teamId) => this.service(teamId),
+    hasService: (teamId) => this.services.has(teamId),
+    workspaceRoot: () => this.workspaceRoot,
+    rolePaths: () => this.rolePaths,
+    contributionRoles: () => this.contributionCatalog.roles,
+    presetCatalog: () => this.presetCatalog(),
+    roleCatalog: () => this.roleCatalog(),
+    resolveNewTeamId: (explicit, teamName) => this.resolveNewTeamId(explicit, teamName),
+    countClarifyRounds: (teamId) => this.countClarifyRounds(teamId),
+    spawnMember: (teamId, roleId, instanceName, overrides) => this.spawnMember(teamId, roleId, instanceName, overrides),
+    taskWithGateChain: (teamId, task) => this.taskWithGateChain(teamId, task),
+    resolveProposal: (teamId, args, actor) => this.resolveProposal(teamId, args, actor),
+    readLedgerEvents: (ledgerPath) => readLedgerEvents(ledgerPath),
   })
   /** CHG-186（T155b）：任务族**成员侧**适配层（同一文件的另一半，见上） */
   private readonly memberTasks = createMemberTaskHandlers({
@@ -1283,287 +1309,16 @@ export class MyTeamHost implements MyTeamHostContract {
     }
     try {
       switch (name) {
-        case 'myteam_submit_plan': {
-          // FR-11.2 七项硬校验先行（修订：原实现 team.created 先落账、校验失败无法回滚，
-          // 会在账本里留下"幽灵团队"；现在校验失败时零事件落账）。
-          // FIX-17（KI-2 实弹）：submit_plan 是"建新团队"语义，teamId 缺省不能走 defaultTeamId()
-          // （recent-mtime 会解析到别的活跃团队，账本落错地方）。改为显式 teamId 优先，
-          // 否则从团队名 slug 派生，与既有团队冲突时自动加 -N 后缀。
-          const newTeamId = this.resolveNewTeamId(args.teamId as string | undefined, String(args.teamName))
-          // CHG-70：同名团队已批准 → 拒绝重复提交（旧实现会落 team.created/plan.staged，
-          // 把 active 团队打回 draft 并覆盖名字）。改名走 myteam_update_team；重建先解散。
-          if (existsSync(resolveTeamLedgerPath(this.workspaceRoot, newTeamId))) {
-            const existing = this.service(newTeamId).projectionSnapshot
-            if (existing.state === 'active') {
-              return {
-                status: 'error',
-                code: 'MT_TEAM_STATE',
-                message: `team "${newTeamId}" already exists and is active; 改名用 myteam_update_team，重建请先 myteam_disband`,
-              }
-            }
-          }
-          // 块级遮蔽：分支内既有 teamId 引用（validatePlan/commit/payload）统一指向新团队 id
-          const teamId = newTeamId
-          const presetId = typeof args.presetId === 'string' && args.presetId.trim() ? args.presetId.trim() : ''
-          const preset = presetId ? this.presetCatalog().entries.find((entry) => entry.definition.id === presetId) : undefined
-          if (presetId && !preset) {
-            return { status: 'error', code: 'MT_VALIDATION', message: `team preset "${presetId}" not found (project/builtin)` }
-          }
-          const rosterIn = (args.roster ?? []) as { roleId: string; instanceName?: string; skills?: string[]; mcpAllowlist?: string[] }[]
-          // v2.13/CHG-36 预置团队：未显式给名册时按内置模板成团（标准三人组：队长+需求验证+开发+验收）；
-          // CHG-54：显式 presetId 时按项目/内置模板的 members 组队（队长隐式），成员可带技能/MCP 覆写。
-          const usingPresetRoster = rosterIn.length === 0
-          const roster = preset
-            ? [{ roleId: 'captain' }, ...preset.definition.members]
-            : usingPresetRoster ? presetTeamRoster('triad') : rosterIn
-          // 模板/名册引用的角色：全局与内置先复制进项目库（运行时只认项目层，R13）
-          const roleErrors: string[] = []
-          for (const entry of roster) {
-            if (entry.roleId === 'captain') continue
-            const catalogEntry = this.roleCatalog().find((item) => item.definition.id === entry.roleId)
-            if (!catalogEntry) {
-              roleErrors.push(`unknown role "${entry.roleId}"`)
-              continue
-            }
-            if (!readProjectRole(this.rolePaths.projectRolesDir, entry.roleId)) {
-              try {
-                copyToProject(this.rolePaths, entry.roleId, catalogEntry.origin, this.contributionCatalog.roles)
-              } catch (e) {
-                roleErrors.push(`role "${entry.roleId}": ${String((e as { message?: string }).message ?? e)}`)
-              }
-            }
-          }
-          if (roleErrors.length > 0) return { status: 'error', code: 'MT_VALIDATION', message: roleErrors.join('; ') }
-          // CHG-55：模板的看板列/泳道/门禁/任务类型落成团队级 team.config.json——
-          // 必须在 service(teamId) 首次创建之前写盘（TeamService 构造时读一次并缓存）。
-          // 只对"新团队"落盘：同 id 续提/已存在团队不覆盖既有配置（避免编辑正在跑的团队）。
-          const presetConfig = preset ? configOverrideFromPreset(preset.definition) : undefined
-          const isNewTeam = !this.services.has(teamId) && !existsSync(resolveTeamLedgerPath(this.workspaceRoot, teamId))
-          let configApplied: string[] | undefined
-          if (presetConfig && isNewTeam) {
-            writeTeamConfigRaw(this.workspaceRoot, teamId, presetConfig)
-            configApplied = Object.keys(presetConfig)
-          }
-          const tasksIn = (args.tasks ?? []) as { id?: string }[]
-          const svc0 = this.service(teamId)
-          /*
-           * FR-1.3（CHG-173）：taskPlanning='template' —— DAG 来源二选一的另一档。
-           * 队长没给任务（tasksIn 为空）且配置选了 template 时，按 `pipeline.stages`
-           * 生成**内置固定流水线模板任务组**（线性链：每阶段一任务，deps 串成一条）。
-           *
-           * 三条边界（诚实第一）：
-           *  ① 显式 tasks 永远优先——模板只补「队长没拆活」这一种空缺；
-           *  ② 生成的 AC / 交付物路径是**占位**（description 注明 + 结果 note 提醒编辑），
-           *     不假装这是一份想好的计划；路径走 archive 门禁时会如实 fail（落位校验），
-           *     队长编辑后即可通过——宁可 needs-human 也不放水；
-           *  ③ stages 为空或名册没有非队长角色 → 明确拒绝（MT_VALIDATION），
-           *     不静默回退 captain 模式（配置说了 template 就按 template 办）。
-           */
-          let templateNote: string | undefined
-          let tasksFinal = tasksIn
-          if (tasksIn.length === 0 && (svc0.effectiveConfig.taskPlanning ?? 'captain') === 'template') {
-            const stages = svc0.effectiveConfig.pipeline.stages
-            const workers = roster.filter((entry) => entry.roleId !== 'captain')
-            if (stages.length === 0 || workers.length === 0) {
-              return {
-                status: 'error',
-                code: 'MT_VALIDATION',
-                message: `taskPlanning='template' 需要 pipeline.stages 非空且名册含至少一个非队长角色（当前 stages=${stages.length}，非队长角色=${workers.length}）`,
-              }
-            }
-            const slugOf = (raw: string) => String(raw).toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '')
-            const used = new Set<string>()
-            const ids = stages.map((stage, i) => {
-              const base = `stage-${slugOf(String(stage)) || `task-${i + 1}`}`
-              let id = base
-              let n = 2
-              while (used.has(id)) { id = `${base}-${n}`; n += 1 }
-              used.add(id)
-              return id
-            })
-            tasksFinal = stages.map((stage, i) => ({
-              id: ids[i],
-              title: String(stage),
-              description: `模板流水线任务组（FR-1.3 taskPlanning:'template'）：阶段「${String(stage)}」，由配置自动生成——验收标准与交付物路径是占位，approve 前请按实际目标编辑。`,
-              acceptanceCriteria: [`「${String(stage)}」阶段完成：产出落位并通过门禁链（模板占位，请按实际目标修改）`],
-              deps: i === 0 ? [] : [ids[i - 1]],
-              requiredRole: workers[i % workers.length].roleId,
-              deliverableSpec: { path: `docs/${ids[i]}.md`, producer: workers[i % workers.length].roleId, reviewer: 'captain', archiver: 'captain' },
-            }))
-            templateNote = `taskPlanning='template'：已按 pipeline.stages 生成 ${ids.length} 个模板任务（线性链 ${ids.join(' → ')}）；AC 与交付物路径是占位，approve 前请用 myteam_edit_task 调整（FR-1.3）。`
-          }
-          const tasksMap: Record<string, Record<string, unknown>> = {}
-          for (let i = 0; i < tasksFinal.length; i++) tasksMap[String(tasksFinal[i].id ?? `task-${i + 1}`)] = tasksFinal[i] as Record<string, unknown>
-          const rosterRoles = [...new Set([...roster.map((r0) => r0.roleId), 'captain'])]
-          const planCheck = validatePlan(tasksMap as never, svc0.effectiveConfig.limits.maxTasks, rosterRoles)
-          if (!planCheck.ok) {
-            return {
-              status: 'error',
-              code: 'MT_VALIDATION',
-              message: planCheck.errors.map((e) => `task ${e.taskId}: ${e.message}`).join('; '),
-            }
-          }
-          // 澄清轮先落账（FR-1.6：≤N 轮硬终止计数在账本）
-          const clarify = args.clarify as { questions?: unknown[] } | undefined
-          if (clarify?.questions && clarify.questions.length > 0) {
-            const round = this.countClarifyRounds(teamId) + 1
-            const maxRounds = svc0.effectiveConfig.clarify.maxRounds
-            if (round > maxRounds) {
-              return { status: 'clarify-limit', message: `澄清已达 ${maxRounds} 轮硬终止；请用默认值+假设标注出草稿（FR-1.6）` }
-            }
-            const rc = this.commit(teamId, { actor, type: 'plan.clarify', payload: { teamId, questions: clarify.questions, round } })
-            if (!rc.ok) return { status: 'error', code: rc.code, message: rc.message }
-          }
-          const r1 = this.commit(teamId, { actor, type: 'team.created', payload: { teamId, name: args.teamName, goal: args.goal, roster } })
-          if (!r1.ok) return { status: 'error', code: r1.code, message: r1.message }
-          const r2 = this.commit(teamId, { actor, type: 'plan.staged', payload: { teamId, planId: `plan-${Date.now()}`, roster, tasks: tasksFinal, ...(preset ? { presetId: preset.definition.id } : {}) } })
-          if (!r2.ok) return { status: 'error', code: r2.code, message: r2.message }
-          /*
-           * CHG-163（docs/10 KI-9 / FR-17.4 沉淀时机①）：**onboarding 采集钩子**。
-           *
-           * 为什么放在返回里而不是「顺手写一条知识」：知识库是**策展制**（成员无写入口、
-           * 队长也只能提案，采纳是人的动作）。规划轮能做的只有「提醒队长去采集」，
-           * 替用户拍板等于把策展制偷偷改成自动记忆（TF ADR-0009 反例）。
-           *
-           * 触发条件（两条同时满足才提示，否则每次提计划都唠叨）：
-           *  ① 知识库**一条条目都没有**（config/knowledge/ 为空）——已有沉淀说明采集过了；
-           *  ② 本团队账本里**没有** `knowledge.proposed`——有人提过（哪怕还没采纳）就不再催。
-           * 口径选「账本事件数」而不是「条目数」，是因为提案被驳回后条目仍为空：
-           * 只看条目会反复催同一个已被否决的提案（R27 的唠叨反模式）。
-           *
-           * 非阻塞：多读一次知识库目录 + 一次团队账本（成团时账本只有个位数事件）；
-           * 读不到就静默不提示——提示是附加信息，不是契约，绝不因它让 submit_plan 失败。
-           */
-          let knowledgeHint: string | undefined
-          try {
-            const kbEmpty = listKnowledge(knowledgeDirOf(this.workspaceRoot)).length === 0
-            const proposedBefore = readLedgerEvents(resolveTeamLedgerPath(this.workspaceRoot, teamId)).events
-              .some((e) => e.type === 'knowledge.proposed')
-            if (kbEmpty && !proposedBefore) {
-              knowledgeHint =
-                'onboarding 采集（FR-17.4 沉淀时机①）：本团队知识库还是空的。规划轮请先做一次采集——' +
-                '采什么：团队目标、领域约束、用户明确说过的边界与偏好（「既非项目自带、也非协作状态」的团队级理解）；' +
-                '怎么采：逐条起草后用 myteam_propose_knowledge 提案，**每条必须带证据**（task:/file:/session:/seq: 指针）；' +
-                '谁定夺：只提案不入库，用户确认后由队长 myteam_adopt_knowledge 采纳才写进 config/knowledge/。' +
-                '**不要凭印象编造条目**——没有证据就不提。'
-            }
-          } catch {
-            /* 读知识库/账本失败不阻断提交（提示是附加信息，不是契约） */
-          }
-          return {
-            status: 'staged',
-            teamId,
-            roster,
-            ...(preset ? { presetId: preset.definition.id, presetName: preset.definition.name } : {}),
-            ...(presetConfig && configApplied ? { configApplied } : {}),
-            ...(knowledgeHint ? { knowledgeHint } : {}),
-            ...(templateNote ? { templateNote } : {}),
-            note:
-              '草稿已暂存（无成员会话产生）；等待人工 Approve & Run / Revise / Discard' +
-              (templateNote ? `；${templateNote}` : '') +
-              (preset
-                ? `；已应用团队模板「${preset.definition.name}」（队长 + ${preset.definition.members.length} 名队员）` +
-                  (configApplied ? `；配置段落已落团队：${configApplied.join('/')}` : '')
-                : usingPresetRoster ? '；未显式提供名册，已应用预置团队「标准三人组」（队长+需求验证员+开发者+验收员）' : ''),
-          }
-        }
-        case 'myteam_approve_plan': {
-          // 守卫：团队已 active（计划已批准过）→ 拒绝二次 approve，防止任务重复入库
-          if (this.service(teamId).projectionSnapshot.state === 'active') {
-            return { status: 'error', code: 'MT_VALIDATION', message: `plan already approved (teamId: ${teamId})` }
-          }
-          // FIX-11：先确认账本里有 staged 计划再落 plan.approved——否则"Approve & Run"
-          // 会静默成功而 Run（自动召唤）无声跳过（t23-1 实弹回归暴露）。
-          const stagedPlan = [...readLedgerEvents(resolveTeamLedgerPath(this.workspaceRoot, teamId)).events]
-            .reverse()
-            .find((e) => e.type === 'plan.staged')
-          if (!stagedPlan) {
-            return { status: 'error', code: 'MT_VALIDATION', message: `no staged plan to approve (teamId: ${teamId})` }
-          }
-          const r = this.commit(teamId, { actor, type: 'plan.approved', payload: { teamId, planId: String(args.planId ?? 'plan-latest') } })
-          if (!r.ok) return { status: 'error', code: r.code, message: r.message }
-          // FIX-9（KI-2 实弹）：Approve & Run 的 Run 由执行面落地——队长 turn 在提交计划后已结束，
-          // 账本事件不会唤醒任何 LLM（wake 管线只覆盖成员四因果）。批准后按名册自动召唤成员
-          // （跳过 captain——队长是 preset 会话本身），成员 followup 引导首轮自治 claim。
-          // revise/discard 仍需队长改计划，走收件箱提醒（M1 面板可见，队长下次被 @ 时处理）。
-          const staged = [...readLedgerEvents(resolveTeamLedgerPath(this.workspaceRoot, teamId)).events]
-            .reverse()
-            .find((e) => e.type === 'plan.staged')
-          const roster = (staged?.payload?.roster as Array<{ roleId: string; instanceName?: string; skills?: string[]; mcpAllowlist?: string[] }> | undefined) ?? []
-          const spawned: string[] = []
-          const spawnErrors: string[] = []
-          for (const entry of roster) {
-            if (entry.roleId === 'captain') continue
-            const out = this.spawnMember(teamId, entry.roleId, entry.instanceName, {
-              skills: entry.skills,
-              mcpAllowlist: entry.mcpAllowlist,
-            })
-            if (out.status === 'spawned') {
-              spawned.push(String(out.memberId))
-              // 上岗引导由 spawnMember 在 handle 到手后发出（FIX-14 内聚）
-            } else {
-              spawnErrors.push(`${entry.instanceName ?? entry.roleId}: ${String((out as any).message ?? (out as any).code ?? 'spawn failed')}`)
-            }
-          }
-          // FIX-13（KI-2 实弹）：plan.staged 的任务只存在于计划 payload（fold 只置 state=draft，
-          // 任务不进 tasksMap）——批准后成员上岗看到空板、无任务可 claim，"Run"断在任务上板。
-          // 成员就位后把 staged 计划的任务逐条入库（task.created → backlog；必须先 spawn——
-          // task.created 领域校验 rosterRoles 以投影成员角色为准，空投影会走草稿分支误拒）。
-          //
-          // CHG-169（FIX-13 增强）：**保留计划 id + deps 重映射**。旧实现无条件重编号 `task-N`，模板任务组
-          // （stage-plan → stage-dev → …）与显式计划里带 deps 的任务会全部悬空——dep 指向
-          // 计划里的 id，入库后不存在 → task.created 领域校验拒绝（DAG 断）。现在：
-          // 计划 id 空闲 = 原样保留；被占用 = 重编号 task-N 兜底；deps 走 plan-id → final-id 映射。
-          const stagedTasks = (stagedPlan.payload?.tasks as Array<Record<string, unknown>> | undefined) ?? []
-          const projNow = this.service(teamId).projectionSnapshot.tasks
-          const taken = new Set(Object.keys(projNow))
-          let maxN = 0
-          for (const id of Object.keys(projNow)) {
-            const mm = /^task-(\d+)$/.exec(id)
-            if (mm) maxN = Math.max(maxN, Number(mm[1]))
-          }
-          const planIdOf = (t: Record<string, unknown>) => (typeof t.id === 'string' && t.id.trim() ? t.id.trim() : '')
-          const idMap = new Map<string, string>()
-          for (const t of stagedTasks) {
-            const want = planIdOf(t)
-            if (!want) continue
-            if (!taken.has(want)) { idMap.set(want, want); taken.add(want); continue }
-            let finalId = `task-${maxN + 1}`
-            maxN += 1
-            while (taken.has(finalId)) { finalId = `task-${maxN + 1}`; maxN += 1 }
-            idMap.set(want, finalId)
-            taken.add(finalId)
-          }
-          const createdTasks: string[] = []
-          const createErrors: string[] = []
-          for (const t of stagedTasks) {
-            const want = planIdOf(t)
-            const finalId = want ? (idMap.get(want) ?? `task-${(maxN += 1)}`) : `task-${(maxN += 1)}`
-            const deps = Array.isArray(t.deps) ? (t.deps as unknown[]).map((d) => idMap.get(String(d)) ?? String(d)) : undefined
-            const taskInput = { ...t, ...(deps !== undefined ? { deps } : {}) }
-            const r2 = this.commit(teamId, { actor, type: 'task.created', payload: { teamId, taskId: finalId, task: this.taskWithGateChain(teamId, taskInput) } })
-            if (r2.ok) createdTasks.push(finalId)
-            else createErrors.push(`create_task ${String(t.taskKey ?? finalId)}: ${r2.message}`)
-          }
-          return {
-            status: 'approved',
-            teamId,
-            note: '成员召唤经 myteam_spawn_member 逐个执行（名册 → spawn）；staged 任务已入库上板',
-            spawned,
-            ...(createdTasks.length > 0 ? { createdTasks } : {}),
-            ...(createErrors.length > 0 ? { createErrors } : {}),
-            ...(spawnErrors.length > 0 ? { spawnErrors } : {}),
-          }
-        }
-        case 'myteam_revise_plan': {
-          const r = this.commit(teamId, { actor, type: 'plan.revised', payload: { teamId, planId: String(args.planId ?? 'plan-latest'), note: args.note } })
-          return r.ok ? { status: 'revised' } : { status: 'error', code: r.code, message: r.message }
-        }
-        case 'myteam_discard_plan': {
-          if (args.confirm !== true) return { status: 'confirm-required', message: 'Discard 是两段确认操作：草稿将归档且不会自动重建，请带 confirm=true 重调' }
-          const r = this.commit(teamId, { actor, type: 'plan.discarded', payload: { teamId, planId: String(args.planId ?? 'plan-latest') } })
-          return r.ok ? { status: 'discarded' } : { status: 'error', code: r.code, message: r.message }
-        }
+        /* CHG-186（T155c）：计划族（提交 / 批准 / 修订 / 丢弃）实现已搬到 `src/host/plan.ts`。
+         * 这里只转发——逻辑/顺序/默认值一个都没改（纯结构重构，行为零变化）。 */
+        case 'myteam_submit_plan':
+          return this.plan.submit(teamId, args, actor)
+        case 'myteam_approve_plan':
+          return this.plan.approve(teamId, args, actor)
+        case 'myteam_revise_plan':
+          return this.plan.revise(teamId, args, actor)
+        case 'myteam_discard_plan':
+          return this.plan.discard(teamId, args, actor)
         /* CHG-186（T155b）：任务族**队长侧**实现已搬到 `src/host/tasks.ts`。这里只转发——
          * 逻辑/顺序/默认值一个都没改（纯结构重构，行为零变化）。 */
         case 'myteam_create_task':
@@ -1657,9 +1412,8 @@ export class MyTeamHost implements MyTeamHostContract {
             note: `归档已落盘：${archived.relativeDir}（${archived.files.length} 个文件，只读可查）`,
           }
         }
-        case 'myteam_resolve_proposal': {
-          return this.resolveProposal(teamId, args, actor)
-        }
+        case 'myteam_resolve_proposal':
+          return this.plan.resolveProposal(teamId, args, actor)
         case 'myteam_adopt_knowledge': {
           // 策展门（FR-17.4）：提案必须存在账本；adopted 落库带归因
           const draftId = String(args.draftId)

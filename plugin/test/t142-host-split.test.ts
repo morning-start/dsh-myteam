@@ -20,6 +20,7 @@
  *
  * T155b 进度：成员族（`src/host/members.ts`）搬完 → 6,160；任务族（`src/host/tasks.ts`）
  * 搬完 → **5,961**（本次压到 5,961，净减 202 行）。
+ * T155c 进度：计划族（`src/host/plan.ts`）搬完 → **5,715**（本次压到 5,715，净减 246 行）。
  */
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
@@ -31,7 +32,7 @@ const here = dirname(fileURLToPath(import.meta.url))
 const read = (p: string) => readFileSync(join(here, '..', p), 'utf8')
 
 /** 入口层行数棘轮基线（CHG-186 拆完实测；只减不增） */
-const HOST_LINES_LIMIT = 5961
+const HOST_LINES_LIMIT = 5715
 
 test('t142-1: 契约独立成文件，remote/service.ts 不再 import host.ts', () => {
   const service = read('src/remote/service.ts')
