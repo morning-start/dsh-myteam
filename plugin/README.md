@@ -51,7 +51,7 @@ npx tsc -p tsconfig.json --noEmit
 | | `core/scheduler/fold.ts` | 账本事件 → `TeamProjection` 逐型折叠，可从零重放重建（纯函数） |
 | | `core/scheduler/wake.ts` | 四种因果唤醒判定（assign / message / resume / revoke）→ `agent.followup()`；无事件即零请求 |
 | | `core/scheduler/recovery.ts` | archive 门禁的落位校验 + 重启后的有序恢复表 |
-| **D3 成员** | `core/members/member-setup.ts` | `setup(agentCtx)` 作用域组装：9 个成员工具 + `tools.restrict` 收窄 + 角色提示词 + 技能 provider |
+| **D3 成员** | `core/members/member-setup.ts` | `setup(agentCtx)` 作用域组装：10 个成员工具 + `tools.restrict` 收窄 + 角色提示词 + 技能 provider |
 | | `core/members/capability-guard.ts` | 技能 / MCP allowlist 的执行面（MCP 真收窄；技能走 deny-by-shadow，无 deny API） |
 | | `core/members/memory.ts` | 成员记忆区（`memory.md` + `notes/`）的幂等播种与事后审计 |
 | | `src/smoke.ts` | 动态冒烟探针（六项），需真实宿主会话，**不进 CI** |
@@ -89,26 +89,29 @@ npx tsc -p tsconfig.json --noEmit
 | `host-workspace.ts` | 旧导出名兼容层（`ensureWorkplaceDirs` 等），实现已收口到 `core/workspace/layout.ts` |
 | `host.js` | 遗留 import 路径的薄转发（仅 `test/t1-workplace.test.js` 用），自身无逻辑 |
 
-## 工具面（63 个 `myteam_*`）
+## 工具面（68 个 `myteam_*`）
 
 定义在 `src/tools/defs.ts`，纯数据；写操作 execute 全部走 `TeamService.commit()`（单写者管线），读走投影。两层注册（ADR-003）：Lead 工具挂 **preset 层**（仅队长会话可见），成员工具挂**成员 setup 作用域**（仅成员会话可见）。下表省略 `myteam_` 前缀。
 
-| 分组 | 队长 54 个 | 成员 9 个 |
+| 分组 | 队长 58 个 | 成员 10 个 |
 |---|---|---|
 | 计划与团队 | `submit_plan` `approve_plan` `revise_plan` `discard_plan` `update_team` `disband` | — |
 | 团队库与快照 | `list_teams` `get_team` `copy_team` `publish_team` `export_team` `import_team` | — |
 | 任务 | `create_task` `create_tasks` `edit_task` `assign_task` `participate_task` `reassign_task` `revoke_attempt` `rescope_task` `cancel_task` `batch_task_op` | `get_task` `list_tasks` `claim_task` `update_task` |
+| **任务读面（CHG-200）** | `read_task` `read_board` | — |
 | 成员与消息 | `spawn_member` `release_member` `message` `interrupt` | `peer_message` `wait_for_change` |
-| 门禁与提案 | `review_task` `resolve_proposal` | `propose_task_change` `escalate_task` |
+| 门禁与提案 | `review_task` `resolve_proposal` | `propose_task_change` `escalate_task` **`submit_review`（CHG-200）** |
 | 角色与预设 | `list_roles` `create_role` `update_role` `delete_role` `copy_role` `publish_role` `set_project_role` `apply_roles` `list_presets` `save_preset` `copy_preset` `delete_preset` | — |
 | 技能与工具 | `list_skills` `create_skill` `create_tool` | — |
-| 知识 | `propose_knowledge` `adopt_knowledge` | `read_knowledge` |
+| 知识 | `propose_knowledge` `adopt_knowledge` `read_knowledge_entry`（CHG-200） | `read_knowledge` |
 | 图谱与观测 | `get_task_graph` `get_tokens` `get_audit` `read_session` | — |
 | 会话 | `handoff` | — |
 | 插件贡献 | `list_contributions` `reload_contributions` | — |
 | 配置 | `save_team_config` `reset_team_config` | — |
 
 几条贯穿全表的口径：任务 / 团队 / 知识类写操作都要 `teamId`；角色与预设是**配置资产**，不带 `teamId`（它们不属于任何团队）。成员侧更新必须带 `attemptId`（陈旧即拒）；`done` 申报必须附证据块（`kind=commands` 或 `kind=na`）；两段确认型操作第一次不带 `confirm` 时只返回影响面，不落账。
+
+**读面与检查分工（CHG-200，用户定案）**：队长读面 `read_task` / `read_board` / `read_knowledge_entry` **只读、不含 `attemptId`**（写凭据只发给当前持有人）、按最新截断并如实报 `omitted`（限界读 NFR-7.6）；两个作用域**零重名**（不复用成员侧 `get_task` / `list_tasks` / `read_knowledge`，CHG-86 的教训）。任务检查由成员用 `submit_review` 自己提交（审查者 = 调用者，强制交叉审查）；队长只做任务创建 / 分发 / 同步与**成果检查**。
 
 ## 装载形态（`cordis.patch.yml`）
 
@@ -151,13 +154,41 @@ node tools/check-drift.mjs    # 退出码 0 = MISMATCH: 0
 
 它直接复用 `build-lib.mjs` 导出的 `compileSource` —— 编译口径只有一个来源，不会再出现「两边各写一份实现、永远差一行」的 100% 假阳性。
 
+## 客户端构建（`scripts/build-client.mjs`）
+
+客户端**源码是 `client/src/*.js` 的 46 个片段**，`client/client.js` 是构建产物（13,343 行 / 912 KB）。
+
+为什么不用 ESM 或打包器：
+
+| 约束 | 后果 |
+|---|---|
+| 宿主 `__ModuleLoader__` 只给 `react` / `react/jsx-runtime` 这类**裸模块名** | 没有跨文件 `require` |
+| `client.js` 被 `new Function('window','document',source)` 当**脚本**执行 | 不能用 `import` / `export` |
+| 131 个测试断言 `source.includes('...')` | 任何转译（压缩 / 重命名）都会让断言失效 |
+
+所以片段**逐字节保留**，构建 = 按文件名排序纯文本拼接。
+
+```bash
+cd plugin
+npm run build:client     # 片段 → client/client.js
+npm run check:client     # 校验产物与片段一致（CI 用，退出码 0 = 一致）
+npm run bundle           # build:client + build:lib（打包前必须跑）
+```
+
+两条纪律：
+
+- **不要直接改 `client/client.js`** —— 下次构建会被覆盖；改 `client/src/*.js`。
+- **依赖方向单向**：`00 引导 → 10 词条 → 20 RPC → 30 原语 → 40 样式 → 50-69 功能组件 → 70-79 组合 → 90 注册`。片段只能引用更早片段声明的名字，由 `node tools/check-client-arch.mjs` 守（**棘轮**：当前 9 处 TDZ + 12 处 hoisting 历史债，只许降不许升）。
+
+片段清单与拆分层级见 [`client/src/README.md`](client/src/README.md)。
+
 ## 测试
 
 ```bash
 cd plugin && npm test
 ```
 
-- `test/` 下 124 个测试文件；**条数以 `npm test` 实际输出为准**（当前基线 913 条；增删测试后不要抄旧数字）。
+- `test/` 下 131 个测试文件；**条数以 `npm test` 实际输出为准**（当前基线 950 条；增删测试后不要抄旧数字）。
 - 门禁型测试不是装饰：`t42`（src↔lib 指纹）、`t80`（构建三道闸）、`t81`（错误码双向锁死）、`t76`（贡献契约）、`t137`（分层与写盘出口，见 `tools/check-architecture.mjs`）都在「实现与声明分叉」时变红。
 - 需要真实宿主会话的探针（`src/smoke.ts`，CHG-174 从 `core/members/` 移出入口层）不在 CI 内，按文件头注释在插件 dev profile 里跑。
 

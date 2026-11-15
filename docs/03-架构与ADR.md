@@ -87,7 +87,7 @@
 ### ADR-003 队长会话 = team preset 行，成员工具用 preset 载体 + setup 双层注入
 - 状态：已接受（2026-10-25，依据 T0-⑤）
 - 背景：CHG-12/13 定稿队长预设化（唯一团队入口）。preset 是声明式 Cordis 插件行，工具注册有全局层与 agent 作用域两层。
-- 决策：①插件 bundle patch 同时声明 host 行与 `myteam-captain` preset 行；preset 的 plugins[] 挂 myteam 工具行 + 队长提示词 section + create-role 技能；②成员工具（9 个）在成员 setup 作用域内经 `agentCtx.tools.register()` 注册——同一工具定义函数复用，注册层不同可见性即不同（Lead 全集 22 个在 preset 层，成员 9 个在 agent 层）；③成员业务工具收窄用 `agentCtx.tools.restrict(allowMask)`，掩码按角色 allow 白名单生成（9 团队工具永不入掩码 deny 名单——C5 硬边界在掩码生成函数中断言）；**CHG-58 起**成员技能/MCP 追加运行时硬隔离（技能同名占位屏蔽 + `tools.restrict({ deny })` + 执行期 guard，见 docs/04 §1.2e）。
+- 决策：①插件 bundle patch 同时声明 host 行与 `myteam-captain` preset 行；preset 的 plugins[] 挂 myteam 工具行 + 队长提示词 section + create-role 技能；②成员工具（10 个）在成员 setup 作用域内经 `agentCtx.tools.register()` 注册——同一工具定义函数复用，注册层不同可见性即不同（Lead 全集 22 个在 preset 层，成员 9 个在 agent 层）；③成员业务工具收窄用 `agentCtx.tools.restrict(allowMask)`，掩码按角色 allow 白名单生成（9 团队工具永不入掩码 deny 名单——C5 硬边界在掩码生成函数中断言）；**CHG-58 起**成员技能/MCP 追加运行时硬隔离（技能同名占位屏蔽 + `tools.restrict({ deny })` + 执行期 guard，见 docs/04 §1.2e）。
 - 备选方案：①全部工具注册在全局层 + 运行时 guard 拒绝越权调用——否：工具 schema 对模型可见性失控（成员看到 Lead 工具诱导误用），token 面浪费（NFR-7.4 违约）；②两套工具定义——否：schema 漂移风险。
 - 放弃原因：preset 层 + agent 层是宿主官方可见性模型（T0-⑤），最小机制实现 NFR-7.4。
 - 何时重构：若宿主 preset 支持 per-session 工具覆写（未来能力），成员工具可迁到 preset 子行。
