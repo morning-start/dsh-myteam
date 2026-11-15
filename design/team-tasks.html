@@ -32,7 +32,7 @@
     <nav class="dsh-nav" aria-label="选项栏">
       <a href="#"><svg class="icon icon-18"><use href="icons.svg#i-puzzle"></use></svg><span class="lbl">插件</span></a>
       <a href="#"><svg class="icon icon-18"><use href="icons.svg#i-clock"></use></svg><span class="lbl">自动化任务</span></a>
-      <a href="shell.html" aria-current="page"><svg class="icon icon-18"><use href="icons.svg#i-people"></use></svg><span class="lbl">myteam</span></a>
+      <a href="global.html" aria-current="page"><svg class="icon icon-18"><use href="icons.svg#i-people"></use></svg><span class="lbl">myteam</span></a>
       <a href="#"><svg class="icon icon-18"><use href="icons.svg#i-grid"></use></svg><span class="lbl">更多</span></a>
     </nav>
     <div class="dsh-sec">
@@ -64,10 +64,7 @@
     <!-- ══ 面板顶栏（作用域切换）══ -->
     <header class="panel-bar">
       <b class="panel-name">myteam</b>
-      <div class="seg" role="group" aria-label="作用域">
-        <a href="global.html" aria-pressed="false">全局</a>
-        <a href="shell.html" aria-pressed="true">项目</a>
-      </div>
+      <span class="scope-label" title="这是当前会话所属项目的视图；全局资产在左侧侧边栏页">项目</span>
       <button class="icon-btn" aria-label="刷新面板"><svg class="icon icon-16"><use href="icons.svg#i-refresh"></use></svg></button>
     </header>
 
@@ -110,13 +107,13 @@
           <button aria-pressed="false">主责 11</button>
           <button aria-pressed="false">协作 1</button>
         </div>
-        <span style="font-size:12px;color:var(--muted);margin-left:auto">本队队员分配在任务详情里改</span>
+        <span style="font-size:12px;color:var(--muted);margin-left:auto">队员分配在团队内管理</span>
       </div>
 
       <div class="sec" style="padding:4px 12px;margin-bottom:var(--s4)">
         <a class="trow" href="detail.html">
           <span class="tid num">t7</span><span class="tt">抽结算服务边界与接口草案</span>
-          <span class="chip run"><span class="shape run"></span>主责</span>
+          <span class="mini-chip team">主责</span>
           <span class="chip idle"><span class="shape idle"></span>进行中</span>
           <span class="who"><span class="mini-chip num">implementer</span></span>
           <span class="mini-chip team coop">协作 · 插件 v0.2</span>
@@ -124,14 +121,14 @@
         </a>
         <a class="trow" href="detail.html">
           <span class="tid num">t6</span><span class="tt">结算页 UI 迁移到模块包</span>
-          <span class="chip run"><span class="shape run"></span>主责</span>
+          <span class="mini-chip team">主责</span>
           <span class="chip idle"><span class="shape idle"></span>进行中</span>
           <span class="who"><span class="mini-chip num">implementer-2</span></span>
           <svg class="icon icon-14 chev"><use href="icons.svg#i-chevron-right"></use></svg>
         </a>
         <a class="trow" href="detail.html">
           <span class="tid num">t4</span><span class="tt">替换调用点并跑通 4 条冒烟</span>
-          <span class="chip run"><span class="shape run"></span>主责</span>
+          <span class="mini-chip team">主责</span>
           <span class="chip gate"><span class="shape gate"></span>门禁</span>
           <span class="who"><span class="mini-chip num">implementer</span><span class="mini-chip num">acceptor</span></span>
           <span class="mini-chip team coop">协作 · 插件 v0.2</span>
@@ -139,31 +136,31 @@
         </a>
         <a class="trow" href="detail.html">
           <span class="tid num">t3</span><span class="tt">移除旧结算组件目录</span>
-          <span class="chip run"><span class="shape run"></span>主责</span>
+          <span class="mini-chip team">主责</span>
           <span class="chip gate"><span class="shape gate"></span>门禁</span>
           <span class="who"><span class="mini-chip num">req-validator</span></span>
           <svg class="icon icon-14 chev"><use href="icons.svg#i-chevron-right"></use></svg>
         </a>
         <a class="trow" href="detail.html">
           <span class="tid num">t5</span><span class="tt">旧调用点替换与灰度开关</span>
-          <span class="chip run"><span class="shape run"></span>主责</span>
+          <span class="mini-chip team">主责</span>
           <span class="chip idle"><span class="shape idle"></span>就绪</span>
           <span class="who"><span class="mini-chip num">reviewer</span></span>
           <svg class="icon icon-14 chev"><use href="icons.svg#i-chevron-right"></use></svg>
         </a>
         <a class="trow" href="detail.html">
           <span class="tid num">t8</span><span class="tt">补 12 条结算回归用例</span>
-          <span class="chip run"><span class="shape run"></span>主责</span>
+          <span class="mini-chip team">主责</span>
           <span class="chip idle"><span class="shape idle"></span>就绪</span>
           <span class="who"><span class="mini-chip num">req-validator</span></span>
           <svg class="icon icon-14 chev"><use href="icons.svg#i-chevron-right"></use></svg>
         </a>
         <a class="trow" href="detail.html">
           <span class="tid num">v2</span><span class="tt">锁定 v0.2 对外契约基线</span>
-          <span class="chip idle"><span class="shape idle"></span>协作</span>
+          <span class="mini-chip team coop">协作</span>
           <span class="chip idle"><span class="shape idle"></span>进行中</span>
           <span class="who"><span class="mini-chip num">implementer</span></span>
-          <span class="mini-chip team coop">主责 · 插件 v0.2</span>
+          <span class="mini-chip team">主责 · 插件 v0.2</span>
           <svg class="icon icon-14 chev"><use href="icons.svg#i-chevron-right"></use></svg>
         </a>
         <a class="trow" href="board.html">

@@ -23,7 +23,7 @@
     <nav class="dsh-nav" aria-label="选项栏">
       <a href="#"><svg class="icon icon-18"><use href="icons.svg#i-puzzle"></use></svg><span class="lbl">插件</span></a>
       <a href="#"><svg class="icon icon-18"><use href="icons.svg#i-clock"></use></svg><span class="lbl">自动化任务</span></a>
-      <a href="shell.html" aria-current="page"><svg class="icon icon-18"><use href="icons.svg#i-people"></use></svg><span class="lbl">myteam</span></a>
+      <a href="global.html" aria-current="page"><svg class="icon icon-18"><use href="icons.svg#i-people"></use></svg><span class="lbl">myteam</span></a>
       <a href="#"><svg class="icon icon-18"><use href="icons.svg#i-grid"></use></svg><span class="lbl">更多</span></a>
     </nav>
     <div class="dsh-sec">
@@ -55,10 +55,7 @@
     <!-- ══ 面板顶栏（宿主面板级常驻）══ -->
     <header class="panel-bar">
       <b class="panel-name">myteam</b>
-      <div class="seg" role="group" aria-label="作用域">
-        <a href="global.html" aria-pressed="false">全局</a>
-        <a href="shell.html" aria-pressed="true">项目</a>
-      </div>
+      <span class="scope-label" title="这是当前会话所属项目的视图；全局资产在左侧侧边栏页">项目</span>
       <button class="icon-btn" aria-label="刷新面板"><svg class="icon icon-16"><use href="icons.svg#i-refresh"></use></svg></button>
     </header>
         <!-- ══ 团队头（真实结构：← 全局 · 名称/ID · 状态 · 描述 · 行内统计 · 右侧动作）══ -->
@@ -85,7 +82,7 @@
     <!-- 背景：设置页 -->
     <div class="page" aria-hidden="true" style="max-width:1000px">
       <div class="page-head">
-        <div><h2>团队设置</h2><p>这里的改动写入 .team-workplace/config/team.config.json。</p></div>
+        <div><h2>团队设置</h2><p>这里的改动写入 .dsh-myteam/config/team.config.json。</p></div>
       </div>
       <div class="rows">
         <div class="row"><div class="row-main"><div class="row-title">团队规模</div></div><span class="readonly-val">硬上限 6</span></div>
@@ -110,27 +107,28 @@
           <div class="impact" id="disbandImpact">
             <b>解散后的影响面</b>
             <ul>
-              <li><b>5 个角色</b>将被排空后释放，包括正在跑 t7、t6 的两名</li>
-              <li><b>8 个未完成任务</b>转为 blocked，不会自动续跑</li>
-              <li>账本与 token 记录归档至 <span class="num">archive/</span>，只读可查，但不能再启动</li>
+              <li><b>5 个在册实例</b>将被排空后释放，包括正在跑 t7、t6 的两名</li>
+              <li><b>未完成的 8 个任务</b>按当前状态冻结进快照，<b>不会自动转 blocked、也不会自动续跑</b></li>
+              <li>账本与产物作为只读快照落到 <span class="num">history/archive/&lt;teamId&gt;/</span>，可在归档回放里查看，<b>不能重新启动</b></li>
               <li>各实例的私有空间（工作笔记、临时文件）<b>会被删除</b></li>
             </ul>
           </div>
 
           <div class="form-row">
             <label for="confirmInput">输入团队 ID 确认</label>
-            <input class="input num" id="confirmInput" value="t-8f3a2c" style="flex:1">
+            <!-- CHG-195（P0-4）：原来把 teamId 预填进 value，第二段门禁等于没有 —— 一进来就能点。 -->
+            <input class="input num" id="confirmInput" placeholder="t-8f3a2c" autocomplete="off" spellcheck="false" style="flex:1">
           </div>
           <p style="font-size:12px;color:var(--muted);line-height:1.7;margin-top:-6px">
-            如果你只是想让团队停下来，用「归档」就好——归档保留全部数据，之后还能重新打开。
+            结束是单向的：归档是<b>只读快照</b>，不会重新启动，也不能恢复成运行中的团队。想先看看归档长什么样，去<a href="archive.html" style="color:var(--primary-deep)">归档回放</a>。
           </p>
         </div>
 
         <div class="dialog-foot">
-          <button class="btn ghost" style="margin-right:auto">改用归档</button>
+          <a class="btn ghost" href="archive.html" style="margin-right:auto">先看看归档</a>
           <div class="right">
             <button class="btn">取消</button>
-            <button class="btn danger">确认解散</button>
+            <button class="btn danger" disabled>确认解散</button>
           </div>
         </div>
       </div>

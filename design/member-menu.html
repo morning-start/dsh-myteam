@@ -23,7 +23,7 @@
     <nav class="dsh-nav" aria-label="选项栏">
       <a href="#"><svg class="icon icon-18"><use href="icons.svg#i-puzzle"></use></svg><span class="lbl">插件</span></a>
       <a href="#"><svg class="icon icon-18"><use href="icons.svg#i-clock"></use></svg><span class="lbl">自动化任务</span></a>
-      <a href="shell.html" aria-current="page"><svg class="icon icon-18"><use href="icons.svg#i-people"></use></svg><span class="lbl">myteam</span></a>
+      <a href="global.html" aria-current="page"><svg class="icon icon-18"><use href="icons.svg#i-people"></use></svg><span class="lbl">myteam</span></a>
       <a href="#"><svg class="icon icon-18"><use href="icons.svg#i-grid"></use></svg><span class="lbl">更多</span></a>
     </nav>
     <div class="dsh-sec">
@@ -55,10 +55,7 @@
     <!-- ══ 面板顶栏（宿主面板级常驻）══ -->
     <header class="panel-bar">
       <b class="panel-name">myteam</b>
-      <div class="seg" role="group" aria-label="作用域">
-        <a href="global.html" aria-pressed="false">全局</a>
-        <a href="shell.html" aria-pressed="true">项目</a>
-      </div>
+      <span class="scope-label" title="这是当前会话所属项目的视图；全局资产在左侧侧边栏页">项目</span>
       <button class="icon-btn" aria-label="刷新面板"><svg class="icon icon-16"><use href="icons.svg#i-refresh"></use></svg></button>
     </header>
         <!-- ══ 团队头（真实结构：← 全局 · 名称/ID · 状态 · 描述 · 行内统计 · 右侧动作）══ -->
@@ -94,28 +91,40 @@
       </div>
 
       <div class="grid grid-2" style="align-items:start">
+        <!-- 实现者：同一角色两个实例，一张角色卡（P1-6 / CHG-198）——
+             实例是聘任记录的运行面，不是第二种实体；一张卡一个角色、实例行在下。
+             每个实例有自己的 ⋯ 菜单（动作按 memberId 走），这里展开的是 implementer-2 的。 -->
         <article class="card">
           <div class="card-top">
             <span class="mavatar a1" style="width:36px;height:36px">实</span>
             <div style="flex:1;min-width:0">
-              <div class="card-title">实现者</div>
-              <div class="card-sub num"><span class="iname">implementer</span> · claude-sonnet · 继承队长路由</div>
-              
+              <div class="card-title">实现者 <span class="mini-chip num">2 个实例</span></div>
+              <div class="card-sub num">claude-sonnet · 继承队长路由</div>
+              <div class="card-row" style="margin-top:5px"><span style="flex:none;color:var(--muted)">兴趣词</span><span class="mini-chip">结算</span><span class="mini-chip">模块边界</span><span class="mini-chip">灰度</span></div>
             </div>
             <span class="chip run"><span class="shape run"></span>运行中</span>
           </div>
-          <div class="card-row">
+          <div class="inst-row">
+            <span class="iname">implementer</span>
             <span class="mini-chip">t7 抽结算服务边界</span>
-            <span class="mini-chip">已交付 2/3</span>
-            <span class="mini-chip">386k token</span><span class="mini-chip">运行 12m</span>
+            <span class="right">交付 2/3 · 386k · 12m</span>
+            <button class="icon-btn" style="width:28px;height:28px" aria-label="私讯 implementer"><svg class="icon icon-14"><use href="icons.svg#i-message"></use></svg></button>
+            <button class="icon-btn" style="width:28px;height:28px" aria-label="implementer 管理菜单"><svg class="icon icon-14"><use href="icons.svg#i-more"></use></svg></button>
           </div>
-          <div class="card-foot">
-            <span>上下文 158k / 256k</span>
-            <div style="margin-left:auto;display:flex;gap:4px">
-              <button class="icon-btn" style="width:28px;height:28px" aria-label="私讯 implementer"><svg class="icon icon-14"><use href="icons.svg#i-message"></use></svg></button>
-              <button class="icon-btn" style="width:28px;height:28px" aria-label="打开 implementer 会话"><svg class="icon icon-14"><use href="icons.svg#i-arrow-up-right"></use></svg></button>
-              <button class="icon-btn" style="width:28px;height:28px" aria-label="implementer 管理菜单"><svg class="icon icon-14"><use href="icons.svg#i-more"></use></svg></button>
-            </div>
+          <div class="inst-row">
+            <span class="iname">implementer-2</span>
+            <span class="mini-chip">t6 结算页 UI 迁移</span>
+            <span class="right">交付 0/2 · 178k · 6m</span>
+            <button class="icon-btn" aria-pressed="true" style="width:28px;height:28px;background:var(--surface-3);color:var(--text)" aria-label="implementer-2 管理菜单"><svg class="icon icon-14"><use href="icons.svg#i-more"></use></svg></button>
+          </div>
+          <div class="menu inline" role="menu" aria-label="对 implementer-2 做什么">
+            <div class="menu-label">对 implementer-2 做什么</div>
+            <button class="menu-item" role="menuitem"><svg class="icon icon-14"><use href="icons.svg#i-message"></use></svg>指导一下<span class="kbd">steer</span></button>
+            <button class="menu-item" role="menuitem"><svg class="icon icon-14"><use href="icons.svg#i-pause"></use></svg>暂停领取新任务</button>
+            <div class="menu-sep"></div>
+            <button class="menu-item" role="menuitem"><svg class="icon icon-14"><use href="icons.svg#i-archive"></use></svg>归档（排空后）</button>
+            <button class="menu-item danger" role="menuitem"><svg class="icon icon-14"><use href="icons.svg#i-trash"></use></svg>移除实例</button>
+            <div class="menu-note">在跑 1 个任务。归档会先排空再收进 <code>history/archive/</code>，移除会连它的私有空间一起删；同角色的另一个实例不受影响。</div>
           </div>
         </article>
 
@@ -154,30 +163,6 @@
           </div>
         </article>
 
-        <article class="card">
-          <div class="card-top">
-            <span class="mavatar a3" style="width:36px;height:36px">实</span>
-            <div style="flex:1;min-width:0">
-              <div class="card-title">实现者</div>
-              <div class="card-sub num"><span class="iname">implementer-2</span> · claude-sonnet · 同角色第 2 个实例</div>
-              
-            </div>
-            <span class="chip run"><span class="shape run"></span>运行中</span>
-          </div>
-          <div class="card-row">
-            <span class="mini-chip">t6 结算页 UI 迁移</span>
-            <span class="mini-chip">已交付 0/2</span>
-            <span class="mini-chip">178k token</span><span class="mini-chip">运行 6m</span>
-          </div>
-          <div class="card-foot">
-            <span>上下文 96k / 256k</span>
-            <div style="margin-left:auto;display:flex;gap:4px">
-              <button class="icon-btn" style="width:28px;height:28px" aria-label="私讯 implementer-2"><svg class="icon icon-14"><use href="icons.svg#i-message"></use></svg></button>
-              <button class="icon-btn" style="width:28px;height:28px" aria-label="打开 implementer-2 会话"><svg class="icon icon-14"><use href="icons.svg#i-arrow-up-right"></use></svg></button>
-              <button class="icon-btn" style="width:28px;height:28px" aria-label="implementer-2 管理菜单"><svg class="icon icon-14"><use href="icons.svg#i-more"></use></svg></button>
-            </div>
-          </div>
-        </article>
 
         <article class="card">
           <div class="card-top">
@@ -225,7 +210,7 @@
           </div>
         </article>
 
-        <a class="card" href="new-team.html" style="border-style:dashed;align-items:center;justify-content:center;min-height:170px;color:var(--muted);gap:6px;text-decoration:none">
+        <a class="card" href="roles.html" style="border-style:dashed;align-items:center;justify-content:center;min-height:170px;color:var(--muted);gap:6px;text-decoration:none">
           <svg class="icon icon-20" style="color:var(--line-strong)"><use href="icons.svg#i-plus"></use></svg>
           <span style="font-size:13px;font-weight:500;color:var(--text-2)">召唤角色</span>
           <span style="font-size:12px;text-align:center;line-height:1.6;max-width:22ch">从角色库选一个角色，插件会告诉你将创建的实例名与模型路由</span>

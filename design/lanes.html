@@ -23,7 +23,7 @@
     <nav class="dsh-nav" aria-label="选项栏">
       <a href="#"><svg class="icon icon-18"><use href="icons.svg#i-puzzle"></use></svg><span class="lbl">插件</span></a>
       <a href="#"><svg class="icon icon-18"><use href="icons.svg#i-clock"></use></svg><span class="lbl">自动化任务</span></a>
-      <a href="shell.html" aria-current="page"><svg class="icon icon-18"><use href="icons.svg#i-people"></use></svg><span class="lbl">myteam</span></a>
+      <a href="global.html" aria-current="page"><svg class="icon icon-18"><use href="icons.svg#i-people"></use></svg><span class="lbl">myteam</span></a>
       <a href="#"><svg class="icon icon-18"><use href="icons.svg#i-grid"></use></svg><span class="lbl">更多</span></a>
     </nav>
     <div class="dsh-sec">
@@ -55,16 +55,13 @@
     <!-- ══ 面板顶栏（宿主面板级常驻）══ -->
     <header class="panel-bar">
       <b class="panel-name">myteam</b>
-      <div class="seg" role="group" aria-label="作用域">
-        <a href="global.html" aria-pressed="false">全局</a>
-        <a href="shell.html" aria-pressed="true">项目</a>
-      </div>
+      <span class="scope-label" title="这是当前会话所属项目的视图；全局资产在左侧侧边栏页">项目</span>
       <button class="icon-btn" aria-label="刷新面板"><svg class="icon icon-16"><use href="icons.svg#i-refresh"></use></svg></button>
     </header>
         <!-- ══ 团队头（真实结构：← 全局 · 名称/ID · 状态 · 描述 · 行内统计 · 右侧动作）══ -->
         <!-- ══ 任务头（项目级实体，与团队是参与关系）══ -->
     <header class="teambar">
-      <span class="tb-title"><b>任务</b><span class="tid num">17 个 · 3 个团队参与</span></span>
+      <span class="tb-title"><b>任务</b><span class="tid num">17 个 · 2 个团队参与</span></span>
       <span class="tb-goal">任务是项目级实体：团队通过「参与」接手，一张任务可多团队参与（主责 / 协作），一个团队也负责多个任务</span>
       <span class="tb-stats num">进行中 3 · 门禁待审 3 · 已完成 5</span>
       <span class="tb-actions">
@@ -112,15 +109,14 @@
               <span class="mavatar a1" style="width:24px;height:24px;font-size:12px">实</span>
               <b>实现者</b>
             </div>
-            <span class="num">implementer · claude-sonnet</span>
-            <span class="num" style="color:var(--muted)">386k token</span>
+            <span class="num" title="implementer · claude-sonnet">implementer · 386k token</span>
           </div>
           <div class="lane-cell empty"></div>
           <div class="lane-cell">
-            <a class="lane-node" href="detail.html"><b>t2</b><span>API 契约</span><span class="tk">阻塞</span></a>
+            <a class="lane-node" href="detail.html"><b>t2</b><i class="shape idle"></i><span>API 契约</span><span class="tk">阻塞</span></a>
           </div>
           <div class="lane-cell">
-            <a class="lane-node run" href="detail.html"><b>t7</b><span>服务边界</span><span class="tk">12m</span></a>
+            <a class="lane-node run" href="detail.html"><b>t7</b><i class="shape run"></i><span>服务边界</span><span class="tk">12m</span></a>
           </div>
           <div class="lane-cell empty"></div>
         </div>
@@ -132,16 +128,15 @@
               <span class="mavatar a2" style="width:24px;height:24px;font-size:12px">评</span>
               <b>评审者</b>
             </div>
-            <span class="num">reviewer · claude-opus-4.6</span>
-            <span class="num" style="color:var(--muted)">241k token</span>
+            <span class="num" title="reviewer · claude-opus-4.6">reviewer · 241k token</span>
           </div>
           <div class="lane-cell empty"></div>
           <div class="lane-cell">
-            <a class="lane-node" href="detail.html"><b>t5</b><span>调用点替换</span><span class="tk">就绪</span></a>
+            <a class="lane-node" href="detail.html"><b>t5</b><i class="shape idle"></i><span>调用点替换</span><span class="tk">就绪</span></a>
           </div>
           <div class="lane-cell empty"></div>
           <div class="lane-cell">
-            <a class="lane-node gate" href="detail.html"><b>t4</b><span>冒烟 4 条</span><span class="tk">重派</span></a>
+            <a class="lane-node gate" href="detail.html"><b>t4</b><i class="shape gate"></i><span>冒烟 4 条</span><span class="tk">重派</span></a>
           </div>
         </div>
 
@@ -152,13 +147,12 @@
               <span class="mavatar a3" style="width:24px;height:24px;font-size:12px">实</span>
               <b>实现者<span class="idx">2</span></b>
             </div>
-            <span class="num">implementer-2 · claude-sonnet</span>
-            <span class="num" style="color:var(--muted)">178k token</span>
+            <span class="num" title="implementer-2 · claude-sonnet">implementer-2 · 178k token</span>
           </div>
           <div class="lane-cell empty"></div>
           <div class="lane-cell empty"></div>
           <div class="lane-cell">
-            <a class="lane-node run" href="detail.html"><b>t6</b><span>UI 迁移</span><span class="tk">6m</span></a>
+            <a class="lane-node run" href="detail.html"><b>t6</b><i class="shape run"></i><span>UI 迁移</span><span class="tk">6m</span></a>
           </div>
           <div class="lane-cell empty"></div>
         </div>
@@ -170,18 +164,17 @@
               <span class="mavatar a4" style="width:24px;height:24px;font-size:12px">需</span>
               <b>需求验证员</b>
             </div>
-            <span class="num">req-validator · qwen3-coder</span>
-            <span class="num" style="color:var(--muted)">96k token</span>
+            <span class="num" title="req-validator · qwen3-coder">req-validator · 96k token</span>
           </div>
           <div class="lane-cell">
-            <a class="lane-node" href="detail.html"><b>t1</b><span>调用点清单</span><span class="tk">待认领</span></a>
+            <a class="lane-node" href="detail.html"><b>t1</b><i class="shape idle"></i><span>调用点清单</span><span class="tk">待认领</span></a>
           </div>
           <div class="lane-cell">
-            <a class="lane-node" href="detail.html"><b>t8</b><span>回归 12 条</span><span class="tk">就绪</span></a>
+            <a class="lane-node" href="detail.html"><b>t8</b><i class="shape idle"></i><span>回归 12 条</span><span class="tk">就绪</span></a>
           </div>
           <div class="lane-cell empty"></div>
           <div class="lane-cell">
-            <a class="lane-node gate" href="detail.html"><b>t3</b><span>移除旧目录</span><span class="tk">验证中</span></a>
+            <a class="lane-node gate" href="detail.html"><b>t3</b><i class="shape gate"></i><span>移除旧目录</span><span class="tk">验证中</span></a>
           </div>
         </div>
 
@@ -192,8 +185,7 @@
               <span class="mavatar" style="width:24px;height:24px;font-size:12px">验</span>
               <b>验收员</b>
             </div>
-            <span class="num">acceptor · claude-opus-4.6</span>
-            <span class="num" style="color:var(--muted)">341k token</span>
+            <span class="num" title="acceptor · claude-opus-4.6">acceptor · 341k token</span>
           </div>
           <div class="lane-cell empty"></div>
           <div class="lane-cell empty"></div>

@@ -23,7 +23,7 @@
     <nav class="dsh-nav" aria-label="选项栏">
       <a href="#"><svg class="icon icon-18"><use href="icons.svg#i-puzzle"></use></svg><span class="lbl">插件</span></a>
       <a href="#"><svg class="icon icon-18"><use href="icons.svg#i-clock"></use></svg><span class="lbl">自动化任务</span></a>
-      <a href="shell.html" aria-current="page"><svg class="icon icon-18"><use href="icons.svg#i-people"></use></svg><span class="lbl">myteam</span></a>
+      <a href="global.html" aria-current="page"><svg class="icon icon-18"><use href="icons.svg#i-people"></use></svg><span class="lbl">myteam</span></a>
       <a href="#"><svg class="icon icon-18"><use href="icons.svg#i-grid"></use></svg><span class="lbl">更多</span></a>
     </nav>
     <div class="dsh-sec">
@@ -55,10 +55,7 @@
     <!-- ══ 面板顶栏（宿主面板级常驻）══ -->
     <header class="panel-bar">
       <b class="panel-name">myteam</b>
-      <div class="seg" role="group" aria-label="作用域">
-        <a href="global.html" aria-pressed="false">全局</a>
-        <a href="shell.html" aria-pressed="true">项目</a>
-      </div>
+      <span class="scope-label" title="这是当前会话所属项目的视图；全局资产在左侧侧边栏页">项目</span>
       <button class="icon-btn" aria-label="刷新面板"><svg class="icon icon-16"><use href="icons.svg#i-refresh"></use></svg></button>
     </header>
 
@@ -283,15 +280,40 @@
           <p class="row-sub" style="margin-top:2px">按 tokenMeter 用量比例分摊，非精确计量。</p>
         </div>
 
-        <!-- 危险操作 -->
+        <!-- 任务操作（P1-2 / P1-4 / CHG-198）——
+             原稿「暂停此任务」「拆分为子任务」都没有端点（11 态无 paused；拆分只有成员提案），
+             而 FR-25 要求的「编辑 / 一键重规划 / 取消 / 改动记录 / 证据过期」缺位。
+             取消还写成「转 blocked 并回队长重规划」，与 task.cancelled 终态矛盾。
+             这里按面板真实写入口重排，取消就地给两段确认（影响面 → 输入任务号）。 -->
         <div class="sec" style="gap:8px">
-          <div class="dsec-head"><h4>任务操作</h4><span class="line"></span></div>
+          <div class="dsec-head"><h4>任务操作</h4><span class="line"></span><span class="n">写操作只在面板</span></div>
           <div style="display:flex;flex-direction:column;gap:6px">
-            <button class="btn sm" style="justify-content:flex-start"><svg class="icon icon-14"><use href="icons.svg#i-pause"></use></svg>暂停此任务</button>
-            <button class="btn sm" style="justify-content:flex-start"><svg class="icon icon-14"><use href="icons.svg#i-branch"></use></svg>拆分为子任务</button>
-            <button class="btn danger sm" style="justify-content:flex-start"><svg class="icon icon-14"><use href="icons.svg#i-x"></use></svg>取消此任务</button>
+            <button class="btn sm" style="justify-content:flex-start"><svg class="icon icon-14"><use href="icons.svg#i-file"></use></svg>编辑任务（标题 / 验收标准 / 依赖）</button>
+            <button class="btn sm" style="justify-content:flex-start"><svg class="icon icon-14"><use href="icons.svg#i-refresh"></use></svg>一键重规划（re-scoping）</button>
+            <button class="btn sm" style="justify-content:flex-start"><svg class="icon icon-14"><use href="icons.svg#i-clock"></use></svg>改动记录 <span class="mini-chip num" style="margin-left:auto">6 条</span></button>
+            <button class="btn danger sm" style="justify-content:flex-start"><svg class="icon icon-14"><use href="icons.svg#i-x"></use></svg>取消此任务…</button>
           </div>
-          <p class="row-sub">取消后已产出证据保留，任务转 blocked 并回到队长重规划。</p>
+
+          <!-- 第 1 段：影响面 -->
+          <div class="impact" style="margin-top:2px">
+            <b>取消 t7 的影响面</b>
+            <ul>
+              <li>下游 <b>3 个任务</b>：t6（进行中）、t8（就绪）、t9（已完成）—— 选「保留依赖」只断 t7 本身，「级联取消」按依赖闭包一起取消，「改指上游」可重挂到别的任务</li>
+              <li>当前有 <b>1 个活跃 attempt</b>（implementer · 12m）会被中止，已产出的证据保留在账本里</li>
+              <li>取消后落 <span class="num">task.cancelled</span> 终态，<b>不能重规划、不能复活</b></li>
+            </ul>
+          </div>
+          <!-- 第 2 段：输入任务号才可提交 -->
+          <div class="form-row" style="margin-top:2px">
+            <label for="cancelConfirm" style="width:auto">输入 <span class="num">t7</span> 确认</label>
+            <input class="input num" id="cancelConfirm" placeholder="t7" autocomplete="off" spellcheck="false" style="flex:1">
+          </div>
+          <div style="display:flex;gap:6px">
+            <button class="btn ghost sm">保留依赖</button>
+            <button class="btn ghost sm">级联取消</button>
+            <button class="btn ghost sm">改指上游</button>
+            <button class="btn danger sm" style="margin-left:auto" disabled>确认取消</button>
+          </div>
         </div>
       </aside>
     </div>

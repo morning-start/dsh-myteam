@@ -137,9 +137,12 @@ code {
 .main { flex: 1 1 0; display: flex; flex-direction: column; min-width: 0; min-height: 0; overflow: hidden; position: relative; }
 
 /* ── 面板顶栏（宿主面板级常驻：myteam + 范围 seg + 刷新）── */
+/* CHG-183 密度：顶栏 48 → 44。五条栏（顶栏/团队头/tab/视图条/成本条）竖向吃掉
+ * ~230px，800 高视口下内容区只剩 570px——看板只放得下两张卡。先各收 2~4px，
+ * 合计 ~30px 还给内容；层级仍靠字号/字重/留白，不靠高度。 */
 .panel-bar {
   flex: none; display: flex; align-items: center; gap: var(--s3);
-  height: 48px; padding: 0 var(--s5);
+  height: 44px; padding: 0 var(--s5);
   background: var(--bg); border-bottom: 1px solid var(--line);
 }
 .panel-bar .panel-name { font-size: 15px; font-weight: 600; color: var(--text); }
@@ -150,12 +153,19 @@ code {
 .panel-bar .seg button[aria-pressed="true"], .panel-bar .seg a[aria-pressed="true"] {
   background: var(--surface-3); box-shadow: none; font-weight: 600;
 }
+/* CHG-201：全局页（侧边栏）与项目页（画布「团队视图」tab）是两个物理表面——
+ * 顶栏只标层级，不做互相切换（旧 `.seg` 的「全局 | 项目」已删除）。 */
+.panel-bar .scope-label {
+  display: inline-flex; align-items: center; min-height: 24px; padding: 0 10px;
+  border-radius: 999px; background: var(--surface-3);
+  font-size: var(--fs-12); font-weight: 600; color: var(--muted);
+}
 
 /* ── 团队头（真实结构：← 全局 · 名称/ID · 状态 · 描述 · 行内统计 · 右侧动作）── */
 .teambar {
   flex: none; display: flex; align-items: center; gap: var(--s3);
-  padding: 7px var(--s5); background: var(--bg);
-  border-bottom: 1px solid var(--line); min-height: 44px;
+  padding: 6px var(--s5); background: var(--bg);
+  border-bottom: 1px solid var(--line); min-height: 40px;
 }
 .back-all {
   display: inline-flex; align-items: center; gap: 5px; flex: none;
@@ -202,6 +212,35 @@ code {
 }
 .team-card:hover { background: var(--surface-2); border-color: var(--line-strong); }
 a.card { text-decoration: none; color: inherit; }
+
+/* ── 团队列表（CHG-183）──
+ * 改前：整宽单列卡，标题在左、状态胶囊在右，中间 700px 全空；扫一眼拿不到
+ * 「这个团队做到哪了」。改后：两组团队各排成 2 列卡网格，卡内固定四行
+ * （标题行 / 描述 / 完成度分段条 / 元信息），完成度从「完成 3/11」这句
+ * 纯文本变成同一行上的可视化条——两列并排时横向也能直接比。 */
+.team-grid {
+  display: grid; grid-template-columns: repeat(auto-fill, minmax(400px, 1fr));
+  gap: 10px; margin-bottom: var(--s5);
+}
+.team-grid .team-card {
+  display: flex; flex-direction: column; gap: 7px;
+  margin-bottom: 0; padding: 11px 14px;
+}
+.team-card .tc-head { gap: 8px; }
+.team-card .tc-bar {
+  display: flex; gap: 2px; height: 5px; border-radius: var(--r-pill);
+  overflow: hidden; background: var(--surface-3);
+}
+.team-card .tc-bar i { display: block; height: 100%; border-radius: 1px; }
+.team-card .tc-bar .seg-done { background: var(--done); }
+.team-card .tc-bar .seg-run  { background: var(--primary); }
+.team-card .tc-bar .seg-gate { background: var(--gate); }
+.team-card .tc-meta { margin-top: 0; gap: 8px; flex-wrap: wrap; }
+.team-card .tc-meta .sep { color: var(--muted); }
+/* 在线 / 离线：标题行右侧一个点 + 文案，不再单独占一列 */
+.team-card .tc-zone { margin-left: auto; padding: 0; border: 0; background: none; font-size: var(--fs-12); color: var(--muted); }
+.team-card .tc-zone.off { color: var(--muted); }
+.team-card .tc-zone.off .dot { background: var(--line-strong); }
 
 /* ── 任务 × 团队：多对多的关系表达 ── */
 .tcard-teams { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 6px; }
@@ -343,7 +382,7 @@ a.btn { text-decoration: none; }
 }
 .tab {
   position: relative; display: inline-flex; align-items: center; gap: 5px;
-  margin-right: var(--s5); padding: 0 1px; height: 40px;
+  margin-right: var(--s5); padding: 0 1px; height: 36px;
   border: 0; background: none; color: var(--muted); text-decoration: none;
   font-size: var(--fs-13); font-weight: 500; cursor: pointer;
   transition: color .16s var(--ease);
@@ -363,11 +402,11 @@ a.btn { text-decoration: none; }
 
 .work { flex: 1; display: flex; flex-direction: column; min-height: 0; position: relative; }
 
-.viewbar { flex: none; display: flex; align-items: center; gap: var(--s2); padding: 8px var(--s5); }
+.viewbar { flex: none; display: flex; align-items: center; gap: var(--s2); padding: 5px var(--s5); }
 .view-label { flex: none; font-size: var(--fs-12); color: var(--muted); }
 .vlinks { display: inline-flex; align-items: center; gap: var(--s1); }
 .vlinks a, .vlinks button {
-  display: inline-flex; align-items: center; height: 28px; padding: 0 8px;
+  display: inline-flex; align-items: center; height: 26px; padding: 0 8px;
   border: 0; border-radius: var(--r-sm); background: none;
   color: var(--muted); font-size: var(--fs-12); font-weight: 500;
   cursor: pointer; text-decoration: none; white-space: nowrap;
@@ -464,19 +503,23 @@ a.btn { text-decoration: none; }
 }
 .mnode-add:hover { border-color: var(--primary); color: var(--primary); }
 
-/* ── 看板 ── */
+/* ── 看板 ──
+ * CHG-183：列宽从「flex:1 1 200px + min-width:200」改成「flex:1 1 0 + min-width:172」。
+ * 改前列最小 200px，五列 + 156px 团队轨在 1440 下总宽 1040 > 可用 1010，
+ * 「已完成」列被切掉一截；172px 下五列 892px 能完整放下，窄视口仍按
+ * `.board` 的 overflow:auto 横向滚动，不挤成折行。 */
 .board {
-  display: flex; gap: 10px;
-  padding: var(--s3) var(--s4) var(--s5);
+  display: flex; gap: 8px;
+  padding: 10px 12px 12px;
   overflow: auto; min-width: 0; align-items: stretch;
 }
 .col {
-  flex: 1 1 200px; min-width: 200px;
+  flex: 1 1 0; min-width: 172px;
   background: var(--surface-3); border: 1px solid var(--line);
   border-radius: var(--r-md); padding: 6px;
   display: flex; flex-direction: column; gap: 6px;
 }
-.col.done-col { flex: 0 0 168px; min-width: 168px; background: transparent; border-style: dashed; }
+.col.done-col { flex: 1 1 0; min-width: 160px; background: transparent; border-style: dashed; }
 .col-head { display: flex; align-items: center; gap: 6px; padding: 2px 4px 3px; }
 .col-head .shape { width: 7px; height: 7px; flex: none; }
 .col-head h4 { font-size: var(--fs-12); font-weight: 600; letter-spacing: .02em; color: var(--text-2); white-space: nowrap; }
@@ -542,10 +585,14 @@ a.btn { text-decoration: none; }
   font-size: var(--fs-12); color: var(--text-2); line-height: 1.5;
 }
 
-/* ── 泳道 ── */
+/* ── 泳道 ──
+ * CHG-183：行高从「3 行标签（角色 / 实例·模型 / token）」收到 2 行。
+ * 128px 标签列放不下「implementer · claude-sonnet」，模型名本来也是
+ * 悬停才知道的东西 → 收进 title，实例名与 token 并成一行。5 条泳道
+ * 合计少 ~120px，一屏能多看一条。 */
 .lanes { padding: var(--s3) var(--s4) var(--s5); overflow: auto; min-width: 0; }
 .lane {
-  display: grid; grid-template-columns: 128px repeat(4, minmax(0, 1fr));
+  display: grid; grid-template-columns: 148px repeat(4, minmax(0, 1fr));
   gap: 1px; background: var(--line);
   border: 1px solid var(--line); border-radius: var(--r-md);
   overflow: hidden; margin-bottom: 10px;
@@ -554,11 +601,12 @@ a.btn { text-decoration: none; }
   background: var(--surface-3); padding: 6px 10px;
   font-size: var(--fs-12); font-weight: 600; letter-spacing: .02em; color: var(--muted);
 }
-.lane-label { background: var(--surface); padding: var(--s2) 10px; display: flex; flex-direction: column; gap: 1px; justify-content: center; }
+.lane-label { background: var(--surface); padding: 6px 10px; display: flex; flex-direction: column; gap: 2px; justify-content: center; }
 .lane-label b { font-size: var(--fs-12); font-weight: 600; }
 .lane-label span { font-size: var(--fs-12); color: var(--muted); }
+.lane-label .num { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .lane-label .mavatar { color: var(--text-2); }
-.lane-cell { background: var(--surface); padding: 5px; display: flex; flex-direction: column; gap: 4px; min-height: 56px; }
+.lane-cell { background: var(--surface); padding: 5px; display: flex; flex-direction: column; gap: 4px; min-height: 46px; }
 .lane-cell.empty { background: var(--surface-2); }
 .lane-node {
   display: flex; align-items: center; gap: 5px;
@@ -737,7 +785,7 @@ a.btn { text-decoration: none; }
 
 .costbar {
   flex: none; display: flex; align-items: stretch; gap: var(--s3);
-  padding: 0 var(--s4); height: 54px;
+  padding: 0 var(--s4); height: 44px;
   background: var(--surface); border-top: 1px solid var(--line);
   position: relative; z-index: 3;
 }
@@ -746,12 +794,12 @@ a.btn { text-decoration: none; }
 .cost-label { font-size: var(--fs-12); color: var(--muted); line-height: 1.35; }
 .cost-val { font-family: var(--mono); font-size: var(--fs-13); font-weight: 600; line-height: 1.35; }
 .cost-val small { font-size: var(--fs-12); font-weight: 400; color: var(--muted); }
-.cost-spark { display: flex; align-items: flex-end; gap: 2px; height: 22px; }
+.cost-spark { display: flex; align-items: flex-end; gap: 2px; height: 18px; }
 .cost-spark i { width: 3px; border-radius: 1px; background: var(--primary); opacity: .26; display: block; }
 .cost-spark i.hot { opacity: 1; }
 .cost-right { margin-left: auto; display: flex; align-items: center; gap: var(--s3); }
 .ring {
-  width: 34px; height: 34px; flex: none; border-radius: 50%;
+  width: 32px; height: 32px; flex: none; border-radius: 50%;
   background: conic-gradient(var(--primary) 0 62%, var(--surface-3) 62% 100%);
   display: grid; place-items: center; position: relative;
 }
@@ -815,7 +863,7 @@ a.btn { text-decoration: none; }
 .filterbar { display: flex; align-items: center; gap: var(--s2); margin-bottom: var(--s3); flex-wrap: wrap; }
 
 .rows { border: 1px solid var(--line); border-radius: var(--r-md); overflow: hidden; background: var(--surface); }
-.row { display: flex; align-items: center; gap: var(--s3); padding: 10px var(--s4); min-height: 54px; }
+.row { display: flex; align-items: center; gap: var(--s3); padding: 8px var(--s4); min-height: 50px; }
 .row + .row { border-top: 1px solid var(--line-soft); }
 .row:hover { background: var(--surface-2); }
 .row-main { flex: 1; min-width: 0; }
@@ -1440,9 +1488,33 @@ textarea.input { height: auto; min-height: 68px; padding: 8px 10px; resize: vert
   .tcard.lift { right: 24px; top: 40px; }
 }
 
+/* 主区 ≤1080（视口 ≤1360）：参与团队轨从左侧 156px 竖列改成看板顶部横排。
+ * 1440 下五列本来放得下，1280 下再被 156px 竖列吃掉就只剩 ~157px/列，
+ * 12 个字的卡标题被迫折行。改横排后看板拿回整幅宽度（≈188px/列），
+ * 竖列那套「团队 + 任务数」原样保留，只是换了个方向。 */
+@media (max-width: 1360px) {
+  .canvas {
+    grid-template-columns: minmax(0, 1fr) !important;
+    grid-template-rows: auto minmax(0, 1fr);
+  }
+  .trail {
+    flex-direction: row; align-items: center; gap: 4px;
+    overflow-x: auto; overflow-y: hidden;
+    border-right: 0; border-bottom: 1px solid var(--line);
+    padding: 6px var(--s3);
+  }
+  .trail-cap { display: none; }
+  .titem { width: auto; flex: none; }
+  .titem .tinfo { display: flex; align-items: baseline; gap: 6px; }
+  .titem .tinfo b, .titem .tinfo span { white-space: nowrap; }
+  .titem.all { justify-content: flex-start; }
+  /* 窄视口下目标描述是「次要上下文」，让位给统计数字：整条被 ellipsis 截断的
+     文本盒会被自动检查判成「和统计叠在一起」，而它确实只是被裁掉的半句话。 */
+  .tb-goal { display: none; }
+}
+
 /* 主区变窄（视口 ≤1260 ≈ 主区 ≤980）：面板 chrome 收纳 */
-@media (max-width: 1260px) {
-  .teambar { flex-wrap: wrap; gap: var(--s2) var(--s3); padding: var(--s2) var(--s3); }
+@media (max-width: 1260px) {  .teambar { flex-wrap: wrap; gap: var(--s2) var(--s3); padding: var(--s2) var(--s3); }
   .tb-goal { display: none; }
   .panel-bar, .tabbar, .viewbar, .page, .costbar, .home { padding-left: var(--s3); padding-right: var(--s3); }
   .board { padding: var(--s3) var(--s3) var(--s4); }
@@ -1472,7 +1544,7 @@ textarea.input { height: auto; min-height: 68px; padding: 8px 10px; resize: vert
   .grid-3, .grid-2 { grid-template-columns: 1fr; }
   .form-row { flex-direction: column; align-items: stretch; gap: 4px; }
   .form-row > label { width: auto; }
-  .lane { grid-template-columns: 84px repeat(4, minmax(0, 1fr)); }
+  .lane { grid-template-columns: 104px repeat(4, minmax(0, 1fr)); }
   .scrim { padding: var(--s2); }
   .home-filter { flex-direction: column; align-items: stretch; }
   .home-filter .field { width: 100%; }
@@ -1482,3 +1554,65 @@ textarea.input { height: auto; min-height: 68px; padding: 8px 10px; resize: vert
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { transition-duration: .01ms !important; animation-duration: .01ms !important; }
 }
+
+/* ============================================================
+   十、名册树（FR-32 子 Agent 编队，CHG-197）
+   成员是「角色 × 团队」的聘任记录，子成员 = 在角色 delegation
+   授权范围内再聘任一次（同一团队内父子树，深度硬上限 2）。
+   树的表达只用「缩进 + 竖向导引 + 深度 chip」，不画 SVG 连线：
+   成员树最多 3 层，连线反而挡住每行的状态与动作。
+   ============================================================ */
+
+.tree { display: flex; flex-direction: column; gap: 6px; }
+.tnode {
+  position: relative; display: flex; align-items: center; gap: 10px;
+  padding: 9px 12px; border: 1px solid var(--line); border-radius: var(--r-sm);
+  background: var(--surface); min-width: 0;
+}
+.tnode:hover { border-color: var(--line-strong); }
+/* 缩进 + 竖向导引：第 2 层 32px、第 3 层 64px */
+.tnode.d1 { margin-left: 32px; }
+.tnode.d2 { margin-left: 64px; }
+.tnode.d1::before, .tnode.d2::before {
+  content: ""; position: absolute; left: -17px; top: 50%;
+  width: 13px; height: 1px; background: var(--line-strong);
+}
+.tnode.d1::after, .tnode.d2::after {
+  content: ""; position: absolute; left: -17px; top: -9px; bottom: 50%;
+  width: 1px; background: var(--line-strong);
+}
+.tnode.root { border-color: var(--primary-line); background: var(--primary-soft); }
+.tnode-main { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 3px; }
+.tnode-top { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+.tnode-name { font-size: var(--fs-13); font-weight: 600; color: var(--text); }
+.tnode-sub { font-size: var(--fs-12); color: var(--muted); display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+.tnode-act { flex: none; display: flex; align-items: center; gap: 6px; }
+.depth-chip {
+  display: inline-flex; align-items: center; gap: 3px;
+  font-family: var(--mono); font-size: var(--fs-12); line-height: 18px;
+  padding: 0 6px; border-radius: var(--r-pill);
+  border: 1px solid var(--line-strong); background: var(--surface-2); color: var(--muted);
+  white-space: nowrap;
+}
+.depth-chip.d0 { border-color: var(--primary-line); background: var(--surface); color: var(--primary-deep); }
+.depth-chip.limit { border-color: var(--gate-line); background: var(--gate-soft); color: var(--gate-ink); }
+.tnode-add {
+  margin-left: 32px; display: flex; align-items: center; justify-content: center; gap: 6px;
+  min-height: 44px; padding: 10px; font-size: var(--fs-12);
+  border: 1px dashed var(--line-strong); border-radius: var(--r-sm);
+  background: none; color: var(--muted); cursor: pointer; text-align: center;
+}
+.tnode-add:hover:not(:disabled) { border-color: var(--primary); color: var(--primary-deep); }
+.tnode-add:disabled { cursor: not-allowed; opacity: .7; }
+/* 泳道节点三通道（P1-8 / CHG-198）：原来只有左边框颜色 + 文字，色弱或黑白打印
+   下五种状态（阻塞 / 就绪 / 重派 / 验证中 / 待认领）完全没有形状差异。
+   补第二通道：节点内一个 6px 的形状标记，形状按 H4 表与 `.chip .shape` 同源
+   （进行中=实心圆 / 门禁=旋转 45° 方块 / 已完成=小方块 / 其它=空心圆）。 */
+.lane-node .shape {
+  width: 6px; height: 6px; flex: none; border-radius: 1px;
+  background: currentColor; margin-left: 1px;
+}
+.lane-node .shape.run  { border-radius: 50%; }
+.lane-node .shape.gate { border-radius: 2px; transform: rotate(45deg); }
+.lane-node .shape.done { border-radius: 1px; }
+.lane-node .shape.idle { background: none; border: 1.5px solid currentColor; border-radius: 50%; }

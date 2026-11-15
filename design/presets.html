@@ -23,7 +23,7 @@
     <nav class="dsh-nav" aria-label="选项栏">
       <a href="#"><svg class="icon icon-18"><use href="icons.svg#i-puzzle"></use></svg><span class="lbl">插件</span></a>
       <a href="#"><svg class="icon icon-18"><use href="icons.svg#i-clock"></use></svg><span class="lbl">自动化任务</span></a>
-      <a href="shell.html" aria-current="page"><svg class="icon icon-18"><use href="icons.svg#i-people"></use></svg><span class="lbl">myteam</span></a>
+      <a href="global.html" aria-current="page"><svg class="icon icon-18"><use href="icons.svg#i-people"></use></svg><span class="lbl">myteam</span></a>
       <a href="#"><svg class="icon icon-18"><use href="icons.svg#i-grid"></use></svg><span class="lbl">更多</span></a>
     </nav>
     <div class="dsh-sec">
@@ -55,10 +55,7 @@
     <!-- ══ 面板顶栏（宿主面板级常驻）══ -->
     <header class="panel-bar">
       <b class="panel-name">myteam</b>
-      <div class="seg" role="group" aria-label="作用域">
-        <a href="global.html" aria-pressed="true">全局</a>
-        <a href="shell.html" aria-pressed="false">项目</a>
-      </div>
+      <span class="scope-label" title="侧边栏页只有全局信息；某个项目的视图在会话画布的「团队视图」tab">全局</span>
       <button class="icon-btn" aria-label="刷新面板"><svg class="icon icon-16"><use href="icons.svg#i-refresh"></use></svg></button>
     </header>
         <!-- ══ 团队头（真实结构：← 全局 · 名称/ID · 状态 · 描述 · 行内统计 · 右侧动作）══ -->
@@ -82,7 +79,7 @@
           <p>预设是团队模板：名册（队长 + N 个角色引用）加上看板列、流程维度、门禁链。新建团队时选一个，就得到一套现成的分工与流程。名册里存的是角色引用（聘任记录），不是副本 —— 改角色会立刻影响之后新建的团队，但不会影响已经聘任的实例。</p>
         </div>
         <div class="page-head-actions">
-          <button class="btn"><svg class="icon icon-14"><use href="icons.svg#i-plus"></use></svg>新建预设</button>
+          <a class="btn" href="conversation.html" style="text-decoration:none"><svg class="icon icon-14"><use href="icons.svg#i-message"></use></svg>在队长会话里新建预设</a>
         </div>
       </div>
 
@@ -99,13 +96,13 @@
             <div class="layer-path">plugin/config/presets · seed-once 写进项目一份，之后不覆盖你的改动</div>
           </div>
           <div class="layer-n">1<span>预设</span></div>
-          <button class="btn sm" style="flex:none">恢复默认</button>
+          <button class="btn sm" style="flex:none" disabled title="面板只读：恢复默认走队长工具 myteam_restore_preset">恢复默认</button>
         </div>
         <div class="layer">
           <span class="layer-ico global"><svg class="icon icon-14"><use href="icons.svg#i-globe"></use></svg></span>
           <div class="layer-main">
-            <div class="layer-title">全局<span class="src global">跨项目</span></div>
-            <div class="layer-path">../.dsh/myteam/presets · 换项目也带着，可复制进任意项目</div>
+            <div class="layer-title">插件贡献<span class="src global">只读</span></div>
+            <div class="layer-path">$DSH_HOME/myteam/plugins/&lt;pluginId&gt;/presets · 插件装载时自带，装了就多一套</div>
           </div>
           <div class="layer-n">1<span>预设</span></div>
           <button class="btn sm" style="flex:none">看全部</button>
@@ -114,7 +111,7 @@
           <span class="layer-ico project"><svg class="icon icon-14"><use href="icons.svg#i-folder"></use></svg></span>
           <div class="layer-main">
             <div class="layer-title">项目<span class="src project">可编辑 · 运行时真相</span></div>
-            <div class="layer-path">.team-workplace/config/presets · 新建团队时能选的只有这一层</div>
+            <div class="layer-path">.dsh-myteam/config/teams · 新建团队时能选的只有这一层</div>
           </div>
           <div class="layer-n">2<span>预设</span></div>
           <button class="btn sm" style="flex:none">看全部</button>
@@ -134,7 +131,7 @@
         <div class="seg" role="group" aria-label="按来源筛选">
           <button aria-pressed="true">全部 4</button>
           <button aria-pressed="false">项目 2</button>
-          <button aria-pressed="false">全局 1</button>
+          <button aria-pressed="false">插件 1</button>
           <button aria-pressed="false">内置 1</button>
         </div>
         <span style="font-size:12px;color:var(--muted)">按作用域从近到远排列</span>
@@ -238,18 +235,18 @@
           </div>
         </article>
 
-        <a class="card hoverable" href="presets.html" style="align-items:center;justify-content:center;text-align:center;min-height:180px;border-style:dashed;border-color:var(--line-strong);background:transparent;text-decoration:none;color:inherit">
+        <a class="card hoverable" href="conversation.html" style="align-items:center;justify-content:center;text-align:center;min-height:180px;border-style:dashed;border-color:var(--line-strong);background:transparent;text-decoration:none;color:inherit">
           <svg class="icon icon-20" style="color:var(--muted)"><use href="icons.svg#i-plus"></use></svg>
-          <span style="font-size:var(--fs-13);font-weight:600;margin-top:var(--s2)">新建预设</span>
-          <span style="font-size:12px;color:var(--muted);line-height:1.6;max-width:22em">从现有预设 fork 一份再改，比从零配快得多</span>
+          <span style="font-size:var(--fs-13);font-weight:600;margin-top:var(--s2)">在队长会话里新建预设</span>
+          <span style="font-size:12px;color:var(--muted);line-height:1.6;max-width:22em">面板对预设只读：从现有预设 fork 一份再改，交给队长执行 <code>myteam_save_preset</code></span>
         </a>
 
       </div>
 
       <!-- ── 全局层 ── -->
       <div class="dsec-head" style="margin-bottom:var(--s2)">
-        <h4>全局 · 1</h4><span class="line"></span>
-        <span class="n">跨项目复用，本项目还没用</span>
+        <h4>插件贡献 · 1</h4><span class="line"></span>
+        <span class="n">插件装载时自带 · 只读</span>
       </div>
       <div class="grid grid-2" style="margin-bottom:var(--s5)">
 
@@ -257,7 +254,7 @@
           <div class="card-top">
             <span class="mavatar lead">队</span>
             <div style="flex:1;min-width:0">
-              <div class="card-title"><span class="iname">api-review</span> <span class="src global">全局</span></div>
+              <div class="card-title"><span class="iname">api-review</span> <span class="src global">插件</span></div>
               <div class="card-sub">接口评审团队 · 本项目 0 个团队使用</div>
             </div>
           </div>
@@ -285,7 +282,7 @@
           </div>
 
           <div class="card-foot" style="border-top:1px solid var(--line-soft);padding-top:var(--s2)">
-            <button class="btn sm">复制进项目</button>
+            <button class="btn sm" disabled title="面板只读：复制走队长工具 myteam_copy_preset">复制进项目</button>
             <a class="btn ghost sm" href="roles.html" style="text-decoration:none">看用到的角色</a>
             <button class="icon-btn" style="margin-left:auto;width:28px;height:28px" aria-label="预设操作"><svg class="icon icon-14"><use href="icons.svg#i-more"></use></svg></button>
           </div>
@@ -324,8 +321,8 @@
           </p>
 
           <div class="card-foot" style="border-top:1px solid var(--line-soft);padding-top:var(--s2)">
-            <button class="btn sm">复制到项目</button>
-            <button class="btn ghost sm">恢复默认</button>
+            <button class="btn sm" disabled title="面板只读：复制走队长工具 myteam_copy_preset">复制到项目</button>
+            <button class="btn ghost sm" disabled title="面板只读">恢复默认</button>
             <span style="margin-left:auto;font-size:12px;color:var(--muted)">只读</span>
           </div>
         </article>

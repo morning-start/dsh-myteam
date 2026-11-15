@@ -23,7 +23,7 @@
     <nav class="dsh-nav" aria-label="选项栏">
       <a href="#"><svg class="icon icon-18"><use href="icons.svg#i-puzzle"></use></svg><span class="lbl">插件</span></a>
       <a href="#"><svg class="icon icon-18"><use href="icons.svg#i-clock"></use></svg><span class="lbl">自动化任务</span></a>
-      <a href="shell.html" aria-current="page"><svg class="icon icon-18"><use href="icons.svg#i-people"></use></svg><span class="lbl">myteam</span></a>
+      <a href="global.html" aria-current="page"><svg class="icon icon-18"><use href="icons.svg#i-people"></use></svg><span class="lbl">myteam</span></a>
       <a href="#"><svg class="icon icon-18"><use href="icons.svg#i-grid"></use></svg><span class="lbl">更多</span></a>
     </nav>
     <div class="dsh-sec">
@@ -55,10 +55,7 @@
     <!-- ══ 面板顶栏（宿主面板级常驻）══ -->
     <header class="panel-bar">
       <b class="panel-name">myteam</b>
-      <div class="seg" role="group" aria-label="作用域">
-        <a href="global.html" aria-pressed="false">全局</a>
-        <a href="shell.html" aria-pressed="true">项目</a>
-      </div>
+      <span class="scope-label" title="这是当前会话所属项目的视图；全局资产在左侧侧边栏页">项目</span>
       <button class="icon-btn" aria-label="刷新面板"><svg class="icon icon-16"><use href="icons.svg#i-refresh"></use></svg></button>
     </header>
         <!-- ══ 团队头（真实结构：← 全局 · 名称/ID · 状态 · 描述 · 行内统计 · 右侧动作）══ -->
@@ -87,45 +84,48 @@
       <div class="page-head">
         <div>
           <h2>团队设置</h2>
-          <p>这里的改动写入 <span class="num">.team-workplace/config/team.config.json</span>。插件默认值 &lt; 项目配置 &lt; 临时参数，后者优先级最高；数组是整条替换，不做深度合并。</p>
+          <p>这里的改动写入 <span class="num">.dsh-myteam/state/teams/&lt;teamId&gt;/team.config.json</span>（团队层）。合并顺序是 <b>内置默认 &lt; 项目层 &lt; 团队层</b>，后者覆盖前者；数组整条替换，对象按子键合并，不做深度合并。</p>
         </div>
         <div class="page-head-actions">
           <button class="btn"><svg class="icon icon-14"><use href="icons.svg#i-terminal"></use></svg>JSON 源视图</button>
         </div>
       </div>
 
-      <!-- 配置来源：三层合并 -->
+      <!-- 配置来源：三层合并（P1-12 / CHG-198）——
+           原稿只有「插件默认 / 项目配置 / 临时参数」三层，缺团队层；而 saveTeamConfig
+           写的是 state/teams/<teamId>/team.config.json（团队层）。按 docs/18 §2.1
+           改成「内置默认 ← 项目层 ← 团队层」，生效层是团队层。 -->
       <section style="margin-bottom:var(--s4)">
-        <div class="dsec-head" style="margin-bottom:var(--s2)"><h4>配置来源</h4><span class="line"></span><span class="n">后者覆盖前者</span></div>
+        <div class="dsec-head" style="margin-bottom:var(--s2)"><h4>配置来源</h4><span class="line"></span><span class="n">后者覆盖前者 · 逐层独立校验</span></div>
         <div class="layers">
           <div class="layer">
             <span class="layer-ico builtin"><svg class="icon icon-14"><use href="icons.svg#i-lock"></use></svg></span>
             <div class="layer-main">
-              <div class="layer-title">插件默认<span class="src builtin">只读</span></div>
-              <div class="layer-path">plugin/config/team.config.default.json · 随插件升级</div>
+              <div class="layer-title">内置默认<span class="src builtin">只读</span></div>
+              <div class="layer-path">代码常量 DEFAULT_CONFIG · 随插件升级，不可写</div>
             </div>
             <div class="layer-n">18<span>项</span></div>
           </div>
           <div class="layer">
             <span class="layer-ico project"><svg class="icon icon-14"><use href="icons.svg#i-folder"></use></svg></span>
             <div class="layer-main">
-              <div class="layer-title">项目配置<span class="src project">本文件</span></div>
-              <div class="layer-path">.team-workplace/config/team.config.json · 只写你改过的项</div>
+              <div class="layer-title">项目层<span class="src project">全项目生效</span></div>
+              <div class="layer-path">.dsh-myteam/config/team.config.json · 只写你在这一层改过的项</div>
             </div>
             <div class="layer-n">4<span>项覆盖</span></div>
           </div>
           <div class="layer">
             <span class="layer-ico global"><svg class="icon icon-14"><use href="icons.svg#i-terminal"></use></svg></span>
             <div class="layer-main">
-              <div class="layer-title">临时参数<span class="src global">仅本次会话</span></div>
-              <div class="layer-path">/myteam new --max-members 4 · 不写盘，关掉就没了</div>
+              <div class="layer-title">团队层<span class="src global">本团队</span></div>
+              <div class="layer-path">.dsh-myteam/state/teams/t-8f3a2c/team.config.json · 本页保存写这一层</div>
             </div>
             <div class="layer-n">0<span>项</span></div>
           </div>
         </div>
         <div class="merge-chain" style="margin-top:var(--s2)">
-          <b>插件默认</b><span class="lt">&lt;</span><b class="cur">项目配置（生效）</b><span class="lt">&lt;</span><b>临时参数</b>
-          <span style="margin-left:4px">数组整条替换，不做深度合并</span>
+          <b>内置默认</b><span class="lt">&lt;</span><b>项目层</b><span class="lt">&lt;</span><b class="cur">团队层（生效）</b>
+          <span style="margin-left:4px">数组整条替换，对象按子键合并，不做深度合并</span>
         </div>
       </section>
 
@@ -148,11 +148,23 @@
           <div class="row">
             <div class="row-main">
               <div class="row-title">委派深度</div>
-              <div class="row-sub">实例能否自己再拉一个角色进团队，0 表示禁止</div>
+              <div class="row-sub">子成员还能否再派一层（同一团队内的父子树），0 表示禁止</div>
             </div>
             <div style="display:flex;align-items:center;gap:var(--s3);flex:none">
-              <span class="readonly-val">硬上限 1</span>
-              <input class="input num" value="0" style="width:64px;text-align:center" aria-label="再派活深度">
+              <span class="readonly-val">硬上限 2</span>
+              <input class="input num" value="1" style="width:64px;text-align:center" aria-label="再派活深度">
+            </div>
+          </div>
+
+          <!-- FR-32 支柱一：maxChildren 与 memberMaxDepth 是两个独立上限，缺一个就画不出「能派生几个」 -->
+          <div class="row">
+            <div class="row-main">
+              <div class="row-title">每人子成员上限</div>
+              <div class="row-sub">一个实例最多派几个子成员（与团队规模 <span class="num">maxMembers</span> 同时生效，取先到者）</div>
+            </div>
+            <div style="display:flex;align-items:center;gap:var(--s3);flex:none">
+              <span class="readonly-val">硬上限 5</span>
+              <input class="input num" value="3" style="width:64px;text-align:center" aria-label="每人子成员上限">
             </div>
           </div>
 
@@ -199,7 +211,7 @@
         <div class="dsec-head" style="margin-bottom:var(--s2)"><h4>状态目录</h4><span class="line"></span></div>
         <div class="card" style="gap:var(--s3)">
           <div style="display:flex;align-items:center;gap:var(--s3);flex-wrap:wrap">
-            <span class="readonly-val num" style="flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis">.team-workplace/</span>
+            <span class="readonly-val num" style="flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis">.dsh-myteam/</span>
             <button class="btn sm"><svg class="icon icon-14"><use href="icons.svg#i-file"></use></svg>打开目录</button>
           </div>
           <div style="display:flex;align-items:center;gap:var(--s3);font-size:12px;color:var(--muted);flex-wrap:wrap">
@@ -216,19 +228,23 @@
       <section>
         <div class="dsec-head" style="margin-bottom:var(--s2)"><h4>团队生命周期</h4><span class="line"></span></div>
         <div class="rows">
+          <!-- CHG-195（P0-4）：账本只有 `team.disbanded` 一个团队级事件，折叠出的状态就是 archived，
+               没有「可逆归档」这一档。原来把它画成「归档（可随时重新打开）」+「解散（不可逆）」两个动作，
+               是给了一个后端并不存在的承诺——点「归档」实际只能走解散。这里合成一个动作：
+               结束 = 归档快照，不可逆，只能只读回放。 -->
           <div class="row">
             <div class="row-main">
-              <div class="row-title">归档此团队</div>
-              <div class="row-sub">在册角色会被排空释放，账本与 token 记录归档到 <span class="num">archive/</span>，可随时重新打开查看</div>
+              <div class="row-title" style="color:var(--fail-ink)">结束此团队，归档快照</div>
+              <div class="row-sub">不可撤销。结束后 5 个在册实例被排空释放、未完成任务<b>按当前状态冻结进快照</b>（不会自动转 blocked），账本与产物作为只读快照落到 <span class="num">history/archive/&lt;teamId&gt;/</span>，之后只能在归档回放里查看，不能重新启动。</div>
             </div>
-            <button class="btn sm" style="flex:none">归档</button>
+            <a class="btn danger sm" href="confirm.html" style="flex:none">结束并归档…</a>
           </div>
           <div class="row">
             <div class="row-main">
-              <div class="row-title" style="color:var(--fail-ink)">解散此团队</div>
-              <div class="row-sub">不可撤销。5 个在册角色将被排空释放，8 个未完成任务转 blocked</div>
+              <div class="row-title">查看归档回放</div>
+              <div class="row-sub">已结束的团队按留档只读展示：结局、名册终态、token 五项分解与账本原件</div>
             </div>
-            <a class="btn danger sm" href="confirm.html" style="flex:none">解散</a>
+            <a class="btn sm" href="archive.html" style="flex:none">打开归档</a>
           </div>
         </div>
       </section>

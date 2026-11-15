@@ -23,7 +23,7 @@
     <nav class="dsh-nav" aria-label="选项栏">
       <a href="#"><svg class="icon icon-18"><use href="icons.svg#i-puzzle"></use></svg><span class="lbl">插件</span></a>
       <a href="#"><svg class="icon icon-18"><use href="icons.svg#i-clock"></use></svg><span class="lbl">自动化任务</span></a>
-      <a href="shell.html" aria-current="page"><svg class="icon icon-18"><use href="icons.svg#i-people"></use></svg><span class="lbl">myteam</span></a>
+      <a href="global.html" aria-current="page"><svg class="icon icon-18"><use href="icons.svg#i-people"></use></svg><span class="lbl">myteam</span></a>
       <a href="#"><svg class="icon icon-18"><use href="icons.svg#i-grid"></use></svg><span class="lbl">更多</span></a>
     </nav>
     <div class="dsh-sec">
@@ -52,13 +52,10 @@
   </aside>
 
   <main class="main">
-    <!-- ══ 面板顶栏（作用域切换）══ -->
+    <!-- ══ 画布「团队视图」tab（CHG-201：项目表面，只标层级、不互相切换）══ -->
     <header class="panel-bar">
       <b class="panel-name">myteam</b>
-      <div class="seg" role="group" aria-label="作用域">
-        <a href="global.html" aria-pressed="false">全局</a>
-        <a href="shell.html" aria-pressed="true">项目</a>
-      </div>
+      <span class="scope-label" title="这是当前会话所属项目的视图；全局资产在左侧侧边栏页">项目</span>
       <button class="icon-btn" aria-label="刷新面板"><svg class="icon icon-16"><use href="icons.svg#i-refresh"></use></svg></button>
     </header>
 
@@ -85,6 +82,7 @@
           <span class="path">D:\Work\harbor-web</span>
         </div>
 
+        <div class="team-grid">
         <a class="team-card" href="roster.html">
           <div class="tc-head">
             <span class="name">结算页模块化</span>
@@ -92,7 +90,10 @@
             <span class="tc-zone"><span class="dot"></span>在线</span>
           </div>
           <p class="tc-desc">把结算页拆成独立模块，补齐回归测试并替换旧调用点</p>
-          <p class="tc-meta num"><span>完成 3/11</span><span>进行中 2</span><span>门禁待审 2</span><span>更新 43 分钟前</span></p>
+          <div class="tc-bar" role="img" aria-label="完成 3/11，进行中 2，门禁待审 2">
+            <i class="seg-done" style="flex:3"></i><i class="seg-run" style="flex:2"></i><i class="seg-gate" style="flex:2"></i><i style="flex:4"></i>
+          </div>
+          <p class="tc-meta num"><span>完成 3/11</span><span class="sep">·</span><span>进行中 2</span><span class="sep">·</span><span>门禁待审 2</span><span class="sep">·</span><span>更新 43 分钟前</span></p>
         </a>
 
         <a class="team-card" href="roster.html">
@@ -102,8 +103,12 @@
             <span class="tc-zone"><span class="dot"></span>在线</span>
           </div>
           <p class="tc-desc">为 v0.2 插件接口做兼容性评审与契约比对</p>
-          <p class="tc-meta num"><span>完成 2/6</span><span>进行中 1</span><span>更新 12 分钟前</span></p>
+          <div class="tc-bar" role="img" aria-label="完成 2/6，进行中 1">
+            <i class="seg-done" style="flex:2"></i><i class="seg-run" style="flex:1"></i><i style="flex:3"></i>
+          </div>
+          <p class="tc-meta num"><span>完成 2/6</span><span class="sep">·</span><span>进行中 1</span><span class="sep">·</span><span>更新 12 分钟前</span></p>
         </a>
+        </div>
       </section>
 
       <section class="home-group">
@@ -112,14 +117,70 @@
           <span class="path">D:\Work\mocha-lab\demo-ws</span>
         </div>
 
-        <div class="team-card">
+        <div class="team-grid">
+        <!-- 草稿团队（FR-26）：不是链接卡——草稿还没有名册可进；给「待裁决」chip 与人审三动作，
+             否则 draft → active 在团队列表没有入口（P1-3 / CHG-198）。 -->
+        <article class="team-card">
           <div class="tc-head">
             <span class="name">控制台国际化</span>
-            <span class="chip idle"><span class="shape idle"></span>草稿</span>
-            <span class="tc-zone">离线</span>
+            <span class="chip gate"><span class="shape gate"></span>待裁决</span>
+            <span class="tc-zone off">离线</span>
           </div>
-          <p class="tc-desc">把控制台文案抽成多语言资源并接入构建</p>
-          <p class="tc-meta num"><span>完成 0/0</span><span>更新 5 小时前</span></p>
+          <p class="tc-desc">把控制台文案抽成多语言资源并接入构建 · 计划已暂存，等你裁决</p>
+          <div class="tc-bar" role="img" aria-label="计划已暂存，还没有任务"><i style="flex:1"></i></div>
+          <p class="tc-meta num"><span>草稿 · 0 任务</span><span class="sep">·</span><span>更新 5 小时前</span></p>
+          <div class="card-row" style="gap:6px;margin-top:2px">
+            <span class="mini-link" style="margin-left:0">Approve &amp; Run</span>
+            <span class="mini-link" style="margin-left:0">Revise</span>
+            <span class="mini-link" style="margin-left:0;color:var(--fail-ink)">Discard</span>
+          </div>
+        </article>
+        </div>
+      </section>
+
+      <!-- ══ 已归档（CHG-195）：archived 态的活入口 ══
+           原来只有已撤屏的 overview.html 链到 archive.html，归档回放在有效 IA 里是孤岛。
+           「团队」tab 必须能进到归档回放，否则团队状态机的 archived 终态不可达。 -->
+      <section class="home-group" id="archived">
+        <div class="home-group-head">
+          <b>已归档</b><span class="n">3 个团队</span>
+          <span class="path">只读 · 回放样例 t-3a80f5</span>
+        </div>
+
+        <div class="rows">
+          <article class="row">
+            <span class="mavatar" style="width:28px;height:28px;flex:none;background:var(--surface-3);color:var(--muted)"><svg class="icon icon-14"><use href="icons.svg#i-archive"></use></svg></span>
+            <div class="row-main">
+              <div class="row-title">埋点口径对齐 <span class="mini-chip num">t-6c19a0</span></div>
+              <div class="row-sub">4 个角色 · 7 个任务全部完成 · 归档于 10 月 26 日</div>
+            </div>
+            <div class="row-act">
+              <a class="btn sm" href="archive.html">回放</a>
+              <button class="icon-btn" style="width:28px;height:28px" aria-label="团队操作"><svg class="icon icon-14"><use href="icons.svg#i-more"></use></svg></button>
+            </div>
+          </article>
+          <article class="row">
+            <span class="mavatar" style="width:28px;height:28px;flex:none;background:var(--surface-3);color:var(--muted)"><svg class="icon icon-14"><use href="icons.svg#i-archive"></use></svg></span>
+            <div class="row-main">
+              <div class="row-title">CI 超时排查 <span class="mini-chip num">t-3a80f5</span> <span class="chip fail" style="height:20px;padding:0 6px 0 5px"><span class="shape fail" style="width:6px;height:6px"></span>未收口</span></div>
+              <div class="row-sub">2 个角色 · 3 个任务，1 个 blocked 后解散 · 归档于 10 月 24 日</div>
+            </div>
+            <div class="row-act">
+              <a class="btn sm" href="archive.html">回放</a>
+              <button class="icon-btn" style="width:28px;height:28px" aria-label="团队操作"><svg class="icon icon-14"><use href="icons.svg#i-more"></use></svg></button>
+            </div>
+          </article>
+          <article class="row">
+            <span class="mavatar" style="width:28px;height:28px;flex:none;background:var(--surface-3);color:var(--muted)"><svg class="icon icon-14"><use href="icons.svg#i-archive"></use></svg></span>
+            <div class="row-main">
+              <div class="row-title">依赖升级预研 <span class="mini-chip num">t-90d2b1</span></div>
+              <div class="row-sub">3 个角色 · 5 个任务全部完成 · 归档于 10 月 21 日</div>
+            </div>
+            <div class="row-act">
+              <a class="btn sm" href="archive.html">回放</a>
+              <button class="icon-btn" style="width:28px;height:28px" aria-label="团队操作"><svg class="icon icon-14"><use href="icons.svg#i-more"></use></svg></button>
+            </div>
+          </article>
         </div>
       </section>
     </div>

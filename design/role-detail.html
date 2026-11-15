@@ -38,7 +38,7 @@
     <nav class="dsh-nav" aria-label="选项栏">
       <a href="#"><svg class="icon icon-18"><use href="icons.svg#i-puzzle"></use></svg><span class="lbl">插件</span></a>
       <a href="#"><svg class="icon icon-18"><use href="icons.svg#i-clock"></use></svg><span class="lbl">自动化任务</span></a>
-      <a href="shell.html" aria-current="page"><svg class="icon icon-18"><use href="icons.svg#i-people"></use></svg><span class="lbl">myteam</span></a>
+      <a href="global.html" aria-current="page"><svg class="icon icon-18"><use href="icons.svg#i-people"></use></svg><span class="lbl">myteam</span></a>
       <a href="#"><svg class="icon icon-18"><use href="icons.svg#i-grid"></use></svg><span class="lbl">更多</span></a>
     </nav>
     <div class="dsh-sec">
@@ -70,10 +70,7 @@
     <!-- ══ 面板顶栏（作用域切换）══ -->
     <header class="panel-bar">
       <b class="panel-name">myteam</b>
-      <div class="seg" role="group" aria-label="作用域">
-        <a href="global.html" aria-pressed="true">全局</a>
-        <a href="shell.html" aria-pressed="false">项目</a>
-      </div>
+      <span class="scope-label" title="侧边栏页只有全局信息；某个项目的视图在会话画布的「团队视图」tab">全局</span>
       <button class="icon-btn" aria-label="刷新面板"><svg class="icon icon-16"><use href="icons.svg#i-refresh"></use></svg></button>
     </header>
 
@@ -84,7 +81,7 @@
       <span class="chip idle"><span class="shape idle"></span>内置 · 只读</span>
       <span class="tb-goal">按任务写实现、附验证证据；fork 到项目后可改</span>
       <span class="tb-actions">
-        <a class="btn primary sm" href="roles.html">复制到项目</a>
+        <a class="btn primary sm" href="roles.html">对比差异</a>
         <button class="icon-btn" aria-label="角色操作"><svg class="icon icon-14"><use href="icons.svg#i-more"></use></svg></button>
       </span>
     </header>
@@ -189,7 +186,7 @@
         <!-- 在册情况 -->
         <section class="sec" style="gap:10px">
           <div class="dsec-head"><h4>在册情况</h4><span class="line"></span></div>
-          <div style="font-size:13px">被 <b>2 个团队</b>聘任 · <b>3 个实例</b></div>
+          <div style="font-size:13px">本项目 <b>2 实例</b><span style="color:var(--muted)"> · 跨项目聘任不在面板可见范围（面板按项目取数）</span></div>
           <div style="display:flex;flex-direction:column;gap:8px">
             <div style="display:flex;align-items:center;gap:8px;font-size:12px">
               <span class="mavatar a1" style="width:22px;height:22px;font-size:12px">实</span>
@@ -220,7 +217,7 @@
         <!-- 操作 -->
         <section class="sec" style="gap:8px">
           <div class="dsec-head"><h4>操作</h4><span class="line"></span></div>
-          <a class="btn primary" href="roles.html" style="width:100%">复制到项目</a>
+          <a class="btn primary" href="roles.html" style="width:100%">对比差异</a>
           <a class="btn" href="conversation.html" style="width:100%">在队长会话试召唤</a>
           <button class="btn ghost" disabled style="width:100%">删除（内置只读）</button>
         </section>
