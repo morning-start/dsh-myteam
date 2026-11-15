@@ -479,7 +479,6 @@ window.__ModuleLoader__.load({
       'role.saveHint': '保存后：在跑实例不变（召唤时快照），下次召唤生效。',
       'role.builtinReadonly': '内置/全局角色是复制源：编辑会先复制成项目角色，原文件不动。',
       'role.invalid': '保存失败：{msg}',
-      'task.formTitleNew': '新建任务',
       'task.formTitleEdit': '编辑任务',
       'task.field.team': '主责团队（在线）',
       'task.field.title': '标题',
@@ -1552,7 +1551,6 @@ window.__ModuleLoader__.load({
       'role.saveHint': 'After saving: running instances keep their summon-time snapshot; the next summon picks it up.',
       'role.builtinReadonly': 'Built-in/global roles are copy sources: editing copies into a project role and leaves the original untouched.',
       'role.invalid': 'Save failed: {msg}',
-      'task.formTitleNew': 'New task',
       'task.formTitleEdit': 'Edit task',
       'task.field.team': 'Owning team (online)',
       'task.field.title': 'Title',
@@ -9777,9 +9775,10 @@ window.__ModuleLoader__.load({
     }
 
     /** 任务表单（CHG-72，FR-29/31；CHG-73：新建单次 createTask，编辑结构改动给「保存并重新规划 / 只保存元数据」两个出口） */
-    function TaskFormDrawer({ t, mode, teams, tasks, initial, defaultTeamId, connection, onClose, onSaved }) {
+    function TaskFormDrawer({ t, teams, tasks, initial, connection, onClose, onSaved }) {
       const src = initial?.input ?? {}
-      const [teamId, setTeamId] = react.useState(initial?.ownerTeamId ?? defaultTeamId ?? '')
+      /* CHG-204：任务不能手动建，本抽屉只剩「编辑」一种用法——团队不可改（由打开时的任务归属决定） */
+      const teamId = initial?.ownerTeamId ?? ''
       const [title, setTitle] = react.useState(src.title ?? '')
       const [description, setDescription] = react.useState(src.description ?? '')
       const [ac, setAc] = react.useState((src.acceptanceCriteria ?? []).join('\n'))
@@ -9853,31 +9852,6 @@ window.__ModuleLoader__.load({
         const api = makeApi(connection, team.sessionId)
         setBusy(true)
         try {
-          if (mode === 'create') {
-            const payload = {
-              title: title.trim(),
-              description: description.trim(),
-              acceptanceCriteria: acList,
-              deps: [...deps],
-              requiredRole: role,
-              priority,
-              ...(deliverable.trim() ? { deliverableSpec: { path: deliverable.trim() } } : {}),
-              ...(gateList.length > 0 ? { gateChain: gateList } : {}),
-              ...(verifyArgv.length > 0 ? { verifyCommand: { argv: verifyArgv, ...(verifyCwdValue ? { cwd: verifyCwdValue } : {}) } } : {}),
-            }
-            // CHG-73：新建改为单次 createTask（assignees/participants 随创建一起落账，服务端补写标注）
-            const created = await api.createTask({
-              teamId,
-              task: payload,
-              ...(assignees.size > 0 ? { assignees: [...assignees] } : {}),
-              ...(coops.size > 0 ? { participants: [...coops].map((coopId) => ({ teamId: coopId })) } : {}),
-            })
-            if (created?.status !== 'created') throw new Error(created?.message ?? created?.code ?? 'create failed')
-            const warnings = (created.warnings ?? []).filter(Boolean)
-            const message = t('task.created').replace('{id}', created.taskId) + (warnings.length > 0 ? ` · ${warnings.join('；')}` : '')
-            onSaved(created.taskId, message)
-            return
-          }
           const normalized = {
             title: title.trim(), description: description.trim(), ac: acList.join('\n'),
             deliverable: deliverable.trim(), deps: [...deps].join(','), role,
@@ -9962,7 +9936,7 @@ window.__ModuleLoader__.load({
       }
       return js('div', { className: 'mt-drawer mt-drawer-wide', children: [
         js('div', { className: 'mt-drawer-head', children: [
-          j('strong', { children: mode === 'create' ? t('task.formTitleNew') : t('task.formTitleEdit') }),
+          j('strong', { children: t('task.formTitleEdit') }),
           j('button', { className: 'mt-btn', onClick: onClose, children: t('action.close') }),
         ] }),
         js('div', { className: 'mt-form', children: [
@@ -9970,8 +9944,7 @@ window.__ModuleLoader__.load({
             j('label', { children: t('task.field.team') }),
             js('select', {
               value: teamId,
-              disabled: mode === 'edit',
-              onChange: (e) => { setTeamId(e.target.value); setRole(''); setDeps(new Set()); setAssignees(new Set()); setCoops(new Set()) },
+              disabled: true,
               children: teams.map((item) => j('option', { key: item.teamId, value: item.teamId, children: `${item.name || item.teamId}${item.online ? '' : ` · ${t('global.offline')}`}` })),
             }),
           ] }),
@@ -10074,10 +10047,6 @@ window.__ModuleLoader__.load({
         ] }),
       ] })
     }
-
-    /* ══ CHG-76 B：批量新建草稿（目标 + 行列表 → 预览 impact → 一次创建） ══ */
-
-    /** 草稿行的稳定 key（只用于列表渲染；不参与提交内容） */
     function TeamCreateDrawer({ t, ctx, projectRoot, presets, roles, onClose, onManagePresets, onRetryPresets }) {
       const [step, setStep] = react.useState(1)
       const [name, setName] = react.useState('')
@@ -11434,17 +11403,6 @@ window.__ModuleLoader__.load({
       ] })
     }
 
-    /**
-     * 主工作台（CHG-201：**两个作用域物理分离**，由挂载点决定，界面内不可切换）。
-     *
-     *  - `mode="global"`（`main` 槽 = 左侧侧边栏页）：**只有全局信息**——内置 + 全局角色、
-     *    预设、技能 & MCP、插件贡献。没有团队列表 / 项目清单 / 任务看板（全局不记录项目）。
-     *  - `mode="project"`（`conversation.view` 槽 = 画布「团队视图」tab）：**一个具体项目**的
-     *    视图——本项目团队列表 + 团队内看板/参与任务/知识/审计/设置，工作区由会话解析。
-     *
-     * 为什么不让界面内切作用域（旧 `全局 | 项目` seg 已删除）：两个作用域的数据面不同
-     * （全局根 vs 项目根），放在同一个可切换的壳里必然互相串数据（「所有项目看起来都一样」）。
-     */
     function Panel(props) {
       const { ctx, connection, t: tProp, mode = 'global', sessionId: panelSessionId } = props
       const t = tProp ?? ((k) => zh[k] ?? k)
@@ -12435,7 +12393,6 @@ window.__ModuleLoader__.load({
           onDelete: openTask.online ? deleteTaskFlow : undefined,
           onDiagnosisFixed,
           onEdit: openTask.online ? (detail) => openTaskEditor({
-            mode: 'edit',
             task: {
               id: detail.id,
               ownerTeamId: openTask.teamId,
@@ -13496,13 +13453,11 @@ window.__ModuleLoader__.load({
             save: saveRoleDef,
           }) : null,
           taskForm ? j(TaskFormDrawer, {
-            key: `task-${taskForm.mode}-${taskForm.task?.id ?? 'new'}`,
+            key: `task-${taskForm.task?.id ?? 'new'}`,
             t,
-            mode: taskForm.mode,
             teams: pv.teams ?? [],
             tasks: pv.tasks ?? [],
             initial: taskForm.task,
-            defaultTeamId: taskForm.defaultTeamId,
             connection,
             onClose: () => setTaskForm(null),
             onSaved: onTaskSaved,

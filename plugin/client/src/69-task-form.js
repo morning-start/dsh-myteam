@@ -1,6 +1,7 @@
-    function TaskFormDrawer({ t, mode, teams, tasks, initial, defaultTeamId, connection, onClose, onSaved }) {
+    function TaskFormDrawer({ t, teams, tasks, initial, connection, onClose, onSaved }) {
       const src = initial?.input ?? {}
-      const [teamId, setTeamId] = react.useState(initial?.ownerTeamId ?? defaultTeamId ?? '')
+      /* CHG-204：任务不能手动建，本抽屉只剩「编辑」一种用法——团队不可改（由打开时的任务归属决定） */
+      const teamId = initial?.ownerTeamId ?? ''
       const [title, setTitle] = react.useState(src.title ?? '')
       const [description, setDescription] = react.useState(src.description ?? '')
       const [ac, setAc] = react.useState((src.acceptanceCriteria ?? []).join('\n'))
@@ -74,31 +75,6 @@
         const api = makeApi(connection, team.sessionId)
         setBusy(true)
         try {
-          if (mode === 'create') {
-            const payload = {
-              title: title.trim(),
-              description: description.trim(),
-              acceptanceCriteria: acList,
-              deps: [...deps],
-              requiredRole: role,
-              priority,
-              ...(deliverable.trim() ? { deliverableSpec: { path: deliverable.trim() } } : {}),
-              ...(gateList.length > 0 ? { gateChain: gateList } : {}),
-              ...(verifyArgv.length > 0 ? { verifyCommand: { argv: verifyArgv, ...(verifyCwdValue ? { cwd: verifyCwdValue } : {}) } } : {}),
-            }
-            // CHG-73：新建改为单次 createTask（assignees/participants 随创建一起落账，服务端补写标注）
-            const created = await api.createTask({
-              teamId,
-              task: payload,
-              ...(assignees.size > 0 ? { assignees: [...assignees] } : {}),
-              ...(coops.size > 0 ? { participants: [...coops].map((coopId) => ({ teamId: coopId })) } : {}),
-            })
-            if (created?.status !== 'created') throw new Error(created?.message ?? created?.code ?? 'create failed')
-            const warnings = (created.warnings ?? []).filter(Boolean)
-            const message = t('task.created').replace('{id}', created.taskId) + (warnings.length > 0 ? ` · ${warnings.join('；')}` : '')
-            onSaved(created.taskId, message)
-            return
-          }
           const normalized = {
             title: title.trim(), description: description.trim(), ac: acList.join('\n'),
             deliverable: deliverable.trim(), deps: [...deps].join(','), role,
@@ -183,7 +159,7 @@
       }
       return js('div', { className: 'mt-drawer mt-drawer-wide', children: [
         js('div', { className: 'mt-drawer-head', children: [
-          j('strong', { children: mode === 'create' ? t('task.formTitleNew') : t('task.formTitleEdit') }),
+          j('strong', { children: t('task.formTitleEdit') }),
           j('button', { className: 'mt-btn', onClick: onClose, children: t('action.close') }),
         ] }),
         js('div', { className: 'mt-form', children: [
@@ -191,8 +167,7 @@
             j('label', { children: t('task.field.team') }),
             js('select', {
               value: teamId,
-              disabled: mode === 'edit',
-              onChange: (e) => { setTeamId(e.target.value); setRole(''); setDeps(new Set()); setAssignees(new Set()); setCoops(new Set()) },
+              disabled: true,
               children: teams.map((item) => j('option', { key: item.teamId, value: item.teamId, children: `${item.name || item.teamId}${item.online ? '' : ` · ${t('global.offline')}`}` })),
             }),
           ] }),
@@ -295,7 +270,3 @@
         ] }),
       ] })
     }
-
-    /* ══ CHG-76 B：批量新建草稿（目标 + 行列表 → 预览 impact → 一次创建） ══ */
-
-    /** 草稿行的稳定 key（只用于列表渲染；不参与提交内容） */

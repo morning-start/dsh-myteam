@@ -988,7 +988,6 @@
           onDelete: openTask.online ? deleteTaskFlow : undefined,
           onDiagnosisFixed,
           onEdit: openTask.online ? (detail) => openTaskEditor({
-            mode: 'edit',
             task: {
               id: detail.id,
               ownerTeamId: openTask.teamId,
@@ -2049,13 +2048,11 @@
             save: saveRoleDef,
           }) : null,
           taskForm ? j(TaskFormDrawer, {
-            key: `task-${taskForm.mode}-${taskForm.task?.id ?? 'new'}`,
+            key: `task-${taskForm.task?.id ?? 'new'}`,
             t,
-            mode: taskForm.mode,
             teams: pv.teams ?? [],
             tasks: pv.tasks ?? [],
             initial: taskForm.task,
-            defaultTeamId: taskForm.defaultTeamId,
             connection,
             onClose: () => setTaskForm(null),
             onSaved: onTaskSaved,

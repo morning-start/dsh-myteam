@@ -255,7 +255,6 @@
       'role.saveHint': 'After saving: running instances keep their summon-time snapshot; the next summon picks it up.',
       'role.builtinReadonly': 'Built-in/global roles are copy sources: editing copies into a project role and leaves the original untouched.',
       'role.invalid': 'Save failed: {msg}',
-      'task.formTitleNew': 'New task',
       'task.formTitleEdit': 'Edit task',
       'task.field.team': 'Owning team (online)',
       'task.field.title': 'Title',

@@ -91,15 +91,11 @@ test('t49-7: 角色删除与技能/MCP 目录 —— canDelete 门控、两段�
   assert.match(source, /const commit = \(\) => \{/)
 })
 
-test('t49-8: 新建任务一次写入 assignees/participants（不再串三个调用）', () => {
-  const start = source.indexOf('const created = await api.createTask({')
-  assert.ok(start > 0, '任务表单应调用 createTask')
-  const body = source.slice(start, start + 700)
-  assert.match(body, /assignees: \[\.\.\.assignees\]/)
-  assert.match(body, /participants: \[\.\.\.coops\]\.map\(\(coopId\) => \(\{ teamId: coopId \}\)\)/)
-  // 保存路径里不应再出现"创建后逐个 assignTask/participateTask"的旧三连
-  assert.ok(!/created\.taskId[\s\S]{0,400}api\.assignTask\(/.test(body), '不应再串 assignTask')
-  assert.ok(!/created\.taskId[\s\S]{0,400}api\.participateTask\(/.test(body), '不应再串 participateTask')
+test('t49-8: 任务表单只剩编辑——createTask 新建路径已删（CHG-204）', () => {
+  // 产品定案「任务不能手动建」：抽屉只由任务详情「编辑」打开，create 分支整段移除。
+  assert.ok(!source.includes('const created = await api.createTask({'), '新建路径已删除')
+  assert.ok(source.includes("const teamId = initial?.ownerTeamId ?? ''"), '团队由打开时的任务归属决定')
+  assert.ok(source.includes('disabled: true,\n              children: teams.map'), '团队选择只读')
 })
 
 test('t49-9: CHG-73 新增词条 zh/en 对等', () => {

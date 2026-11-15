@@ -260,7 +260,6 @@
       'role.saveHint': '保存后：在跑实例不变（召唤时快照），下次召唤生效。',
       'role.builtinReadonly': '内置/全局角色是复制源：编辑会先复制成项目角色，原文件不动。',
       'role.invalid': '保存失败：{msg}',
-      'task.formTitleNew': '新建任务',
       'task.formTitleEdit': '编辑任务',
       'task.field.team': '主责团队（在线）',
       'task.field.title': '标题',
