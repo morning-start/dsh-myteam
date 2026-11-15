@@ -1947,16 +1947,10 @@
         setDetailToken((value) => value + 1)
         await loadProject(projectRoot)
       }
-      /** 角色删除（CHG-73 / CHG-103）：deleteRole 两段确认；全局作用域需 confirmGlobal */
-      const deleteRoleFlow = async (roleId, confirm, scope) => {
+      /** 角色删除（CHG-73 / CHG-103）：deleteRole 两段确认 */
+      const deleteRoleFlow = async (roleId, confirm) => {
         if (!roleId) return { status: 'error', code: 'MT_VALIDATION', message: 'missing roleId' }
-        const result = await discoveryApi.deleteRole({
-          workspaceRoot: projectRoot,
-          roleId,
-          scope: scope === 'global' ? 'global' : 'project',
-          ...(scope === 'global' ? { confirmGlobal: confirm === true } : {}),
-          confirm,
-        })
+        const result = await discoveryApi.deleteRole({ workspaceRoot: projectRoot, roleId, confirm })
         if (result?.status === 'deleted') {
           setNotice(t('role.deleted').replace('{id}', roleId))
           setOpenRole(null)

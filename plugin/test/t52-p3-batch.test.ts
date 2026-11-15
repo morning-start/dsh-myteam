@@ -7,7 +7,7 @@
  *   3) 批量建任务：预览不写账本、确认后逐条 task.created（同一 batchId）、after 解析成依赖；
  *   4) 批量建任务的部分失败与结构校验（缺 title / after 自指 / 越界 / 成环）；
  *   5) 诊断 fix：no-role → 换角色 / 召唤；role-busy → 召唤增援；deps-pending 有闲置同角色 → 可指派；
- *   6) 门面透传：remote.batchTaskOp(rewire) 与 remote.createTasks（预览 + 创建）。
+ *   6) 门面透传：remote.batchTaskOp(rewire) 与 myteam_create_tasks 工具（预览 + 创建）。
  */
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
@@ -46,6 +46,10 @@ async function setupTeam(root: string) {
 
 const ledgerOf = (host: MyTeamHost, teamId: string) =>
   readFileSync(host.service(teamId).ledgerPath, 'utf8').trim().split('\n').map((line) => JSON.parse(line))
+
+/** CHG-204：`createTasks` 面板 RPC 已退役；批量建任务的能力只保留在队长工具通道（actor=human） */
+const createTasks = (host: MyTeamHost, args: Record<string, unknown>) =>
+  host.executeLeadTool('myteam_create_tasks', args, { actor: 'human' })
 
 /* ── 1. 批量改挂 ───────────────────────────────────────────── */
 
@@ -155,7 +159,7 @@ test('t52-4: 批量建任务 —— 预览不写账本；确认后逐条落账�
       { title: '验收', requiredRole: 'implementer', after: [2] },
     ]
     const before = ledgerOf(host, teamId).length
-    const preview = (await remote.createTasks({ teamId, goal: '把登录做完', tasks: drafts })) as any
+    const preview = (await createTasks(host, { teamId, goal: '把登录做完', tasks: drafts })) as any
     assert.equal(preview.status, 'confirm-required')
     assert.equal(preview.impact.tasks, 3)
     assert.deepEqual(preview.impact.byRole, { implementer: 3 })
@@ -166,7 +170,7 @@ test('t52-4: 批量建任务 —— 预览不写账本；确认后逐条落账�
     ])
     assert.equal(ledgerOf(host, teamId).length, before, '预览不写账本')
 
-    const created = (await remote.createTasks({ teamId, goal: '把登录做完', tasks: drafts, confirm: true })) as any
+    const created = (await createTasks(host, { teamId, goal: '把登录做完', tasks: drafts, confirm: true })) as any
     assert.equal(created.status, 'created')
     assert.equal(created.summary.created, 3)
     assert.equal(created.tasks.length, 3)
@@ -194,14 +198,14 @@ test('t52-5: 批量建任务的部分失败 —— 名册外角色该条失败�
   try {
     const { host, remote, teamId } = await setupTeam(root)
     // 预览就该点出"名册里没有这个角色"（同一条 create_task 管线：requiredRole 必须在名册）
-    const preview = (await remote.createTasks({
+    const preview = (await createTasks(host, {
       teamId,
       tasks: [{ title: 'A', requiredRole: 'implementer' }, { title: 'B', requiredRole: 'ghost-role' }],
     })) as any
     assert.equal(preview.status, 'confirm-required')
     assert.deepEqual(preview.impact.rolesMissing, ['ghost-role'])
 
-    const created = (await remote.createTasks({
+    const created = (await createTasks(host, {
       teamId,
       tasks: [
         { title: 'A', requiredRole: 'implementer' },
@@ -243,7 +247,7 @@ test('t52-6: 批量建任务的结构校验 —— 缺 title / after 自指 / �
       { tasks: [], code: 'MT_VALIDATION', match: /at least 1/ },
     ]
     for (const item of cases) {
-      const out = (await remote.createTasks({ teamId, tasks: item.tasks, confirm: true })) as any
+      const out = (await createTasks(host, { teamId, tasks: item.tasks, confirm: true })) as any
       assert.equal(out.status, 'error', JSON.stringify(item.tasks))
       assert.equal(out.code, item.code, JSON.stringify(out))
       if (item.match) assert.match(String(out.message), item.match)
@@ -326,7 +330,7 @@ test('t52-10: 批量建任务支持前向引用（第 1 条依赖第 2 条）—
   const root = mkdtempSync(join(tmpdir(), 'mt-t52-createtasks-forward-'))
   try {
     const { host, remote, teamId } = await setupTeam(root)
-    const created = (await remote.createTasks({
+    const created = (await createTasks(host, {
       teamId,
       tasks: [
         { title: '后置', requiredRole: 'implementer', after: [2] },
@@ -349,10 +353,10 @@ test('t52-10: 批量建任务支持前向引用（第 1 条依赖第 2 条）—
 
 /* ── 4. 门面透传 ───────────────────────────────────────────── */
 
-test('t52-9: 门面透传 —— batchTaskOp(rewire) 与 createTasks 走同一条账本管线（actor=human）', async () => {
+test('t52-9: 门面透传 —— batchTaskOp(rewire) 与 myteam_create_tasks 走同一条账本管线（actor=human）', async () => {
   const root = mkdtempSync(join(tmpdir(), 'mt-t52-facade-'))
   try {
-    const { remote, teamId } = await setupTeam(root)
+    const { host, remote, teamId } = await setupTeam(root)
     const a = (await remote.createTask({ teamId, task: TASK })) as any
     const b = (await remote.createTask({ teamId, task: { ...TASK, title: 'B', deps: [a.taskId] } })) as any
     const e = (await remote.createTask({ teamId, task: { ...TASK, title: 'E' } })) as any
@@ -361,7 +365,7 @@ test('t52-9: 门面透传 —— batchTaskOp(rewire) 与 createTasks 走同一�
     assert.equal(cancelled.results[0].rewired[0].added, e.taskId)
     void b
 
-    const preview = (await remote.createTasks({ teamId, tasks: [{ title: 'X', requiredRole: 'implementer' }] })) as any
+    const preview = (await createTasks(host, { teamId, tasks: [{ title: 'X', requiredRole: 'implementer' }] })) as any
     assert.equal(preview.status, 'confirm-required')
     assert.equal(preview.impact.tasks, 1)
   } finally {

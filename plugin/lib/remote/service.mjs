@@ -108,11 +108,6 @@ export class MyTeamRemote extends TypertRemoteService {
     return { status: 'ok', ...this.host.archiveView(args?.teamId) }
   }
 
-  /** 已归档团队清单（面板「全部团队」入口） */
-  async getArchives() {
-    return { status: 'ok', ...this.host.archiveList() }
-  }
-
   /**
    * 门禁裁决（CHG-86 / M2-C，FR-5.1~5.2）：面板侧的 review/verify 裁决入口。
    * 与队长工具 `myteam_review_task` 同一条管线（actor=human）；
@@ -260,11 +255,6 @@ export class MyTeamRemote extends TypertRemoteService {
   /** CHG-139c（docs/20 §8）：导出团队快照（只读团队；写 history/exports/） */
   async exportTeam(args                          = {}) {
     return this.host.exportTeamTool(args)
-  }
-
-  /** CHG-139c（docs/20 §8）：导入团队快照（新 id，永不覆盖） */
-  async importTeam(args                          = {}) {
-    return this.host.importTeamTool(args)
   }
 
   /** CHG-139d（docs/20 §5.4）：创建技能（**只写 myteam 队长预设**，不污染其它预设） */
@@ -525,24 +515,6 @@ export class MyTeamRemote extends TypertRemoteService {
     )                           
   }
 
-  /**
-   * CHG-76（FR-33）：批量建任务（面板「从目标出草稿」）——与队长工具同一条管线（task.created，actor=human）。
-   * 不带 confirm 时返回影响面预览，带 confirm=true 才落账。
-   */
-  async createTasks(args                                                                                         ) {
-    const { teamId } = this.resolveTeam(args?.teamId)
-    return this.host.executeLeadTool(
-      'myteam_create_tasks',
-      {
-        teamId,
-        ...(args?.goal ? { goal: args.goal } : {}),
-        tasks: args?.tasks ?? [],
-        confirm: args?.confirm === true,
-      },
-      { actor: 'human' },
-    )                           
-  }
-
   /** 解散团队（两段确认 + 影响面，FR-14.1 M1 聊天为主、面板入口兜底） */
   async disband(args                                       ) {
     if (args.confirm !== true) {
@@ -655,9 +627,9 @@ export class MyTeamRemote extends TypertRemoteService {
 }
 
 // 手动 Remote 标记（strip-only 环境等价装饰器）：gateway 按 method 名发现端点
-markRemoteMethods(MyTeamRemote.prototype, ['getBoard', 'getTaskDetail', 'getTokens', 'getInbox', 'getAudit', 'getConfig', 'saveTeamConfig', 'resetTeamConfig', 'getPlanFeedback', 'getTaskGraph', 'listSkills', 'listMembers', 'copyTeam', 'publishTeam', 'exportTeam', 'importTeam', 'createSkill', 'createTool', 'readSessionHistory', 'getPresets', 'planAction', 'postComment', 'memberOp', 'disband', 'createTask', 'createTasks', 'updateTask', 'assignTask', 'participateTask', 'rescopeTask', 'cancelTask', 'deleteTask', 'getProjectBoard', 'getProjectSummary', 'batchTaskOp',
+markRemoteMethods(MyTeamRemote.prototype, ['getBoard', 'getTaskDetail', 'getTokens', 'getInbox', 'getAudit', 'getConfig', 'saveTeamConfig', 'resetTeamConfig', 'getPlanFeedback', 'getTaskGraph', 'listSkills', 'listMembers', 'copyTeam', 'publishTeam', 'exportTeam', 'createSkill', 'createTool', 'readSessionHistory', 'getPresets', 'planAction', 'postComment', 'memberOp', 'disband', 'createTask', 'updateTask', 'assignTask', 'participateTask', 'rescopeTask', 'cancelTask', 'deleteTask', 'getProjectBoard', 'getProjectSummary', 'batchTaskOp',
   // CHG-86：门禁裁决 / 归档快照 / 知识提案策展
-  'reviewTask', 'getArchive', 'getArchives', 'adoptKnowledge',
+  'reviewTask', 'getArchive', 'adoptKnowledge',
   // CHG-87（FR-13.1/FR-16.1）：角色库统一写入口 + 单角色调用
   'roleOp', 'applyRoles',
   // CHG-88（M2-E / FR-16.3）：会话移交（摘要 → 新团队预设会话）

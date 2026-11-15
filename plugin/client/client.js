@@ -2827,18 +2827,15 @@ window.__ModuleLoader__.load({
         getProjectSummary: (query) => call('getProjectSummary', query),
         batchTaskOp: (query) => call('batchTaskOp', query),
         createTask: (query) => call('createTask', query),
-        /* CHG-76 B：批量建任务（预览 / 确认同一端点；逐条 task.created 同一 batchId） */
-        createTasks: (query) => call('createTasks', query),
         updateTask: (query) => call('updateTask', query),
         assignTask: (query) => call('assignTask', query),
         participateTask: (query) => call('participateTask', query),
         /* CHG-86 新增端点（面板直连；与队长工具同一条管线，actor=human）：
          *  - reviewTask：门禁裁决（pass / fail；review·verify 门强制交叉审查，archive 门由 host 落位校验）；
-         *  - getArchive / getArchives：归档快照读面（archive/<teamId>/team.json 等真实落盘文件）；
+         *  - getArchive：归档快照读面（archive/<teamId>/team.json 等真实落盘文件）；
          *  - adoptKnowledge：知识提案采纳 / 驳回（UI-5 验收门的按钮写路径）。 */
         reviewTask: (query) => call('reviewTask', query),
         getArchive: (query) => call('getArchive', query),
-        getArchives: (query) => call('getArchives', query),
         adoptKnowledge: (query) => call('adoptKnowledge', query),
         /* CHG-87（FR-16.1 / 契约 §5.1）：单角色调用写入口。
          * `applyRoles({ teamId?, roles: string[], remove?: string[], confirm? })`——
@@ -2874,9 +2871,8 @@ window.__ModuleLoader__.load({
         /* CHG-139b（docs/19 §5.2/§5.3）：复制团队 / 发布团队（发布 = H 档两段确认） */
         copyTeam: (query) => call('copyTeam', query),
         publishTeam: (query) => call('publishTeam', query),
-        /* CHG-139c（docs/20 §8）：导出 / 导入团队快照（导入 = 新 id，永不覆盖） */
+        /* CHG-139c（docs/20 §8）：导出团队快照（只读团队；写 history/exports/） */
         exportTeam: (query) => call('exportTeam', query),
-        importTeam: (query) => call('importTeam', query),
         /* CHG-139d（docs/20 §5.4）：创建技能 / 工具（只写 myteam 队长预设） */
         createSkill: (query) => call('createSkill', query),
         createTool: (query) => call('createTool', query),
@@ -2891,9 +2887,8 @@ window.__ModuleLoader__.load({
     let pendingNav = null
     /** 团队摘要 → 工作台入口上下文（纯函数，测试直接断言） */
     function entryNavForTeam(team) {
-      if (!team || !team.teamId) return { scope: 'global' }
+      if (!team || !team.teamId) return {}
       return {
-        scope: 'project',
         workspaceRoot: String(team.workspaceRoot ?? ''),
         teamId: String(team.teamId),
         projectTab: 'teams',
@@ -2921,13 +2916,13 @@ window.__ModuleLoader__.load({
       return nav
     }
     async function resolveNavForSession(connection, sessionId) {
-      if (!connection || !sessionId) return { scope: 'global' }
+      if (!connection || !sessionId) return {}
       try {
         /* CHG-201：项目作用域按**会话**解析（getProjectScope），不再跨工作区发现团队。 */
         const scope = await makeApi(connection, sessionId).getProjectScope()
         return entryNavForTeam((scope?.teams ?? []).find((entry) => entry.sessionId === sessionId))
       } catch {
-        return { scope: 'global' }
+        return {}
       }
     }
     /* ── 状态徽标（H4：文字 + 形状，不依赖颜色）── */
@@ -13399,16 +13394,10 @@ window.__ModuleLoader__.load({
         setDetailToken((value) => value + 1)
         await loadProject(projectRoot)
       }
-      /** 角色删除（CHG-73 / CHG-103）：deleteRole 两段确认；全局作用域需 confirmGlobal */
-      const deleteRoleFlow = async (roleId, confirm, scope) => {
+      /** 角色删除（CHG-73 / CHG-103）：deleteRole 两段确认 */
+      const deleteRoleFlow = async (roleId, confirm) => {
         if (!roleId) return { status: 'error', code: 'MT_VALIDATION', message: 'missing roleId' }
-        const result = await discoveryApi.deleteRole({
-          workspaceRoot: projectRoot,
-          roleId,
-          scope: scope === 'global' ? 'global' : 'project',
-          ...(scope === 'global' ? { confirmGlobal: confirm === true } : {}),
-          confirm,
-        })
+        const result = await discoveryApi.deleteRole({ workspaceRoot: projectRoot, roleId, confirm })
         if (result?.status === 'deleted') {
           setNotice(t('role.deleted').replace('{id}', roleId))
           setOpenRole(null)

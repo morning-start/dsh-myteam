@@ -2,7 +2,7 @@
  * CHG-76（P3 收口）客户端契约：三块必须真的接上端点与两段确认，不能只画按钮。
  *
  *  A. 批量条三档下游策略（leave / cancel / rewire）+ 新上游下拉 + 三档影响面 + 已改挂汇总
- *  B. 任务页「批量新建」草稿抽屉：createTasks 预览（不带 confirm）→ 创建（confirm）→ notice
+ *  B. 任务页「批量新建」草稿抽屉：已随 CHG-202v 删除；`createTasks` 面板 RPC 于 CHG-204 退役（能力留在队长工具）
  *  C. 详情页诊断「一键修复」：assignable → assignTask / roleSwap → updateTask(requiredRole) / spawnRole 提示
  *
  * 静态契约（不依赖浏览器）+ 新增词条 zh/en 对等（缺 en 会直接显示 key）。
@@ -65,10 +65,11 @@ test('t53-3: A 三档影响面文案 + 改挂明细 + 已改挂 N 个任务（re
   assert.ok(source.includes("t('batch.failedItems')"), '失败原因文案')
 })
 
-test('t53-4: B 批量新建抽屉已移除，但 createTasks 门面仍在（供队长/CLI 用）', () => {
+test('t53-4: B 批量新建抽屉已移除，createTasks 面板 RPC 也已退役（能力只留在队长工具）', () => {
   // CHG-202v：用户定案「任务不能手动建」→ 抽屉连同 74-batch.js 整个删除。
-  // 这里只保留「会话门面暴露 createTasks」这一条契约（它不是 UI，是 RPC 能力）。
-  assert.match(source, /createTasks: \(query\) => call\('createTasks', query\)/, 'makeApi 暴露 createTasks（会话门面）')
+  // CHG-204：无调用者的 `createTasks` 面板 RPC 一并退役——能力仍由队长工具
+  // `myteam_create_tasks` 提供，UI 不再暴露任何直接调用面。
+  assert.ok(!source.includes("createTasks: (query) => call('createTasks', query)"), 'makeApi 不再暴露 createTasks')
   assert.ok(!source.includes('function BatchCreateDrawer'), '抽屉组件已删除')
   assert.ok(!source.includes("t('batchCreate."), '批量新建词条已无渲染点')
 })
@@ -124,12 +125,12 @@ test('t53-7: 离线/只读 —— 一键修复的禁用与 title', () => {
   assert.match(source, /title: tip \?\? t\('diag\.fixAssign'\)/)
 })
 
-test('t53-8: 未新增门面端点（只加 createTasks），其余复用既有端点', () => {
+test('t53-8: 未新增门面端点（createTasks 已退役），其余复用既有端点', () => {
   assert.ok(!/myteam\/(rewireBatch|batchRewire|fixTask|batchCreateTasks|autoFix)/.test(source), '不得新增门面端点')
   for (const method of ['batchTaskOp', 'assignTask', 'updateTask']) {
     assert.ok(source.includes(`${method}: (query) => call('${method}', query)`), `${method} 复用既有门面`)
   }
-  assert.ok(source.includes("createTasks: (query) => call('createTasks', query)"), '唯一新增：createTasks')
+  assert.ok(!source.includes("createTasks: (query) => call('createTasks', query)"), 'createTasks 面板 RPC 已退役（CHG-204）')
 })
 
 test('t53-9: CHG-76 新增词条 zh/en 对等', () => {

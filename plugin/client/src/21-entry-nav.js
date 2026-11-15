@@ -1,9 +1,8 @@
     let pendingNav = null
     /** 团队摘要 → 工作台入口上下文（纯函数，测试直接断言） */
     function entryNavForTeam(team) {
-      if (!team || !team.teamId) return { scope: 'global' }
+      if (!team || !team.teamId) return {}
       return {
-        scope: 'project',
         workspaceRoot: String(team.workspaceRoot ?? ''),
         teamId: String(team.teamId),
         projectTab: 'teams',
@@ -31,12 +30,12 @@
       return nav
     }
     async function resolveNavForSession(connection, sessionId) {
-      if (!connection || !sessionId) return { scope: 'global' }
+      if (!connection || !sessionId) return {}
       try {
         /* CHG-201：项目作用域按**会话**解析（getProjectScope），不再跨工作区发现团队。 */
         const scope = await makeApi(connection, sessionId).getProjectScope()
         return entryNavForTeam((scope?.teams ?? []).find((entry) => entry.sessionId === sessionId))
       } catch {
-        return { scope: 'global' }
+        return {}
       }
     }

@@ -3,7 +3,7 @@
  *
  * 覆盖（对应阶段四十九网关契约）：
  *  - namespace 绑定：typertRemote = { serviceKey:'myteamPanel', namespace:'myteam' }（客户端端点 myteam/* 不变）
- *  - marker：63 个方法全部 direct invocation（gateway srcClaims 来源；含 6 个离线只读 + getAudit/getConfig 审计与配置 + memberOp 成员管理 + CHG-69 项目聚合/角色详情）
+ *  - marker：60 个方法全部 direct invocation（gateway srcClaims 来源；含 6 个离线只读 + getAudit/getConfig 审计与配置 + memberOp 成员管理 + CHG-69 项目聚合/角色详情）
  *  - 方法签名：简单标识符（agent/query）——gateway methodParameterNames 用 Function.toString 读形参名，
  *    首参 `agent` 必须命中 dsh-agent lookup（wire=agentId）；离线视图方法无 agent 首参，只收 query
  *  - 委托：serviceFor(agent,'myteam') → 隔离服务方法透传 query
@@ -66,19 +66,19 @@ test('t13p-1: typertRemote 绑定 serviceKey=myteamPanel + namespace=myteam（�
   assert.equal(binding.namespace, 'myteam')
 })
 
-test('t13p-2: marker 63 方法全部 direct invocation（CHG-203：+getOfflinePlanFeedback）', () => {
+test('t13p-2: marker 60 方法全部 direct invocation（CHG-204：退役 3 个无调用者 RPC）', () => {
   const d = (MyTeamPanelFacade.prototype as any)[DESCRIPTOR]
   assert.ok(d, 'prototype 上必须有 remote-methods 描述符')
   assert.equal(d.version, 1)
   const names = d.methods.map((m: any) => m.method)
-  assert.deepEqual(names, ['batch', 'describe', 'watch', 'getGlobalScope', 'getProjectScope', 'getStoreState', 'initStore', 'getProject', 'getRoleDetail', 'saveRole', 'deleteRole', 'getCapabilityCatalog', 'getOfflineBoard', 'getOfflineTaskDetail', 'getOfflineTokens', 'getOfflineAudit', 'getOfflinePlanFeedback', 'getOfflinePresets', 'getBoard', 'getTaskDetail', 'getTokens', 'getInbox', 'getAudit', 'getConfig', 'getPresets', 'getRoles', 'getKnowledge', 'planAction', 'postComment', 'memberOp', 'disband', 'createTask', 'createTasks', 'updateTask', 'assignTask', 'participateTask', 'rescopeTask', 'cancelTask', 'deleteTask', 'getProjectBoard', 'getProjectSummary', 'batchTaskOp', 'reviewTask', 'getArchive', 'getArchives', 'adoptKnowledge', 'roleOp', 'applyRoles', 'handoff', 'getContributions', 'reloadContributions', 'saveTeamConfig', 'resetTeamConfig', 'getPlanFeedback', 'readSessionHistory', 'getTaskGraph', 'listSkills', 'listMembers', 'copyTeam', 'publishTeam', 'exportTeam', 'importTeam', 'createSkill', 'createTool'])
+  assert.deepEqual(names, ['batch', 'describe', 'watch', 'getGlobalScope', 'getProjectScope', 'getStoreState', 'initStore', 'getProject', 'getRoleDetail', 'saveRole', 'deleteRole', 'getCapabilityCatalog', 'getOfflineBoard', 'getOfflineTaskDetail', 'getOfflineTokens', 'getOfflineAudit', 'getOfflinePlanFeedback', 'getOfflinePresets', 'getBoard', 'getTaskDetail', 'getTokens', 'getInbox', 'getAudit', 'getConfig', 'getPresets', 'getRoles', 'getKnowledge', 'planAction', 'postComment', 'memberOp', 'disband', 'createTask', 'updateTask', 'assignTask', 'participateTask', 'rescopeTask', 'cancelTask', 'deleteTask', 'getProjectBoard', 'getProjectSummary', 'batchTaskOp', 'reviewTask', 'getArchive', 'adoptKnowledge', 'roleOp', 'applyRoles', 'handoff', 'getContributions', 'reloadContributions', 'saveTeamConfig', 'resetTeamConfig', 'getPlanFeedback', 'readSessionHistory', 'getTaskGraph', 'listSkills', 'listMembers', 'copyTeam', 'publishTeam', 'exportTeam', 'createSkill', 'createTool'])
   for (const m of d.methods) assert.deepEqual(m.invocation, { kind: 'direct' })
 })
 
 test('t13p-3: 方法签名 = 简单标识符 (agent, query)；listTeams/saveRole 无 agent 首参（gateway methodParameterNames 契约）', () => {
   const proto = MyTeamPanelFacade.prototype as Record<string, Function>
   // CHG-87：roleOp 只收 query（无 agent 首参，同离线视图口径）；applyRoles 是会话门面 (agent, query)
-  const withAgent = ['getBoard', 'getTaskDetail', 'getTokens', 'getInbox', 'getAudit', 'getConfig', 'saveTeamConfig', 'resetTeamConfig', 'getPlanFeedback', 'readSessionHistory', 'getTaskGraph', 'listSkills', 'listMembers', 'copyTeam', 'publishTeam', 'exportTeam', 'importTeam', 'createSkill', 'createTool', 'getPresets', 'getRoles', 'getKnowledge', 'planAction', 'postComment', 'memberOp', 'disband', 'createTask', 'createTasks', 'updateTask', 'assignTask', 'participateTask', 'reviewTask', 'getArchive', 'getArchives', 'adoptKnowledge', 'applyRoles']
+  const withAgent = ['getBoard', 'getTaskDetail', 'getTokens', 'getInbox', 'getAudit', 'getConfig', 'saveTeamConfig', 'resetTeamConfig', 'getPlanFeedback', 'readSessionHistory', 'getTaskGraph', 'listSkills', 'listMembers', 'copyTeam', 'publishTeam', 'exportTeam', 'createSkill', 'createTool', 'getPresets', 'getRoles', 'getKnowledge', 'planAction', 'postComment', 'memberOp', 'disband', 'createTask', 'updateTask', 'assignTask', 'participateTask', 'reviewTask', 'getArchive', 'adoptKnowledge', 'applyRoles']
   for (const name of withAgent) {
     const src = proto[name].toString()
     const m = src.match(/^async\s+\w+\s*\(([^)]*)\)/)
@@ -256,10 +256,10 @@ test('t13p-8: 隔离服务 MyTeamRemote 的 marker 不含 defaultTeamId（门面
   const d = (MyTeamRemote.prototype as any)[DESCRIPTOR]
   const names = d.methods.map((m: any) => m.method)
   assert.ok(!names.includes('defaultTeamId'), 'defaultTeamId 只作门面发现通道，不应暴露为网关端点')
-  /* CHG-139a~d：+getTaskGraph/+listSkills/+copyTeam/+publishTeam/+exportTeam/+importTeam/+createSkill/+createTool = 40 */
-  /* CHG-187（FR-32 支柱一）：+listMembers = 41 */
-  /* CHG-202z（FR-33）：+getProjectBoard/+getProjectSummary = 44 */
-  assert.equal(names.length, 44)
+  /* CHG-139a~d：+getTaskGraph/+listSkills/+copyTeam/+publishTeam/+exportTeam/+createSkill/+createTool = 37（CHG-204 退役 createTasks/getArchives/importTeam） */
+  /* CHG-187（FR-32 支柱一）：+listMembers = 38 */
+  /* CHG-202z（FR-33）：+getProjectBoard/+getProjectSummary = 41 */
+  assert.equal(names.length, 41)
 })
 
 test('t13p-9: 载体行 guard —— hostApply(ctx, {carrier:true}) 直接返回（dsh-client-modules 组图载体）', () => {

@@ -345,7 +345,6 @@ interface HandoffSessionRef {
 | `rescopeTask({teamId, taskId, reason, patch?, memberIds?})` | **一键重新规划（CHG-73）**：撤当前 attempt（若有，落 `task.attempt.revoked`）→ 带补丁落 `task.rescoped` → 任务回 `ready`（新依赖未完成则 `backlog`）→ 可选重派（`task.assigned`）。`reason` 必填；终态任务 → `MT_TASK_TERMINAL`；返回 `{status:'rescoped', taskId, state, revokedAttempt?, assigned?, changes?}` | 写→账本（actor=human） |
 | `cancelTask({teamId, taskId, reason, downstream?, rewireTo?, confirm?})` | **取消任务（CHG-73/75）**：不带 confirm → `{status:'confirm-required', impact:{dependents,hasAttempt,downstream,rewireTo?,directDependents?}}`；带 confirm → 先撤 attempt 再落 `task.cancelled`；`downstream:'leave'`（默认）只停本任务、`'cancel'` 级联取消下游闭包（逐条事件带 `cascadeFrom`）、**`'rewire'`（CHG-75）把直接下游改挂到 `rewireTo`**（不填 = 解除依赖让下游变独立任务；逐条落 `task.rewired`）。返回 `{status:'cancelled', taskId, cancelled[], downstream, rewired?:[{taskId,removed,added?}]}`；改挂非法（不存在/自身/已取消/成环 `MT_TASK_CYCLE`）**在取消落账前就被拒**（不留半吊子状态） | 写→账本（actor=human） |
 | `batchTaskOp({teamId, op, taskIds, reason?, memberIds?, priority?, downstream?, rewireTo?, confirm?})` | **批量编排（CHG-73/76）**：`op ∈ cancel/rescope/assign/priority`；逐条独立落账（同一 `batchId`），个别失败不影响其余；`cancel` 需两段确认（先返回 `impact{tasks,dependents,downstream?,rewireTo?,rewireByTask?}`）；**CHG-76**：`downstream:'rewire'` 逐任务把直接下游改挂到整批统一的 `rewireTo`（缺省 = 逐条解除依赖），`rewireTo` 是本批要取消的任务 / 已取消 → 整批 `MT_VALIDATION`；返回 `{status:'batch-done', batchId, results[{taskId,ok,status?,code?,message?,rewired?,rewireErrors?}], summary{total,ok,failed}}` | 写→账本（actor=human） |
-| `createTasks({teamId, goal?, tasks[], confirm?})` | **批量建任务（CHG-76 / FR-33）**：草稿列表（1~30）→ 不带 confirm 返回 `{status:'confirm-required', impact{tasks,byRole,rolesMissing,edges,ids,warnings?}}` → 带 confirm 逐条落 `task.created`（同一 `batchId`）；`after` 用本批 1-based 序号声明批内依赖，按拓扑序创建（自指/越界/成环 `MT_TASK_CYCLE` 且不写账本）；缺验收标准/叶子缺交付物自动补齐并进 `warnings`；返回 `{status:'created', batchId, tasks[{taskId,title}], results[{index,ok,title,taskId?,code?,message?,warnings?}], summary{total,created,failed}}`；依赖失败条目后续 `MT_DEPENDENCY_FAILED` | 写→账本（actor=human） |
 | `deleteRole({workspaceRoot, roleId, confirm?})` | **删除项目角色（CHG-73，C7 守门）**：只能删项目库（内置/全局 → `MT_ROLE_BUILTIN`），captain → `MT_ROLE_CAPTAIN`；被模板/团队在册/项目自身角色占用 → `MT_ROLE_OCCUPIED`（`usage{bindings}` 给占用方）；两段确认（先返回 `usage{teams,instances,presets}`）；删除后追加 `.audit.jsonl`（action=deleted）。返回 `{status:'deleted', roleId, filePath, auditPath}` | 写（配置资产 + 审计） |
 | `getCapabilityCatalog({workspaceRoot})` | **角色表单候选（CHG-73）**：`skills[{name,source:'host'\|'role'}]`（宿主 skills 服务 + 已有角色声明）、`mcp[{name,source}]`（工具表 `mcp__<server>__*` 推导 + 角色声明）、`warnings[]`。**是提示不是白名单**：允许输入目录外的名字 | 读（宿主服务 + 角色库，降级不报错） |
 | `getOfflineTaskDetail({workspaceRoot, teamId, taskId})` | 离线任务详情：时间线 / 证据块 / 交付物 / 门禁链与裁决 / 沟通消息从账本复原（`readOnly:true`）；任务不存在或账本为空 → `MT_VALIDATION` | 读（账本文件） |
@@ -355,7 +354,6 @@ interface HandoffSessionRef {
 | `disband(teamId, confirm?)` | 解散两段确认：`confirm:false` → `{status:'confirm-required', impact:{members,tasks}}`；`confirm:true` → 落 `team.disbanded` **并真的写归档文件**（**CHG-86 / P0-2**：返回 `archive:{dir, relativeDir, files[]}`，写失败 → `MT_ARCHIVE_FAILED`） | 写→账本 + 文件 |
 | `reviewTask({teamId?, taskId, verdict:'pass'\|'fail', reviewerMemberId?, reason?, confirm?})` | **门禁裁决（CHG-86 / M2-C，FR-5.1~5.2）**：面板任务详情「门禁裁决」区的唯一写入口，与队长工具 `myteam_review_task` 同一条管线（`actor:'human'`）。review/verify 门强制交叉审查（`reviewerMemberId` 必填且 ≠ 实现者）；archive 门由 host 落位校验；`confirm:true` 是打回预算超限后的人工放行开关 | 写→账本（actor=human） |
 | `getArchive({teamId?})` | **归档快照（CHG-86 / P0-2）**：面板归档回放视图的读面，返回 `{status:'ok', teamId, archive:{version,teamId,name,goal,state,archivedAt,archivedBy,ledgerPath,eventCount,revision,members[],tasks[],artifacts[],tokens}, root}`；未归档 → `archive:null`（按"未归档"渲染，不猜半个快照） | 读（`.dsh-myteam/history/archive/<id>/`） |
-| `getArchives()` | 已归档团队 id 清单（面板「全部团队」入口）：`{status:'ok', root, teams[]}` | 读（归档目录名） |
 | `adoptKnowledge({teamId?, draftId, decision:'adopted'\|'rejected', note?})` | **知识提案策展（CHG-86 / P1-9，FR-17.4）**：面板「采纳 / 驳回」按钮的写路径（`actor:'human'`），与队长工具 `myteam_adopt_knowledge` 同一条管线。修复前 UI 只写"由队长执行"、面板没有任何写路径 | 写→账本 + 知识库文件 |
 | `getBoard(teamId, view)` | 看板/泳道/DAG 三视图数据（同源投影）。**board 字段（CHG-62/69/72/73）**：`teamId/name?/state/goal/members[]/columns[{name,tasks[]}]/inboxCount/proposalCount/revision/graph{levels,edges,roots,cyclic}`；每个 task 含 `id/title/state/priority/assignee?/assignees?/requiredRole/deps/gates/gateVerdicts/evidenceCount/participants[{teamId,role,memberIds}]/diagnosis?{codes,roleId,roleMembers,depsPending?,depsCancelled?,busyMembers?,fix?{assignable?,roleSwap?,spawnRole?}}/actions{rescope,cancel,edit}/evidenceStale?{since,fields}/cancelled?{ts,reason}`（**CHG-72**：诊断 `codes` ∈ team-inactive/deps-pending/no-role/role-busy；**CHG-73**：`dep-cancelled` + 动作可用性 + 证据过期 + 取消留痕；**CHG-76**：`fix` 给一键修复候选——`assignable[{memberId,instanceName}]` 同角色空闲、`roleSwap[{roleId,idleMembers}]` 其它角色空闲、`spawnRole` 建议召唤，只在 codes 含 no-role/role-busy/deps-pending 时出现）；旧账本无参与事件时 participants 回落 `[{teamId(owner),role:'lead'}]` | 读 |
 | `getTaskDetail(teamId, taskId)` | 时间线 + 沟通区 + 证据块 + 交付物 + 门禁链/逐门裁决（FR-8.1/12.2，CHG-47）。**CHG-69**：增 `participants[]` / `assignees[]`（参与团队与多队员负责）。**CHG-63**：`evidenceRefs[{seq, evidence, attemptId?}]`（attemptId 取自 `task.evidence` 事件载荷，旧账本缺失时前端归入「—」组），面板按 attempt 分组渲染命令与退出码。**CHG-73**：增 `actions{rescope,cancel,edit}` / `evidenceStale?{since,fields,evidenceSeq?}` / `edits[{seq,ts,actor,reason?,changes[]}]`（新→旧 20 条，来自 `task.updated`/`task.rescoped` 载荷）/ `cancellation?{ts,reason,downstream}` | 读 |
@@ -388,6 +386,17 @@ interface HandoffSessionRef {
 > **裁决理由**：新增一个只读端点的唯一价值是「给外部消费者一个稳定入口」，但本插件是**单一消费者**（面板），
 > `describe()` 已经是内部稳定面；再加一层网关封装是**纯转发**，只会多一个需要同步维护的契约面。
 > 故**删行不补端点**——表里只留真实存在的端点，历史记在 CHG-87 / CHG-93 变更单里。
+
+> **契约勘误（CHG-204 裁决）：`createTasks` / `getArchives` / `importTeam` 三个面板 RPC 退役。**
+>
+> 三者在 `plugin/client` **全量零调用**（批量新建抽屉已随 CHG-202v 删除；归档列表与团队导入从未接 UI），
+> 属于「文档承诺、代码无消费者」的纯转发面。**能力本身没有消失，只是不再经由面板 RPC 暴露**：
+> - 批量建任务 → 队长工具 `myteam_create_tasks`（`{teamId, goal?, tasks[], confirm?}`，语义与返回同原行）；
+> - 导入团队快照 → 队长工具 `myteam_import_team`（见 §2 工具表，永不覆盖 + `sourceTeamId` 溯源）；
+> - 已归档团队清单 → `myteam_list_teams({includeArchived:true})` 的 `archived.ids` / `archiveList()` 宿主读面。
+>
+> 门面从 63 个方法降为 **60**、Remote 从 44 个端点降为 **41**；`t52` / `t111` / `t13p` / `t13r` 同步改为
+> 工具通道与反向断言。历史记在 CHG-204 变更单里。
 错误统一结构：`{code: string, message: string, detail?: object}`。
 
 ## 3. 数据模型

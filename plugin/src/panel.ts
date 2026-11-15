@@ -149,13 +149,10 @@ type RemoteLike = {
   rescopeTask?(args: Record<string, unknown>): Promise<unknown>
   cancelTask?(args: Record<string, unknown>): Promise<unknown>
   batchTaskOp?(args: Record<string, unknown>): Promise<unknown>
-  /** CHG-76：从目标出草稿 → 批量建任务（预览 + 两段确认），actor=human */
-  createTasks?(args: Record<string, unknown>): Promise<unknown>
   /** CHG-86（M2-C）：门禁裁决（review/verify 强制交叉审查；archive 由 host 落位校验），actor=human */
   reviewTask?(args: Record<string, unknown>): Promise<unknown>
   /** CHG-86（P0-2）：归档快照读面（面板归档回放视图） */
   getArchive?(args: Record<string, unknown>): Promise<unknown>
-  getArchives?(args: Record<string, unknown>): Promise<unknown>
   /** CHG-86（P1-9）：知识提案采纳/驳回（面板写路径，actor=human） */
   adoptKnowledge?(args: Record<string, unknown>): Promise<unknown>
   /**
@@ -177,7 +174,6 @@ type RemoteLike = {
   publishTeam?(args: Record<string, unknown>): Promise<unknown>
   /** CHG-139c（docs/20 §8）：导出 / 导入团队快照（导入 = 新 id，永不覆盖） */
   exportTeam?(args: Record<string, unknown>): Promise<unknown>
-  importTeam?(args: Record<string, unknown>): Promise<unknown>
   /** CHG-139d（docs/20 §5.4）：创建技能 / 工具（**只写 myteam 队长预设**） */
   createSkill?(args: Record<string, unknown>): Promise<unknown>
   createTool?(args: Record<string, unknown>): Promise<unknown>
@@ -879,19 +875,6 @@ export class MyTeamPanelFacade extends TypertRemoteService {
   }
 
   /**
-   * CHG-139c（docs/20 §8）：**导入团队快照**（面板「导入」按钮）。
-   *
-   * **永不覆盖**：新团队 id 由系统生成，快照里的 teamId 只作 `sourceTeamId` 溯源。
-   */
-  async importTeam(agent: AgentLike, query: Record<string, unknown>) {
-    const remote = this.remoteFor(agent)
-    if (!remote || typeof remote.importTeam !== 'function') {
-      return { status: 'error', code: 'MT_UNAVAILABLE', message: '导入团队需要活动队长会话' }
-    }
-    return remote.importTeam(query ?? {})
-  }
-
-  /**
    * CHG-139d（docs/20 §5.4）：**创建技能**（面板「新建技能」表单）。
    *
    * 隔离铁律：只写 `$DSH_HOME/myteam/presets/myteam-captain/skills/`，
@@ -1193,16 +1176,6 @@ export class MyTeamPanelFacade extends TypertRemoteService {
     return remote.batchTaskOp(query ?? {})
   }
 
-  /** 面板批量建任务（CHG-76，FR-33）：草稿列表 → 预览影响面 → 两段确认落账（actor=human） */
-  async createTasks(agent: AgentLike, query: Record<string, unknown>) {
-    const remote = this.remoteFor(agent)
-    if (!remote) return UNAVAILABLE
-    if (typeof remote.createTasks !== 'function') {
-      return { status: 'error', code: 'MT_UNAVAILABLE', message: 'createTasks requires a live team session (disable offline view)' }
-    }
-    return remote.createTasks(query ?? {})
-  }
-
   /**
    * 成员管理（FR-14.2，CHG-48）：suspend/archive/remove/restore（remove 两段确认）。
    *
@@ -1241,16 +1214,6 @@ export class MyTeamPanelFacade extends TypertRemoteService {
       return { status: 'error', code: 'MT_UNAVAILABLE', message: 'getArchive requires a live team session' }
     }
     return remote.getArchive(query ?? {})
-  }
-
-  /** 已归档团队清单（CHG-86 / P0-2）：面板「全部团队」入口 */
-  async getArchives(agent: AgentLike, query: Record<string, unknown>) {
-    const remote = this.remoteFor(agent)
-    if (!remote) return UNAVAILABLE
-    if (typeof remote.getArchives !== 'function') {
-      return { status: 'error', code: 'MT_UNAVAILABLE', message: 'getArchives requires a live team session' }
-    }
-    return remote.getArchives(query ?? {})
   }
 
   /** 知识提案策展（CHG-86 / P1-9，FR-17.4）：面板「采纳 / 驳回」按钮的写路径（actor=human） */
@@ -1455,9 +1418,9 @@ export class MyTeamPanelFacade extends TypertRemoteService {
 }
 
 // 手动 Remote 标记：gateway 按 method 名发现端点（namespace=myteam，direct invocation）
-markRemoteMethods(MyTeamPanelFacade.prototype, ['batch', 'describe', 'watch', 'getGlobalScope', 'getProjectScope', 'getStoreState', 'initStore', 'getProject', 'getRoleDetail', 'saveRole', 'deleteRole', 'getCapabilityCatalog', 'getOfflineBoard', 'getOfflineTaskDetail', 'getOfflineTokens', 'getOfflineAudit', 'getOfflinePlanFeedback', 'getOfflinePresets', 'getBoard', 'getTaskDetail', 'getTokens', 'getInbox', 'getAudit', 'getConfig', 'getPresets', 'getRoles', 'getKnowledge', 'planAction', 'postComment', 'memberOp', 'disband', 'createTask', 'createTasks', 'updateTask', 'assignTask', 'participateTask', 'rescopeTask', 'cancelTask', 'deleteTask', 'getProjectBoard', 'getProjectSummary', 'batchTaskOp',
+markRemoteMethods(MyTeamPanelFacade.prototype, ['batch', 'describe', 'watch', 'getGlobalScope', 'getProjectScope', 'getStoreState', 'initStore', 'getProject', 'getRoleDetail', 'saveRole', 'deleteRole', 'getCapabilityCatalog', 'getOfflineBoard', 'getOfflineTaskDetail', 'getOfflineTokens', 'getOfflineAudit', 'getOfflinePlanFeedback', 'getOfflinePresets', 'getBoard', 'getTaskDetail', 'getTokens', 'getInbox', 'getAudit', 'getConfig', 'getPresets', 'getRoles', 'getKnowledge', 'planAction', 'postComment', 'memberOp', 'disband', 'createTask', 'updateTask', 'assignTask', 'participateTask', 'rescopeTask', 'cancelTask', 'deleteTask', 'getProjectBoard', 'getProjectSummary', 'batchTaskOp',
   // CHG-86：门禁裁决 / 归档快照 / 知识提案策展
-  'reviewTask', 'getArchive', 'getArchives', 'adoptKnowledge',
+  'reviewTask', 'getArchive', 'adoptKnowledge',
   // CHG-87（FR-13.1/FR-16.1）：角色库统一写入口 + 单角色调用
   'roleOp', 'applyRoles',
   // CHG-88（M2-E / FR-16.3）：会话移交
@@ -1477,7 +1440,7 @@ markRemoteMethods(MyTeamPanelFacade.prototype, ['batch', 'describe', 'watch', 'g
   // CHG-139b（docs/19 §5.2/§5.3）：复制团队 / 发布团队（发布 = H 档人类专属）
   'copyTeam', 'publishTeam',
   // CHG-139c（docs/20 §8）：导出 / 导入团队快照
-  'exportTeam', 'importTeam',
+  'exportTeam',
   // CHG-139d（docs/20 §5.4）：创建技能 / 工具（只写 myteam 队长预设）
   'createSkill', 'createTool'])
 

@@ -86,7 +86,6 @@ test('t87-1: entryNavForTeam —— 团队摘要 → 项目作用域 + 团队页
   const { module } = loadClient()
   const { entryNavForTeam } = module.__testEntry
   assert.deepEqual(entryNavForTeam({ teamId: 't1', workspaceRoot: 'D:/p' }), {
-    scope: 'project',
     workspaceRoot: 'D:/p',
     teamId: 't1',
     projectTab: 'teams',
@@ -94,15 +93,14 @@ test('t87-1: entryNavForTeam —— 团队摘要 → 项目作用域 + 团队页
   })
   /* 旧宿主 describe 不提供 workspaceRoot：仍落项目作用域，根由 Panel 的候选列表兜底 */
   assert.deepEqual(entryNavForTeam({ teamId: 't1' }), {
-    scope: 'project',
     workspaceRoot: '',
     teamId: 't1',
     projectTab: 'teams',
     teamTab: 'members',
   })
-  assert.deepEqual(entryNavForTeam(undefined), { scope: 'global' })
-  assert.deepEqual(entryNavForTeam(null), { scope: 'global' })
-  assert.deepEqual(entryNavForTeam({}), { scope: 'global' })
+  assert.deepEqual(entryNavForTeam(undefined), {})
+  assert.deepEqual(entryNavForTeam(null), {})
+  assert.deepEqual(entryNavForTeam({}), {})
 })
 
 test('t87-2: openWorkbench —— 调宿主 ctx.layout.selectPanel，并交接一次性上下文', () => {
@@ -110,9 +108,9 @@ test('t87-2: openWorkbench —— 调宿主 ctx.layout.selectPanel，并交接�
   const { openWorkbench, takePendingNav, PANEL_KEY } = module.__testEntry
   const calls = []
   const ctx = { get: (name) => (name === 'layout' ? { selectPanel: (id) => calls.push(id) } : undefined) }
-  assert.equal(openWorkbench(ctx, { scope: 'project', teamId: 't1' }), true)
+  assert.equal(openWorkbench(ctx, { teamId: 't1' }), true)
   assert.deepEqual(calls, [PANEL_KEY], '宿主面板选择 API = ctx.layout.selectPanel(panelKey)')
-  assert.deepEqual(takePendingNav(), { scope: 'project', teamId: 't1' })
+  assert.deepEqual(takePendingNav(), { teamId: 't1' })
   assert.equal(takePendingNav(), null, '交接只消费一次')
 })
 
@@ -120,11 +118,11 @@ test('t87-3: 没有 layout 服务 / selectPanel 抛错 —— 不崩、不留残
   const { module } = loadClient()
   const { openWorkbench, takePendingNav } = module.__testEntry
   /* 老宿主 / 测试桩：没有 layout 服务 → 如实返回 false（入口不会假装打开） */
-  assert.equal(openWorkbench({}, { scope: 'global' }), false)
+  assert.equal(openWorkbench({}, { teamId: 't1' }), false)
   assert.equal(takePendingNav(), null, '没调到宿主 API 时不留残余交接')
   /* 面板未注册：selectPanel 抛错 → 吞掉并告警（插件跑在真实桌面，不能连坐整屏） */
   const boom = { get: () => ({ selectPanel: () => { throw new Error('main panel "myteam" is not registered') } }) }
-  assert.equal(openWorkbench(boom, { scope: 'project', teamId: 't1' }), false)
+  assert.equal(openWorkbench(boom, { teamId: 't1' }), false)
   assert.equal(takePendingNav(), null, '失败也不留残余交接')
 })
 
@@ -146,15 +144,14 @@ test('t87-4: resolveNavForSession —— 按 sessionId 命中团队；命中不�
     },
   }
   assert.deepEqual(await resolveNavForSession(connection, 's1'), {
-    scope: 'project',
     workspaceRoot: 'D:/p',
     teamId: 't1',
     projectTab: 'teams',
     teamTab: 'members',
   })
-  assert.deepEqual(await resolveNavForSession(connection, 'nope'), { scope: 'global' }, '非队长会话回全局库')
-  assert.deepEqual(await resolveNavForSession(undefined, 's1'), { scope: 'global' }, '没有 connection 不空转')
-  assert.deepEqual(await resolveNavForSession({ rpc: { call: async () => { throw new Error('offline') } } }, 's1'), { scope: 'global' }, '传输失败回全局')
+  assert.deepEqual(await resolveNavForSession(connection, 'nope'), {}, '非队长会话回全局库')
+  assert.deepEqual(await resolveNavForSession(undefined, 's1'), {}, '没有 connection 不空转')
+  assert.deepEqual(await resolveNavForSession({ rpc: { call: async () => { throw new Error('offline') } } }, 's1'), {}, '传输失败回全局')
 })
 
 test('t87-5: 源码静态 —— 两个入口都走 openWorkbench，Panel 初值来自交接', () => {

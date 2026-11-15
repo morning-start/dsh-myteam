@@ -61,7 +61,7 @@ npx tsc -p tsconfig.json --noEmit
 | | `core/roles/captain-skills.ts` | 队长内置技能：create-role / modify-role / create-team / write-team-charter |
 | | `core/roles/session-defaults.ts` | 单角色调用（`/myteam+<id>`）的落盘与跨重启恢复 |
 | **D5 接口** | `tools/defs.ts` | `memberToolDefs()` / `leadToolDefs()` 的纯数据定义（见下文「工具面」） |
-| | `remote/service.ts` | `MyTeamRemote`：44 个 Remote 方法（手写 marker 等价装饰器 —— strip-only 环境无装饰器语法） |
+| | `remote/service.ts` | `MyTeamRemote`：41 个 Remote 方法（手写 marker 等价装饰器 —— strip-only 环境无装饰器语法） |
 | | `remote/views.ts` | 面板只读投影纯函数：看板 / 详情 / token / 审计 / 配置 |
 
 跨域模块：
@@ -85,7 +85,7 @@ npx tsc -p tsconfig.json --noEmit
 | 文件 | 职责 |
 |---|---|
 | `host.ts` | `apply(ctx, config)` + `inject`：目录初始化、TeamService 惰性创建与冷启动重放、Lead 工具注册、成员 spawn、唤醒管线 |
-| `panel.ts` | `MyTeamPanelFacade`：根级 typert remote 门面（63 个方法），经 `agentPresets.serviceFor(agent, 'myteam')` 读隔离服务 |
+| `panel.ts` | `MyTeamPanelFacade`：根级 typert remote 门面（60 个方法），经 `agentPresets.serviceFor(agent, 'myteam')` 读隔离服务 |
 | `host-workspace.ts` | 旧导出名兼容层（`ensureWorkplaceDirs` 等），实现已收口到 `core/workspace/layout.ts` |
 | `host.js` | 遗留 import 路径的薄转发（仅 `test/t1-workplace.test.js` 用），自身无逻辑 |
 
