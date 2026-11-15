@@ -7,11 +7,11 @@
 >
 > | 契约 | 变化 | 关联 |
 > |---|---|---|
-> | `role.delegation` | 角色 schema 新增 `{canSpawn, allowedRoles[], maxDepth?, maxChildren?}` | FR-32 / docs/18 |
+> | `role.delegation` | 角色 schema 新增 `{canSpawn, allowedRoles[], maxDepth?, maxChildren?}`。**已实施（CHG-202y）**：隐含「缺省 = 不可派生」，13 类非法形状拒绝式校验 | FR-32 / docs/18 |
 > | `member.spawned` | 载荷 +`parentMemberId` / `depth` / `rootMemberId`（**必填**，CHG-187b：旧账本在 `openLedger` 里一次性迁移；不新增事件型，仍 40 型） | FR-32 |
-> | `myteam_spawn_member` / `myteam_release_member` | 档位 **C → CM**（成员需角色授权可见）；release 增 `cascade?: boolean` | FR-32 |
+> | `myteam_spawn_member` / `myteam_release_member` | 档位 **C → CM**（成员需角色授权可见）；release 增 `cascade?: boolean`。**已实施（CHG-202y）**：成员侧按 `delegation.canSpawn` **条件注册**（未授权 = 看不见） | FR-32 |
 > | `myteam_list_members` | **新增**（A 档，只读成员树） | FR-32 |
-> | `getProjectBoard` / `getProjectSummary` | **新增**两个 Remote 端点（项目级看板聚合 / 五指标汇总）；Remote 40 → 42、门面 58 → 60 | FR-33 |
+> | `getProjectBoard` / `getProjectSummary` | **新增**两个 Remote 端点（项目级看板聚合 / 五指标汇总）；**实测 Remote 42 → 44、门面 60 → 62**（CHG-202z；`groupBy` 非法 → `MT_VALIDATION`，不静默回落） | FR-33 |
 > | 错误码 | 新增成员树相关错误码（深度超限 / 有子成员未排空 / 子成员数超限；M3 实现后由 `gen-error-docs.mjs` 生成进本文码表，届时本节改为具体码名） | FR-32 |
 >
 > 目标体系与验收场景见 [docs/23](23-项目目标重梳理.md)。

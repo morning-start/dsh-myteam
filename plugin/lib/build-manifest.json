@@ -1,6 +1,6 @@
 {
   "schema": 1,
-  "builtAt": "2026-11-15T12:33:00.454Z",
+  "builtAt": "2026-11-15T12:34:27.878Z",
   "node": "v22.23.2",
   "entry": "./lib/host.mjs",
   "modules": 73,
