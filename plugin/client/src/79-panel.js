@@ -1792,7 +1792,7 @@
            * 当时这条注释写的「删除仍走任务详情」只是一句空头承诺，删了实现（见 docs/25 §7）。 */
         ] }),
         js('div', { className: 'mt-viewbar', children: [
-          /* CHG-84：新建任务 / 批量新建 已在任务头（.mt-taskhead-actions）里，视图条不再重复 */
+          /* CHG-84 / CHG-202u：任务头整块已删（新建 / 批量新建入口移除），这里只剩视图切换 */
           j('span', { className: 'mt-viewbar-hint', children: t('view.label') }),
           /* design/tasks.html 的 .viewbar .vlinks：列表 / 看板 / 流程 / 依赖图（保留 mt-seg 供既有交互脚本与样式复用） */
           js('div', { className: 'mt-viewlinks', role: 'group', 'aria-label': t('view.label'), children: [

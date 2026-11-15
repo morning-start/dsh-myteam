@@ -1121,7 +1121,6 @@
       '.mt-taskhead-meta{font-size:11px;color:var(--dsw-alias-label-tertiary);font-variant-numeric:tabular-nums}',
       '.mt-taskhead-goal{flex:1;min-width:200px;font-size:12px;line-height:1.5;color:var(--dsw-alias-label-secondary)}',
       '.mt-taskhead-stats{flex:none;font-size:11px;color:var(--dsw-alias-label-tertiary);font-variant-numeric:tabular-nums}',
-      '.mt-taskhead-actions{display:inline-flex;gap:6px;flex:none;flex-wrap:wrap}',
       '.mt-summary{display:flex;align-items:flex-start;gap:20px;flex-wrap:wrap;padding:12px 16px;margin-bottom:16px;border:.5px solid var(--dsw-alias-border-l2);border-radius:10px;background:var(--dsw-alias-bg-layer-1)}',
       '.mt-tstat{display:flex;flex-direction:column;align-items:flex-start;line-height:1.35}',
       '.mt-tstat b{color:var(--dsw-alias-label-primary);font-size:13px;font-weight:600;font-variant-numeric:tabular-nums}',
