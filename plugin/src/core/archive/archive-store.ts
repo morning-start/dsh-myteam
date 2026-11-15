@@ -32,7 +32,7 @@ import type { TokensFile } from '../ledger/token-sidecar.ts'
 import { teamArchiveDir, archiveRoot, STORE_DIR } from '../workspace/layout.ts'
 
 /** 归档快照版本（结构演进时 +1，读侧按版本兼容） */
-export const ARCHIVE_VERSION = 1
+const ARCHIVE_VERSION = 1
 
 export interface ArchiveMember {
   id: string
@@ -83,7 +83,7 @@ export interface ArchiveTeamSnapshot {
 }
 
 /** 归档目录（团队级）：`history/archive/<teamId>` */
-export function archiveDirOf(workspaceRoot: string, teamId: string): string {
+function archiveDirOf(workspaceRoot: string, teamId: string): string {
   return teamArchiveDir(workspaceRoot, teamId)
 }
 

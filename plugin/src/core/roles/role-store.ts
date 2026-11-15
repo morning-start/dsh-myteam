@@ -187,11 +187,11 @@ export interface RoleAuditEntry {
   actor?: string
 }
 
-export function roleAuditPath(paths: RoleStorePaths): string {
+function roleAuditPath(paths: RoleStorePaths): string {
   return join(paths.projectRolesDir, '.audit.jsonl')
 }
 
-export function appendRoleAudit(paths: RoleStorePaths, entry: RoleAuditEntry): string {
+function appendRoleAudit(paths: RoleStorePaths, entry: RoleAuditEntry): string {
   const p = roleAuditPath(paths)
   mkdirSync(dirname(p), { recursive: true })
   appendText(p, `${JSON.stringify({ ts: Date.now(), actor: entry.actor ?? 'human', action: entry.action, roleId: entry.roleId, file: entry.file })}\n`)
@@ -456,7 +456,7 @@ function requireGlobalDir(paths: RoleStorePaths): string {
 }
 
 /** 全局角色文件路径（`$DSH_HOME/myteam/roles/<id>.json`） */
-export function globalRoleFilePath(paths: RoleStorePaths, id: string): string {
+function globalRoleFilePath(paths: RoleStorePaths, id: string): string {
   return join(requireGlobalDir(paths), `${id}.json`)
 }
 
@@ -467,7 +467,7 @@ export function readGlobalRole(paths: RoleStorePaths, id: string): RoleDefinitio
 }
 
 /** 全局角色审计行（与项目库同构，落在全局目录） */
-export function globalRoleAuditPath(paths: RoleStorePaths): string {
+function globalRoleAuditPath(paths: RoleStorePaths): string {
   return join(requireGlobalDir(paths), '.audit.jsonl')
 }
 

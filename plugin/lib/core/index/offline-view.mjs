@@ -13,7 +13,7 @@
  *  - 路径安全：teamId 走白名单字符集，workspaceRoot 必须是绝对路径，禁止拼出子目录穿越。
  */
 import { dirname, isAbsolute, join } from 'node:path'
-import { readFileSync, readdirSync } from 'node:fs'
+import { readFileSync, readdirSync, statSync } from 'node:fs'
 import { applyEvent } from '../scheduler/fold.mjs'
 import { emptyProjection,                     } from '../scheduler/state.mjs'
                                                       
@@ -149,11 +149,37 @@ export function buildOfflineTaskDetail(workspaceRoot        , teamId        , ta
  * 离线 tokens：直接读团队目录下 tokens.json 侧车（不依赖会话）。
  * 侧车缺失/损坏返回 undefined（UI 显示"暂无用量记录"），绝不抛错。
  */
+/**
+ * 读取 token 侧车（CHG-202x / P1-14）：**契约位置优先、旧路径只读兼容**。
+ *
+ * 为什么放在这里而不是 `token-sidecar.ts`：那个模块是纯函数（无 IO）——
+ * 「按天桶聚合」的口径不该为一次读盘开例外。
+ */
+export function readTokensSidecar(candidates          )                         {
+  for (const candidate of candidates) {
+    try {
+      const parsed = JSON.parse(readFileSync(candidate, 'utf8'))              
+      if (parsed && typeof parsed === 'object' && parsed.days) return parsed
+    } catch {
+      // 缺失 / 损坏：试下一个候选（冷启动本来就可能没有文件）
+    }
+  }
+  return undefined
+}
+
 export function readOfflineTokens(workspaceRoot        , teamId        )                         {
   const ledgerPath = teamLedgerPath(workspaceRoot, teamId)
   if (!ledgerPath) return undefined
+  /* CHG-202x（P1-14）：侧车在 `history/tokens/<teamId>.json`（契约位置，不入库）。
+   * 旧工作区可能还停在 `tasks/<teamId>/tokens.json` —— 只读兼容，避免历史用量凭空消失。 */
+  const layout = storeLayout(workspaceRoot)
+  const candidates = [join(layout.tokens, `${teamId}.json`), join(dirname(ledgerPath), 'tokens.json')]
+  const sidecar = candidates.find((p) => {
+    try { return statSync(p).isFile() } catch { return false }
+  })
+  if (!sidecar) return undefined
   try {
-    const parsed = JSON.parse(readFileSync(join(dirname(ledgerPath), 'tokens.json'), 'utf8'))                       
+    const parsed = JSON.parse(readFileSync(sidecar, 'utf8'))                       
     if (parsed?.version !== 1 || typeof parsed.totals !== 'object' || parsed.totals === null) return undefined
     if (typeof parsed.days !== 'object' || parsed.days === null) return undefined
     /* CHG-158：白名单重建会**丢掉** `memberMeter`（成员级计量观测表），而覆盖率三态

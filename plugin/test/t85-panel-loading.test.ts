@@ -92,8 +92,11 @@ test('t85-4: 面板不得因为存储状态 early return（未初始化也要能
   assert.ok(contentAt > 0, '找不到项目内容选择')
   // 从「内容选择」往后取到工作区容器（注意：mt-workspace 在文件别处也出现过，必须带起点）
   const pageReturn = clientSource.slice(contentAt, clientSource.indexOf('mt-workspace', contentAt))
-  assert.ok(pageReturn.includes('projectTabs,'), 'tab 必须照常渲染')
-  assert.ok(pageReturn.includes('storeBanner,'), '横幅必须渲染进面板（topbar + tabs 之后）')
+  /* CHG-202d：tab 条并进顶栏那一行了（`projectTabs` 成了 `topbar` 的第一个孩子），
+   * 面板根上不再单独渲染 `projectTabs,`——断言「顶栏渲染了」+「tab 确实在顶栏里」。 */
+  assert.ok(pageReturn.includes('topbar,'), '顶栏必须照常渲染')
+  assert.match(clientSource, /className: 'mt-topbar', children: \[\s*\n?\s*projectTabs,/, 'tab 必须并进顶栏那一行（CHG-202d）')
+  assert.ok(pageReturn.includes('storeBanner,'), '横幅必须渲染进面板（topbar 之后）')
 })
 
 test('t85-5: 未初始化横幅提供「初始化」出口，且初始化是幂等的项目级写', () => {

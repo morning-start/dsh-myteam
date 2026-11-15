@@ -120,7 +120,7 @@ export interface SpawnLifecycleDeps {
   agentOf: (handle: unknown) => { followup?: (msg: unknown) => void; cancel?: (o: unknown) => void } | undefined
   /** followup 消息构造（FIX-16 实弹形状：`{role,id,content,source}`；全插件唯一构造点） */
   followupMessage: (text: string) => Record<string, unknown>
-  /** 成员工具执行入口（P1-5 护栏埋点；9 个成员工具的唯一分派点） */
+  /** 成员工具执行入口（P1-5 护栏埋点；10 个成员工具的唯一分派点） */
   executeMemberTool: (member: MemberInstance, name: string, args: Record<string, unknown>) => Record<string, unknown>
   /** 成员工具定义（9 个；住在 `src/tools/defs.ts`，core 不能 import 那一层） */
   memberToolDefs: () => ReadonlyArray<SpawnToolDef>

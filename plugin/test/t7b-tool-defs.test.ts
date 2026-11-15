@@ -3,10 +3,10 @@ import assert from 'node:assert/strict'
 import { leadToolDefs, memberToolDefs, toolRegistryPlan, toolOutput, EVIDENCE_PARAM } from '../src/tools/defs.ts'
 import { TEAM_MEMBER_TOOLS } from '../src/core/members/member-setup.ts'
 
-test('T7 tool defs: 55 lead tools + 9 member tools, names match contract (docs/04 §1 + CHG-17/19/53/57/69/73/76/86/87/91/122~134/163/187)', () => {
+test('T7 tool defs: 59 lead tools + 10 member tools, names match contract (docs/04 §1 + CHG-17/19/53/57/69/73/76/86/87/91/122~134/163/187/199)', () => {
   const plan = toolRegistryPlan()
-  assert.equal(plan.lead.length, 55)
-  assert.equal(plan.member.length, 9)
+  assert.equal(plan.lead.length, 59)
+  assert.equal(plan.member.length, 10)
   assert.deepEqual(plan.member, [...TEAM_MEMBER_TOOLS])
   // CHG-86（P0-4）：两个作用域不能有同名工具——旧实现队长侧与成员侧都叫
   // myteam_update_task，同名跨层注册时解析顺序决定谁生效（成员可能绕过 attemptId 校验）。
@@ -58,9 +58,13 @@ test('T7 tool defs: 55 lead tools + 9 member tools, names match contract (docs/0
     'myteam_create_skill', 'myteam_create_tool',
     // CHG-163（docs/10 KI-9 / FR-17.4）：onboarding 采集的队长侧提案入口
     'myteam_propose_knowledge',
+    // CHG-200（用户定案「队长没有最基本的读取工具」）：**队长读面**——任务详情 / 看板 / 知识条目
+    'myteam_read_task', 'myteam_read_board', 'myteam_read_knowledge_entry',
   ]) {
     assert.ok(plan.lead.includes(expected), `missing lead tool ${expected}`)
   }
+  // CHG-200（用户定案「任务检查应该由成员自己完成」）：成员侧门禁裁决入口
+  assert.ok(plan.member.includes('myteam_submit_review'), 'missing member tool myteam_submit_review')
 })
 
 test('T7 tool defs: every tool has name/description/valid parameters object', () => {

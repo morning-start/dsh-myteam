@@ -39,6 +39,7 @@ import type { CommitDraft, TeamService } from '../core/service.ts'
 import {
   adoptDraft,
   knowledgeDirOf,
+  knowledgeEntryView,
   listKnowledge,
   readKnowledgeEntry,
   reviseEntry,
@@ -259,11 +260,11 @@ export function createKnowledgeHandlers(host: KnowledgeHostSurface) {
 
 export function createMemberKnowledgeHandlers(host: MemberKnowledgeHostSurface) {
   return {
+    /** `myteam_read_knowledge`：条目视图与队长读面同源（`knowledgeEntryView`，CHG-200）。 */
     read(args: Record<string, unknown>): Record<string, unknown> {
-      const entry = readKnowledgeEntry(knowledgeDirOf(host.workspaceRoot()), String(args.id))
+      const entry = knowledgeEntryView(host.workspaceRoot(), String(args.id))
       if (!entry) return { status: 'error', code: 'MT_KB_NOT_FOUND', message: `knowledge entry "${args.id}" not found（索引见提示词）` }
-      const body = entry.staleSince ? `[stale 待复核] 该条目已被主题相近任务触及，请勿盲信，注意交叉核对。\n\n${entry.body}` : entry.body
-      return { status: 'ok', entry: { id: entry.id, title: entry.title, tags: entry.tags, unverified: entry.unverified, staleSince: entry.staleSince, proofCount: entry.proofCount, body } }
+      return { status: 'ok', entry }
     },
   }
 }

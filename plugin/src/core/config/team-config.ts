@@ -258,7 +258,7 @@ export function loadEffectiveConfig(projectConfigRaw: unknown, teamConfigRaw?: u
 }
 
 /** 项目级配置落点（CHG-56 / CHG-102）：`<project>/.dsh-myteam/config/team.config.json` */
-export function projectConfigPath(workspaceRoot: string): string {
+function projectConfigPath(workspaceRoot: string): string {
   return storeLayout(workspaceRoot).teamConfig
 }
 

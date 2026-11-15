@@ -47,6 +47,16 @@ export const TOOL_TIERS                           = {
   myteam_get_task_graph: 'A',
   myteam_create_skill: 'A',
   myteam_create_tool: 'A',
+  /* CHG-200（用户定案「队长没有最基本的读取工具」）：**队长读面**——任务详情 / 看板 / 知识条目。
+   * 为什么是 A 而不是 C：它们是**只读**能力（不写账本、不改状态），队长与人类都该能看；
+   * 队长视图**不返回 attemptId**（写凭据只发给当前持有人），所以 A 不会变成越权口子。 */
+  myteam_read_task: 'A',
+  myteam_read_board: 'A',
+  myteam_read_knowledge_entry: 'A',
+  /* CHG-200（用户定案「任务检查应该由成员自己完成」）：**成员提交门禁裁决**——审查者 = 调用者，
+   * 强制交叉审查（不能审自己实现的任务）。A 档：检查是成员的份内事，不需要队长先授权；
+   * 越权边界由 reviewTask 的 reviewer≠implementer 硬校验守住（MT_CROSS_REVIEW）。 */
+  myteam_submit_review: 'A',
 
   /* ── C：仅队长 ──────────────────────────────────────────── */
   myteam_submit_plan: 'C',
@@ -56,6 +66,8 @@ export const TOOL_TIERS                           = {
   myteam_review_task: 'C',
   myteam_rescope_task: 'C',
   myteam_cancel_task: 'C',
+  /* CHG-202x（P0-1）：删除任务 = 清理型写操作（与取消同档） */
+  myteam_delete_task: 'C',
   myteam_batch_task_op: 'C',
   myteam_assign_task: 'C',
   myteam_reassign_task: 'C',

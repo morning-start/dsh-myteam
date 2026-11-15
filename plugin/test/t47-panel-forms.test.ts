@@ -28,7 +28,9 @@ test('t47-2: 建队引导 = 打开团队模式会话 + 预填首条消息（不�
   // uiWorkspace 是「未 inject 就抛错」的 cordis 服务属性，必须经 ctx.get 取（否则按钮点了没反应）
   assert.match(source, /ctx\.get\('uiWorkspace'\)/)
   // 工作区入口缺失时降级为「复制指令」，不能静默失败
-  assert.match(source, /team\.new\.unavailable/)
+  // CHG-202g：词条已由 `team.new.unavailable` 更名为 `g6.wizard.unavailable`（建队向导 G6 那一版），
+  // 旧 key 只剩两张表里的定义、没有任何渲染点——按死词条删除，断言跟着改成现名。
+  assert.match(source, /g6\.wizard\.unavailable/)
   assert.match(source, /copyText\(prompt\)/)
 })
 
@@ -42,7 +44,8 @@ test('t47-3: 角色表单 / 任务表单 / 建队引导三抽屉存在，且角�
 })
 
 test('t47-4: 任务表单的结构守卫提示 + 只保存元数据出口（避免静默丢字段）', () => {
-  assert.match(source, /const structuralKeys = \['acceptanceCriteria', 'deps', 'requiredRole', 'gateChain', 'deliverableSpec'\]/)
+  /* CHG-202x（P1-1）：`verifyCommand` 也是任务定义的一部分（改它同样要在跑任务走 rescope 出口） */
+  assert.match(source, /const structuralKeys = \['acceptanceCriteria', 'deps', 'requiredRole', 'gateChain', 'deliverableSpec', 'verifyCommand'\]/)
   assert.match(source, /if \(running && structuralKeys\.length > 0 && !metaOnly\)/)
   assert.match(source, /task\.saveMetaOnly/)
   assert.match(source, /task\.structuralBlocked/)
@@ -72,9 +75,18 @@ test('t47-6: 新增词条 zh/en 对等（缺失时界面会直接显示 key）',
   assert.deepEqual(missing, [], `en 缺词条：${missing.join(', ')}`)
 })
 
-test('t47-7: 没有团队的新项目也能进入项目作用域（工作区列表兜底，建队/建角色不被空数据卡死）', () => {
-  assert.match(source, /const rootCandidates = react\.useMemo\(/)
-  assert.match(source, /teamRoots\.length > 0\) return teamRoots\.sort\(\)/)
-  assert.match(source, /workspaces\?\.list\?\.getSnapshot\?\.\(\)\?\.items/)
-  assert.match(source, /const roots = rootCandidates/)
+test('t47-7: 项目视图只认会话工作目录——没有项目候选兜底（CHG-202b）', () => {
+  /* 用户定案：「会话模式下的 UI 应该自己打开当前会话所在工作目录的位置，而不是什么能指定的
+   * 项目位置」。
+   *
+   * 所以这里从「断言候选兜底存在」翻成「断言它被删掉」：项目根**只能**来自
+   * `getProjectScope()`（会话 → 工作目录）。留着 `rootCandidates` 就是留了第二真源——
+   * 解析不出时会静默打开别人家的工作区，用户以为自己在看本项目（「所有项目看起来都一样」）。
+   * 没有团队的新项目照样能建队/建角色：那是**空数据**，不是「换一个项目」。 */
+  assert.doesNotMatch(source, /const rootCandidates = react\.useMemo\(/, '项目候选列表必须删除（第二真源）')
+  assert.doesNotMatch(source, /const roots = rootCandidates/, '不能再用候选列表渲染项目下拉')
+  assert.doesNotMatch(source, /setProjectRoot\(rootCandidates\[0\]\)/, '不能拿候选列表第一个顶上')
+  assert.match(source, /getProjectScope: \(\) => rpcCall\(connection, 'myteam\/getProjectScope', \{ agentId: sessionId \}\)/, '项目根只能来自会话解析')
+  assert.match(source, /className: 'mt-project-name'/, '顶部只读展示项目名（不给切换入口）')
+  assert.match(source, /'project\.unresolved'/, '解析不出工作目录时如实说，不猜项目')
 })

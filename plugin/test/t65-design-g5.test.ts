@@ -102,8 +102,10 @@ test('t65-1: 四屏的设计稿元素在实现里都有对应 class（lanes / da
     'mt-trail', 'mt-trail-cap', 'mt-titem', 'mt-tav', 'mt-tinfo', 'mt-viewbar-right',
     'mt-lane-count', 'mt-lane-label-unassigned', 'mt-avatar-dashed', 'mt-lane-empty',
     /* design/dag.html · dag-vertical.html */
+    /* CHG-202f：`mt-dag-note`（依赖图图注条）按用户定案删除——箭头方向是图例常识，
+     * 「哪些在跑」已有节点高亮，60 字说明常驻底部只是噪音。 */
     'mt-dagwrap', 'mt-dag-canvas', 'mt-dag-card', 'mt-dag-card-top', 'mt-dag-card-title', 'mt-dag-card-meta',
-    'mt-dag-svg', 'mt-dag-edge', 'mt-dag-edge-hot', 'mt-arrow', 'mt-arrow-hot', 'mt-dag-note',
+    'mt-dag-svg', 'mt-dag-edge', 'mt-dag-edge-hot', 'mt-arrow', 'mt-arrow-hot',
     'mt-dag-node-focus', 'mt-dag-node-chain', 'mt-viewbar-dir', 'mt-chip-gate',
     /* design/dragging.html */
     'mt-col-drop', 'mt-col-nodrop', 'mt-dropzone', 'mt-task-ghost', 'mt-task-lift', 'mt-lift-tag',
@@ -141,10 +143,10 @@ test('t65-2: 四屏文案（zh + en 都落，禁硬编码只走 locale）', () =
   for (const key of [
     'lanes.groupBy', 'lanes.byStage', 'lanes.byPriority', 'lanes.noMembers', 'lanes.noteLead', 'lanes.noteBody',
     'lanes.emptyRow', 'lanes.unassignedNote', 'lanes.unassigned',
-    'dag.showModel', 'dag.hotChain', 'dag.hotChainEmpty', 'dag.arrowNote', 'dag.arrowNoteV', 'dag.noteLead', 'dag.noteLeadV',
+    'dag.showModel', 'dag.hotChain', 'dag.hotChainEmpty',
     'dag.teams', 'dag.evidence',
     'drag.liftTag', 'drag.ghost', 'drag.dropzone', 'drag.rejectedTitle', 'drag.rejectedBody', 'drag.rejectedLink',
-    'drag.accepted', 'drag.locked', 'drag.lockedTitle', 'drag.rulesBadge',
+    'drag.accepted', 'drag.locked', 'drag.lockedTitle',
   ]) {
     assert.ok(source.includes(`'${key}'`), `zh/en 缺 locale 键：${key}`)
   }
@@ -153,9 +155,17 @@ test('t65-2: 四屏文案（zh + en 都落，禁硬编码只走 locale）', () =
   assert.ok(source.includes('正被拖动'), '源列幽灵占位「t6 正被拖动」')
   assert.ok(source.includes('释放移入'), '虚线落区「释放移入」')
   assert.ok(source.includes('审查 → 命令验证 → 存档'), '落区链路文案')
-  assert.ok(source.includes('dragRules: state-machine'), 'viewbar 徽标')
-  assert.ok(source.includes('箭头从上游指到下游'), '依赖图图注（横向）')
-  assert.ok(source.includes('一个任务可以同时解锁多个下游'), '图注写明一对多解锁')
+  /* CHG-202f（用户定案「红框的这部分去掉」）+ CHG-202g：viewbar 的「流转规则」chip、它展开的
+   * `.mt-rules` 状态机说明条、依赖图画布底部的 `.mt-dag-note` 图注**整块删除**，零渲染点的
+   * 词条（`rules.*` / `dag.noteLead*` / `dag.arrowNote*` / `drag.rulesBadge`）一并从词表删掉。
+   * 反向断言：组件和文案都不能回来（要恢复就整块恢复，别只留半截）。 */
+  assert.ok(!source.includes("className: 'mt-rules'"), '状态机约束说明条已删除')
+  assert.ok(!source.includes("className: 'mt-dag-note'"), '依赖图图注条已删除')
+  assert.ok(!source.includes("'rules.title'") && !source.includes("'rules.body'"), '状态机说明词条已删除')
+  /* 按**词条 key**断言而不是文案：client.js 里保留了说明「删了什么」的 CHG 注释，
+   * 注释里会原样引用那句文案，用 `includes(文案)` 会自己打自己。 */
+  assert.ok(!source.includes("'dag.noteLead'") && !source.includes("'dag.noteLeadV'"), '依赖图图注引导词条已删除')
+  assert.ok(!source.includes("'dag.arrowNote'") && !source.includes("'dag.arrowNoteV'"), '依赖图图注正文词条已删除')
   assert.ok(source.includes('行 = 角色'), '泳道行头文案')
 })
 

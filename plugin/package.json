@@ -45,7 +45,10 @@
     "icon.svg"
   ],
   "scripts": {
-    "bundle": "node scripts/build-lib.mjs",
+    "build:client": "node scripts/build-client.mjs",
+    "build:lib": "node scripts/build-lib.mjs",
+    "bundle": "npm run build:client && npm run build:lib",
+    "check:client": "node scripts/build-client.mjs --check",
     "test": "node --test test/*.test.ts test/*.test.js"
   },
   "license": "MIT"

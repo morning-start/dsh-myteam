@@ -59,6 +59,23 @@ export const GUARD_STUCK_THRESHOLD = 2
 export const GUARD_STUCK_TIMEOUT_MS = 120_000
 
 /**
+ * 「回合边界」工具（CHG-200 从 `host.ts` 下沉——A6 入口层行数棘轮只减不增）。
+ *
+ * 为什么是这两个：`myteam_update_task` 是**申报**（progress / done / failed），
+ * `myteam_escalate_task` 是**上报受阻**——两者都意味着「本回合结束了」。
+ * **`myteam_wait_for_change` 不在其中**：等待本来就是空闲成员的正常行为（提示词明确让成员
+ * 无就绪任务时去等），把它算成回合边界会让「老实等待」被误判成空转（护栏变成新的误杀源）。
+ *
+ * 为什么需要回合边界：空转判据（`empty-turn`）是**回合**粒度——「一个回合里没有任何真实动作」
+ * 才是只说不做。宿主的成员通道没有 turn 结束回调（`executeMemberTool` 每次只看到一次调用），
+ * 所以用「申报/上报」这两个天然收尾点作为回合结束的挂点。
+ */
+export const GUARD_TURN_BOUNDARY_TOOLS: ReadonlySet<string> = new Set(['myteam_update_task', 'myteam_escalate_task'])
+
+/** 护栏输出尾部预算（字符）：环境特征匹配只需要「哪一句」，账本/日志不能无界 */
+export const GUARD_OUTPUT_TAIL_LIMIT = 2000
+
+/**
  * 环境不可用判据：同签名连续失败达到这个次数就中止（TeamFlow 的 ABORT 阈值同款）。
  * 取 3 而不是更大：实测模型第 2 次就会「按策略停止重试」转去绕道，提醒要早于它放弃
  * （第 2 次），中止要在绕道成规模之前（第 3 次）。
@@ -80,7 +97,7 @@ export const GUARD_EMPTY_TURN_THRESHOLD = 2
  * `pwsh` 的中文报错是「无法将“xxx”项识别为 cmdlet」，与 POSIX 的 `command not found`
  * 语义相同，不能只认英文。
  */
-export const ENV_UNAVAILABLE_PATTERN = new RegExp(
+const ENV_UNAVAILABLE_PATTERN = new RegExp(
   [
     '命令不存在',
     '不是内部或外部命令',

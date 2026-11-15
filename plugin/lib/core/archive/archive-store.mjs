@@ -32,7 +32,7 @@ import { writeTextAtomic } from '../fs/write-log.mjs'
 import { teamArchiveDir, archiveRoot, STORE_DIR } from '../workspace/layout.mjs'
 
 /** 归档快照版本（结构演进时 +1，读侧按版本兼容） */
-export const ARCHIVE_VERSION = 1
+const ARCHIVE_VERSION = 1
 
                                 
             
@@ -83,7 +83,7 @@ export const ARCHIVE_VERSION = 1
  
 
 /** 归档目录（团队级）：`history/archive/<teamId>` */
-export function archiveDirOf(workspaceRoot        , teamId        )         {
+function archiveDirOf(workspaceRoot        , teamId        )         {
   return teamArchiveDir(workspaceRoot, teamId)
 }
 

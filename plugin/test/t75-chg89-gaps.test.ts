@@ -153,9 +153,12 @@ test('t75-1: makeApi 接上 roleOp（根级）+ handoff（会话门面）——�
 /* ── 2. 乐观锁（QA-4 收尾）：面板真的把 expectedRevision 发出去了 ──── */
 
 test('t75-2: 乐观锁 —— 编辑表单快照 revision，三处写调用都回传 expectedRevision', () => {
-  // 两个打开编辑表单的入口（团队工作台 / 看板）都要快照 revision
+  /* CHG-202x（P0-4）：三个入口（团队工作台 / 任务看板 / 归档回放）现在共用**同一个** taskDetailNode——
+   * 快照只写一处（每多写一处就多一个「某个入口能绕过乐观锁」的洞），但三处必须真的都用它。 */
   const snapshots = clientSource.match(/revision: detail\.revision,/g) ?? []
-  assert.equal(snapshots.length, 2, '两个 openTaskEditor 入口都必须快照 detail.revision')
+  assert.equal(snapshots.length, 1, '快照 detail.revision 只应写一处（共用 taskDetailNode）')
+  const detailSites = clientSource.match(/taskDetailNode\(/g) ?? []
+  assert.equal(detailSites.length, 3, `三个渲染入口（团队工作台 / 任务看板 / 归档回放）都必须走 taskDetailNode（实际 ${detailSites.length} 处）`)
 
   // 表单里把它读出来（不是每次渲染重取，否则冲突检测失效）
   assert.match(
@@ -190,7 +193,9 @@ test('t75-2: 乐观锁 —— 编辑表单快照 revision，三处写调用都�
 /* ── 3. 发布到全局（FR-13.1）：角色详情页的按钮 + 两段确认 ─────────── */
 
 test('t75-3: 角色详情「发布到全局」—— 仅项目库来源可发布、两段确认、服务端 published 才提示', () => {
-  assert.match(clientSource, /function RoleDetailDrawer\(\{[^}]*onPublish \}\)/, '抽屉必须接收 onPublish')
+  /* CHG-202x（P0-3）：抽屉的 props 末尾新增了 `copyHint`（全局页没有项目库可写时置灰复制按钮），
+   * 所以这里不再断言「onPublish 是最后一个」，只要求**接收**它。 */
+  assert.match(clientSource, /function RoleDetailDrawer\(\{[^}]*onPublish[^}]*\}\)/, '抽屉必须接收 onPublish')
   assert.match(
     clientSource,
     /onPublish: openRoleEntry\?\.origin === 'project' \? \(confirm\) => publishRoleFlow\(/,
@@ -504,14 +509,17 @@ test('t75-11 (CHG-91): ContributionsSection 真渲染 —— 首屏给 loading�
   assert.ok(ContributionsSection({ t, api: undefined, workspaceRoot: '/w' }), '无 api 时也要能渲染')
 })
 
-test('t75-12 (CHG-91): 插件贡献相关词条 zh / en 对等（16 条）', () => {
+test('t75-12 (CHG-91): 插件贡献相关词条 zh / en 对等（14 条）', () => {
+  /* CHG-202l：`contrib.ok`（同步完成状态行）与 `contrib.pluginCount`（贡献数徽标）在
+   * `ContributionsSection` 重构后**没有渲染点**（改由 `contrib.title` 里的计数 +
+   * `contrib.providedBy` 承担），两条词条已从 zh / en 表删除，清单 16 → 14。 */
   const keys = [
     'contrib.title', 'contrib.desc', 'contrib.empty', 'contrib.reload', 'contrib.reloading',
-    'contrib.reloaded', 'contrib.pluginCount', 'contrib.roles', 'contrib.teams', 'contrib.providedBy',
-    'contrib.readonly', 'contrib.warnTitle', 'contrib.warnHint', 'contrib.ok', 'contrib.root',
+    'contrib.reloaded', 'contrib.roles', 'contrib.teams', 'contrib.providedBy',
+    'contrib.readonly', 'contrib.warnTitle', 'contrib.warnHint', 'contrib.root',
     'role.origin.plugin',
   ]
-  assert.equal(keys.length, 16)
+  assert.equal(keys.length, 14)
   for (const key of keys) {
     const hits = clientSource.split(`'${key}':`).length - 1
     assert.equal(hits, 2, `${key} 必须 zh / en 各一条（实际 ${hits}）`)

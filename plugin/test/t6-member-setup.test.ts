@@ -10,10 +10,12 @@ import {
 } from '../src/core/members/member-setup.ts'
 import { BUILTIN_ROLES } from '../src/core/roles/builtin-roles.ts'
 
-test('T6: exactly 9 member tools (v2.5 +read_knowledge); team tools never in deny mask (FR-3.5)', () => {
-  assert.equal(TEAM_MEMBER_TOOLS.length, 9)
+test('T6: exactly 10 member tools (v2.5 +read_knowledge, CHG-200 +submit_review); team tools never in deny mask (FR-3.5)', () => {
+  assert.equal(TEAM_MEMBER_TOOLS.length, 10)
   assert.ok(TEAM_MEMBER_TOOLS.includes('myteam_claim_task'))
   assert.ok(TEAM_MEMBER_TOOLS.includes('myteam_read_knowledge'))
+  // CHG-200（用户定案「任务检查应该由成员自己完成」）：审查者 = 调用者本人
+  assert.ok(TEAM_MEMBER_TOOLS.includes('myteam_submit_review'))
   // deny 团队工具 → 拒绝
   assert.throws(
     () => buildToolMask({ ...BUILTIN_ROLES[1], toolPolicy: { deny: ['myteam_claim_task'] } }),
@@ -25,7 +27,7 @@ test('T6: exactly 9 member tools (v2.5 +read_knowledge); team tools never in den
   assert.deepEqual(denyMask.deny, ['bash'])
 })
 
-test('T6: allow whitelist always includes the 8 team tools (C5 narrowing only)', () => {
+test('T6: allow whitelist always includes the 10 team tools (C5 narrowing only)', () => {
   const mask = buildToolMask({ ...BUILTIN_ROLES[1], toolPolicy: { allow: ['bash', 'read'] } })
   assert.equal(mask.mode, 'allow')
   for (const t of TEAM_MEMBER_TOOLS) {

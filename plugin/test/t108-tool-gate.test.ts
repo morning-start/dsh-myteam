@@ -52,9 +52,9 @@ test('t108-1: 成员通道硬拦 —— C 档不可调，A 档照常', async () 
   }
 })
 
-test('t108-2: 成员侧 9 个工具全部是 A 档（不会自锁）', () => {
+test('t108-2: 成员侧 10 个工具全部是 A 档（不会自锁）', () => {
   const aTier = new Set(toolsByTier().A)
-  for (const name of ['myteam_get_task', 'myteam_list_tasks', 'myteam_claim_task', 'myteam_update_task', 'myteam_peer_message', 'myteam_wait_for_change', 'myteam_propose_task_change', 'myteam_escalate_task', 'myteam_read_knowledge']) {
+  for (const name of ['myteam_get_task', 'myteam_list_tasks', 'myteam_claim_task', 'myteam_update_task', 'myteam_peer_message', 'myteam_wait_for_change', 'myteam_propose_task_change', 'myteam_escalate_task', 'myteam_read_knowledge', 'myteam_submit_review']) {
     assert.equal(TOOL_TIERS[name], 'A', `${name} 必须是 A 档（否则成员自锁）`)
     assert.equal(aTier.has(name), true)
   }

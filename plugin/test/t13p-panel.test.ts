@@ -19,8 +19,6 @@ import { join } from 'node:path'
 import { MyTeamPanelFacade, apply } from '../src/panel.ts'
 import { MyTeamRemote } from '../src/remote/service.ts'
 import { apply as hostApply } from '../src/host.ts'
-import { upsertGlobalWorkspace, entryFromProjection } from '../src/core/index/team-index.ts'
-import { emptyProjection } from '../src/core/scheduler/state.ts'
 
 const DESCRIPTOR = '@deepseek-ai/dsh-typert-protocol/remote-methods'
 
@@ -53,16 +51,11 @@ const stubRemote = {
 
 const captainAgent = (id: string) => ({ session: { id } })
 
-/** 测试隔离：默认指向不存在的全局索引，避免读到本机真实 ~/.dsh/myteam/workspaces.json */
-function absentGlobalIndexPath(): string {
-  return join(tmpdir(), `myteam-t13p-${process.pid}-${Math.random().toString(36).slice(2)}`, 'workspaces.json')
-}
-
 /** 构造门面（mock ctx 走 normalizeCtx 降级面）；teams=队长 sessionId 列表 */
-function makeFacade(teams: string[] = ['s-1'], serviceForImpl?: (agent: unknown, name: string) => unknown, globalIndexPath = absentGlobalIndexPath()) {
+function makeFacade(teams: string[] = ['s-1'], serviceForImpl?: (agent: unknown, name: string) => unknown) {
   const agents = { list: () => teams.map(captainAgent) }
   const agentPresets = { serviceFor: serviceForImpl ?? ((agent: unknown, name: string) => (name === 'myteam' ? stubRemote : undefined)) }
-  const facade = new MyTeamPanelFacade({ agents, agentPresets }, { globalIndexPath })
+  const facade = new MyTeamPanelFacade({ agents, agentPresets })
   return { facade, agents, agentPresets }
 }
 
@@ -73,12 +66,12 @@ test('t13p-1: typertRemote 绑定 serviceKey=myteamPanel + namespace=myteam（�
   assert.equal(binding.namespace, 'myteam')
 })
 
-test('t13p-2: marker 59 方法全部 direct invocation（listTeams/getStoreState/initStore + getProject/getRoleDetail/saveRole/deleteRole/getCapabilityCatalog + 5 个离线只读 + 25 个会话门面 + CHG-87 roleOp/applyRoles + CHG-88 handoff + CHG-91 getContributions/reloadContributions + CHG-102 项目存储 + CHG-117 saveTeamConfig/resetTeamConfig + CHG-119 getPlanFeedback + CHG-120 readSessionHistory + CHG-139a getTaskGraph/listSkills + CHG-187 listMembers + CHG-139b copyTeam/publishTeam + CHG-139c exportTeam/importTeam + CHG-139d createSkill/createTool）', () => {
+test('t13p-2: marker 60 方法全部 direct invocation（CHG-201：getGlobalScope/getProjectScope 取代 listTeams）', () => {
   const d = (MyTeamPanelFacade.prototype as any)[DESCRIPTOR]
   assert.ok(d, 'prototype 上必须有 remote-methods 描述符')
   assert.equal(d.version, 1)
   const names = d.methods.map((m: any) => m.method)
-  assert.deepEqual(names, ['batch', 'describe', 'watch', 'listTeams', 'getStoreState', 'initStore', 'getProject', 'getRoleDetail', 'saveRole', 'deleteRole', 'getCapabilityCatalog', 'getOfflineBoard', 'getOfflineTaskDetail', 'getOfflineTokens', 'getOfflineAudit', 'getOfflinePresets', 'getBoard', 'getTaskDetail', 'getTokens', 'getInbox', 'getAudit', 'getConfig', 'getPresets', 'getRoles', 'getKnowledge', 'planAction', 'postComment', 'memberOp', 'disband', 'createTask', 'createTasks', 'updateTask', 'assignTask', 'participateTask', 'rescopeTask', 'cancelTask', 'batchTaskOp', 'reviewTask', 'getArchive', 'getArchives', 'adoptKnowledge', 'roleOp', 'applyRoles', 'handoff', 'getContributions', 'reloadContributions', 'saveTeamConfig', 'resetTeamConfig', 'getPlanFeedback', 'readSessionHistory', 'getTaskGraph', 'listSkills', 'listMembers', 'copyTeam', 'publishTeam', 'exportTeam', 'importTeam', 'createSkill', 'createTool'])
+  assert.deepEqual(names, ['batch', 'describe', 'watch', 'getGlobalScope', 'getProjectScope', 'getStoreState', 'initStore', 'getProject', 'getRoleDetail', 'saveRole', 'deleteRole', 'getCapabilityCatalog', 'getOfflineBoard', 'getOfflineTaskDetail', 'getOfflineTokens', 'getOfflineAudit', 'getOfflinePresets', 'getBoard', 'getTaskDetail', 'getTokens', 'getInbox', 'getAudit', 'getConfig', 'getPresets', 'getRoles', 'getKnowledge', 'planAction', 'postComment', 'memberOp', 'disband', 'createTask', 'createTasks', 'updateTask', 'assignTask', 'participateTask', 'rescopeTask', 'cancelTask', 'deleteTask', 'batchTaskOp', 'reviewTask', 'getArchive', 'getArchives', 'adoptKnowledge', 'roleOp', 'applyRoles', 'handoff', 'getContributions', 'reloadContributions', 'saveTeamConfig', 'resetTeamConfig', 'getPlanFeedback', 'readSessionHistory', 'getTaskGraph', 'listSkills', 'listMembers', 'copyTeam', 'publishTeam', 'exportTeam', 'importTeam', 'createSkill', 'createTool'])
   for (const m of d.methods) assert.deepEqual(m.invocation, { kind: 'direct' })
 })
 
@@ -93,8 +86,11 @@ test('t13p-3: 方法签名 = 简单标识符 (agent, query)；listTeams/saveRole
     const params = m![1].split(',').map((s) => s.trim()).filter(Boolean)
     assert.deepEqual(params, ['agent', 'query'], `${name} 形参必须是 (agent, query)，实际 ${JSON.stringify(params)}`)
   }
-  const lt = proto.listTeams.toString()
-  assert.match(lt, /^async\s+listTeams\s*\(\s*\)/, 'listTeams 必须无参（无参 args={} 直连调用）')
+  /* CHG-201：全局页无参（只读全局资产）；项目页按 agent 解析会话工作区。 */
+  const gs = proto.getGlobalScope.toString()
+  assert.match(gs, /^async\s+getGlobalScope\s*\(\s*\)/, 'getGlobalScope 必须无参')
+  const gps = proto.getProjectScope.toString()
+  assert.match(gps, /^async\s+getProjectScope\s*\(\s*agent\s*\)/, 'getProjectScope 必须收 agent 首参')
   // T25：离线视图方法没有 agent 首参（网关 args 只发 {query}），形参必须是单个 query
   for (const name of ['getOfflineBoard', 'getOfflineTaskDetail', 'getOfflineTokens', 'getOfflineAudit', 'getOfflinePresets', 'saveRole', 'roleOp', 'getStoreState', 'initStore']) {
     const m = proto[name].toString().match(/^async\s+\w+\s*\(([^)]*)\)/)
@@ -131,68 +127,29 @@ test('t13p-5: 非队长会话 → {status:"unavailable"}（serviceFor undefined 
   assert.equal((r2 as any).status, 'unavailable')
 })
 
-test('t13p-6: listTeams 聚合队长会话（sessionId + 团队摘要：团队/工作区/目标/状态/成员/计数）；同工作区同团队去重（CHG-72）', async () => {
-  const summary = {
-    teamId: 'default',
-    name: '登录改造',
-    workspaceRoot: '/ws/proj',
-    goal: '目标',
-    state: 'active',
-    members: [{ roleId: 'developer', instanceName: 'dev-1', status: 'active', currentTaskId: '' }],
-    counts: { tasks: 3, done: 1, running: 1 },
-  }
+test('t13p-6: getProjectScope 按会话工作区解析本项目团队（同团队多会话去重）', async () => {
   const { facade } = makeFacade(['s-1', 's-2'])
-  const r = await facade.listTeams()
-  // 两个队长会话指向同一工作区的同一团队（多开会话/重开页面）→ 面板只保留一条，避免团队卡与任务重复
-  assert.deepEqual(r, {
-    status: 'ok',
-    teams: [
-      { sessionId: 's-1', ...summary, online: true },
-    ],
-  })
-  const { facade: f3 } = makeFacade([]) // 无队长
-  assert.deepEqual(await f3.listTeams(), { status: 'ok', teams: [] })
-})
-
-test('t13p-6c: listTeams 合并跨工作区离线索引（会话未运行的团队仍可见，online=false）', async () => {
-  const globalPath = join(tmpdir(), `myteam-t13p-offline-${process.pid}-${Math.random().toString(36).slice(2)}`, 'workspaces.json')
-  const offlineEntry = entryFromProjection('archived-team', emptyProjection('archived-team'), 100)
-  upsertGlobalWorkspace('/ws/other', { version: 1, workspaceRoot: '/ws/other', updatedAt: 1, teams: [offlineEntry] }, globalPath)
-
-  const { facade } = makeFacade(['s-1'], undefined, globalPath)
-  const r = await facade.listTeams()
-  assert.equal(r.teams.length, 2)
-  assert.equal(r.teams[0].online, true, '存活会话优先')
-  const offline = r.teams.find((team) => team.teamId === 'archived-team')!
-  assert.equal(offline.online, false)
-  assert.equal(offline.workspaceRoot, '/ws/other')
-  assert.equal(offline.sessionId, '')
-})
-
-test('t13p-6f: 存活会话缺 workspaceRoot 时按 teamId 去重离线索引（CHG-46 修正）', async () => {
-  const globalPath = join(tmpdir(), `myteam-t13p-noroot-${process.pid}-${Math.random().toString(36).slice(2)}`, 'workspaces.json')
-  const entry = entryFromProjection('dup-team', emptyProjection('dup-team'), 100)
-  upsertGlobalWorkspace('/ws/other', { version: 1, workspaceRoot: '/ws/other', updatedAt: 1, teams: [entry] }, globalPath)
-  const noRootRemote = {
-    ...stubRemote,
-    describe: () => ({ teamId: 'dup-team', workspaceRoot: '', goal: '', state: 'active', members: [], counts: { tasks: 0, done: 0, running: 0 } }),
-  }
-  const { facade } = makeFacade(['s-1'], () => noRootRemote, globalPath)
-  const r = await facade.listTeams()
-  assert.equal(r.teams.length, 1, '同一 teamId 只保留存活会话条目')
+  const r = await facade.getProjectScope(captainAgent('s-1'))
+  assert.equal(r.status, 'ok')
+  assert.equal(r.workspaceRoot, '/ws/proj', '工作区来自会话（describe 回落）')
+  assert.equal(r.teams.length, 1, '两个会话指向同一团队 → 去重为一条')
+  assert.equal(r.teams[0].teamId, 'default')
   assert.equal(r.teams[0].online, true)
+  /* 无队长会话 → 没有团队（且不枚举别的项目） */
+  const { facade: f3 } = makeFacade([])
+  const empty = await f3.getProjectScope(captainAgent('s-1'))
+  assert.equal(empty.status, 'ok')
+  assert.deepEqual(empty.teams, [])
 })
 
-
-test('t13p-6b: listTeams 在隔离服务无 describe 时降级为仅 id（旧实现兼容）', async () => {
+test('t13p-6b: 隔离服务无 describe 时无法解析工作区 → 空作用域（不猜项目）', async () => {
   const legacyRemote = { ...stubRemote, describe: undefined }
   delete (legacyRemote as any).describe
   const { facade } = makeFacade(['s-1'], () => legacyRemote)
-  const r = await facade.listTeams()
-  assert.deepEqual(r, {
-    status: 'ok',
-    teams: [{ sessionId: 's-1', teamId: 'default', name: '', workspaceRoot: '', goal: '', state: '', members: [], counts: { tasks: 0, done: 0, running: 0 }, online: true }],
-  })
+  const r = await facade.getProjectScope(captainAgent('s-1'))
+  assert.equal(r.status, 'ok')
+  assert.equal(r.workspaceRoot, '')
+  assert.deepEqual(r.teams, [])
 })
 
 test('t13p-6d: 离线视图参数校验（相对路径 / 路径穿越 / 空 teamId 一律 MT_VALIDATION）', async () => {
@@ -301,7 +258,8 @@ test('t13p-8: 隔离服务 MyTeamRemote 的 marker 不含 defaultTeamId（门面
   assert.ok(!names.includes('defaultTeamId'), 'defaultTeamId 只作门面发现通道，不应暴露为网关端点')
   /* CHG-139a~d：+getTaskGraph/+listSkills/+copyTeam/+publishTeam/+exportTeam/+importTeam/+createSkill/+createTool = 40 */
   /* CHG-187（FR-32 支柱一）：+listMembers = 41 */
-  assert.equal(names.length, 41)
+  /* CHG-202x（P0-1）：+deleteTask = 42 */
+  assert.equal(names.length, 42)
 })
 
 test('t13p-9: 载体行 guard —— hostApply(ctx, {carrier:true}) 直接返回（dsh-client-modules 组图载体）', () => {

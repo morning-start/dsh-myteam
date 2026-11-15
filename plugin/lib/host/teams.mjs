@@ -28,6 +28,17 @@
                                                                  
 import { buildArchiveSnapshot, writeArchive } from '../core/archive/archive-store.mjs'
 import { STORE_DIR } from '../core/workspace/layout.mjs'
+/* CHG-200：团队索引装配（A6 棘轮：`host.ts` 只减不增——ensureTeamIndex / refreshTeamIndex
+ * 两个私有方法体下沉到这里，宿主侧只留一行转发）。 */
+/* CHG-201（用户定案「全局和项目级分开」）：只写**项目级**索引（`.dsh-myteam/state/teams.json`），
+ * 全局层不再记录「都有哪些项目」（`$DSH_HOME/myteam/workspaces.json` 退役）。 */
+import {
+  entryFromProjection,
+  readWorkspaceIndex,
+  scanWorkspaceIndex,
+  upsertTeamEntry,
+  writeWorkspaceIndex,
+} from '../core/index/team-index.mjs'
 
 /**
  * 团队族用到的宿主面（**只列用到的成员**，不做全能门面）。
@@ -94,7 +105,9 @@ export function createTeamsHandlers(host                  ) {
     },
 
     disband(teamId        , args                         , actor        )                          {
-      if (args.confirm !== true) return { status: 'confirm-required', message: '解散是两段确认操作（影响面：成员排空/未完成任务转 blocked/账本归档），请带 confirm=true 重调' }
+      /* CHG-202x（P1-8）：文案曾承诺「未完成任务转 blocked」——**实现里没有任何事件能写入 blocked**，
+       * 那句话只是空头承诺。现在如实说：团队转 archived，未完成任务保持原状态（只读回放可查）。 */
+      if (args.confirm !== true) return { status: 'confirm-required', message: '解散是两段确认操作（影响面：成员排空 / 归档快照落盘 / 团队转 archived，未完成任务保持原状态可回放），请带 confirm=true 重调' }
       const svc = host.service(teamId)
       const proj = svc.projectionSnapshot
       const memberCount = Object.keys(proj.members).length
@@ -174,6 +187,28 @@ export function createTeamsHandlers(host                  ) {
 
     resetTeamConfig(teamId        , args                         )                          {
       return host.resetTeamConfig(teamId, args)
+    },
+
+    /** T24：索引缺失时从账本全量重建工作区索引 + 全局索引（失败只 warn） */
+    ensureIndex()       {
+      try {
+        if (readWorkspaceIndex(host.workspaceRoot())) return
+        const index = scanWorkspaceIndex(host.workspaceRoot())
+        writeWorkspaceIndex(host.workspaceRoot(), index)
+      } catch (e) {
+        host.log('warn', `team index rebuild failed: ${String(e)}`)
+      }
+    },
+
+    /** T24：commit 后单条 upsert（派生数据；失败不阻断主路径） */
+    refreshIndex(teamId        )       {
+      try {
+        const svc = host.service(teamId)
+        const entry = entryFromProjection(teamId, svc.projectionSnapshot)
+        upsertTeamEntry(host.workspaceRoot(), entry)
+      } catch (e) {
+        host.log('warn', `team index update failed: ${String(e)}`)
+      }
     },
   }
 }

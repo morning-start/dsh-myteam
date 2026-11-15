@@ -88,6 +88,7 @@ export interface TasksHostSurface {
   /** CHG-73：取消（下游依赖按 `downstream` 档处理） */
   cancelTask(teamId: string, args: Record<string, unknown>, actor: string): Record<string, unknown>
 
+
   /** CHG-73：批量编排（cancel / rescope / assign / priority） */
   batchTaskOp(teamId: string, args: Record<string, unknown>, actor: string): Record<string, unknown>
 
@@ -152,6 +153,47 @@ export function createTasksHandlers(host: TasksHostSurface) {
     /** `myteam_cancel_task` */
     cancel(teamId: string, args: Record<string, unknown>, actor: string): Record<string, unknown> {
       return host.cancelTask(teamId, args, actor)
+    },
+
+    /**
+     * `myteam_delete_task`（CHG-202x / P0-1）：产品定案「任务不能手动建，但是可以手动删除」。
+     *
+     * 与 `cancel` 的区别：cancel 是**终态**（任务留在看板「已取消」列，下游仍挂着它，只能靠 rewire 解开）；
+     * delete 是**把任务从投影里去掉**（误建任务的清理出口）。两段确认：第一次返回影响面
+     * （标题 / 状态 / 直接下游 / 是否有活跃 attempt），带 confirm=true 才落账。
+     * 落账后 fold 会把它的 id 从其它任务的 deps 里摘掉——下游不会永久死锁。
+     */
+    deleteTask(teamId: string, args: Record<string, unknown>, actor: string): Record<string, unknown> {
+      const taskId = String(args.taskId ?? '')
+      if (!taskId) return { status: 'error', code: 'MT_VALIDATION', message: 'taskId is required' }
+      const proj = host.service(teamId).projectionSnapshot
+      const task = proj.tasks[taskId]
+      if (!task) return { status: 'error', code: 'MT_VALIDATION', message: `task "${taskId}" not found` }
+      const reason = String(args.reason ?? '').trim()
+      const dependents = Object.values(proj.tasks)
+        .filter((t) => t.id !== taskId && (t.input.deps ?? []).includes(taskId))
+        .map((t) => t.id)
+      if (args.confirm !== true) {
+        return {
+          status: 'confirm-required',
+          taskId,
+          impact: { title: task.input.title, state: task.state, dependents, hasAttempt: Boolean(task.attemptId) },
+          message: `删除「${task.input.title}」会把它从账本投影里移除（历史事件保留、可回放）；${
+            dependents.length > 0
+              ? `它的 ${dependents.length} 个直接下游会**解除对该任务的依赖**（变独立任务）`
+              : '当前没有下游依赖它'
+          }；确认请带 confirm=true`,
+        }
+      }
+      const r = host.commitGuarded(teamId, args, {
+        actor,
+        type: 'task.deleted',
+        payload: { teamId, taskId, ...(reason ? { reason } : {}), ...(typeof args.batchId === 'string' ? { batchId: args.batchId } : {}) },
+      })
+      if (!r.ok) {
+        return { status: 'error', code: r.code, message: r.message, ...(r.currentRevision !== undefined ? { currentRevision: r.currentRevision } : {}) }
+      }
+      return { status: 'deleted', taskId, dependents }
     },
 
     /** `myteam_batch_task_op` */
@@ -239,6 +281,14 @@ export interface MemberTasksHostSurface {
 
   /** 成员侧等待：与 Lead 侧同一异步长轮询实现（工具 execute 返回 Promise，宿主管线 await 之） */
   waitForChange(args: Record<string, unknown>): Promise<Record<string, unknown>>
+
+  /**
+   * CHG-200（用户定案「任务检查应该由成员自己完成」）：门禁裁决入口（**与队长侧同一条实现**）。
+   *
+   * 为什么复用而不是各写一份：裁决口径（review/verify/archive 三门、交叉审查、打回预算）
+   * 只能有一处实现——两处各判一次，成员侧与队长侧迟早得出不同结论。
+   */
+  reviewTask(teamId: string, args: Record<string, unknown>, actor: string): Record<string, unknown> | Promise<Record<string, unknown>>
 
   /** FIX-12：`agents.create` 返回形状未实证——双形状兼容 */
   agentOf(handle: unknown): { followup?: (msg: unknown) => void; cancel?: (o: unknown) => void } | undefined
@@ -438,6 +488,20 @@ export function createMemberTaskHandlers(host: MemberTasksHostSurface) {
       if (!r.ok) return { status: 'error', code: r.code, message: r.message }
       host.agentOf(host.memberHandle(String(args.toMemberId)))?.followup?.(host.followupMessage(`[myteam] 来自 ${member.instanceName} 的消息：${String(args.content)}`))
       return { status: 'sent' }
+    },
+
+    /**
+     * `myteam_submit_review`（CHG-200）：**成员侧门禁裁决**——审查者 = 调用者本人。
+     *
+     * 为什么必须由成员提交（而不是队长代填 reviewerMemberId）：审查是成员的份内事，
+     * 队长只做任务同步与成果检查。让队长代填，等于「谁都能以别人的名义下结论」——
+     * 账本上的 reviewerMemberId 就成了一个没有主体的名字。
+     *
+     * 越权边界不在这里重写：`reviewTask` 的 `reviewer ≠ implementer` 硬校验
+     * （MT_CROSS_REVIEW）与三门语义原样复用。
+     */
+    submitReview(teamId: string, member: MemberInstance, args: Record<string, unknown>, actor: string): Record<string, unknown> | Promise<Record<string, unknown>> {
+      return host.reviewTask(teamId, { ...args, reviewerMemberId: member.memberId }, actor)
     },
 
     /** `myteam_wait_for_change`：长轮询（P2-1：把自己传进去，活跃 peer 判定要排除自己） */

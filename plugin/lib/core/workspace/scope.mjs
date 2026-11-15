@@ -60,7 +60,7 @@ export function normalizeScope(raw         )        {
 }
 
 /** 全局资产根：`$DSH_HOME/myteam`（跨项目，**不含** tasks/history/state/export） */
-export function globalRoot(env                    = process.env)         {
+function globalRoot(env                    = process.env)         {
   const home = env.DSH_HOME || join(homedir(), '.dsh')
   return join(home, 'myteam')
 }

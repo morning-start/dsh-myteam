@@ -1,12 +1,15 @@
 /**
- * T24（CHG-45）：团队索引 —— 工作区级 + 跨工作区级派生索引。
+ * T24（CHG-45）：团队索引 —— **项目级**派生索引。
  *
- * 背景：面板全局视图此前只聚合「存活的队长会话」——会话关闭/宿主重启后，未归档团队
- * 会从全局列表消失（docs/11 §七 P1）。本模块把账本折叠成可重建的摘要索引：
+ * 背景：面板项目视图此前只聚合「存活的队长会话」——会话关闭/宿主重启后，未归档团队
+ * 会从项目列表消失（docs/11 §七 P1）。本模块把账本折叠成可重建的摘要索引：
  *
- *   .dsh-myteam/state/teams.json          # 工作区级：本工作区所有团队摘要
- *   $DSH_HOME/myteam/workspaces.json      # 跨工作区级：workspaceRoot → teams[]（**只用于「全部项目」入口，
- *                                         #   绝不并入项目视图**——CHG-102 修「所有项目看起来都一样」）
+ *   <project>/.dsh-myteam/state/teams.json    # 项目级：本项目所有团队摘要
+ *
+ * ── CHG-201（用户定案「全局和项目级分开」）──────────────────────────────────
+ * **删掉跨工作区全局索引 `$DSH_HOME/myteam/workspaces.json`**：全局层只放全局资产
+ * （全局角色 / 全局团队库 / 预设 / 技能），**不记录「都有哪些项目」**。项目清单由
+ * 项目视图按会话工作区读 `.dsh-myteam/` 得到——两个作用域物理分离，不互相枚举。
  *
  * 纪律（docs/11 §二）：
  *  - 索引是**派生数据**，不是事实源：任何时刻可 scanWorkspaceIndex() 全量重建；
@@ -47,18 +50,6 @@ import { storeLayout } from '../workspace/layout.mjs'
                          
  
 
-                                       
-                       
-                   
-                         
- 
-
-                              
-            
-                   
-                                                  
- 
-
 const INDEX_FILE = 'teams.json'
 
 /* ── 路径 ── */
@@ -71,10 +62,6 @@ export function workspaceIndexPath(workspaceRoot        )         {
 export function resolveMyteamHome(env                    = process.env)         {
   const home = env.DSH_HOME || join(homedir(), '.dsh')
   return join(home, 'myteam')
-}
-
-export function globalIndexPath(env                    = process.env)         {
-  return join(resolveMyteamHome(env), 'workspaces.json')
 }
 
 /**
@@ -201,38 +188,9 @@ export function upsertTeamEntry(workspaceRoot        , entry                )   
   return index
 }
 
-/* ── 跨工作区索引 ── */
-
-export function readGlobalIndex(path         = globalIndexPath())                          {
-  if (!existsSync(path)) return undefined
-  try {
-    return JSON.parse(readFileSync(path, 'utf8'))               
-  } catch {
-    return undefined
-  }
-}
-
-/** 把某工作区的索引写进全局索引（workspaceRoot 维度覆盖）
- *  - path 显式给出（单测/导出）→ 正常写
- *  - 缺省且处于 node:test 环境 → 只计算不落盘（避免单测污染 ~/.dsh 且规避并发 rename 竞争）
- */
-export function upsertGlobalWorkspace(workspaceRoot        , index                , path         )              {
-  const target = path ?? globalIndexPath()
-  if (!path && process.env.NODE_TEST_CONTEXT) {
-    return { version: 1, updatedAt: Date.now(), workspaces: { [workspaceRoot]: { workspaceRoot, updatedAt: Date.now(), teams: index.teams } } }
-  }
-  const existing = readGlobalIndex(target) ?? { version: 1, updatedAt: 0, workspaces: {} }
-  const updated              = {
-    version: 1,
-    updatedAt: Date.now(),
-    workspaces: {
-      ...existing.workspaces,
-      [workspaceRoot]: { workspaceRoot, updatedAt: Date.now(), teams: index.teams },
-    },
-  }
-  writeJsonAtomic(target, updated)
-  return updated
-}
+/* ── CHG-201：跨工作区全局索引已删除 ──────────────────────────────
+ * 全局层不再记录「都有哪些项目」（`$DSH_HOME/myteam/workspaces.json` 整个文件退役）。
+ * 项目视图按会话工作区读本项目 `.dsh-myteam/`；两个作用域物理分离，互不枚举。 */
 
 
 //# sourceURL=./src/core/index/team-index.ts

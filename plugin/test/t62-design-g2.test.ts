@@ -115,7 +115,9 @@ const DESIGN_CLASSES = [
   /* role-detail.html：.detail-grid / .sec / .abl-row / .tgl / .prompt / 侧列 */
   'mt-roledetail', 'mt-roledetail-grid', 'mt-roledetail-main', 'mt-roledetail-side', 'mt-sec', 'mt-sec-info',
   'mt-kvline', 'mt-prompt-head', 'mt-prompt-block', 'mt-abl-list', 'mt-abl-row', 'mt-abl-ico', 'mt-abl-main',
-  'mt-abl-name', 'mt-abl-sub', 'mt-tgl', 'mt-tgl-off', 'mt-side-actions',
+  /* CHG-202m：`mt-tgl-off`（开关关闭态）没有渲染点——`66-role-detail.js` 的 `mt-tgl`
+   * 目前硬编码 `aria-checked: true`、只画开态。已随死 CSS 删除；开关真正支持关闭时再加回来。 */
+  'mt-abl-name', 'mt-abl-sub', 'mt-tgl', 'mt-side-actions',
 ]
 
 test('t62-1: 四屏组件都在实现里（RoleLibrary / RoleCard / ProjectRoleCard / RoleCardCreate / MemberCard / RosterSummonCard / RoleDetailDrawer）', () => {

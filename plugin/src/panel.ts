@@ -21,7 +21,14 @@
  *    禁解构/默认/rest；`signal` 只能是末参）——首参命名 `agent` 命中 lookup，第二参 `query`
  *    为原 args 对象（json 参数可缺省）。
  *  - apply + 行级 inject（cordis.patch.yml myteam-panel 行）双保险：门面要读
- *    ctx.agents（listTeams 会话发现）与 ctx.agentPresets（serviceFor）。
+ *    ctx.agents（getProjectScope 会话→项目解析）与 ctx.agentPresets（serviceFor）。
+ *
+ * ── CHG-201（用户定案「全局和项目级分开」）──────────────────────────────────
+ * 两个作用域**物理分离**：
+ *  - 全局（侧边栏 `main` 页）：只读全局资产（内置 + 全局角色 / 预设 / 技能），**不记录项目**；
+ *  - 项目（画布「团队视图」tab）：按**会话工作区**读本项目 `.dsh-myteam/`（团队 / 任务 / 看板）。
+ * 跨工作区全局索引 `$DSH_HOME/myteam/workspaces.json` 退役；`listTeams` 的「全部项目」
+ * 语义删除，改由 `getProjectScope(agent)` 解析「当前会话属于哪个项目」。
  */
 import { TypertRemoteService } from '@deepseek-ai/dsh-typert-protocol'
 import { isAbsolute, join } from 'node:path'
@@ -53,9 +60,11 @@ function rootLevelMethods(): string[] {
 /** CHG-111：typert 描述符键 + 面板协议版本（方法表只增不减，新增能力时 +1） */
 const DESCRIPTOR_KEY = '@deepseek-ai/dsh-typert-protocol/remote-methods'
 const PANEL_PROTOCOL_VERSION = 1
-import { readGlobalIndex } from './core/index/team-index.ts'
+/* CHG-201：项目级索引（`.dsh-myteam/state/teams.json`）；跨工作区全局索引已退役。
+ * 全局作用域只需要全局根（`$DSH_HOME/myteam/`）——见 `getGlobalScope`。 */
+import { globalStoreLayout, readWorkspaceIndex } from './core/index/team-index.ts'
 import { buildOfflineAudit, buildOfflineBoard, buildOfflinePresets, buildOfflineProject, buildOfflineTaskDetail, buildOfflineTokens, isSafeTeamId, projectRolePaths, readOfflineTeam, roleUsage } from './core/index/offline-view.ts'
-import { buildProjectView, buildRoleDetailView, type ProjectTeamInput } from './core/index/views.ts'
+import { buildProjectView, buildRoleCatalogView, buildRoleDetailView, type ProjectTeamInput } from './core/index/views.ts'
 import { assertValidRole, deleteProjectRoleSafe, listRoleCatalog, readProjectRole, saveProjectRole } from './core/roles/role-store.ts'
 // CHG-87（docs/04 §2 承诺的 roleOp 端点）：与 host 侧共用同一份角色库写实现
 import { roleOp as roleOpImpl } from './core/roles/role-ops.ts'
@@ -186,8 +195,6 @@ function offlineTarget(query: Record<string, unknown> | undefined): { workspaceR
 }
 
 export class MyTeamPanelFacade extends TypertRemoteService {
-  /** 跨工作区索引路径（测试可注入；缺省 ~/.dsh/myteam/workspaces.json） */
-  private globalIndexPath?: string
   /**
    * CHG-91：插件贡献目录缓存（按工作区）。
    *
@@ -197,11 +204,10 @@ export class MyTeamPanelFacade extends TypertRemoteService {
    */
   private contributionCache = new Map<string, ContributionCatalog>()
 
-  constructor(ctx: unknown, opts: { globalIndexPath?: string } = {}) {
+  constructor(ctx: unknown) {
     // cordis 服务名 = "myteamPanel"；typert namespace = "myteam"（客户端端点 myteam/* 不变，
     // 与 SessionController 的 super(ctx,'sessionController',{namespace:'session'}) 同模式）
     super(normalizeCtx(ctx as never), 'myteamPanel', { namespace: 'myteam' })
-    this.globalIndexPath = opts.globalIndexPath
   }
 
   /** 官方口子读隔离服务：agentPresets.serviceFor(agent, 'myteam')（mount.js serviceForMount 扫 store） */
@@ -224,7 +230,11 @@ export class MyTeamPanelFacade extends TypertRemoteService {
     if (cached) return cached
     // **基准目录**：故意取「不含插件」的那一份——否则插件角色会把自己的 id 当成「已知」
     // 而自我放行（撞内置也发现不了）。
-    const base = listRoleCatalog(projectRolePaths(workspaceRoot))
+    // CHG-201：全局页（`workspaceRoot === ''`）没有项目目录，基准 = 内置 + 全局库
+    // （插件角色引用的全局/内置角色仍然可解析；项目角色在全局页不存在）。
+    const base = workspaceRoot === ''
+      ? listRoleCatalog({ projectRolesDir: '', globalRolesDir: globalStoreLayout().roles })
+      : listRoleCatalog(projectRolePaths(workspaceRoot))
     const catalog = loadContributions(contributionsRoot(), {
       builtinRoleIds: new Set(base.filter((entry) => entry.origin === 'builtin').map((entry) => entry.definition.id)),
       builtinTemplateIds: new Set(BUILTIN_PRESET_IDS),
@@ -251,61 +261,105 @@ export class MyTeamPanelFacade extends TypertRemoteService {
   }
 
   /**
-   * 无参会话发现：列出所有队长会话（sessionId 与客户端 slot binding.key 同命名空间，
-   * 即 agents store 键 = agent.session.id）。root 槽（main）的 Panel 用它拿 sessionId。
+   * CHG-201（用户定案「全局和项目级分开」）：**当前会话所属项目的作用域**。
+   *
+   * 为什么必须按 agent 解析：项目视图 = **一个具体项目**的视图，工作区由会话 cwd
+   * （`resolveProjectRoot` 优先级 1）决定；不能靠「全局索引里有哪些项目」反查——
+   * 那正是 CHG-201 从物理上拆掉的耦合（全局层不记录项目，`workspaces.json` 退役）。
+   *
+   * 返回 `teams` = 本项目在线会话 + 本项目账本/索引里未运行的团队（同构摘要）；
+   * 全局页（侧边栏）**不调用**它——全局页只读全局资产。
    */
-  async listTeams() {
-    const agents = (this.ctx as { agents?: { list?: () => AgentLike[] } }).agents
-    const teams: TeamSummary[] = []
-    const liveAgents = agents && typeof agents.list === 'function' ? agents.list() : []
-    for (const agent of liveAgents) {
-      const remote = this.remoteFor(agent)
-      if (!remote) continue
-      let info: TeamInfo | undefined
-      try {
-        info = remote.describe?.()
-      } catch {
-        info = undefined
+  async getProjectScope(agent: AgentLike) {
+    const workspaceRoot = this.workspaceRootOf(agent)
+    if (!workspaceRoot) return { status: 'ok', workspaceRoot: '', initialized: false, teams: [] }
+    const { inputs } = await this.collectProject(workspaceRoot)
+    const teams: TeamSummary[] = inputs.map((input) => {
+      const boardTasks = (input.board?.tasks ?? []) as Array<{ state?: string }>
+      const members = (input.members ?? []) as Array<{ roleId?: string; instanceName?: string; status?: string; currentTaskId?: string }>
+      return {
+        sessionId: input.sessionId ?? '',
+        teamId: input.teamId,
+        name: input.name ?? '',
+        workspaceRoot,
+        goal: input.goal ?? '',
+        state: input.state,
+        members: members.map((member) => ({
+          roleId: String(member.roleId ?? ''),
+          instanceName: String(member.instanceName ?? ''),
+          status: String(member.status ?? ''),
+          currentTaskId: String(member.currentTaskId ?? ''),
+        })),
+        counts: {
+          tasks: boardTasks.length,
+          done: boardTasks.filter((task) => task.state === 'done').length,
+          running: boardTasks.filter((task) => task.state === 'in_progress').length,
+        },
+        online: input.online,
       }
-      teams.push({
-        sessionId: agent.session.id,
-        teamId: info?.teamId ?? remote.defaultTeamId(),
-        name: info?.name ?? '',
-        workspaceRoot: info?.workspaceRoot ?? '',
-        goal: info?.goal ?? '',
-        state: info?.state ?? '',
-        members: info?.members ?? [],
-        counts: info?.counts ?? { tasks: 0, done: 0, running: 0 },
-        online: true,
-      })
+    })
+    return { status: 'ok', workspaceRoot, initialized: isStoreInitialized(workspaceRoot), teams }
+  }
+
+  /**
+   * CHG-201（用户定案「左侧侧边栏只有全局的信息」）：**全局作用域**（侧边栏页）。
+   *
+   * 数据面 = 内置 + 全局角色（`$DSH_HOME/myteam/roles`）+ 插件贡献 + 内置/插件预设。
+   * **没有**项目角色 / 团队 / 任务 / 项目清单——那些属于项目视图（`getProjectScope(agent)`）。
+   *
+   * 为什么不需要任何参数：全局资产跨项目共享，读的是全局根；传空 workspaceRoot 给
+   * `listRoleCatalog` / `readPresetCatalog` 时，不存在的项目目录自然返回空（不建第二事实源）。
+   */
+  async getGlobalScope() {
+    const contributions = this.contributionsFor('')
+    const roles = buildRoleCatalogView(
+      listRoleCatalog({ projectRolesDir: '', globalRolesDir: globalStoreLayout().roles }, contributions.roles),
+      [],
+    )
+    return {
+      status: 'ok',
+      ...roles,
+      presets: readPresetCatalog('', contributions.teams),
+      contributions: {
+        root: contributions.root,
+        ok: contributions.ok,
+        scannedAt: contributions.scannedAt,
+        plugins: contributions.plugins,
+        warnings: contributions.warnings,
+      },
+      warnings: contributions.warnings,
+      note: '全局作用域只读全局资产（内置 + 全局角色 / 预设 / 插件贡献）；项目与任务属于项目视图。',
     }
-    // T24（CHG-45）：合并跨工作区离线索引（会话未运行/宿主重启后的团队仍可见）
-    const liveKeys = new Set(teams.map((team) => `${team.workspaceRoot}::${team.teamId}`))
-    // CHG-72：同一工作区可能同时有多个队长会话指向同一个团队（多开会话/重开页面）——
-    // 面板按「工作区 + 团队」去重，避免团队卡/任务重复出现。
-    const deduped: TeamSummary[] = []
-    const seenLive = new Set<string>()
-    for (const team of teams) {
-      const key = `${team.workspaceRoot}::${team.teamId}`
-      if (seenLive.has(key)) continue
-      seenLive.add(key)
-      deduped.push(team)
-    }
-    teams.length = 0
-    teams.push(...deduped)
-    // 旧版 describe 不提供 workspaceRoot 时，按 teamId 兜底去重（CHG-46 修正：看存活侧是否缺 root）
-    const liveNoRoot = new Set(teams.filter((team) => !team.workspaceRoot).map((team) => team.teamId))
-    for (const offline of this.offlineTeams()) {
-      if (liveKeys.has(`${offline.workspaceRoot}::${offline.teamId}`)) continue
-      if (liveNoRoot.has(offline.teamId)) continue
-      teams.push(offline)
-    }
-    /**
-     * CHG-102（P0「所有项目看起来都一样」）：这里**只做跨工作区发现**（项目下拉的候选），
-     * 项目作用域的数据面是 `getProject({workspaceRoot})`——它按工作区过滤，不再把全局
-     * 索引串进项目视图。两侧职责分开，避免「切了项目看到同一批团队」。
+  }
+
+  /**
+   * 会话 → 项目根：`agent.session.cwd` 优先（`resolveProjectRoot` 优先级 1）；
+   * 旧宿主缺 cwd 时回落到隔离服务的 `describe().workspaceRoot`（同一份解析）。
+   * 落在 `$DSH_HOME` 内的路径一律拒绝（P0-1 回归防线）。
+   */
+  private workspaceRootOf(agent: AgentLike | undefined): string {
+    /* CHG-202：DSH 的会话 cwd 在 `session.header.cwd`，**不是** `session.cwd`（后者恒为空）。
+     *
+     * 修复前这里只读 `session.cwd` → 永远 `''` → `getProjectScope()` 返回空 workspaceRoot →
+     * 客户端静默回落到「候选列表第一个工作区」。用户看到的就是「团队视图里是别人家的项目 /
+     * 所有项目看起来都一样」——CHG-201 想根治的那个问题，其实一直没通。
+     *
+     * 优先级与 `TeamHost.workspaceRoot`（host.ts `sessionCwdOf`）保持一致：
+     * `header.cwd` → 旧形态 `session.cwd` → 隔离服务 `describe().workspaceRoot`。
+     * 落在 `$DSH_HOME` 内的路径一律拒绝（P0-1 回归防线）。
      */
-    return { status: 'ok', teams }
+    const session = (agent as { session?: unknown } | undefined)?.session
+    const headerCwd = String((session as { header?: { cwd?: unknown } } | undefined)?.header?.cwd ?? '')
+    const legacyCwd = String((session as { cwd?: unknown } | undefined)?.cwd ?? '')
+    const cwd = headerCwd || legacyCwd
+    if (cwd.length > 0 && isAbsolute(cwd) && !rejectProjectRoot(cwd)) return cwd
+    try {
+      const info = agent ? this.remoteFor(agent)?.describe?.() : undefined
+      const root = String(info?.workspaceRoot ?? '')
+      return root.length > 0 && isAbsolute(root) && !rejectProjectRoot(root) ? root : ''
+    } catch {
+      return ''
+    }
   }
 
   /**
@@ -372,34 +426,6 @@ export class MyTeamPanelFacade extends TypertRemoteService {
         include: ['manifest.json', 'README.md', 'structure.md', 'config/', 'tasks/'],
         exclude: ['state/', 'history/', 'export/', '*.tmp'],
       },
-    }
-  }
-
-  /** 跨工作区索引 → 离线团队摘要（索引缺失/损坏时返回空，不抛错） */
-  private offlineTeams(): TeamSummary[] {
-    try {
-      const global = this.globalIndexPath ? readGlobalIndex(this.globalIndexPath) : readGlobalIndex()
-      if (!global?.workspaces) return []
-      const out: TeamSummary[] = []
-      for (const ws of Object.values(global.workspaces)) {
-        for (const team of ws.teams ?? []) {
-          out.push({
-            sessionId: '',
-            teamId: team.teamId,
-            name: team.name ?? '',
-            workspaceRoot: ws.workspaceRoot,
-            goal: team.goal ?? '',
-            state: team.state ?? '',
-            members: (team.members ?? []).map((member) => ({ roleId: member.roleId, instanceName: member.instanceName, status: member.status, currentTaskId: '' })),
-            counts: team.counts ?? { tasks: 0, done: 0, running: 0 },
-            online: false,
-            updatedAt: team.updatedAt ?? 0,
-          })
-        }
-      }
-      return out
-    } catch {
-      return []
     }
   }
 
@@ -487,11 +513,31 @@ export class MyTeamPanelFacade extends TypertRemoteService {
     return { status: 'ok', ...view }
   }
 
-  /** 角色详情（FR-24）：定义/设定/技能/MCP + 跨团队在册情况（实例名与状态） */
+  /**
+   * 角色详情（FR-24）：定义/设定/技能/MCP + 跨团队在册情况（实例名与状态）。
+   *
+   * CHG-202x（P0-2）：**全局页没有项目根**（侧边栏挂载点只读全局资产），但角色详情本来
+   * 就不需要项目——内置 / 全局 / 插件贡献都是跨项目的。传空 `workspaceRoot` = 只列这三层、
+   * 在册情况为空（在册只对「项目库 / 项目自身角色」成立，R13）。
+   *
+   * 修复前这里直接 `OFFLINE_INVALID` → 客户端 `roleDetail` 恒 null → 抽屉永远停在「加载中…」。
+   * 注意**不能**退回 `projectRolePaths('')`：那会把 `resolve('', '.dsh-myteam')`（= 进程 cwd）
+   * 当成项目库，全局页会看到「别人家的项目角色」——正是 CHG-201 从物理上拆掉的耦合。
+   */
   async getRoleDetail(query: Record<string, unknown>) {
     const workspaceRoot = String(query?.workspaceRoot ?? '')
     const roleId = String(query?.roleId ?? '')
-    if (!isAbsolute(workspaceRoot) || !roleId) return OFFLINE_INVALID
+    const globalOnly = workspaceRoot === ''
+    if (!roleId || (!globalOnly && !isAbsolute(workspaceRoot))) return OFFLINE_INVALID
+    if (globalOnly) {
+      const entries = listRoleCatalog(
+        { projectRolesDir: '', globalRolesDir: globalStoreLayout().roles },
+        this.contributionsFor('').roles,
+      )
+      const detail = buildRoleDetailView(entries, roleId, [])
+      if (!detail) return { status: 'error', code: 'MT_ROLE_NOT_FOUND', message: 'role "' + roleId + '" not found in any library' }
+      return { status: 'ok', workspaceRoot: '', roleId, ...detail }
+    }
     const { inputs, entries } = await this.collectProject(workspaceRoot)
     const memberships = inputs.flatMap((team) =>
       (team.members ?? []).map((member) => ({
@@ -518,14 +564,21 @@ export class MyTeamPanelFacade extends TypertRemoteService {
    */
   async saveRole(query: Record<string, unknown>) {
     const workspaceRoot = String(query?.workspaceRoot ?? '')
-    if (!isAbsolute(workspaceRoot)) return OFFLINE_INVALID
+    const isGlobal = query?.scope === 'global'
+    /* CHG-202x（P0-2）：全局作用域写的是 `$DSH_HOME/myteam/roles`，**不依赖项目根**——
+     * 侧边栏全局页没有项目根，但「新建全局角色」必须能用。项目作用域仍要求绝对路径。
+     * 路径显式给 `projectRolesDir: ''`（**不能**用 `projectRolePaths('')`：那是进程 cwd）。 */
+    if (!isGlobal && !isAbsolute(workspaceRoot)) return OFFLINE_INVALID
     const role = query?.role as Record<string, unknown> | undefined
     if (!role || typeof role !== 'object' || Array.isArray(role)) {
       return { status: 'error', code: 'MT_VALIDATION', message: 'role is required (object)' }
     }
     // CHG-103：作用域守卫与工具链**同一份实现**（缺省 project；global 需 confirmGlobal）
+    const paths = isGlobal
+      ? { projectRolesDir: '', globalRolesDir: globalStoreLayout().roles }
+      : projectRolePaths(workspaceRoot)
     const out = roleOpImpl(
-      { paths: projectRolePaths(workspaceRoot), actor: 'human' },
+      { paths, actor: 'human' },
       'save',
       { role, scope: query?.scope, confirmGlobal: query?.confirmGlobal, confirm: query?.confirm },
     )
@@ -542,11 +595,13 @@ export class MyTeamPanelFacade extends TypertRemoteService {
    */
   async deleteRole(query: Record<string, unknown>) {
     const workspaceRoot = String(query?.workspaceRoot ?? '')
-    if (!isAbsolute(workspaceRoot)) return OFFLINE_INVALID
+    const isGlobal = query?.scope === 'global'
+    /* CHG-202x（P0-2）：同 saveRole——全局库的删除只看 `$DSH_HOME/myteam/roles`，与项目根无关。
+     * 全局角色不在任何项目团队的名册里（在册用的是项目库副本），占用面恒为空。 */
+    if (!isGlobal && !isAbsolute(workspaceRoot)) return OFFLINE_INVALID
     const roleId = String(query?.roleId ?? '').trim()
     if (!roleId) return { status: 'error', code: 'MT_VALIDATION', message: 'roleId is required' }
-    const usage = roleUsage(workspaceRoot, roleId)
-    const isGlobal = query?.scope === 'global'
+    const usage = isGlobal ? { teams: [], instances: 0, presets: [], bindings: [] } : roleUsage(workspaceRoot, roleId)
     if (query?.confirm !== true || (isGlobal && query?.confirmGlobal !== true)) {
       return {
         status: 'confirm-required',
@@ -562,7 +617,7 @@ export class MyTeamPanelFacade extends TypertRemoteService {
       }
     }
     const out = roleOpImpl(
-      { paths: projectRolePaths(workspaceRoot), actor: 'human', bindings: usage.bindings },
+      { paths: isGlobal ? { projectRolesDir: '', globalRolesDir: globalStoreLayout().roles } : projectRolePaths(workspaceRoot), actor: 'human', bindings: usage.bindings },
       'delete',
       { roleId, scope: query?.scope, confirmGlobal: query?.confirmGlobal, confirm: query?.confirm },
     )
@@ -904,11 +959,11 @@ export class MyTeamPanelFacade extends TypertRemoteService {
         ...(boardView ? { board: boardView } : {}),
       })
     }
-    // 离线团队（索引里存在但会话未运行）：折叠账本，与在线同构
+    // 离线团队（**本项目**索引里存在但会话未运行）：折叠账本，与在线同构。
+    // CHG-201：读项目级 `state/teams.json`（不再读跨工作区全局索引——全局不记录项目）。
     try {
-      const global = this.globalIndexPath ? readGlobalIndex(this.globalIndexPath) : readGlobalIndex()
-      const ws = global?.workspaces?.[workspaceRoot]
-      for (const team of ws?.teams ?? []) {
+      const projectIndex = readWorkspaceIndex(workspaceRoot)
+      for (const team of projectIndex?.teams ?? []) {
         if (liveKeys.has(team.teamId)) continue
         const offline = buildOfflineBoard(workspaceRoot, team.teamId)
         if (!offline) continue
@@ -1059,6 +1114,16 @@ export class MyTeamPanelFacade extends TypertRemoteService {
       return { status: 'error', code: 'MT_UNAVAILABLE', message: 'cancelTask requires a live team session' }
     }
     return remote.cancelTask(query ?? {})
+  }
+
+  /** 面板删除任务（CHG-202x / P0-1）：从账本投影移除（误建任务的清理出口）；两段确认 */
+  async deleteTask(agent: AgentLike, query: Record<string, unknown>) {
+    const remote = this.remoteFor(agent)
+    if (!remote) return UNAVAILABLE
+    if (typeof remote.deleteTask !== 'function') {
+      return { status: 'error', code: 'MT_UNAVAILABLE', message: 'deleteTask requires a live team session' }
+    }
+    return remote.deleteTask(query ?? {})
   }
 
   /** 面板批量编排（CHG-73/76）：取消/重规划/指派/改优先级，逐条落账；cancel 支持三档下游策略 */
@@ -1333,7 +1398,7 @@ export class MyTeamPanelFacade extends TypertRemoteService {
 }
 
 // 手动 Remote 标记：gateway 按 method 名发现端点（namespace=myteam，direct invocation）
-markRemoteMethods(MyTeamPanelFacade.prototype, ['batch', 'describe', 'watch', 'listTeams', 'getStoreState', 'initStore', 'getProject', 'getRoleDetail', 'saveRole', 'deleteRole', 'getCapabilityCatalog', 'getOfflineBoard', 'getOfflineTaskDetail', 'getOfflineTokens', 'getOfflineAudit', 'getOfflinePresets', 'getBoard', 'getTaskDetail', 'getTokens', 'getInbox', 'getAudit', 'getConfig', 'getPresets', 'getRoles', 'getKnowledge', 'planAction', 'postComment', 'memberOp', 'disband', 'createTask', 'createTasks', 'updateTask', 'assignTask', 'participateTask', 'rescopeTask', 'cancelTask', 'batchTaskOp',
+markRemoteMethods(MyTeamPanelFacade.prototype, ['batch', 'describe', 'watch', 'getGlobalScope', 'getProjectScope', 'getStoreState', 'initStore', 'getProject', 'getRoleDetail', 'saveRole', 'deleteRole', 'getCapabilityCatalog', 'getOfflineBoard', 'getOfflineTaskDetail', 'getOfflineTokens', 'getOfflineAudit', 'getOfflinePresets', 'getBoard', 'getTaskDetail', 'getTokens', 'getInbox', 'getAudit', 'getConfig', 'getPresets', 'getRoles', 'getKnowledge', 'planAction', 'postComment', 'memberOp', 'disband', 'createTask', 'createTasks', 'updateTask', 'assignTask', 'participateTask', 'rescopeTask', 'cancelTask', 'deleteTask', 'batchTaskOp',
   // CHG-86：门禁裁决 / 归档快照 / 知识提案策展
   'reviewTask', 'getArchive', 'getArchives', 'adoptKnowledge',
   // CHG-87（FR-13.1/FR-16.1）：角色库统一写入口 + 单角色调用

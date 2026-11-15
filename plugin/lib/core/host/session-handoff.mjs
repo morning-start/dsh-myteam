@@ -28,7 +28,7 @@
 export const TEAM_AGENT_PRESET_ID = 'myteam-captain'
 
 /** 摘要各分段的行数上限（超出部分折叠成「省略 N 项」） */
-export const HANDOFF_SECTION_LIMITS = {
+const HANDOFF_SECTION_LIMITS = {
   tasks: 12,
   members: 12,
   events: 8,
@@ -345,8 +345,11 @@ export function buildHandoffPrompt(summary        )         {
     '接手要求：',
     // A1：这里引用的每个工具名都必须能在 `plugin/src/tools/defs.ts` 里找到——
     // 旧文案写了一个**全仓没有任何定义**的看板工具名（幽灵工具：模型照着调只会拿到
-    // unknown tool）。看现状的真实路径是：团队目录 → 团队详情 → 任务列表/详情。
-    '1. 先读团队账本与看板确认真实现状（myteam_list_teams / myteam_get_team 看名册与计数，myteam_list_tasks / myteam_get_task 看具体任务）；摘要可能已过时，以账本为准。',
+    // unknown tool）。看现状的真实路径是：团队目录 → 团队详情 → 看板/任务详情。
+    // CHG-200：读面是**队长专属**的 `myteam_read_board` / `myteam_read_task`——
+    // 旧文案写的 `myteam_list_tasks` / `myteam_get_task` 只注册在成员作用域，
+    // 队长会话照着调只会拿到 unknown tool（同一类幽灵工具，两轮后又在提示词里长回来）。
+    '1. 先读团队账本与看板确认真实现状（myteam_list_teams / myteam_get_team 看名册与计数，myteam_read_board / myteam_read_task 看任务列表与详情）；摘要可能已过时，以账本为准。',
     '2. 摘要里的任务清单不是已下达的计划——名册、任务与分工由你（队长）自己决定（myteam_submit_plan / myteam_spawn_member / myteam_create_task）。',
     '3. 需要原会话的细节时，按摘要里的来源会话 id 向用户索取引用，不要凭空猜测原会话内容。',
   ].join('\n')

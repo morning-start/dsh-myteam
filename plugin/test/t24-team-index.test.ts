@@ -1,11 +1,13 @@
 /**
- * T24（CHG-45）：团队索引测试 —— 工作区级 teams.json + 跨工作区 workspaces.json。
+ * T24（CHG-45）：团队索引测试 —— **项目级** teams.json。
  *
  * 覆盖：
  *  - entryFromProjection：投影 → 摘要（目标/状态/成员/计数）
  *  - scanWorkspaceIndex：从账本全量重建（坏行容错、空目录）
  *  - 原子写 + 读回 + upsert（createdAt 沿用旧值、排序）
- *  - 跨工作区索引合并（workspaceRoot 维度覆盖）
+ *
+ * CHG-201（用户定案「全局和项目级分开」）：跨工作区索引 `workspaces.json` 已删除
+ * （全局层不记录「都有哪些项目」），原 t24-4 用例随之移除。
  */
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
@@ -18,8 +20,6 @@ import {
   workspaceIndexPath,
   readWorkspaceIndex,
   upsertTeamEntry,
-  upsertGlobalWorkspace,
-  readGlobalIndex,
 } from '../src/core/index/team-index.ts'
 import { emptyProjection } from '../src/core/scheduler/state.ts'
 
@@ -113,23 +113,5 @@ test('t24-3: 工作区索引原子读写 + upsert（createdAt 沿用、团队去
   assert.doesNotThrow(() => JSON.parse(readFileSync(path, 'utf8')))
 })
 
-test('t24-4: 跨工作区索引合并（workspaceRoot 维度覆盖，读回结构完整）', () => {
-  const globalPath = join(tmpWs(), 'global', 'workspaces.json')
-  const wsA = '/w/a'
-  const wsB = '/w/b'
-  const idxA = { version: 1 as const, workspaceRoot: wsA, updatedAt: 1, teams: [entryFromProjection('alpha', emptyProjection('alpha'), 1)] }
-  const idxB = { version: 1 as const, workspaceRoot: wsB, updatedAt: 2, teams: [entryFromProjection('beta', emptyProjection('beta'), 2)] }
-
-  upsertGlobalWorkspace(wsA, idxA, globalPath)
-  const merged = upsertGlobalWorkspace(wsB, idxB, globalPath)
-  assert.deepEqual(Object.keys(merged.workspaces).sort(), ['/w/a', '/w/b'])
-  assert.equal(merged.workspaces[wsA].teams[0].teamId, 'alpha')
-  assert.equal(merged.workspaces[wsB].teams[0].teamId, 'beta')
-
-  // 覆盖同一工作区：旧条目被替换
-  upsertGlobalWorkspace(wsA, { version: 1, workspaceRoot: wsA, updatedAt: 3, teams: [] }, globalPath)
-  const after = readGlobalIndex(globalPath)!
-  assert.deepEqual(after.workspaces[wsA].teams, [])
-  assert.equal(after.workspaces[wsB].teams[0].teamId, 'beta')
-  assert.equal(readGlobalIndex(join(tmpWs(), 'none.json')), undefined, '缺失返回 undefined')
-})
+/* CHG-201：跨工作区索引（workspaces.json）已退役——全局层不记录项目。
+ * 项目清单由项目视图按会话工作区读 `.dsh-myteam/state/teams.json`（t24-2/3 已覆盖）。 */

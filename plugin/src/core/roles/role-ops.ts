@@ -40,7 +40,7 @@ export interface RoleOpContext {
 
 export type RoleOpName = 'save' | 'delete' | 'publish' | 'fork'
 
-export const ROLE_OPS: readonly RoleOpName[] = ['save', 'delete', 'publish', 'fork']
+const ROLE_OPS: readonly RoleOpName[] = ['save', 'delete', 'publish', 'fork']
 
 /**
  * 角色库统一写入口。

@@ -51,7 +51,9 @@ test('t49-4: 批量编排 —— 四种操作、取消要两段确认、离线�
   assert.match(source, /const r = await makeApi\(connection, team\.sessionId\)\.batchTaskOp\(query\)/)
   // 批量取消：先不带 confirm 拿 impact，确认后才执行；离线团队的任务不进批次
   assert.match(source, /code: 'MT_OFFLINE', message: t\('batch\.offlineSkipped'\)/)
-  for (const key of ['batch.cancel', 'batch.rescope', 'batch.assign', 'batch.priority', 'batch.confirm', 'batch.impact']) {
+  /* CHG-202l：`batch.cancel`（旧「取消」）已由带宾语的 `batch.cancelTask` 取代，旧键
+   * 没有渲染点、已删；清单换成现役键。 */
+  for (const key of ['batch.cancelTask', 'batch.rescope', 'batch.assign', 'batch.priority', 'batch.confirm', 'batch.impact']) {
     assert.ok(source.includes(`'${key}'`), `缺词条 ${key}`)
   }
 })

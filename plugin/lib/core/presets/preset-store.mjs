@@ -188,7 +188,7 @@ function normalizePreset(raw         , origin              , filePath           
 }
 
 /** 读取单层目录（不存在返回空；坏文件只记 warning） */
-export function readPresetsFromDir(dir        , origin              , warnings          )                {
+function readPresetsFromDir(dir        , origin              , warnings          )                {
   if (!existsSync(dir)) return []
   const out                = []
   for (const file of readdirSync(dir).filter((name) => name.endsWith('.json')).sort()) {
@@ -240,7 +240,7 @@ export function readPresetCatalog(workspaceRoot        , contributions          
 
 export const BUILTIN_PRESET_IDS                      = new Set(BUILTIN_PRESETS.map((preset) => preset.id))
 
-export function projectPresetPath(workspaceRoot        , presetId        )         {
+function projectPresetPath(workspaceRoot        , presetId        )         {
   return join(presetDirs(workspaceRoot).project, `${presetId}.json`)
 }
 

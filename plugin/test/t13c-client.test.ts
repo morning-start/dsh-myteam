@@ -167,12 +167,16 @@ test('t13c-2b: M2 RPC 通道静态契约——直连 /api + 信封解包 + 端�
   assert.ok(source.includes('myteam/${method}'), '端点 = myteam/<method>（namespace 与门面一致）')
   assert.ok(source.includes("'ok' in r"), '官方 {ok,value}|{ok,error} 信封解包')
   assert.ok(source.includes('listTeams'), 'root 槽经 listTeams 发现队长会话')
-  assert.ok(source.includes('panel.unavailable'), '非队长/无团队 → 友好不可用态')
+  /* CHG-202l：`panel.unavailable` 已按场景拆成 `roles.unavailable` / `settings.unavailable` /
+   * `store.unavailable` 等（旧的「一条键兜所有不可用态」不再有渲染点，词条已删）。
+   * 断言改成**真的检查渲染点**，而不是检查词条表里有没有这个字符串——
+   * 后者是同义反复（表里写了就绿），UI 删了也不会红。 */
+  assert.ok(source.includes("t('roles.unavailable')") && source.includes("t('settings.unavailable')"), '非队长/无团队 → 按场景给出不可用态')
 })
 
 test('t13c-2c: 角色目录（CHG-69）——项目/全局角色卡、兴趣词 chips、在册情况、角色详情入口', () => {
   const source = readFileSync(clientPath, 'utf8')
-  assert.ok(source.includes("'project.tabs.roles'") && source.includes("'roles.page.project'"), '项目角色标签与项目角色库')
+  assert.ok(source.includes("'project.tabs.roles'") && source.includes("'roles.page.title'"), '项目角色标签与项目角色库标题')
   assert.ok(source.includes('getRoles') && source.includes("getRoleDetail: (query) => rpcCall(connection, 'myteam/getRoleDetail'"), '角色目录/详情数据面')
   assert.ok(source.includes("t(`role.origin.${role.origin}`)"), 'origin 动态标注（内置/全局/项目/项目自身角色）')
   assert.ok(source.includes("'roles.origin.builtin'") && source.includes("'roles.origin.project'"), '三态 origin 标签')
@@ -186,8 +190,11 @@ test('t13c-2d: 知识 tab（FR-17.5，M2-0b）——三 tab、getKnowledge 懒�
   assert.ok(source.includes("'tab.knowledge'"), '知识 tab 按钮')
   assert.ok(source.includes('getKnowledge'), '知识库走门面 getKnowledge')
   assert.ok(source.includes('getRoles: (query) => call(') && source.includes('getKnowledge: (query) => call('), 'makeApi 必须暴露 getRoles/getKnowledge（否则 tab 永远 unavailable）')
-  assert.ok(source.includes('kb.search') && source.includes('kb.queue'), '搜索框 + 待审提案队列')
-  assert.ok(source.includes('mt-kb-badge') && source.includes('kb.unverified') && source.includes('kb.stale'), 'unverified/stale 徽标')
+  /* CHG-202l：`kb.queue`（待审提案）/ `kb.stale`（待复核）**没有任何渲染点**——知识 tab 里
+   * 只有搜索框、core/unverified 徽标、证据指针、演化时间线、关系徽标。两个词条已删；
+   * 断言改成查真实渲染的键（`t('kb.x')` 形式 = 真的渲染了，而不是「表里写了」）。 */
+  assert.ok(source.includes("t('kb.search')") && source.includes('mt-kb-search'), '搜索框')
+  assert.ok(source.includes('mt-kb-badge') && source.includes("t('kb.unverified')") && source.includes("t('kb.core')"), 'core/unverified 徽标')
   assert.ok(source.includes('kb.rel.refine') && source.includes('kb.rel.contradict'), '提案关系可视化（refine/contradict）')
   assert.ok(source.includes('kb.timeline') && source.includes('mt-kb-tlitem'), '条目详情演化时间线')
   assert.ok(source.includes('mt-kb-search') && source.includes('mt-kb-entry'), '知识条目样式类')
@@ -201,9 +208,12 @@ test('t13c-2e: 离线只读工作台（T25/CHG-46）——离线团队可进入�
   assert.ok(source.includes("getOfflineBoard: (query) => rpcCall(connection, 'myteam/getOfflineBoard', { query })"), '离线调用只发 query')
   assert.ok(source.includes("getOfflineTaskDetail: (query) => rpcCall(connection, 'myteam/getOfflineTaskDetail', { query })"), '离线详情只发 query')
   assert.ok(source.includes('const offline = selectedTeam ? !selectedTeam.online : false'), '离线态按团队 online 判定（CHG-69：团队来自项目聚合）')
-  assert.ok(source.includes('offline.banner') && source.includes('offline.readonlyTip'), '离线横幅 + 只读提示')
+  /* CHG-202l：`offline.banner` 已无渲染点（离线态只剩 `offline.readonlyTip` 这一条提示），
+   * 词条已删；断言只查真实渲染的那个。 */
+  assert.ok(source.includes("t('offline.readonlyTip')"), '只读提示')
   assert.ok(source.includes('readOnly'), '详情抽屉只读态隐藏沟通输入')
-  assert.ok(source.includes("'global.search'"), '全局视图筛选框')
+  /* `global.search` 已按视图拆成 `roles.searchPlaceholder` / `g6.tasks.searchPlaceholder` */
+  assert.ok(source.includes("t('roles.searchPlaceholder')") && source.includes("t('g6.tasks.searchPlaceholder')"), '各视图筛选框占位符')
   assert.ok(source.includes('mt-team-card') && source.includes('mt-team-head'), '团队卡片（项目 · 团队标签）')
 })
 
@@ -215,7 +225,9 @@ test('t13c-2f: 成本 tab（CHG-47）——四桶表 + 双口径标注 + 离线 
   assert.ok(source.includes("getOfflineTokens: (query) => rpcCall(connection, 'myteam/getOfflineTokens', { query })"), '离线 tokens 端点 args 只发 query')
   assert.ok(source.includes('cost.note'), 'REV-5 口径说明')
   assert.ok(source.includes('cost.offlineEmpty'), '离线空态文案')
-  assert.ok(source.includes("'detail.gates'") && source.includes('mt-gate'), '任务详情门禁链')
+  /* CHG-202l：`detail.gates` 已拆成 `detail.gatesTitle` / `gatesCount` / `gatesEmpty`（旧的
+   * 单数键没有渲染点，已删）；断言改成查真实渲染的标题键。 */
+  assert.ok(source.includes("t('detail.gatesTitle')") && source.includes('mt-gate'), '任务详情门禁链')
   assert.ok(source.includes("'detail.deliverables'") && source.includes('mt-deliverables'), '任务详情交付物')
 })
 
@@ -223,7 +235,9 @@ test('t13c-2f: 成本 tab（CHG-47）——四桶表 + 双口径标注 + 离线 
 test('t13c-2g: 成员管理（CHG-48）——暂停/归档/恢复/移除两段确认；离线只读隐藏操作', () => {
   const source = readFileSync(clientPath, 'utf8')
   assert.ok(source.includes("memberOp: (query) => call('memberOp', query)"), 'memberOp 走门面')
-  assert.ok(source.includes("'member.suspend'") && source.includes("'member.restore'") && source.includes("'member.remove'"), '成员操作文案')
+  /* CHG-202l：`member.suspend|restore|remove` 已改名为 `roster.menu.*`（名册卡右键菜单），
+   * 旧键没有渲染点，已删；断言改成查现役的三个菜单键。 */
+  assert.ok(source.includes("'roster.menu.suspend'") && source.includes("'roster.menu.restore'") && source.includes("'roster.menu.remove'"), '成员操作文案')
   assert.ok(source.includes('member.removeConfirm'), '移除两段确认')
   assert.ok(source.includes('mt-member-actions'), '成员操作区样式')
   assert.ok(source.includes('mt-link-danger'), '移除危险色')
@@ -240,7 +254,10 @@ test('t13c-2h: 团队工作台（CHG-49/69）——五标签、审计/设置数�
   assert.ok(source.includes("getAudit: (query) => call('getAudit', query)"), 'getAudit 走门面')
   assert.ok(source.includes("getConfig: (query) => call('getConfig', query)"), 'getConfig 走门面')
   assert.ok(source.includes("getOfflineAudit: (query) => rpcCall(connection, 'myteam/getOfflineAudit', { query })"), '离线审计只发 query')
-  assert.ok(source.includes('mt-audit-row') && source.includes('mt-settings-card') && source.includes('mt-costbar'), '审计/设置/成本栏样式')
+  /* CHG-202m：mt-audit-row / mt-settings-card 是旧布局的类名（审计 tab 重写成
+   * mt-audit-item / mt-audit-rail，设置 tab 重写成 mt-setrow / mt-ssection），
+   * 已随死 CSS 清理删除；断言改成查现役类名。 */
+  assert.ok(source.includes('mt-audit-item') && source.includes('mt-setrow') && source.includes('mt-costbar'), '审计/设置/成本栏样式')
   assert.ok(source.includes('mt-seg') && source.includes('mt-viewbar'), '视图条样式')
 })
 
@@ -289,6 +306,33 @@ test('t13c-4: 状态标签三通道（文字+形状）覆盖关键状态，颜�
     assert.ok(new RegExp(`'?${s}'?:`).test(source), `STATE_LABEL covers ${s}`)
   }
   assert.ok(source.includes('aria-hidden'), 'decorative shapes marked aria-hidden')
+})
+
+test('t13c-2h: 居中列（CHG-202c）——每个「行」都吃同一个 gutter，角色页根 div 必须撑满', () => {
+  const source = readFileSync(clientPath, 'utf8')
+  const GUTTER = 'padding-inline:max(20px,calc((100% - 1100px) / 2))'
+
+  /* 为什么要这条锁：居中列靠 `padding-inline` 的**百分比**解析，而百分比按**包含块宽度**算。
+   * 角色页的根 div 是 `.mt-workspace`（display:flex 的行容器）的 flex item，不给 `flex:1`
+   * 就退化成「内容宽度」——2148 画布下实测内边距 176px 而不是 380px，整页左对齐、右边空
+   * 一大块（用户报的「很多位置没有改到」）。所以撑满 + 每条行容器都在规则里，缺一不可。 */
+  assert.ok(source.includes(GUTTER), '居中列 gutter 规则存在')
+
+  // 面板壳 + 页面级的「行」：全部共用同一个 gutter
+  const rule = source.match(/'[^']*mt-topbar[^']*\{?[^']*padding-inline:max\(20px[^']*'/)
+  assert.ok(rule, 'topbar 那条 gutter 规则存在')
+  for (const sel of ['.mt-subtabs', '.mt-banner', '.mt-page', '.mt-empty', '.mt-teambar', '.mt-taskhead', '.mt-viewbar', '.mt-body', '.mt-home', '.mt-detail-page']) {
+    assert.ok(rule[0].includes(sel), `${sel} 必须在居中列的「行」清单里`)
+  }
+
+  // 角色 / 团队 tab 顶部那几张**行级卡片**与 .mt-page 平级（不是它的后代），必须单独点名
+  for (const sel of ['.mt-sec', '.mt-ssection']) {
+    assert.ok(source.includes(`.mt-panel > .mt-workspace > div > ${sel}`), `${sel} 是行级卡片，要单独进居中列`)
+  }
+
+  // 角色页根 div：flex item 必须撑满，否则百分比内边距按内容宽度算（居中失效）
+  assert.ok(source.includes(`.mt-rolepage{flex:1 1 auto;min-width:0}`), '角色页根 div 撑满')
+  assert.ok(source.includes(`className: 'mt-rolepage'`), '角色页根 div 带类名')
 })
 
 test('t13c-2g: 看板/名册 UI 修复契约（CHG-62）——列全高可滚、优先级不重复、成员显示任务名与在岗态', () => {
@@ -343,11 +387,12 @@ test('t13c-2j: 面板信息架构（CHG-69）——全局/项目双作用域 + �
   const source = readFileSync(clientPath, 'utf8')
   // 作用域：全局只有角色/资产，项目有角色/团队/任务三标签
   assert.ok(source.includes("scope === 'global'") && source.includes("scope === 'project'"), '作用域切换')
-  assert.ok(source.includes("'scope.project'") && source.includes("'project.tabs.roles'") && source.includes("'project.tabs.teams'") && source.includes("'project.tabs.tasks'"), '全局/项目 + 项目三标签')
+  // CHG-202e：作用域标签（`scope.project` / `scope.global`）随「插件名 + 项目 |」整块删除（只读项目信息替代）
+  assert.ok(source.includes("'project.tabs.roles'") && source.includes("'project.tabs.teams'") && source.includes("'project.tabs.tasks'"), '项目三标签')
   // 团队页五标签：队员 / 参与任务 / 知识 / 审计 / 设置
   assert.ok(source.includes("const tabs = ['members', 'participating', 'knowledge', 'audit', 'feedback', 'settings']"), '团队六标签（CHG-119 增「反馈」）')
-  // 任务四视图 + 依赖图横竖方向
-  assert.ok(source.includes("'list', 'board', 'lanes', 'dag'") && source.includes("'view.dir.h'") && source.includes("'view.dir.v'"), '任务四视图 + 方向切换')
+  // 任务四视图 + 依赖图横竖方向（CHG-202g：短标签 `view.dir.h/v` 已由带箭头的 `view.dir.arrow.h/v` 取代）
+  assert.ok(source.includes("'list', 'board', 'lanes', 'dag'") && source.includes("'view.dir.arrow.h'") && source.includes("'view.dir.arrow.v'"), '任务四视图 + 方向切换')
   // 参与关系三处：任务卡 chip / 详情参与团队区块 / 团队参与任务页
   assert.ok(source.includes('mt-tchip-lead') && source.includes('mt-tchip-coop'), '主责/协作 chip 样式')
   assert.ok(source.includes("t('detail.participants')") && source.includes("t('team.tab.participating')"), '任务详情 + 团队参与任务')

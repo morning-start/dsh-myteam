@@ -8,7 +8,7 @@
  * 安全：不跟随符号链接（`withFileTypes` + `isDirectory()` 对 symlink 返回 false），
  * 防越权读（契约 §3.3）。
  */
-import { existsSync, readdirSync, statSync } from 'node:fs'
+import { existsSync, readdirSync } from 'node:fs'
 import { join } from 'node:path'
 import { resolveMyteamHome } from '../index/team-index.mjs'
                                                        
@@ -48,19 +48,6 @@ export function discoverContributions(root         = contributionsRoot())       
     })
 }
 
-/**
- * 插件目录是否「看起来像」一个贡献（有 `plugin.json`）。
- *
- * 用来在面板里区分「这是给人看的根目录」和「这是插件」——不参与装载决策
- * （装载仍然「有清单就校验，没有就报 MANIFEST_INVALID」，因为静默跳过是 P4 禁止的）。
- */
-export function looksLikeContribution(dir        )          {
-  try {
-    return existsSync(join(dir, 'plugin.json')) && statSync(dir).isDirectory()
-  } catch {
-    return false
-  }
-}
 
 
 //# sourceURL=./src/core/contributions/discover.ts

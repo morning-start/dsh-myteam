@@ -19,7 +19,7 @@ import { writeTextAtomic } from '../fs/write-log.mjs'
                                                         
 import { storeLayout } from '../workspace/layout.mjs'
 
-export const SESSION_DEFAULTS_VERSION = 1
+const SESSION_DEFAULTS_VERSION = 1
 
 /** 单角色调用的落盘形态（schema 极小：只存角色 id 列表 + 归因） */
                                       

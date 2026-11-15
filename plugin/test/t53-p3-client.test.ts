@@ -65,40 +65,28 @@ test('t53-3: A 三档影响面文案 + 改挂明细 + 已改挂 N 个任务（re
   assert.ok(source.includes("t('batch.failedItems')"), '失败原因文案')
 })
 
-test('t53-4: B 批量新建 —— createTasks 门面、预览不带 confirm、创建带 confirm', () => {
+test('t53-4: B 批量新建抽屉已移除，但 createTasks 门面仍在（供队长/CLI 用）', () => {
+  // CHG-202v：用户定案「任务不能手动建」→ 抽屉连同 74-batch.js 整个删除。
+  // 这里只保留「会话门面暴露 createTasks」这一条契约（它不是 UI，是 RPC 能力）。
   assert.match(source, /createTasks: \(query\) => call\('createTasks', query\)/, 'makeApi 暴露 createTasks（会话门面）')
-  assert.match(source, /function BatchCreateDrawer\(/, '抽屉组件')
-  assert.match(source, /const callCreate = \(confirm\) => makeApi\(connection, team\.sessionId\)\.createTasks\(\{/)
-  assert.match(source, /\.\.\.\(confirm \? \{ confirm: true \} : \{\}\)/, '只有创建才带 confirm')
-  assert.match(source, /const r = await callCreate\(false\)/, '预览不带 confirm')
-  assert.match(source, /const r = await callCreate\(true\)/, '创建带 confirm')
-  // 行号 → after[]（本批 1-based）；非数字 → 既有任务 id
-  assert.match(source, /\.\.\.\(after\.length > 0 \? \{ after \} : \{\}\)/)
-  assert.match(source, /\.\.\.\(ids\.length > 0 \? \{ deps: ids \} : \{\}\)/)
-  assert.match(source, /n <= rows\.length && n !== index \+ 1/, 'after 只接受本批行号且排除自己')
-  // 实测形状：rolesMissing 会在创建时逐条失败（requiredRole 不在名册），文案必须说清
-  assert.match(source, /t\('batchCreate\.rolesMissing'\)\.replace\('\{roles\}', \(impact\.rolesMissing \?\? \[\]\)/)
-  // 预览 impact.warnings 是逐条带序号的字符串（服务端自动补齐 AC/交付物），一条一行列出
-  assert.match(source, /\.\.\.\(impact\.warnings \?\? \[\]\)\.map\(\(item, i\) => j\('span', \{ key: `\$\{i\}`, children: String\(item\) \}\)\)/)
-  // 确认响应部分失败不中断：逐条 results（index/ok/code/message）把失败原因并进 notice
-  assert.match(source, /const failureNotes = \[\.\.\.new Set\(\(r\.results \?\? \[\]\)/)
-  assert.ok(source.includes("'batchCreate.failedItems'"), '失败条目文案')
+  assert.ok(!source.includes('function BatchCreateDrawer'), '抽屉组件已删除')
+  assert.ok(!source.includes("t('batchCreate."), '批量新建词条已无渲染点')
 })
 
-test('t53-5: B 草稿行可增删 + 抽屉互斥 + 工具条入口 + 成功 notice', () => {
-  // 行一改就清掉旧预览（避免"看着过期影响面点创建"）
-  assert.match(source, /const addRow = \(\) => \{ setImpact\(null\); return setRows\(\(prev\) => \[\.\.\.prev, newBatchDraftRow/)
-  assert.match(source, /const removeRow = \(key\) => \{ setImpact\(null\); return setRows\(\(prev\) => \(prev\.length <= 1 \? prev : prev\.filter/)
-  assert.match(source, /const updateRow = \(key, patch\) => \{ setImpact\(null\); return setRows\(/)
-  assert.match(source, /const \[batchCreate, setBatchCreate\] = react\.useState\(false\)/, '复用既有状态（不引入新状态库）')
-  assert.match(source, /const openBatchCreator = \(\) => \{ setBatchCreate\(true\); setTaskForm\(null\); setRoleForm\(null\); setTeamCreate\(false\); setOpenRole\(null\); setOpenTask\(null\) \}/)
-  // 既有 opener 也要关掉批量新建（互斥）
-  assert.match(source, /const openTaskEditor = \(form\) => \{ setTaskForm\(form\); setRoleForm\(null\); setTeamCreate\(false\); setOpenRole\(null\); setOpenTask\(null\); setBatchCreate\(false\) \}/)
-  assert.match(source, /const closeDrawers = \(\) => \{ setTeamCreate\(false\); setRoleForm\(null\); setTaskForm\(null\); setBatchCreate\(false\) \}/)
-  assert.match(source, /batchCreate \? j\(BatchCreateDrawer, \{/)
-  assert.match(source, /children: t\('tasks\.newBatch'\)/, '工具条「批量新建」')
-  assert.match(source, /const onBatchCreated = async \(message\) => \{/, '创建成功回调')
-  assert.match(source, /t\('batchCreate\.done'\)\.replace\('\{n\}', String\(created\)\)\.replace\('\{failed\}', String\(failed\)\)/)
+test('t53-5: B 任务页不再有任何手动创建入口', () => {
+  // CHG-202u（用户定案「任务不能手动建，但是可以手动删除」）：三个创建入口全部移除
+  assert.ok(!source.includes("children: t('tasks.newBatch')"), '工具条不再有「批量新建」入口')
+  assert.ok(!source.includes("children: t('task.new')"), '工具条不再有「新建任务」入口')
+  assert.ok(!/onAdd: \(\) => \{[\s\S]{0,400}?openTaskEditor\(\{ mode: 'create'/.test(source), '列头「＋」直达新建已移除')
+  // 抽屉状态机也一并删除（CHG-202v）
+  assert.ok(!source.includes('const [batchCreate, setBatchCreate] = react.useState(false)'), 'batchCreate 状态已删除')
+  assert.ok(!source.includes('const openBatchCreator = '), 'openBatchCreator 已删除')
+  assert.ok(!source.includes('const onBatchCreated = '), 'onBatchCreated 已删除')
+  // CHG-202x（P0-1）：删除能力**真实现**了（t145 用真账本 + 真渲染锁住）。
+  // 这里不再拿「源码里出现某个字符串」当证据——那正是当初的假绿：
+  // 唯一匹配那条注释的地方就是它自己，能力一行都没实现。
+  assert.ok(source.includes("t('detail.deleteTaskBtn')"), '任务详情必须有删除按钮')
+  assert.match(source, /onDelete: openTask\.online \? deleteTaskFlow : undefined/, '删除写路径必须接到队长会话')
 })
 
 test('t53-6: C 诊断一键修复 —— assignable / roleSwap / spawnRole 三分支', () => {
@@ -126,13 +114,10 @@ test('t53-6: C 诊断一键修复 —— assignable / roleSwap / spawnRole 三�
   assert.match(source, /const onDiagnosisFixed = async \(message\) => \{/)
 })
 
-test('t53-7: 离线/只读 —— 批量新建与一键修复都禁用并给 title', () => {
-  // 工具条按钮：没有在线团队 → disabled，title 用离线说明
-  assert.match(source, /disabled: \(pv\.teams \?\? \[\]\)\.filter\(\(team\) => team\.online && team\.sessionId\)\.length === 0/)
-  assert.match(source, /title: \(pv\.teams \?\? \[\]\)\.some\(\(team\) => team\.online && team\.sessionId\) \? t\('batchCreate\.title'\) : t\('batchCreate\.offline'\)/)
-  // 抽屉内预览/创建按钮同样禁用
-  assert.match(source, /j\('button', \{ className: 'mt-btn', disabled: busy \|\| !online, onClick: preview, children: busy \? t\('state\.loading'\) : t\('batchCreate\.preview'\) \}\)/)
-  assert.match(source, /j\('button', \{ className: 'mt-btn mt-btn-primary', disabled: busy \|\| !online, onClick: submit, children: busy \? t\('state\.loading'\) : t\('batchCreate\.submit'\) \}\)/)
+test('t53-7: 离线/只读 —— 一键修复的禁用与 title', () => {
+  // CHG-202u/v：工具条的新建入口与批量新建抽屉都已整块删除（任务由队长规划）
+  assert.ok(!source.includes("className: 'mt-taskhead-actions'"), '工具条动作区已删除')
+  assert.ok(!source.includes("t('batchCreate."), '批量新建词条已无渲染点')
   // 一键修复：只读 → disabled + 只读 title
   assert.match(source, /const tip = readOnly \? t\('task\.readonlyTitle'\) : undefined/)
   assert.match(source, /disabled: readOnly \|\| busy,/)
@@ -155,8 +140,10 @@ test('t53-9: CHG-76 新增词条 zh/en 对等', () => {
   const keysOf = (text) => new Set([...text.matchAll(/^\s+'([^']+)':/gm)].map((match) => match[1]))
   const zh = keysOf(source.slice(zhStart, enStart))
   const en = keysOf(source.slice(enStart, enEnd))
-  const added = [...zh].filter((key) => /^(batch\.(leave|rewire|rewireTo|rewireNone|rewireDone|rewireHint|impactRewire|rewiredDone)|tasks\.newBatch|batchCreate\.|diag\.fix)/.test(key))
-  assert.ok(added.length >= 40, `CHG-76 新增词条应成组出现，实际 ${added.length}`)
+  // CHG-202v：`batchCreate.*` 与 `tasks.newBatch` 已随批量新建抽屉一起删除，
+  // 这里只复核**仍在用**的那批词条 zh/en 对等。
+  const added = [...zh].filter((key) => /^(batch\.(leave|rewire|rewireTo|rewireNone|rewireDone|rewireHint|impactRewire|rewiredDone)|diag\.fix)/.test(key))
+  assert.ok(added.length >= 8, `CHG-76 词条应成组出现，实际 ${added.length}`)
   const missing = added.filter((key) => !en.has(key))
   assert.deepEqual(missing, [], `en 缺词条：${missing.join(', ')}`)
 })
@@ -168,6 +155,7 @@ test('t53-10: 新增 UI 只用宿主 token 且窄容器不横向溢出（flex-wr
   assert.match(css, /var\(--dsw-alias-/)
   assert.ok(!/#[0-9a-fA-F]{3,6}\b/.test(css), '新增样式不应出现硬编码 hex 颜色')
   assert.match(css, /\.mt-diag-fix\{[^}]*flex-wrap:wrap/, '诊断修复区可换行')
-  assert.match(css, /\.mt-drawgrid\{[^}]*repeat\(auto-fit,minmax\(/, '草稿行等宽栅格自适应')
+  // CHG-202v：`.mt-drawgrid` 随批量新建抽屉删除（死 CSS 清理）
+  assert.ok(!css.includes('.mt-drawgrid{'), '草稿栅格样式已随抽屉删除')
   assert.match(css, /\.mt-diag-fix \.mt-select\{[^}]*max-width:100%/, '下拉不超宽')
 })

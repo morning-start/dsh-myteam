@@ -168,12 +168,15 @@ test('t91-4: 源码契约 —— 保存 / 两段确认 / 恢复默认 / 旧宿�
   assert.ok(source.includes('setBoard(undefined)'), '配置变更后重拉看板')
 })
 
-test('t91-5: 新增文案 zh/en 成对（20 个键不得只加一边）', () => {
+test('t91-5: 新增文案 zh/en 成对（17 个键不得只加一边）', () => {
+  /* CHG-202l：`settings.impactMembers` / `settings.impactTasks`（影响面拆项）与
+   * `settings.resetConfirm`（恢复默认的标题）没有渲染点——影响面改由 `discard.*` /
+   * `disband.*` 承担，恢复默认只用 `settings.resetConfirmBody`。三条词条已删，20 → 17。 */
   const keys = [
     'settings.editHint', 'settings.formTitle', 'settings.formNote', 'settings.save', 'settings.saved',
     'settings.saveFailed', 'settings.jsonApply', 'settings.jsonInvalid', 'settings.jsonNote', 'settings.dirty',
-    'settings.confirmSave', 'settings.confirmSaveBody', 'settings.impactMembers', 'settings.impactTasks',
-    'settings.resetBtn', 'settings.resetConfirm', 'settings.resetConfirmBody', 'settings.resetDone', 'settings.unavailable',
+    'settings.confirmSave', 'settings.confirmSaveBody',
+    'settings.resetBtn', 'settings.resetConfirmBody', 'settings.resetDone', 'settings.unavailable',
     'settings.jsonView',
   ]
   for (const key of keys) {

@@ -191,7 +191,7 @@ export const GATE_REJECT_BUDGET = 2
 /** 状态机合法转移表（拒绝式校验的数据源）。
  * gate 链按 config 驱动（FR-10.3 通用性）：任意 gate:xxx 的合法后继 = gate 链的下一项或 done。
  * 静态表只列固定骨架；gate 间转移由 fold 按 t.gates 动态判定（见 fold.ts gateAdvance）。 */
-export const LEGAL_TRANSITIONS                                 = {
+const LEGAL_TRANSITIONS                                 = {
   backlog: ['ready', 'blocked', 'cancelled'],
   // CHG-73：重新规划（rescope）带结构补丁时，任务可能退回 backlog（新依赖还没完成）——
   // 「ready → backlog」只在 rescope 事件里出现，是补丁生效后的重新调度，不是回退历史。

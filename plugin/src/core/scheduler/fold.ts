@@ -53,11 +53,11 @@ const MEMBER_TOUCHING_EVENTS = new Set([
 ])
 
 /** 参与边集合（participantsOf 的数据来源；变了下游视图必须重建） */
-const PARTICIPATION_TOUCHING_EVENTS = new Set(['task.created', 'task.participate', 'task.participation.released'])
+const PARTICIPATION_TOUCHING_EVENTS = new Set(['task.created', 'task.participate', 'task.participation.released', 'task.deleted'])
 
-const PROPOSAL_TOUCHING_EVENTS = new Set(['task.proposal', 'task.proposal.resolved'])
+const PROPOSAL_TOUCHING_EVENTS = new Set(['task.proposal', 'task.proposal.resolved', 'task.deleted'])
 
-const PER_TASK_MESSAGE_TOUCHING_EVENTS = new Set(['message.sent'])
+const PER_TASK_MESSAGE_TOUCHING_EVENTS = new Set(['message.sent', 'task.deleted'])
 
 const INBOX_TOUCHING_EVENTS = new Set(['task.escalated', 'message.sent'])
 
@@ -404,6 +404,36 @@ export function applyEvent(proj: TeamProjection, event: LedgerEvent): void {
       releaseMember(proj, t)
       break
     }
+    /*
+     * CHG-202x（P0-1）：**删除任务**（产品定案「任务不能手动建，但可以手动删除」）。
+     *
+     * 与 `task.cancelled` 的区别：cancel 是**终态**（任务仍在看板「已取消」列、下游仍挂着它，
+     * 只能靠 rewire 解开）；delete 是**把任务从投影里去掉**（误建任务的清理出口）。
+     * 为了让下游不永久死锁，删除时把它的 id 从其它任务的 deps 里摘掉，并补一次
+     * backlog→ready 判定（与 task.rewired 同口径）。
+     * 账本只追加不删行：历史事件全部保留，投影才是「当前样子」。
+     */
+    case 'task.deleted': {
+      const t = proj.tasks[p.taskId]
+      if (t) releaseMember(proj, t)
+      delete proj.tasks[p.taskId]
+      delete proj.participations[p.taskId]
+      delete proj.perTaskMessages[p.taskId]
+      for (const [proposalId, proposal] of Object.entries(proj.proposals)) {
+        if (proposal.taskId === p.taskId) delete proj.proposals[proposalId]
+      }
+      for (const other of Object.values(proj.tasks)) {
+        const deps = other.input.deps ?? []
+        if (!deps.includes(p.taskId)) continue
+        other.input.deps = deps.filter((dep) => dep !== p.taskId)
+        other.rewiredFrom = { removed: p.taskId, ts: event.ts }
+        if (other.state === 'backlog' && other.input.deps.every((dep) => proj.tasks[dep]?.state === 'done')) {
+          other.state = 'ready'
+          other.waitingSince = event.ts
+        }
+      }
+      break
+    }
     /* CHG-75：下游改挂——把 deps 里的 removed 换成 added（added 缺省 = 解除依赖，变独立任务）。
      * 只改依赖，不动状态机 / attempt / 证据。 */
     case 'task.rewired': {
@@ -486,7 +516,7 @@ function requireTask(proj: TeamProjection, taskId: string, seq: number): TaskPro
  * 只合并任务输入面字段；状态 / attempt / 证据 / 门禁裁决不在补丁面（由状态机与证据链拥有）。
  * gateChain 变更时同步 t.gates（当前门禁链 = 新链；已过门的裁决保留，供审计追溯）。
  */
-export function applyTaskPatch(t: TaskProjection, patch: Record<string, unknown>): void {
+function applyTaskPatch(t: TaskProjection, patch: Record<string, unknown>): void {
   if (typeof patch.title === 'string') t.input.title = patch.title
   if (typeof patch.description === 'string') t.input.description = patch.description
   if (Array.isArray(patch.acceptanceCriteria)) {
@@ -519,7 +549,7 @@ export function applyTaskPatch(t: TaskProjection, patch: Record<string, unknown>
  *  - 结构性字段改动且此前已有证据 → evidenceStale（UI 提示"证据已过期，建议重规划"）；
  *  - lastEditAt 供详情页「改动记录」与看板「最近编辑」排序。
  */
-export function applyEditWithDiff(t: TaskProjection, patch: Record<string, unknown>, ts: number): FieldChange[] {
+function applyEditWithDiff(t: TaskProjection, patch: Record<string, unknown>, ts: number): FieldChange[] {
   const before = { ...(t.input as unknown as Record<string, unknown>) }
   const changes = diffTaskInput(before, patch)
   applyTaskPatch(t, patch)

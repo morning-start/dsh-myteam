@@ -44,6 +44,7 @@ export const EVENT_TYPES = [
   'task.rescoped',
   'task.updated',       // CHG-70：任务元数据编辑（补丁合并，不改状态）
   'task.cancelled',     // CHG-73：取消任务（终态；下游按 downstream 策略处理）
+  'task.deleted',       // CHG-202x（P0-1）：删除任务（从投影移除；产品定案「可以手动删除」）
   'task.rewired',       // CHG-75：下游改挂（把被取消的上游换成新上游，或解除依赖）
   'team.updated',       // CHG-70：团队名/目标编辑
   'task.proposal',
@@ -124,6 +125,8 @@ const PAYLOAD_REQUIRED: Partial<Record<EventType, string[]>> = {
   'task.updated': ['teamId', 'taskId', 'patch'],
   // CHG-73：取消必须留理由（终态不可逆，审计要能回答"为什么停"）
   'task.cancelled': ['teamId', 'taskId', 'reason'],
+  // CHG-202x（P0-1）：删除（从投影移除）。reason 可选——「清理误建」本身就说明动机。
+  'task.deleted': ['teamId', 'taskId'],
   // CHG-75：改挂下游依赖；removed = 被换掉的上游 id；added 可省（= 解除依赖，下游变独立任务）
   'task.rewired': ['teamId', 'taskId', 'removed', 'reason'],
   'team.updated': ['teamId'],

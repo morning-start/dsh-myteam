@@ -494,6 +494,14 @@ export class TeamService {
         }
         break
       }
+      /* CHG-202x（P0-1）：删除任务——从投影移除（误建任务的清理出口）。
+       * 与 cancel 的差别：cancel 只改状态（任务还在），delete 让它**不再存在**。
+       * 理由可选（清理误建本身即动机），但存在就留痕。 */
+      case 'task.deleted': {
+        const t = proj.tasks[p.taskId]
+        if (!t) return { ok: false, code: 'MT_VALIDATION', message: `task "${p.taskId}" not found` }
+        break
+      }
       /* CHG-70：任务编辑（白名单补丁；不改状态 / attempt / 证据） */
       case 'task.updated': {
         const t = proj.tasks[p.taskId]

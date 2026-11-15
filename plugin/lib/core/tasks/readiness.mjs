@@ -31,6 +31,14 @@ import { TERMINAL_STATES,                                          } from '../sc
                                                         
                                                               
                     
+     
+                                            
+    
+                                                              
+                                                            
+                                                                     
+     
+                                                           
  
 
 /** 单个任务的诊断结果（codes 为空时不返回对象；UI 只在有诊断时展示） */
@@ -87,8 +95,17 @@ export function diagnoseTask(proj                , taskId        )              
   if (codes.length === 0) return undefined
   // CHG-76：把"接下来能做什么"一并给出——只陈述投影事实（谁空闲、谁在册），不替人做决定。
   // team-inactive 不给（团队没跑，做什么都没用）；dep-cancelled 的出口是重新规划/改挂，不在这里。
-  const fixable = codes.includes('no-role') || codes.includes('role-busy') || codes.includes('deps-pending')
-  const fix = fixable ? buildFix(proj, roleId) : undefined
+  const fixable = codes.includes('no-role') || codes.includes('role-busy') || codes.includes('deps-pending') || codes.includes('dep-cancelled')
+  /* CHG-202x（P1-9）：dep-cancelled 的出口 = 摘掉已取消上游（其余修复候选照旧并列，互不排斥） */
+  const baseFix = fixable ? buildFix(proj, roleId) : undefined
+  const fix = fixable
+    ? {
+      ...(baseFix ?? {}),
+      ...(depsCancelled.length > 0
+        ? { depCancelled: { removed: depsCancelled, remaining: (task.input.deps ?? []).filter((dep) => !depsCancelled.includes(dep)) } }
+        : {}),
+    }
+    : undefined
   return {
     codes,
     roleId,

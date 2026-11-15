@@ -33,7 +33,7 @@ import { join } from 'node:path'
 import { STORE_DIR } from '../workspace/layout.ts'
 
 /** 章程文件相对项目根的位置（与 `core/workspace/layout.ts` 的 `storeLayout().charter` 同源） */
-export const TEAM_CHARTER_FILE = join(STORE_DIR, 'structure.md')
+const TEAM_CHARTER_FILE = join(STORE_DIR, 'structure.md')
 
 /**
  * 注入上限（64 KiB）。

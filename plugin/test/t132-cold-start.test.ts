@@ -296,7 +296,8 @@ test('t132-6: 重连后 syncTokens 能读到该成员 —— token 不再少算�
     assert.equal(bucket.calls, 2, '累计调用数从投影读到（重连前这里会是 no-session / 缺行）')
     assert.equal(bucket.uncachedInput, 100)
     // 落盘也是真的（不是只在内存里）
-    const onDisk = JSON.parse(readFileSync(join(root, '.dsh-myteam', 'tasks', teamId, 'tokens.json'), 'utf8'))
+    /* CHG-202x（P1-14）：契约位置 = history/tokens/<teamId>.json（派生数据不入库） */
+    const onDisk = JSON.parse(readFileSync(join(root, '.dsh-myteam', 'history', 'tokens', `${teamId}.json`), 'utf8'))
     assert.equal(onDisk.totals[live.memberId].calls, 2)
   } finally {
     cleanup()

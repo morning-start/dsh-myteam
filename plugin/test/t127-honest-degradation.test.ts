@@ -87,8 +87,10 @@ test('t127-1: buildHandoffPrompt 引用的每个 myteam_* 都是 defs.ts 里的�
   // 旧文案的幽灵名：必须彻底消失
   assert.ok(!prompt.includes('myteam_get_board'), 'myteam_get_board 全仓无定义，不能出现在提示词里')
   // 看现状的真实路径仍要在（否则模型不知道去哪读）
+  // CHG-200：接手的是**队长**会话——任务读面是队长专属的 myteam_read_task / myteam_read_board；
+  // 旧文案写的 myteam_get_task / myteam_list_tasks 只注册在成员作用域（同一类幽灵引用）。
   assert.match(prompt, /myteam_list_teams/, '看团队目录用 myteam_list_teams')
-  assert.match(prompt, /myteam_get_task/, '看单个任务用 myteam_get_task')
+  assert.match(prompt, /myteam_read_task/, '看单个任务用 myteam_read_task（队长读面）')
 })
 
 test('t127-2: session-handoff.ts 源文件全文的 myteam_* 名字同样全部可解析', () => {

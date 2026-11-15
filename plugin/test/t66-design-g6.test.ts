@@ -275,44 +275,22 @@ test('t66-5: 团队参与任务（team-tasks.html）——本队角色筛选 + �
   assert.ok(source.includes("t('g6.teamTasks.rest')"), '其余 N 个去向')
 })
 
-test('t66-6: 会话页团队视图（conversation.view）—— 只读真实账本，空态说清楚，不画假数据', () => {
-  const { module, source } = loadClient()
-  const G6 = module.__testG6
-  assert.equal(typeof G6.MyTeamConversationView, 'function', '团队视图组件')
-
-  /* ① 没有 team 时：空态（不是假对话） */
-  const emptyTree = G6.MyTeamConversationView({ t: (k) => k, ctx: {}, sessionId: undefined })
-  const emptyClasses = collectClasses(emptyTree)
-  for (const name of ['mt-conv', 'mt-conv-head', 'mt-team-mark', 'mt-conv-title', 'mt-conv-body', 'mt-conv-cmd', 'mt-conv-stats', 'mt-conv-stat']) {
-    assert.ok(emptyClasses.has(name), `空态渲染出 .${name}`)
-  }
-  const emptyText = collectText(emptyTree).join('')
-  for (const copy of ['conv.emptyTitle', 'conv.emptySub', 'conv.emptyCmd', 'conv.openPanel', 'conv.stat.tasks', 'conv.stat.live', 'conv.stat.gates', 'conv.stat.roles']) {
-    assert.ok(emptyText.includes(copy), `空态文案含 ${copy}`)
-  }
-  assert.ok(emptyText.includes('/myteam'), '空态给出组建命令')
-
-  /* ② CHG-107：**渲染出来的树里**不得再有演示对话/演示团队 */
-  const emptyTextAll = collectText(emptyTree).join('')
-  for (const fake of ['结算页模块化', '把结算页拆成独立模块', 't-8f3a2c', '11 个任务', '实现者', '评审者']) {
-    assert.ok(!emptyTextAll.includes(fake), `团队视图不得渲染演示内容「${fake}」`)
-  }
-  for (const gone of ['mt-stream', 'mt-turn', 'mt-bubble', 'mt-guestbar', 'mt-guestchips', 'mt-conv-seg']) {
-    assert.ok(!emptyClasses.has(gone), `团队视图不得再渲染 .${gone}（旧演示结构）`)
-  }
+test('t66-6: 画布「团队视图」tab = 项目页（CHG-201：与全局页物理分离，旧只读会话视图已删除）', () => {
+  const { source } = loadClient()
+  /* ① 槽渲染项目页——作用域由挂载点决定，不再是独立的只读会话视图组件 */
+  assert.ok(source.includes("name: 'conversation.view'"), 'conversation.view 槽存在')
+  assert.ok(source.includes("mode: 'project'"), '团队视图 tab = 项目作用域（挂载点决定）')
+  /* 旧只读会话视图保留为结构参照（CHG-201 撤出生产路径：槽改渲染 Panel 项目页） */
+  assert.ok(source.includes('function MyTeamConversationView'), '旧会话视图保留作回归基线')
+  assert.ok(!/withRenderBoundary\(MyTeamConversationView\)/.test(source), '槽不再挂载旧会话视图')
+  /* ② 数据源必须真实：getBoard + getProjectScope（团队名/状态；CHG-201 取代跨工作区 listTeams） */
+  assert.ok(source.includes('makeApi(connection, sessionId)'), '看板数据源')
+  assert.ok(source.includes('api.getProjectScope()'), '团队名/状态来自 getProjectScope')
+  /* ③ 演示数据彻底删除（CHG-107 纪律） */
   assert.ok(!source.includes('CONV_DEMO_TASKS'), '演示任务常量必须删除')
   assert.ok(!source.includes('__MYTEAM_DEMO__'), '演示开关必须删除')
-  /* ⑤ CHG-109：脚注时间不得写死——没有真实时间戳就只写「账本已记录」 */
   assert.ok(!source.includes("replace('{time}', '21:13')"), '不得再把脚注时间写死为 21:13')
-  assert.ok(source.includes("t('g6.conv.ledgerNoTime')"), '无时间戳时用「账本已记录」兜底')
-  assert.ok(source.includes("typeof task.updatedAt === 'string'"), '任务映射要带真实时间戳')
-
-  /* ③ 数据源必须真实：getBoard + listTeams（团队名/状态） */
-  assert.ok(source.includes('makeApi(connection, sessionId)'), '看板数据源')
-  assert.ok(source.includes('api.listTeams()'), '团队名/状态来自 listTeams')
-  assert.ok(source.includes('.find((entry) => entry.sessionId === sessionId)'), '按 sessionId 命中真实团队')
-  /* ④ 成员名册与 composer dock 仍在（真实计数） */
-  assert.ok(source.includes("t('conv.section.members')") && source.includes('mt-conv-members'), '成员名册区块')
+  /* ④ composer dock 真实计数仍在（不画假数据） */
   assert.ok(source.includes("t('g6.dock.running')") && source.includes("t('g6.dock.gates')"), 'composer dock 真实计数')
   assert.ok(source.includes('if (live === 0 && unread === 0) return null'), 'dock chip 空态不渲染')
 })

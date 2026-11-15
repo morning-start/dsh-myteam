@@ -2,11 +2,15 @@
  * D5 接口域：myteam_* 工具定义（T7 收口，v2.5）。
  *
  * 两层注册（ADR-003）：
- *   - Lead 工具（54 个）：preset 层 → 仅队长会话可见；
- *   - 成员工具（9 个）：成员 setup 作用域 → 仅成员会话可见。
+ *   - Lead 工具（58 个）：preset 层 → 仅队长会话可见；
+ *   - 成员工具（10 个）：成员 setup 作用域 → 仅成员会话可见。
  *   （CHG-158：此数字此前写死为「22 个」，长期没随工具增长回改。现在以 `leadToolDefs()`
  *   的实际条数为准：加工具时必须同步改这一行——`t127-7` 的全仓扫描门禁只校验**名字**能不能
- *   解析，不校验数量，所以数量漂移不会自己变红。）
+ *   解析，不校验数量，所以数量漂移不会自己变红。
+ *   CHG-200（用户定案）：**两个作用域仍然零重名**（t7b 硬断言）——队长读面用
+ *   `read_task` / `read_board` / `read_knowledge_entry` 命名，不复用成员侧的
+ *   `get_task` / `list_tasks` / `read_knowledge`：宿主按解析顺序取同名工具
+ *   （CHG-86 的教训），复用名字会让成员拿到队长视图、或队长拿到成员实现。）
  * 工具 execute 全部走 TeamService.commit()（单写者管线）+ 投影读。
  *
  * 参数用宿主 parameter schema spec 风格（T0 实证 dsh-tools/lib L603：属性级
@@ -212,6 +216,27 @@ export function memberToolDefs(): ToolDef[] {
       name: 'myteam_read_knowledge',
       description: '读团队知识库条目全文（FR-17.3 按需读：先看提示词里的索引层，遇到相关主题再读对应条目；绝不凭印象做事）。只读——写知识库走 done 申报的 knowledgeDraft 提案（队长采纳才入库）。',
       parameters: { type: 'object', properties: { id: str('知识条目 id（见索引层）', true) } },
+    },
+    {
+      /* CHG-200（用户定案「任务检查应该由成员自己完成」）：成员侧的**门禁裁决入口**。
+       * 修复前 review/verify 门只有队长工具（C 档）能提交——审查者由队长在参数里点名，
+       * 成员本人没有任何入口，「成员检查」只是纸面说法。现在审查者 = 调用者本人：
+       *  - review 门：强制交叉审查（reviewer ≠ 实现者，MT_CROSS_REVIEW）；
+       *  - verify 门：由 host 跑命令取真实退出码（连成员点 pass 也不算）；
+       *  - archive 门：host 按 deliverableSpec 落位校验（不是人工裁决门）。 */
+      name: 'myteam_submit_review',
+      description: '提交门禁裁决（CHG-200 / FR-5.1~5.3，**审查者 = 调用者**）：任务处于 gate:* 时由审查者本人提交结论。review 门强制交叉审查（不能审自己实现的任务，MT_CROSS_REVIEW）；verify 门由 host 跑任务声明的 verifyCommand 取真实退出码（不接受人工 verdict）；archive 门由 host 按 deliverableSpec 做落位校验。打回预算 ≤2 轮，超限后只有人工能放行。',
+      parameters: {
+        type: 'object',
+        properties: {
+          teamId: teamId(),
+          taskId: taskId(),
+          verdict: { type: 'string', enum: ['pass', 'fail'], description: '裁决结论（只认显式结论行；无结论 = needs-human，不回退解析自由文本 FR-5.1）', required: true },
+          reason: str('裁决说明（verdict=fail 时必填；pass 时可选）'),
+          expectedRevision: expectedRevision(),
+        },
+        required: ['taskId', 'verdict'],
+      },
     },
   ]
 }
@@ -463,6 +488,24 @@ export function leadToolDefs(): ToolDef[] {
           expectedRevision: expectedRevision(),
         },
         required: ['taskId', 'reason'],
+      },
+    },
+    {
+      /* CHG-202x（P0-1）：产品定案「任务不能手动建，但是可以手动删除」——误建任务的清理出口。
+       * 与 myteam_cancel_task 的区别：cancel 是终态（任务还在看板「已取消」列），delete 让它**不再存在**；
+       * 删除时把它的 id 从其它任务的 deps 里摘掉（下游不会永久死锁）。两段确认。 */
+      name: 'myteam_delete_task',
+      description: '删除任务（CHG-202x / P0-1）：把任务从账本投影里移除（历史事件保留、可回放）。用于清理误建的任务——与 myteam_cancel_task 不同，取消是终态、任务仍留在看板；删除让它不再存在。直接下游会解除对该任务的依赖（变独立任务），不会永久死锁。第一次不带 confirm 返回影响面，带 confirm=true 才落账。',
+      parameters: {
+        type: 'object',
+        properties: {
+          teamId: teamId(),
+          taskId: taskId(),
+          reason: str('删除理由（可选，建议写清为什么要清理）'),
+          confirm: bool('二段确认：先不带 confirm 看 impact，再带 confirm=true 落账'),
+          expectedRevision: expectedRevision(),
+        },
+        required: ['taskId'],
       },
     },
     {
@@ -902,6 +945,56 @@ export function leadToolDefs(): ToolDef[] {
           teamId: teamId(),
           confirm: bool('二段确认必须为 true', true),
         },
+      },
+    },
+    /* ── CHG-200（用户定案「队长没有最基本的读取工具」）：队长读面 ─────────────────
+     * 修复前：队长能建任务 / 改任务 / 裁决任务，却**读不到任务**——55 个 Lead 工具里
+     * 没有任何一个能回答「这个任务现在什么状态、证据是什么、交付物在哪」。任务检查
+     * （review 门）也只有队长能提交，成员本人没有入口。
+     *
+     * 三条边界：
+     *  ① **只读**：不写账本、不改状态（t144 前后账本行数一致）；
+     *  ② **不含 attemptId**：attemptId 是写凭据（陈旧写校验），只发给当前持有人——
+     *     队长读面返回它等于把「代成员写」的口子打开，与「队长不做领域工作」相悖；
+     *  ③ **与成员侧零重名**（t7b）：不复用 get_task / list_tasks / read_knowledge。 */
+    {
+      name: 'myteam_read_task',
+      description: '读单个任务的完整视图（队长读面，CHG-200）：任务定义（title/description/AC/deliverableSpec/deps/writeScopes/verifyCommand）、状态与门禁链、逐门裁决与打回轮数、负责队员、证据块、交付物落位、时间线与改动记录。**只读且不含 attemptId**（写凭据只发给当前持有人）——检查任务成果用这个，不要重做实现者的检查。证据/时间线默认各截断（限界读 NFR-7.6）。',
+      parameters: {
+        type: 'object',
+        properties: {
+          teamId: teamId(),
+          taskId: taskId(),
+          evidenceLimit: num('证据条数上限（默认 5，按最新取）'),
+          timelineLimit: num('时间线条数上限（默认 20）'),
+        },
+        required: ['taskId'],
+      },
+    },
+    {
+      name: 'myteam_read_board',
+      description: '读任务看板（队长读面，CHG-200）：按 state / requiredRole / assignee 过滤，返回汇总计数（total/open/done/byState）+ 任务行（id/title/state/priority/requiredRole/assignee/assignees/deps/escalateCount/evidenceCount）。**只读**；返回行数 ≠ 已读全部内容（NFR-7.6）。任务同步（谁在跑、哪里卡住、还差几个）用这个。',
+      parameters: {
+        type: 'object',
+        properties: {
+          teamId: teamId(),
+          state: str('只列某状态（backlog/ready/in_progress/re-scoping/gate:review/gate:verify/gate:archive/blocked/failed/done/cancelled；缺省 all）'),
+          requiredRole: str('只列某角色可领的任务'),
+          assignee: str('只列某负责队员的任务（含协作）'),
+          limit: num('最多返回条数（默认 50，上限 200）'),
+        },
+      },
+    },
+    {
+      name: 'myteam_read_knowledge_entry',
+      description: '读团队知识库条目全文（队长读面，CHG-200；与成员侧 myteam_read_knowledge 同语义、不同名）：**只读**——写知识库走 myteam_propose_knowledge 提案 + myteam_adopt_knowledge 采纳（策展制）。stale 条目的 body 带 `[stale 待复核]` 前缀，引用前先交叉核对。',
+      parameters: {
+        type: 'object',
+        properties: {
+          teamId: teamId(),
+          id: str('知识条目 id（索引层可见；见团队知识库）', true),
+        },
+        required: ['id'],
       },
     },
   ]

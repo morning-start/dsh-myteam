@@ -482,6 +482,26 @@ export class MyTeamRemote extends TypertRemoteService {
     )                           
   }
 
+  /**
+   * CHG-202x（P0-1）：删除任务——从账本投影移除（误建任务的清理出口）。
+   *
+   * 两段确认：不带 confirm 时返回影响面（标题 / 状态 / 直接下游 / 是否有活跃 attempt），
+   * 带 confirm=true 才落 `task.deleted`。与 cancelTask 的区别见 host 侧实现头。
+   */
+  async deleteTask(args                                                                         ) {
+    const { teamId } = this.resolveTeam(args?.teamId)
+    return this.host.executeLeadTool(
+      'myteam_delete_task',
+      {
+        teamId,
+        taskId: args?.taskId,
+        ...(args?.reason ? { reason: args.reason } : {}),
+        confirm: args?.confirm === true,
+      },
+      { actor: 'human' },
+    )                           
+  }
+
   /** CHG-73/76：批量编排（取消/重规划/指派/改优先级），逐条落账，部分失败不影响其余；cancel 可走三档下游策略 */
   async batchTaskOp(args                                                                                                                                                                                                ) {
     const { teamId } = this.resolveTeam(args?.teamId)
@@ -602,7 +622,7 @@ export class MyTeamRemote extends TypertRemoteService {
 }
 
 // 手动 Remote 标记（strip-only 环境等价装饰器）：gateway 按 method 名发现端点
-markRemoteMethods(MyTeamRemote.prototype, ['getBoard', 'getTaskDetail', 'getTokens', 'getInbox', 'getAudit', 'getConfig', 'saveTeamConfig', 'resetTeamConfig', 'getPlanFeedback', 'getTaskGraph', 'listSkills', 'listMembers', 'copyTeam', 'publishTeam', 'exportTeam', 'importTeam', 'createSkill', 'createTool', 'readSessionHistory', 'getPresets', 'planAction', 'postComment', 'memberOp', 'disband', 'createTask', 'createTasks', 'updateTask', 'assignTask', 'participateTask', 'rescopeTask', 'cancelTask', 'batchTaskOp',
+markRemoteMethods(MyTeamRemote.prototype, ['getBoard', 'getTaskDetail', 'getTokens', 'getInbox', 'getAudit', 'getConfig', 'saveTeamConfig', 'resetTeamConfig', 'getPlanFeedback', 'getTaskGraph', 'listSkills', 'listMembers', 'copyTeam', 'publishTeam', 'exportTeam', 'importTeam', 'createSkill', 'createTool', 'readSessionHistory', 'getPresets', 'planAction', 'postComment', 'memberOp', 'disband', 'createTask', 'createTasks', 'updateTask', 'assignTask', 'participateTask', 'rescopeTask', 'cancelTask', 'deleteTask', 'batchTaskOp',
   // CHG-86：门禁裁决 / 归档快照 / 知识提案策展
   'reviewTask', 'getArchive', 'getArchives', 'adoptKnowledge',
   // CHG-87（FR-13.1/FR-16.1）：角色库统一写入口 + 单角色调用

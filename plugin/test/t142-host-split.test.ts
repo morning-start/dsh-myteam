@@ -47,8 +47,8 @@ import { fileURLToPath } from 'node:url'
 const here = dirname(fileURLToPath(import.meta.url))
 const read = (p: string) => readFileSync(join(here, '..', p), 'utf8')
 
-/** 入口层行数棘轮基线（CHG-186 拆完实测；CHG-189 下沉 spawn 生命周期后 5,563 → 5,311；CHG-190 下沉门禁执行后 5,311 → 4,815；CHG-191 下沉批量编排后 4,815 → 4,405；只减不增） */
-const HOST_LINES_LIMIT = 4405
+/** 入口层行数棘轮基线（CHG-186 拆完实测；CHG-189 下沉 spawn 生命周期后 5,563 → 5,311；CHG-190 下沉门禁执行后 5,311 → 4,815；CHG-191 下沉批量编排后 4,815 → 4,405；CHG-200 下沉团队索引装配 + 队长读面路由后 **4,400**；只减不增） */
+const HOST_LINES_LIMIT = 4400
 
 test('t142-1: 契约独立成文件，remote/service.ts 不再 import host.ts', () => {
   const service = read('src/remote/service.ts')

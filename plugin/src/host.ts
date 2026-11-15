@@ -27,7 +27,7 @@ import { ensureWorkplaceDirs, ensureGitignoreManagedBlock } from './host-workspa
  * 没有 fsync 屏障、临时文件名固定、不拒符号链接。全部经 `writeTextAtomic`（八步写序），
  * 门禁 `tools/check-architecture.mjs` 的 A2 规则守着这条边界。 */
 import { writeTextAtomic, runWithRollback, snapshotFor } from './core/fs/write-log.ts'
-import { resolveProjectRoot, storeLayout, teamLedgerPath as teamLedgerPathOf, displayPath, STORE_DIR } from './core/workspace/layout.ts'
+import { resolveProjectRoot, storeLayout, teamLedgerPath as teamLedgerPathOf, displayPath, STORE_DIR, tokenSidecarPath, legacyTokenSidecarPath } from './core/workspace/layout.ts'
 // CHG-103：作用域契约（全局 vs 项目级）——角色两级都可用，任务/历史/状态只能项目级
 import { normalizeScope } from './core/workspace/scope.ts'
 import { TeamService, bootstrapTeam, type CommitDraft } from './core/service.ts'
@@ -47,6 +47,8 @@ import { createRolesHandlers } from './host/roles.ts'
 import { createTeamsHandlers } from './host/teams.ts'
 import { createKnowledgeHandlers, createMemberKnowledgeHandlers } from './host/knowledge.ts'
 import { createQueryHandlers } from './host/query.ts'
+/* CHG-200：队长读面适配层（只读 / 不含 attemptId / 限界读，见 `src/host/read.ts` 文件头） */
+import { createReadHandlers } from './host/read.ts'
 import { leadToolDefs, memberToolDefs, type ToolDef } from './tools/defs.ts'
 // CHG-148（P1-6）：按工具名取完整结果契约（jsonOutput 双声明），不再用统一空 schema
 import { outputForTool } from './core/tools/output-contract.ts'
@@ -56,7 +58,7 @@ import { TERMINAL_STATES, downstreamOf } from './core/scheduler/state.ts'
  * 为什么不用 `this.service(teamId).projectionSnapshot`：`service()` 构造 TeamService 时会
  * `bootstrapTeam` 落 `rules.version.adopted`——重连就成了**写账本**，违反「重连不改账本」不变量。
  * `readOfflineTeam` + `foldTolerant` 只读文件、坏行/坏事件各自跳过，正好是重连需要的容错面。 */
-import { foldTolerant, isSafeTeamId, readOfflineTeam } from './core/index/offline-view.ts'
+import { foldTolerant, isSafeTeamId, readOfflineTeam, readTokensSidecar } from './core/index/offline-view.ts'
 import { diffTaskInput } from './core/tasks/diff.ts'
 import { treeFieldsOf, HOST_TEAM_TOOLS_TO_HIDE, type MemberInstance } from './core/members/member-setup.ts'
 import { memoryDirFor, auditMemoryContent, type MemoryFinding } from './core/members/memory.ts'
@@ -79,11 +81,16 @@ import {
   guardReminder,
   observeCall,
   observeEmptyTurn,
+  GUARD_OUTPUT_TAIL_LIMIT,
+  GUARD_TURN_BOUNDARY_TOOLS,
   type GuardCall,
   type GuardOptions,
   type GuardState,
   type GuardVerdict,
 } from './core/agent/guard.ts'
+/* CHG-200：回合边界常量已下沉 `core/agent/guard.ts`（A6 棘轮：入口层只减不增）；
+ * 对外导出面不变——`test/t123` 等既有 import 点一个都不用改。 */
+export { GUARD_TURN_BOUNDARY_TOOLS } from './core/agent/guard.ts'
 import type { ScopeAudit } from './core/gates/scope-audit.ts'
 // CHG-87（M2-D 剩余，FR-16.4③）：证据指针投影（task/file/session 三类；解析原语已随任务族搬到 src/host/tasks.ts）
 import { evidenceRefsOf } from './core/knowledge/evidence-pointer.ts'
@@ -129,7 +136,7 @@ import { createBatchOrchestration } from './core/tasks/batch-orchestration.ts'
 import { canCall, tierOf, type ToolCaller } from './core/tools/tool-tiers.ts'
 /* CHG-124（docs/19 §M6）：任务依赖图谱纯函数（Kahn 分层 + 环检测） */
 import { buildTaskGraph } from './core/scheduler/task-graph.ts'
-import { entryFromProjection, scanWorkspaceIndex, readWorkspaceIndex, writeWorkspaceIndex, upsertTeamEntry, upsertGlobalWorkspace, resolveMyteamHome, globalStoreLayout } from './core/index/team-index.ts'
+import { readWorkspaceIndex, resolveMyteamHome, globalStoreLayout } from './core/index/team-index.ts'
 // CHG-91（插件团队贡献契约 v1）：装载第三方插件贡献的角色与团队模板
 import { loadContributions } from './core/contributions/parse.ts'
 import { contributionsRoot } from './core/contributions/discover.ts'
@@ -186,34 +193,11 @@ export interface HostRuntime {
 /**
  * 会话工作目录（CHG-102）：项目根的**权威来源**。
  *
- * 宿主里 `ctx.workspace.root` 在 desktop profile 下是 profile 目录（不是项目），
- * 而每个会话的 cwd 才是用户真正打开的项目。`agents.currentInitiator()` 是官方给
- * 「工具执行链」用的口子（宿主 agents 服务签名），拿不到再用 workingDirectory。
+ * CHG-202：实现下沉到 `src/host/session-cwd.ts`（A6 入口层棘轮：host.ts 只减不增）。
+ * 这里 import 后原样 re-export，调用点（`TeamHost.workspaceRoot`）与外部消费者都不用改。
  */
-function sessionCwdOf(rt: unknown): string | undefined {
-  try {
-    const agents = (rt as { agents?: { currentInitiator?: () => unknown; requireInitiator?: () => unknown } } | undefined)?.agents
-    let agent: unknown
-    try {
-      agent = agents?.currentInitiator?.()
-    } catch {
-      agent = undefined
-    }
-    if (!agent) return undefined
-    const session = (agent as { session?: { cwd?: unknown } }).session
-    const cwd = session?.cwd
-    if (typeof cwd === 'string' && cwd.length > 0) return cwd
-    // 兜底：workingDirectory 服务按会话解析
-    const wd = (rt as { workingDirectory?: { get?: (session: unknown) => string | undefined } } | undefined)?.workingDirectory
-    if (wd?.get && session) {
-      const resolved = wd.get(session)
-      if (typeof resolved === 'string' && resolved.length > 0) return resolved
-    }
-    return undefined
-  } catch {
-    return undefined
-  }
-}
+import { sessionCwdOf } from './host/session-cwd.ts'
+export { sessionCwdOf }
 
 /* CHG-186：行 config 的类型 `MyTeamConfig` 已下沉到 `core/host/contract.ts`（见文件头 import）——
  * 契约里的 `config` 成员要用它，而 `core/**` 不许 import 入口层（A1 门禁）。本文件 re-export。 */
@@ -298,7 +282,7 @@ export function readLedgerEvents(ledgerPath: string): { events: Record<string, a
  * 需求 / 验收类（prd/qa）的交付物**就是文字结论**，短正文必然信息不足。
  * 为什么导出常量：面板、提示词、文档要引用同一组数字——各写一份必然漂移。
  */
-export const DELIVERABLE_MIN_LENGTH: Readonly<Record<'dev' | 'qa' | 'prd', number>> = {
+const DELIVERABLE_MIN_LENGTH: Readonly<Record<'dev' | 'qa' | 'prd', number>> = {
   dev: 60,
   qa: 250,
   prd: 400,
@@ -400,24 +384,11 @@ export function deliverablePathsOf(spec: unknown, extra: readonly string[] = [])
 /* ── P1-5 接线（docs/21 §6）：成员单调用护栏 ─────────────────────────── */
 
 /**
- * 「回合边界」工具：成员的这一回合以此结束（交出控制权 / 宣告结果）。
- *
- * 为什么是这两个：`myteam_update_task` 是**申报**（progress / done / failed），
- * `myteam_escalate_task` 是**上报受阻**——两者都意味着「本回合结束了」。
- * **`myteam_wait_for_change` 不在其中**：等待本来就是空闲成员的正常行为（提示词明确让成员
- * 无就绪任务时去等），把它算成回合边界会让「老实等待」被误判成空转（护栏变成新的误杀源）。
- *
- * 为什么需要回合边界：空转判据（`empty-turn`）是**回合**粒度——「一个回合里没有任何真实动作」
- * 才是只说不做。宿主的成员通道没有 turn 结束回调（`executeMemberTool` 每次只看到一次调用），
- * 所以用「申报/上报」这两个天然收尾点作为回合结束的挂点。
+ * `no-active-peer` 短路的可执行文案（必须给动作：先看名册，再唤醒，最后才等）。
+ * CHG-200：读面按**调用者**分叉——成员 `myteam_list_tasks` / 队长 `myteam_read_board`
+ * （两个作用域零重名，CHG-86 口径）；提示词同时给出两条，模型按自己的工具面取用。
  */
-export const GUARD_TURN_BOUNDARY_TOOLS: ReadonlySet<string> = new Set(['myteam_update_task', 'myteam_escalate_task'])
-
-/** `no-active-peer` 短路的可执行文案（必须给动作：先看名册，再唤醒，最后才等） */
-export const NO_ACTIVE_PEER_HINT = '先 myteam_list_tasks + myteam_get_team 确认名册，再 myteam_message 唤醒，然后才等'
-
-/** 护栏输出尾部预算（字符）：环境特征匹配只需要「哪一句」，账本/日志不能无界 */
-const GUARD_OUTPUT_TAIL_LIMIT = 2000
+export const NO_ACTIVE_PEER_HINT = '先看板与名册（成员 myteam_list_tasks / 队长 myteam_read_board，myteam_get_team 看名册），再 myteam_message 唤醒，然后才等'
 
 /**
  * 稳定 JSON（递归按 key 排序）：护栏的签名 = 「同一条命令」的唯一身份。
@@ -500,7 +471,7 @@ export function guardPayloadOf(verdict: GuardVerdict): Record<string, unknown> {
 }
 
 /** 从账本统计 plan.clarify 事件数（FR-1.6 硬终止计数，T7 防统计盲区） */
-export function countClarifyRoundsIn(ledgerPath: string): number {
+function countClarifyRoundsIn(ledgerPath: string): number {
   try {
     return readLedgerEvents(ledgerPath).events.filter((e) => e.type === 'plan.clarify').length
   } catch {
@@ -594,7 +565,7 @@ export function buildKnowledgeView(workspaceRoot: string): KnowledgeView {
 }
 
 /** 默认团队：状态目录下唯一团队；多团队时取最近修改的账本（M1 单活跃团队口径） */
-export function pickDefaultTeamId(workspaceRoot: string): string {
+function pickDefaultTeamId(workspaceRoot: string): string {
   const teamsDir = storeLayout(workspaceRoot).tasks
   try {
     const names = readdirSync(teamsDir).filter((n) => existsSync(join(teamsDir, n, 'ledger.jsonl')))
@@ -772,9 +743,17 @@ export class MyTeamHost implements MyTeamHostContract {
     evaluateArchiveGate: (teamId, taskId, actor, declaredPaths) => this.evaluateArchiveGate(teamId, taskId, actor, declaredPaths),
     auditMemberMemory: (teamId, memberId, taskId) => this.auditMemberMemory(teamId, memberId, taskId),
     waitForChange: (args) => this.waitForChange(args),
+    /* CHG-200：成员提交门禁裁决——与队长侧同一条 reviewTask 实现（口径只有一处） */
+    reviewTask: (teamId, args, actor) => this.reviewTask(teamId, args, actor),
     agentOf: (handle) => this.agentOf(handle),
     memberHandle: (memberId) => this.memberHandles.get(memberId),
     followupMessage: (text) => this.followupMessage(text),
+    workspaceRoot: () => this.workspaceRoot,
+  })
+  /** CHG-200：**队长读面**（`src/host/read.ts`）——逻辑全在族文件，入口只留路由。 */
+  private readonly read = createReadHandlers({
+    service: (teamId) => this.service(teamId),
+    readLedgerEvents: (ledgerPath) => readLedgerEvents(ledgerPath),
     workspaceRoot: () => this.workspaceRoot,
   })
   /**
@@ -1049,28 +1028,9 @@ export class MyTeamHost implements MyTeamHostContract {
     return this.contributionCatalog.roles.find((role) => role.id === roleId)
   }
 
-  /** T24：索引缺失时从账本全量重建工作区索引 + 全局索引（失败只 warn） */
+  /** T24：索引缺失时从账本全量重建工作区索引 + 全局索引（实现见 `host/teams.ts`，失败只 warn） */
   ensureTeamIndex(): void {
-    try {
-      if (readWorkspaceIndex(this.workspaceRoot)) return
-      const index = scanWorkspaceIndex(this.workspaceRoot)
-      writeWorkspaceIndex(this.workspaceRoot, index)
-      upsertGlobalWorkspace(this.workspaceRoot, index)
-    } catch (e) {
-      this.log('warn', `team index rebuild failed: ${String(e)}`)
-    }
-  }
-
-  /** T24：commit 后单条 upsert（派生数据；失败不阻断主路径） */
-  private refreshTeamIndex(teamId: string): void {
-    try {
-      const svc = this.service(teamId)
-      const entry = entryFromProjection(teamId, svc.projectionSnapshot)
-      const index = upsertTeamEntry(this.workspaceRoot, entry)
-      upsertGlobalWorkspace(this.workspaceRoot, index)
-    } catch (e) {
-      this.log('warn', `team index update failed: ${String(e)}`)
-    }
+    this.teams.ensureIndex()
   }
 
   log(level: 'info' | 'warn' | 'error', msg: string): void {
@@ -1343,7 +1303,7 @@ export class MyTeamHost implements MyTeamHostContract {
   }
 
   private afterCommit(teamId: string, event: { seq: number; type: string; payload: Record<string, unknown> }): void {
-    this.refreshTeamIndex(teamId)
+    this.teams.refreshIndex(teamId)
     const wakes = wakeDecisionsFor(event) as WakeDecision[]
     for (const wake of wakes) {
       const agent = this.agentOf(this.memberHandles.get(wake.memberId))
@@ -1488,8 +1448,7 @@ export class MyTeamHost implements MyTeamHostContract {
           return this.plan.revise(teamId, args, actor)
         case 'myteam_discard_plan':
           return this.plan.discard(teamId, args, actor)
-        /* CHG-186（T155b）：任务族**队长侧**实现已搬到 `src/host/tasks.ts`。这里只转发——
-         * 逻辑/顺序/默认值一个都没改（纯结构重构，行为零变化）。 */
+        /* CHG-186（T155b）：任务族**队长侧**实现已搬到 `src/host/tasks.ts`。这里只转发——逻辑/顺序/默认值一个都没改。 */
         case 'myteam_create_task':
           return this.tasks.create(teamId, args, actor)
         case 'myteam_edit_task':
@@ -1506,6 +1465,7 @@ export class MyTeamHost implements MyTeamHostContract {
           return this.tasks.rescope(teamId, args, actor)
         case 'myteam_cancel_task':
           return this.tasks.cancel(teamId, args, actor)
+        case 'myteam_delete_task': return this.tasks.deleteTask(teamId, args, actor)
         case 'myteam_batch_task_op':
           return this.tasks.batchOp(teamId, args, actor)
         /* ── CHG-76：批量建任务（从目标出草稿 → 预览 → 一次创建）── */
@@ -1593,6 +1553,13 @@ export class MyTeamHost implements MyTeamHostContract {
         /* CHG-124（docs/19 §M6）：任务依赖图谱只读查询（全员可读） */
         case 'myteam_get_task_graph':
           return this.query.getTaskGraph(args)
+        /* CHG-200：**队长读面**——只读 / 不含 attemptId / 限界读（见 `src/host/read.ts`） */
+        case 'myteam_read_task':
+          return this.read.readTask(teamId, args)
+        case 'myteam_read_board':
+          return this.read.readBoard(teamId, args)
+        case 'myteam_read_knowledge_entry':
+          return this.read.readKnowledgeEntry(teamId, args)
         /* CHG-123（docs/19 §M0/M2）：团队目录 + 详情（全员可读） */
         case 'myteam_list_teams':
           return this.query.listTeams(args)
@@ -2144,7 +2111,7 @@ export class MyTeamHost implements MyTeamHostContract {
       // 已经有变化 → 先回答变化（比「没人在」更有信息量）
       const result = changeSince(events as never, sinceSeq, args.taskId ? String(args.taskId) : undefined)
       if (result.changed) {
-        return { status: 'changed', changed: true, cause: result.cause, note: '失效提示：重新 myteam_get_task/myteam_list_tasks 读取（不推正文）' }
+        return { status: 'changed', changed: true, cause: result.cause, note: '失效提示：成员用 myteam_get_task/myteam_list_tasks、队长用 myteam_read_task/myteam_read_board 重新读取（不推正文）' }
       }
       // P2-1：没有活跃 peer → 等不到新事件，立即返回（不 sleep、不消耗模型回合）。
       // `status` 复用词表里的 `unavailable`（没有**可等待对象** = 本次等待不可用）；
@@ -2562,7 +2529,9 @@ export class MyTeamHost implements MyTeamHostContract {
     return this.observeMemberCall(member, name, args, result)
   }
 
-  private executeMemberToolInner(member: MemberInstance, name: string, args: Record<string, unknown>): Record<string, unknown> {
+  /* CHG-200：`myteam_submit_review` 在 verify 门要等命令执行（FR-5.3）——返回类型补实为
+   * 「同步结果 | Promise」，与 `executeLeadTool` 同形（结算由 `executeMemberTool` 的 thenable 分支负责）。 */
+  private executeMemberToolInner(member: MemberInstance, name: string, args: Record<string, unknown>): Record<string, unknown> | Promise<Record<string, unknown>> {
     const teamId = member.teamId
     const actor = `member:${member.memberId}`
     /* CHG-138（docs/19 §3）：**成员通道硬拦**——成员只能调 A 档工具（C5 铁律的运行时保证） */
@@ -2601,6 +2570,9 @@ export class MyTeamHost implements MyTeamHostContract {
           return this.memberTasks.escalate(teamId, member, args, actor)
         case 'myteam_read_knowledge':
           return this.memberKnowledge.read(args)
+        /* CHG-200（用户定案「任务检查应该由成员自己完成」）：成员提交门禁裁决——审查者 = 调用者。 */
+        case 'myteam_submit_review':
+          return this.memberTasks.submitReview(teamId, member, args, actor)
         default:
           return { status: 'error', code: 'MT_UNKNOWN_TOOL', message: `unknown member tool: ${name}` }
       }
@@ -4160,18 +4132,9 @@ export class MyTeamHost implements MyTeamHostContract {
    */
   syncTokens(teamId: string): TokensFile {
     const svc = this.service(teamId)
-    const dir = storeLayout(this.workspaceRoot).tasks + sep + teamId
-    const filePath = join(dir, 'tokens.json')
-    // ① 已有历史：优先内存，其次读盘（进程重启后 days 不能丢）
-    let file = this.tokensFiles.get(teamId)
-    if (!file) {
-      try {
-        const parsed = JSON.parse(readFileSync(filePath, 'utf8')) as TokensFile
-        if (parsed && typeof parsed === 'object' && parsed.days) file = parsed
-      } catch {
-        file = undefined
-      }
-    }
+    // ① 已有历史：优先内存，其次读盘（进程重启后 days 不能丢；旧路径只读兼容，见 CHG-202x / P1-14）
+    const filePath = tokenSidecarPath(this.workspaceRoot, teamId)
+    let file = this.tokensFiles.get(teamId) ?? readTokensSidecar([filePath, legacyTokenSidecarPath(this.workspaceRoot, teamId)])
     file ??= emptyTokensFile(teamId)
     // ② 基线：冷启动从 totals 恢复（totals = 每个成员的累计量）
     let baselines = this.tokenBaselines.get(teamId)

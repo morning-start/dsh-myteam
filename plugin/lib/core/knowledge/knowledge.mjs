@@ -24,7 +24,7 @@ import { storeLayout } from '../workspace/layout.mjs'
 export const INDEX_BUDGET_LINES = 40
 
 /** 提案关系声明（v2.7 观察巩固语义，FR-17.4） */
-export const KNOWLEDGE_RELATIONS = ['new', 'refine', 'contradict']         
+const KNOWLEDGE_RELATIONS = ['new', 'refine', 'contradict']         
                                                                     
 
                                  
@@ -372,6 +372,22 @@ export function readKnowledgeEntry(dir        , id        )                     
   const p = join(dir, `${id}.md`)
   if (!existsSync(p)) return undefined
   return entryFromMarkdown(readFileSync(p, 'utf8'), id)
+}
+
+/**
+ * 条目视图（CHG-200）：**成员 / 队长共用的「条目怎么展示」契约**。
+ *
+ * 为什么收敛到一处：成员工具 `myteam_read_knowledge` 与队长读面
+ * `myteam_read_knowledge_entry` 是同一份展示口径（字段集 + stale 前缀）。两处各写一份，
+ * 字段集与提示语必然漂移——「同一个条目在两边读到的不一样」是最难查的一类不一致。
+ *
+ * @returns 条目视图；条目不存在 → `undefined`（调用方决定错误码，不在这里造 MT_*）
+ */
+export function knowledgeEntryView(workspaceRoot        , id        )                                      {
+  const entry = readKnowledgeEntry(knowledgeDirOf(workspaceRoot), String(id))
+  if (!entry) return undefined
+  const body = entry.staleSince ? `[stale 待复核] 该条目已被主题相近任务触及，请勿盲信，注意交叉核对。\n\n${entry.body}` : entry.body
+  return { id: entry.id, title: entry.title, tags: entry.tags, unverified: entry.unverified, staleSince: entry.staleSince, proofCount: entry.proofCount, body }
 }
 
 export function writeKnowledgeEntry(dir        , entry                )                       {

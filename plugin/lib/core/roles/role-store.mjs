@@ -187,11 +187,11 @@ export function deleteProjectRole(dir        , id        , bindings          )  
                 
  
 
-export function roleAuditPath(paths                )         {
+function roleAuditPath(paths                )         {
   return join(paths.projectRolesDir, '.audit.jsonl')
 }
 
-export function appendRoleAudit(paths                , entry                )         {
+function appendRoleAudit(paths                , entry                )         {
   const p = roleAuditPath(paths)
   mkdirSync(dirname(p), { recursive: true })
   appendText(p, `${JSON.stringify({ ts: Date.now(), actor: entry.actor ?? 'human', action: entry.action, roleId: entry.roleId, file: entry.file })}\n`)
@@ -456,7 +456,7 @@ function requireGlobalDir(paths                )         {
 }
 
 /** 全局角色文件路径（`$DSH_HOME/myteam/roles/<id>.json`） */
-export function globalRoleFilePath(paths                , id        )         {
+function globalRoleFilePath(paths                , id        )         {
   return join(requireGlobalDir(paths), `${id}.json`)
 }
 
@@ -467,7 +467,7 @@ export function readGlobalRole(paths                , id        )               
 }
 
 /** 全局角色审计行（与项目库同构，落在全局目录） */
-export function globalRoleAuditPath(paths                )         {
+function globalRoleAuditPath(paths                )         {
   return join(requireGlobalDir(paths), '.audit.jsonl')
 }
 

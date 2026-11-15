@@ -168,7 +168,8 @@ test('t87-5: 源码静态 —— 两个入口都走 openWorkbench，Panel 初值
   assert.ok(source.includes('openWorkbench(ctx, entryNav)'), 'composer chip 也走同一个入口')
   /* ③ Panel 初值来自交接 */
   assert.ok(source.includes('entryNavRef.current = { nav: takePendingNav() }'), 'Panel 挂载时消费交接')
-  assert.ok(source.includes("entryNav?.scope === 'project' ? 'project' : 'global'"), '初始作用域来自交接')
+  /* CHG-201：作用域由**挂载点**决定（全局页 / 项目页两个物理表面），不再由交接的 scope 决定 */
+  assert.ok(source.includes("const scope = mode === 'project' ? 'project' : 'global'"), '作用域来自挂载点')
   assert.ok(source.includes('entryNav?.teamId ?? null'), '初始团队来自交接')
   assert.ok(source.includes('entryNav?.projectTab ?? \'tasks\''), '初始项目 tab 来自交接')
 })

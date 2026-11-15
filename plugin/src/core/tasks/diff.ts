@@ -12,7 +12,7 @@
  */
 
 /** 可编辑字段白名单（与 service.validateTaskPatch 的 known 列表一致） */
-export const EDITABLE_FIELDS = [
+const EDITABLE_FIELDS = [
   'title',
   'description',
   'acceptanceCriteria',
@@ -32,7 +32,7 @@ export type EditableField = (typeof EDITABLE_FIELDS)[number]
  * 结构性字段：改了就等于「任务的完成定义变了」。
  * 任务在跑时这些字段只能走 rescope（CHG-71 守卫）；任务已交付后改了 → 证据过期（CHG-73）。
  */
-export const STRUCTURAL_FIELDS: ReadonlySet<string> = new Set([
+const STRUCTURAL_FIELDS: ReadonlySet<string> = new Set([
   'acceptanceCriteria',
   'deliverableSpec',
   'deps',
@@ -82,11 +82,6 @@ export function diffTaskInput(input: Record<string, unknown>, patch: Record<stri
     changes.push({ field, from: before ?? null, to: after ?? null })
   }
   return changes
-}
-
-/** 补丁里是否有结构性字段（不看真的有没有变化——调用方可用 diff 结果更精确） */
-export function hasStructuralFields(patch: Record<string, unknown>): boolean {
-  return Object.keys(patch ?? {}).some((key) => STRUCTURAL_FIELDS.has(key))
 }
 
 /** 改动里落到结构性字段的那些字段名（证据过期判定用） */

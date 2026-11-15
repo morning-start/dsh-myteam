@@ -188,7 +188,7 @@ function normalizePreset(raw: unknown, origin: PresetOrigin, filePath: string | 
 }
 
 /** 读取单层目录（不存在返回空；坏文件只记 warning） */
-export function readPresetsFromDir(dir: string, origin: PresetOrigin, warnings: string[]): PresetEntry[] {
+function readPresetsFromDir(dir: string, origin: PresetOrigin, warnings: string[]): PresetEntry[] {
   if (!existsSync(dir)) return []
   const out: PresetEntry[] = []
   for (const file of readdirSync(dir).filter((name) => name.endsWith('.json')).sort()) {
@@ -240,7 +240,7 @@ export function readPresetCatalog(workspaceRoot: string, contributions?: readonl
 
 export const BUILTIN_PRESET_IDS: ReadonlySet<string> = new Set(BUILTIN_PRESETS.map((preset) => preset.id))
 
-export function projectPresetPath(workspaceRoot: string, presetId: string): string {
+function projectPresetPath(workspaceRoot: string, presetId: string): string {
   return join(presetDirs(workspaceRoot).project, `${presetId}.json`)
 }
 

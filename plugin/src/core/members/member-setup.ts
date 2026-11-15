@@ -14,7 +14,8 @@
 import type { RoleDefinition } from '../roles/builtin-roles.ts'
 import { scratchDir } from '../workspace/layout.ts'
 
-/** 9 个团队协调工具（FR-3.5 v2.5：永不可被策略关闭；v2.4 +claim_task，v2.5 +read_knowledge） */
+/** 10 个团队协调工具（FR-3.5 v2.5：永不可被策略关闭；v2.4 +claim_task，v2.5 +read_knowledge，
+ *  CHG-200 +submit_review——任务检查是成员的份内事，审查者 = 调用者本人） */
 export const TEAM_MEMBER_TOOLS = [
   'myteam_get_task',
   'myteam_list_tasks',
@@ -25,6 +26,7 @@ export const TEAM_MEMBER_TOOLS = [
   'myteam_propose_task_change',
   'myteam_escalate_task',
   'myteam_read_knowledge',
+  'myteam_submit_review',
 ] as const
 
 /** 内置团队工具（宿主 experimental agentTeam；hideBuiltinTeamTools 要隐藏的名单，T0 实测 9 个） */
@@ -123,6 +125,7 @@ export function memberPromptSection(role: RoleDefinition, member: MemberInstance
       `5. 结构性建议（拆分/补依赖）用 myteam_propose_task_change 提案，等队长批准。`,
       `6. 与任务相关的沟通挂 taskId（进任务 thread 留痕）；纯协调消息可不挂。`,
       `7. 空闲无任务时保持静默（零请求）；用 myteam_wait_for_change 等待失效提示。`,
+      `8. 任务检查由成员自己完成：审查他人的产出用 myteam_submit_review 提交门禁裁决（不能审自己实现的任务，MT_CROSS_REVIEW）；先核证据块再下结论，队长只做同步与成果检查。`,
     ].join('\n'),
   }
 }

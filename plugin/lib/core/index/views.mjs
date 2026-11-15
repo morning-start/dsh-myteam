@@ -55,7 +55,7 @@ import { resolveEffectiveRole } from '../roles/role-store.mjs'
  
 
 /** 终态任务不可再重规划/取消；已取消与失败的任务连元数据编辑也没有意义（不再参与任何调度） */
-export function taskActionsOf(task                )              {
+function taskActionsOf(task                )              {
   const terminal = TERMINAL_STATES.has(task.state)
   const editable = task.state !== 'cancelled' && task.state !== 'failed'
   return { rescope: !terminal, cancel: !terminal, edit: editable }

@@ -90,10 +90,10 @@ test('t86-6: 客户端只展示 rootDisplay，绝对路径进 title（可复制/
     /className: 'mt-contrib-root', title: String\(data\?\.root \?\? ''\), children: t\('contrib\.root'\)\.replace\('\{root\}', String\(data\?\.rootDisplay \?\? data\?\.root \?\? ''\)\)/,
     '贡献目录必须展示 rootDisplay，title 留绝对路径',
   )
-  // 存储横幅路径
+  // 存储横幅路径（CHG-202b：允许带附加类名，如引导卡的 `mt-store-path` 省略号版式）
   assert.match(
     clientSource,
-    /className: 'mt-banner-path', title: String\(storeState\.layout\?\.root \?\? ''\), children: String\(storeState\.layout\?\.rootDisplay \?\? storeState\.layout\?\.root \?\? ''\)/,
+    /className: 'mt-banner-path[^']*', title: String\(storeState\.layout\?\.root \?\? ''\), children: String\(storeState\.layout\?\.rootDisplay \?\? storeState\.layout\?\.root \?\? ''\)/,
     '存储横幅必须展示 rootDisplay，title 留绝对路径',
   )
   // 初始化回执

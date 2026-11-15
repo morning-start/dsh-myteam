@@ -58,9 +58,9 @@ export interface SessionPageView {
 /** 单页默认消息数（20 条 ≈ 一屏；宿主会按自己的上限再封顶） */
 export const ARCHAEOLOGY_DEFAULT_MAX_MESSAGES = 20
 /** 单条记录摘要的字符上限（超出截断并显式标记） */
-export const ARCHAEOLOGY_MAX_CHARS = 600
+const ARCHAEOLOGY_MAX_CHARS = 600
 /** 单页里最多展示几条（`records` 可能比它多，多出的折叠成「省略 N 条」） */
-export const ARCHAEOLOGY_MAX_ITEMS = 30
+const ARCHAEOLOGY_MAX_ITEMS = 30
 
 /** 造翻页请求（sessionId 为空 → 抛错，由调用方转 MT_VALIDATION） */
 export function buildSessionPageRequest(sessionId: string, options: { beforeSeq?: number; maxMessages?: number } = {}): SessionPageRequest {

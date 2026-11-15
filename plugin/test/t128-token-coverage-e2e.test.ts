@@ -22,7 +22,7 @@
  */
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import { mkdtempSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
+import { existsSync, mkdtempSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { MyTeamHost, type HostRuntime } from '../src/host.ts'
@@ -39,8 +39,13 @@ import {
 
 const TEAM = 't128'
 
-/** tokens.json 落盘路径（宿主本地存储布局：<root>/.dsh-myteam/tasks/<teamId>/tokens.json） */
+/** tokens.json 落盘路径（CHG-202x / P1-14 契约位置：<root>/.dsh-myteam/history/tokens/<teamId>.json） */
 function tokensPath(root: string, teamId: string): string {
+  return join(root, '.dsh-myteam', 'history', 'tokens', `${teamId}.json`)
+}
+
+/** 旧位置（`tasks/<teamId>/tokens.json`）——只读兼容，新写入不应再碰它 */
+function legacyTokensPath(root: string, teamId: string): string {
   return join(root, '.dsh-myteam', 'tasks', teamId, 'tokens.json')
 }
 
@@ -107,6 +112,8 @@ test('t128-1: syncTokens 把计量计数写进 tokens.json（meteredCalls + memb
     await stageTeam(host, TEAM)
     const file = host.syncTokens(TEAM)
     const onDisk = JSON.parse(readFileSync(tokensPath(root, TEAM), 'utf8')) as TokensFile
+    // CHG-202x（P1-14）：侧车是派生数据——落在 history/（.gitignore 覆盖），旧位置不再写
+    assert.equal(existsSync(legacyTokensPath(root, TEAM)), false, '旧路径 tasks/<teamId>/tokens.json 不应再被写入（派生数据不入库）')
     // ① 计数字段必须落盘（旧实现只写 5 个字段 → 覆盖率恒 partial 的死代码）
     assert.equal(onDisk.totals['m1-developer'].calls, 3)
     assert.equal(onDisk.totals['m1-developer'].meteredCalls, 3, 'meteredCalls 必须写进 tokens.json')
@@ -240,8 +247,10 @@ test('t128-4: 上下文占比分母为 0 → undefined（不是 0），有数据
 test('t128-5: 老 tokens.json（无计数字段）加载后保守 partial（离线快照兼容旧数据）', () => {
   const root = mkdtempSync(join(tmpdir(), 't128d-'))
   try {
-    const dir = join(root, '.dsh-myteam', 'tasks', TEAM)
-    mkdirSync(dir, { recursive: true })
+    /* CHG-202x（P1-14）：旧工作区的侧车还在 tasks/<teamId>/——这里刻意写到**旧位置**，
+     * 验证「新路径优先、旧路径只读兼容」不会让历史用量凭空消失。 */
+    const legacyFile = legacyTokensPath(root, TEAM)
+    mkdirSync(join(legacyFile, '..'), { recursive: true })
     // 旧版落盘结构：只有四桶 + calls，没有 meteredCalls / memberMeter
     const legacy = {
       version: 1,
@@ -251,7 +260,7 @@ test('t128-5: 老 tokens.json（无计数字段）加载后保守 partial（离�
       totals: { m1: { uncachedInput: 10, cacheRead: 20, cacheWrite: 5, output: 8, calls: 2 } },
       note: '',
     }
-    writeFileSync(tokensPath(root, TEAM), `${JSON.stringify(legacy, null, 2)}\n`, 'utf8')
+    writeFileSync(legacyFile, `${JSON.stringify(legacy, null, 2)}\n`, 'utf8')
     const loaded = buildOfflineTokens(root, TEAM)
     assert.ok(loaded, '离线视图必须能读到 tokens.json')
     assert.equal(loaded!.coverage, 'partial', '旧数据无法证明全量 → 保守 partial')

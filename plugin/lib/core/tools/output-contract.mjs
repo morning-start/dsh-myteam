@@ -1,14 +1,14 @@
 /**
  * P1-6（docs/21 §6）：**工具输出契约**——`jsonOutput` 双声明。
  *
- * 为什么必须有：63 个工具的 `output.schema` 此前只有 `{ status: string }` —— 结果契约只声明了
+ * 为什么必须有：68 个工具的 `output.schema` 此前只有 `{ status: string }` —— 结果契约只声明了
  * 一个字段，宿主的 `createSuccessResult → validateJsonSchemaValue` 等于什么都没校验，
  * 面板与模型也都不知道「这个工具能拿到什么」。
  *
  * 官方范式（`tool/lib/index.js:211-219`）是**双声明**：
  *   ① `output.schema` = 完整结果契约（成功字段与失败字段在同一个 schema 里）；
  *   ② `render` 只负责把值压成**紧凑 JSON**（不丢字段、不加装饰、不 pretty-print）。
- * 本模块是这两件事的唯一来源，`defs.ts` 的 63 个工具全部经它声明。
+ * 本模块是这两件事的唯一来源，`defs.ts` 的 68 个工具全部经它声明。
  *
  * 三条纪律（都是「为什么这么写」而不是「怎么写」）：
  *
@@ -17,7 +17,7 @@
  *
  *  ② **不改工具行为**：`properties` 只做**开放声明**（不加 `additionalProperties: false`），
  *     既有 `execute` 返回值原样通过宿主校验。本批只补声明、不动返回形状——
- *     63 个工具的真实返回里有 `field` / `currentRevision` / `attemptId` 等按路径才出现的字段，
+ *     68 个工具的真实返回里有 `field` / `currentRevision` / `attemptId` 等按路径才出现的字段，
  *     写死 `additionalProperties` 会让今天能用的工具明天报 `ToolOutputError`。
  *
  *  ③ **失败不抛**：`assertToolResult` 返回结构化结果（`{ok:false, code:'MT_TOOL_CONTRACT'}`）。
@@ -128,7 +128,7 @@ const RESULT_PROPERTIES                                 = {
 }
 
 /**
- * 统一结果契约：63 个工具**共同**的那部分。
+ * 统一结果契约：68 个工具**共同**的那部分。
  *
  * `required` 只有 `status`：它是唯一「所有工具、所有分支都一定给」的字段。
  * 其余字段按工具就地补（`TOOL_OUTPUT_FIELDS`），没补的也不代表拿不到——
@@ -191,6 +191,17 @@ export const TOOL_OUTPUT_FIELDS                                 = {
       },
     },
   },
+  /* CHG-200（用户定案「任务检查应该由成员自己完成」）：**成员提交门禁裁决**。
+   * 审查者 = 调用者；review/verify 门强制交叉审查（reviewer ≠ 实现者，MT_CROSS_REVIEW）。 */
+  myteam_submit_review: {
+    properties: {
+      gate: { type: 'string', description: '门禁名（review / verify / archive）' },
+      taskState: { type: 'string', description: '裁决后的任务状态（gate-pass / gate-fail / needs-human 等）' },
+      rejectCount: { type: 'number', description: '本门已打回轮数（>0 时看板/详情可见）' },
+      delivery: { type: 'object', description: '交付判定结果（P1-2 三级信号；review 门只留痕不否决）' },
+      note: { type: 'string', description: '口径说明（archive 门由 host 落位校验，不接受模型自述）' },
+    },
+  },
   /* CHG-163（docs/10 KI-9）：队长侧**提案入口**的结果面——只回提案凭据，不回条目
    * （条目要等 `myteam_adopt_knowledge` 采纳后才存在于 config/knowledge/，宣称有就是假的）。 */
   myteam_propose_knowledge: {
@@ -203,6 +214,32 @@ export const TOOL_OUTPUT_FIELDS                                 = {
     },
   },
   /* ── Lead 工具：只读面 ───────────────────────────────────── */
+  /* CHG-200（用户定案「队长没有最基本的读取工具」）：**队长读面**——任务详情 / 看板 / 知识条目。
+   * 只读：不写账本、不改状态；**不返回 attemptId**（写凭据只发给当前持有人）。 */
+  myteam_read_task: {
+    properties: {
+      task: {
+        type: 'object',
+        description: '任务完整视图（state/input/gates/gateVerdicts/assignees/evidenceRefs/deliverables/timeline/edits/scopeAudit）；**不含 attemptId**',
+      },
+      omitted: { type: 'object', description: '被截断的条数（evidence/timeline/messages；限界读 NFR-7.6）' },
+      note: { type: 'string', description: '只读口径说明' },
+    },
+  },
+  myteam_read_board: {
+    properties: {
+      teamId: { type: 'string', description: '团队 id' },
+      counts: { type: 'object', description: '计数（total/open/done/byState）' },
+      tasks: { type: 'array', items: { type: 'object' }, description: '任务行（id/title/state/priority/requiredRole/assignee/assignees/deps/escalateCount/evidenceCount）' },
+      returnedCount: { type: 'number', description: '本次返回行数（≠ 已读全部内容，NFR-7.6）' },
+      note: { type: 'string', description: '限界读说明' },
+    },
+  },
+  myteam_read_knowledge_entry: {
+    properties: {
+      entry: { type: 'object', description: '知识条目（id/title/tags/unverified/staleSince/proofCount/body）；stale 时 body 带待复核前缀' },
+    },
+  },
   myteam_get_audit: {
     properties: {
       teamId: { type: 'string', description: '团队 id' },
@@ -372,7 +409,7 @@ export function assertToolResult(toolName        , result         )             
  
 
 /**
- * 63 个工具的契约清单（**按名字排序**，与 `TOOL_TIERS` 同源）。
+ * 68 个工具的契约清单（**按名字排序**，与 `TOOL_TIERS` 同源）。
  *
  * 为什么从 `TOOL_TIERS` 派生而不是再写一份名单：档位表已经是「工具有哪些」的单一事实源
  * （t107 双向锁死），再抄一份 63 行名单必然漂移。数量/去重由 t121 断言。

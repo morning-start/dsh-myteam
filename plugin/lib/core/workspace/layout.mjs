@@ -57,10 +57,10 @@ import { writeTextAtomic } from '../fs/write-log.mjs'
 /** 项目级存储根目录名（用户定案：与插件包名 `dsh-plugin-myteam` 对齐） */
 export const STORE_DIR = '.dsh-myteam'
 /** 旧目录名（CHG-3 曾改名 `.team-workplace`；CHG-102 起回到 `.dsh-myteam`） */
-export const LEGACY_STORE_DIR = '.team-workplace'
+const LEGACY_STORE_DIR = '.team-workplace'
 /** 布局版本：目录结构变化时 +1（写进 manifest.json，迁移按版本判） */
-export const LAYOUT_VERSION = 1
-export const SCHEMA_VERSION = 1
+const LAYOUT_VERSION = 1
+const SCHEMA_VERSION = 1
 
 /** 目录布局（全部为绝对路径；`storeLayout()` 的返回值） */
                               
@@ -135,8 +135,23 @@ export function storeLayout(projectRoot        )              {
 
 /* ── 团队级路径（都有一个参数化入口，避免调用点自己拼） ───────────── */
 
+/**
+ * token 侧车（CHG-202x / P1-14）：**契约位置** `history/tokens/<teamId>.json`。
+ *
+ * 为什么必须从这里取：侧车是**派生数据**，而 `.gitignore` 只忽略 `state/ history/ export/`——
+ * 写在 `tasks/<teamId>/tokens.json` 会被**入库**，每次跑任务都改一份本不该提交的统计。
+ */
+export function tokenSidecarPath(projectRoot        , teamId        )         {
+  return join(storeLayout(projectRoot).tokens, `${teamId}.json`)
+}
+
+/** 旧位置（`tasks/<teamId>/tokens.json`）：**只读兼容**，新写入一律走 {@link tokenSidecarPath} */
+export function legacyTokenSidecarPath(projectRoot        , teamId        )         {
+  return join(storeLayout(projectRoot).tasks, teamId, 'tokens.json')
+}
+
 /** 团队目录（任务与依赖）：`tasks/<teamId>/` */
-export function teamTasksDir(projectRoot        , teamId        )         {
+function teamTasksDir(projectRoot        , teamId        )         {
   return join(storeLayout(projectRoot).tasks, teamId)
 }
 
@@ -160,11 +175,6 @@ export function archiveRoot(projectRoot        )         {
   return storeLayout(projectRoot).archive
 }
 
-/** token 侧车：`history/tokens/<teamId>.json` */
-export function teamTokensPath(projectRoot        , teamId        )         {
-  return join(storeLayout(projectRoot).tokens, `${teamId}.json`)
-}
-
 /** 成员身份快照目录：`history/members/<teamId>/<memberId>`（identity.json 的落点） */
 export function memberIdentityDir(projectRoot        , teamId        , memberId        )         {
   return join(storeLayout(projectRoot).members, teamId, memberId)
@@ -179,11 +189,6 @@ export function memberMemoryDir(projectRoot        , teamId        , memberId   
 export function scratchDir(projectRoot        , teamId        , memberId         )         {
   const base = join(storeLayout(projectRoot).scratch, teamId)
   return memberId ? join(base, memberId) : base
-}
-
-/** 账本相对路径（写进事件/快照的展示串，永远用 `/`） */
-export function teamLedgerRelative(teamId        )         {
-  return `${STORE_DIR}/tasks/${teamId}/ledger.jsonl`
 }
 
 /* ── 项目根解析 ───────────────────────────────────────────────── */
@@ -323,7 +328,7 @@ const LEGACY_GITIGNORE_BEGIN = '# >>> dsh-plugin-myteam managed block >>>'
 const LEGACY_GITIGNORE_END = '# <<< dsh-plugin-myteam managed block <<<'
 
 /** `.dsh-myteam/README.md`：目录说明（人读；只在缺失时写，用户可改） */
-export const STORE_README = `# .dsh-myteam —— 项目级团队存储
+const STORE_README = `# .dsh-myteam —— 项目级团队存储
 
 本目录是 myteam 的**项目级唯一落盘根**：角色、团队、技能、工具、任务依赖、流程配置
 都在这里，随项目走，不落到用户全局 profile。
@@ -430,7 +435,7 @@ export function ensureStore(projectRoot        , opts                           
  * 为什么 rename 而不是复制：账本可能很大（append-only），复制既慢又容易半途失败；
  * rename 在同一卷上是原子的。跨设备失败时降级为「保留旧目录 + 告警」——不静默丢数据。
  */
-export function migrateLegacyStore(projectRoot        , warn                            = () => {})                                            {
+function migrateLegacyStore(projectRoot        , warn                            = () => {})                                            {
   const warnings           = []
   const next = storeLayout(projectRoot).root
   const legacy = resolve(projectRoot, LEGACY_STORE_DIR)
@@ -456,7 +461,7 @@ export function migrateLegacyStore(projectRoot        , warn                    
 }
 
 /** 清掉旧实现写在项目根 `.gitignore` 的托管块（只删自己那几行，保留用户规则） */
-export function removeLegacyGitignoreBlock(projectRoot        )          {
+function removeLegacyGitignoreBlock(projectRoot        )          {
   const path = join(projectRoot, '.gitignore')
   if (!existsSync(path)) return false
   let text        

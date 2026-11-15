@@ -40,7 +40,7 @@ import { assertWritableAtScope, normalizeScope,            } from '../workspace/
 
                                                                
 
-export const ROLE_OPS                        = ['save', 'delete', 'publish', 'fork']
+const ROLE_OPS                        = ['save', 'delete', 'publish', 'fork']
 
 /**
  * 角色库统一写入口。

@@ -118,7 +118,12 @@ export const FROZEN_A2 = []
  * （装配与唤醒逻辑）。⚠️ **入口层再降要靠装配逻辑下沉，不是端点**——`executeLeadTool`
  * 的 switch 已经是纯「工具名 → 适配层」路由表，再按端点切只是把转发行搬来搬去。
  */
-export const A6_LIMIT = { 'host.ts': 4405 }
+/* CHG-200：`ensureTeamIndex` / `refreshTeamIndex` 两个私有方法体下沉 `src/host/teams.ts`，
+ * 入口层 4,405 → **4,400**（4 个新工具的路由成本 + 读面装配已由这次下沉抵消）。
+ * CHG-202：`sessionCwdOf`（会话工作目录解析）下沉 `src/host/session-cwd.ts`，入口层
+ * 4,400 → **4,377**（同一个 bug 的修复落在了入口层，靠这次下沉抵消）。
+ * 新代码一律落到 `src/host/<族>.ts`——入口层只留「工具名 → 适配层」一行转发。 */
+export const A6_LIMIT = { 'host.ts': 4377 }
 
 /** 递归列出 dir 下扩展名为 ext 的文件（确定性排序；Dirent 直接给答案，不 try/catch 猜目录） */
 function walk(dir, ext) {
