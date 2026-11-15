@@ -87,8 +87,11 @@ export const TOOL_TIERS                           = {
   myteam_save_preset: 'C',
   myteam_copy_preset: 'C',
   myteam_delete_preset: 'C',
-  myteam_spawn_member: 'C',
-  myteam_release_member: 'C',
+  /* CHG-202y（FR-32 · G1-2）：派生 / 释放从 C 挪到 CM——成员被角色 `delegation.canSpawn`
+   * 显式授权后可见（**两套授权源不许混**：委派类看 `delegation`，其它 CM 看 `toolPolicy.allow`）。
+   * 队长的能力一个字没变（C 与 CM 队长都可调）。 */
+  myteam_spawn_member: 'CM',
+  myteam_release_member: 'CM',
   myteam_interrupt: 'C',
   myteam_message: 'C',
   myteam_resolve_proposal: 'C',

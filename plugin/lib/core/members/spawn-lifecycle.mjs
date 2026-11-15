@@ -55,6 +55,8 @@ import { copyToProject, resolveRuntimeRole,                                     
 import { rosterOf, spawnLimitsOf, spawnTreeFields } from '../members/hierarchy.mjs'
 import {
   buildToolMask,
+  /* CHG-202y（FR-32）：C5 第 9 条——子成员工具集 ⊆ 父成员（纯函数，判定在掩码产物上） */
+  childToolSubsetViolation,
   memberPromptSection,
   memberSessionId,
   memoryPromptSection,
@@ -122,8 +124,13 @@ import { outputForTool } from '../tools/output-contract.mjs'
                                                             
                                            
                                                                                                                      
-                                                              
+                                                               
                                                    
+     
+                                                                                   
+                                                                        
+     
+                                                       
                                                                   
                                        
                                                                
@@ -179,6 +186,17 @@ export function createSpawnLifecycle(deps                    ) {
       ...(overrides.mcpAllowlist && overrides.mcpAllowlist.length > 0 ? { mcpAllowlist: overrides.mcpAllowlist } : {}),
     }
     const roleDef = resolveRuntimeRole(deps.rolePaths(), roleId) .definition
+    /* C5 第 9 条（CHG-202y / FR-32）：**子成员工具集 ⊆ 父成员**——派生是扩编，不是提权。
+     * 与深度/子数准入同一位置（任何 commit 之前），被拒 = 账本零写入。 */
+    if (overrides.parentMemberId) {
+      const parent = svc.projectionSnapshot.members[overrides.parentMemberId]
+      const parentRole = parent ? resolveRuntimeRole(deps.rolePaths(), parent.roleId) : undefined
+      if (!parentRole) {
+        return { status: 'error', code: 'MT_UNAVAILABLE', message: `delegation denied: parent member "${overrides.parentMemberId}" not found or its role is unavailable` }
+      }
+      const violation = childToolSubsetViolation(buildToolMask(parentRole.definition), buildToolMask(roleDef))
+      if (violation) return { status: 'error', code: 'MT_UNAVAILABLE', message: `delegation denied (C5 #9): ${violation}` }
+    }
 
     // ① 第一段：provisioning 先落账（崩溃在这里 = 启动时可对账，而不是孤儿）
     // maxMembers / 角色解析在 service.checkDomain（账本校验先行）
@@ -201,8 +219,12 @@ export function createSpawnLifecycle(deps                    ) {
         sessionId,
         agentOptions: roleDef.model ?? undefined,
         setup: async (agentCtx     , agent     ) => {
-        // ① 成员工具 9 个（仅该成员可见）
-        for (const def of deps.memberToolDefs()) {
+        // ① 成员工具 10 个（仅该成员可见）+ **条件**委派工具（角色 delegation.canSpawn 授权才注册）
+        const toolDefs = [
+          ...deps.memberToolDefs(),
+          ...(roleDef.delegation?.canSpawn === true ? deps.delegationToolDefs() : []),
+        ]
+        for (const def of toolDefs) {
           const compiled = deps.compileParameters(def)
           agentCtx.tools.register({
             ...compiled,

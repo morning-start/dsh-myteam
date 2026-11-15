@@ -55,6 +55,8 @@ import { copyToProject, resolveRuntimeRole, type RoleEntry, type RoleStorePaths 
 import { rosterOf, spawnLimitsOf, spawnTreeFields } from '../members/hierarchy.ts'
 import {
   buildToolMask,
+  /* CHG-202y（FR-32）：C5 第 9 条——子成员工具集 ⊆ 父成员（纯函数，判定在掩码产物上） */
+  childToolSubsetViolation,
   memberPromptSection,
   memberSessionId,
   memoryPromptSection,
@@ -122,8 +124,13 @@ export interface SpawnLifecycleDeps {
   followupMessage: (text: string) => Record<string, unknown>
   /** 成员工具执行入口（P1-5 护栏埋点；10 个成员工具的唯一分派点） */
   executeMemberTool: (member: MemberInstance, name: string, args: Record<string, unknown>) => Record<string, unknown>
-  /** 成员工具定义（9 个；住在 `src/tools/defs.ts`，core 不能 import 那一层） */
+  /** 成员工具定义（10 个；住在 `src/tools/defs.ts`，core 不能 import 那一层） */
   memberToolDefs: () => ReadonlyArray<SpawnToolDef>
+  /**
+   * 委派工具定义（CHG-202y / FR-32 G1-2）：`myteam_spawn_member` / `myteam_release_member`。
+   * **条件注册**——只有角色 `delegation.canSpawn === true` 的成员才会拿到（CM 档的"授权可见"）。
+   */
+  delegationToolDefs: () => ReadonlyArray<SpawnToolDef>
   /** 工具参数编译（宿主 register 前必须编译成完整 JSON Schema；`host.ts` 模块级纯函数） */
   compileParameters: (tool: any) => any
   /** 准入校验的 try/catch 包装（`src/host/members.ts`；`MT_*` 错误码归一） */
@@ -179,6 +186,17 @@ export function createSpawnLifecycle(deps: SpawnLifecycleDeps) {
       ...(overrides.mcpAllowlist && overrides.mcpAllowlist.length > 0 ? { mcpAllowlist: overrides.mcpAllowlist } : {}),
     }
     const roleDef = resolveRuntimeRole(deps.rolePaths(), roleId)!.definition
+    /* C5 第 9 条（CHG-202y / FR-32）：**子成员工具集 ⊆ 父成员**——派生是扩编，不是提权。
+     * 与深度/子数准入同一位置（任何 commit 之前），被拒 = 账本零写入。 */
+    if (overrides.parentMemberId) {
+      const parent = svc.projectionSnapshot.members[overrides.parentMemberId]
+      const parentRole = parent ? resolveRuntimeRole(deps.rolePaths(), parent.roleId) : undefined
+      if (!parentRole) {
+        return { status: 'error', code: 'MT_UNAVAILABLE', message: `delegation denied: parent member "${overrides.parentMemberId}" not found or its role is unavailable` }
+      }
+      const violation = childToolSubsetViolation(buildToolMask(parentRole.definition), buildToolMask(roleDef))
+      if (violation) return { status: 'error', code: 'MT_UNAVAILABLE', message: `delegation denied (C5 #9): ${violation}` }
+    }
 
     // ① 第一段：provisioning 先落账（崩溃在这里 = 启动时可对账，而不是孤儿）
     // maxMembers / 角色解析在 service.checkDomain（账本校验先行）
@@ -201,8 +219,12 @@ export function createSpawnLifecycle(deps: SpawnLifecycleDeps) {
         sessionId,
         agentOptions: roleDef.model ?? undefined,
         setup: async (agentCtx: any, agent: any) => {
-        // ① 成员工具 9 个（仅该成员可见）
-        for (const def of deps.memberToolDefs()) {
+        // ① 成员工具 10 个（仅该成员可见）+ **条件**委派工具（角色 delegation.canSpawn 授权才注册）
+        const toolDefs = [
+          ...deps.memberToolDefs(),
+          ...(roleDef.delegation?.canSpawn === true ? deps.delegationToolDefs() : []),
+        ]
+        for (const def of toolDefs) {
           const compiled = deps.compileParameters(def)
           agentCtx.tools.register({
             ...compiled,

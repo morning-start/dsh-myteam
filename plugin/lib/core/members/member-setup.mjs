@@ -102,6 +102,35 @@ export function buildToolMask(role                )           {
   return { mode: 'allow', allow }
 }
 
+/**
+ * C5 第 9 条（CHG-202y / FR-32）：**子成员工具集 ⊆ 父成员**。
+ *
+ * 为什么必须有：派生是**扩编**，不是提权。父成员能用的宿主工具，子成员不能凭空多出来——
+ * 否则任何被授权派生的角色都能借「派生一个自己的副本」绕回被收走的工具。
+ *
+ * 判定在 {@link buildToolMask} 的产物上（掩码就是成员的真实工具面）：
+ *  - 父 `none`（无策略 = 继承宿主全量）→ 子集恒成立；
+ *  - 父 `allow` → 子必须是 `allow` 且 ⊆ 父 allow（子 `none` 也不行：那等于放开全量）；
+ *  - 父 `deny` → 子的 allow 里不能出现父 deny 的名字。
+ *
+ * 返回 `null` = 通过；否则是拒绝说明（调用方转 `MT_UNAVAILABLE`，**在任何 commit 之前**）。
+ */
+export function childToolSubsetViolation(parent          , child          )                {
+  if (parent.mode === 'none') return null
+  if (parent.mode === 'allow') {
+    if (child.mode !== 'allow') {
+      return `parent is restricted (allow) but child mask is "${child.mode}" — child would inherit more tools than parent`
+    }
+    const allowed = new Set(parent.allow ?? [])
+    const extra = (child.allow ?? []).filter((name) => !allowed.has(name))
+    return extra.length > 0 ? `child tool set exceeds parent: ${extra.join(', ')}` : null
+  }
+  const denied = new Set(parent.deny ?? [])
+  if (child.mode !== 'allow') return null
+  const reenabled = (child.allow ?? []).filter((name) => denied.has(name))
+  return reenabled.length > 0 ? `child re-enables tools the parent denies: ${reenabled.join(', ')}` : null
+}
+
 /** 成员 sessionId 命名（ADR-001：mt-<teamId>-<roleSlug>-<n>，幂等恢复键） */
 export function memberSessionId(teamId        , roleId        , n        )         {
   const slug = roleId.replace(/[^a-z0-9-]/g, '-')

@@ -26,6 +26,10 @@
                                                           
                                                                   
 import { childrenOf } from '../core/members/hierarchy.mjs'
+/* CHG-202y（FR-32 · G1-2）：成员侧委派——两套授权源（delegation / toolPolicy）与子树归属 */
+import { buildToolMask } from '../core/members/member-setup.mjs'
+import { resolveRuntimeRole,                     } from '../core/roles/role-store.mjs'
+import { DELEGATION_TOOL_NAMES } from '../tools/defs.mjs'
 
 /**
  * 纯规则层（`core/**`）只抛 `MTError`，工具面必须**返回**错误结果。
@@ -82,6 +86,9 @@ export function guardRule   (rule         )                                     
 
                                                           
                                                
+
+                                           
+                             
  
 
 export function createMembersHandlers(host                    ) {
@@ -94,6 +101,63 @@ export function createMembersHandlers(host                    ) {
         // CHG-187（FR-32）：父成员 id（缺省 = 队长直接召唤的一级成员）
         parentMemberId: typeof args.parentMemberId === 'string' && args.parentMemberId.length > 0 ? args.parentMemberId : undefined,
       })
+    },
+
+    /**
+     * 成员能否调用某个 CM 档工具（CHG-202y / FR-32 · G1-2）：**两套授权源，不许混**。
+     *
+     *  - 委派类（`myteam_spawn_member` / `myteam_release_member`）看角色 `delegation.canSpawn`
+     *    ——这是**组织授权**（能不能扩编），与「工具交没交给你」是两件事；
+     *  - 其它 CM（审计 / 会话考古）看 `toolPolicy.allow` **显式点名**——那是工具级收窄（C5 原口径）。
+     *
+     * 两条都缺省 false：CM 档没有「默认放行」。
+     */
+    cmAuthorized(member                  , toolName        )          {
+      const role = resolveRuntimeRole(host.rolePaths(), member.roleId)
+      if (!role) return false
+      if ((DELEGATION_TOOL_NAMES                     ).includes(toolName)) return role.delegation?.canSpawn === true
+      return (role.toolPolicy?.allow ?? []).includes(toolName)
+    },
+
+    /**
+     * `targetId` 是否是 `ancestorId` 的**后代**（含直接子成员）。
+     *
+     * 为什么需要：成员侧的 `myteam_release_member` 只能动**自己的子树**——否则任何被授权派生的
+     * 角色都能把同队的别人释放掉（那是队长的权力）。顺着 `parentMemberId` 上溯，带环保护。
+     */
+    isDescendant(teamId        , targetId        , ancestorId        )          {
+      if (!targetId || targetId === ancestorId) return false
+      const byId = new Map(host.membersOf(teamId).map((member) => [member.id, member]))
+      let cursor = byId.get(targetId)
+      const seen = new Set        ()
+      while (cursor?.parentMemberId && !seen.has(cursor.id)) {
+        seen.add(cursor.id)
+        if (cursor.parentMemberId === ancestorId) return true
+        cursor = byId.get(cursor.parentMemberId)
+      }
+      return false
+    },
+
+    /** `myteam_spawn_member`（**成员侧**，CHG-202y）：父成员 = 调用者（派生树由账本说话，不信自报） */
+    spawnAs(teamId        , member                  , args                         )                          {
+      return host.spawnMember(teamId, String(args.roleId), args.instanceName ? String(args.instanceName) : undefined, {
+        skills: Array.isArray(args.skills) ? args.skills.filter((skill)                  => typeof skill === 'string') : undefined,
+        mcpAllowlist: Array.isArray(args.mcpAllowlist) ? args.mcpAllowlist.filter((name)                 => typeof name === 'string') : undefined,
+        parentMemberId: member.id,
+      })
+    },
+
+    /** `myteam_release_member`（**成员侧**，CHG-202y）：只能释放自己的子树，别人的成员是队长的权力 */
+    releaseAs(teamId        , member                  , args                         )                          {
+      const targetId = String(args.memberId ?? '')
+      if (!this.isDescendant(teamId, targetId, member.id)) {
+        return {
+          status: 'error',
+          code: 'MT_UNAVAILABLE',
+          message: `成员 ${member.id} 只能释放自己的子成员（${targetId || '(未指定)'} 不在你的子树里）`,
+        }
+      }
+      return this.release(teamId, args)
     },
 
     /** `myteam_release_member`：`confirm` 两段确认由 `releaseMember` 自己判；`cascade` 走倒序级联 */

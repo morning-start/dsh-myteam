@@ -241,6 +241,22 @@ export function memberToolDefs()            {
   ]
 }
 
+/**
+ * 成员侧**条件可见**的委派工具（CHG-202y / FR-32 G1-2）。
+ *
+ * 为什么单独一个列表：这两个工具是 **CM 档**——队长天生可调，成员只有角色
+ * `delegation.canSpawn === true` 时才注册进**它自己**的工具面。所以它们
+ * 既不能进 `memberToolDefs()`（那会让所有成员都看见，等于授权形同虚设），
+ * 也不该复制一份 schema（定义只有一处：`leadToolDefs()` 里那两个）。
+ */
+export const DELEGATION_TOOL_NAMES = ['myteam_spawn_member', 'myteam_release_member']         
+
+/** 成员侧委派工具定义（**按名字从 Lead 表取**，不复制 schema——复制就是第二真相源） */
+export function delegationToolDefs()            {
+  const wanted = new Set        (DELEGATION_TOOL_NAMES)
+  return leadToolDefs().filter((def) => wanted.has(def.name))
+}
+
 /* ── Lead 工具（22 个）──────────────────────────────────────── */
 
 export function leadToolDefs()            {

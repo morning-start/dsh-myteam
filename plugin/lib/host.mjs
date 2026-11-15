@@ -49,7 +49,7 @@ import { createKnowledgeHandlers, createMemberKnowledgeHandlers } from './host/k
 import { createQueryHandlers } from './host/query.mjs'
 /* CHG-200：队长读面适配层（只读 / 不含 attemptId / 限界读，见 `src/host/read.ts` 文件头） */
 import { createReadHandlers } from './host/read.mjs'
-import { leadToolDefs, memberToolDefs,              } from './tools/defs.mjs'
+import { DELEGATION_TOOL_NAMES, delegationToolDefs, leadToolDefs, memberToolDefs,              } from './tools/defs.mjs'
 // CHG-148（P1-6）：按工具名取完整结果契约（jsonOutput 双声明），不再用统一空 schema
 import { outputForTool } from './core/tools/output-contract.mjs'
 import { wakeDecisionsFor, changeSince,                   } from './core/scheduler/wake.mjs'
@@ -603,6 +603,7 @@ export class MyTeamHost                               {
     memberHandle: (memberId) => this.memberHandles.get(memberId),
     noteGuardTurnEnd: (memberId) => this.noteGuardTurnEnd(memberId),
     membersOf: (teamId) => Object.values(this.service(teamId).projectionSnapshot.members),
+    rolePaths: () => this.rolePaths,
   })
   /**
    * CHG-186（T155b）：任务族端点适配层（`src/host/tasks.ts`）。
@@ -783,6 +784,7 @@ export class MyTeamHost                               {
     followupMessage: (text) => this.followupMessage(text),
     executeMemberTool: (member, name, args) => this.executeMemberTool(member, name, args),
     memberToolDefs,
+    delegationToolDefs,
     compileParameters,
     guardRule,
     readLedgerEvents,
@@ -2536,7 +2538,11 @@ export class MyTeamHost                               {
     const actor = `member:${member.memberId}`
     /* CHG-138（docs/19 §3）：**成员通道硬拦**——成员只能调 A 档工具（C5 铁律的运行时保证） */
     const tier = tierOf(name)
-    if (tier && !canCall(name, 'member')) {
+    /* CHG-202y（FR-32 · G1-2）：CM 档对成员是**条件放行**——两套授权源不许混：
+     *  - 委派类（spawn/release）：角色 `delegation.canSpawn`（组织授权，C5 第 9 条）；
+     *  - 其它 CM（审计 / 会话考古）：`toolPolicy.allow` 显式点名（工具级收窄，C5 原口径）。
+     * 缺省一律 false —— CM 档没有「默认放行」。 */
+    if (tier && !canCall(name, 'member', this.members.cmAuthorized(member, name))) {
       return {
         status: 'error',
         code: 'MT_UNAVAILABLE',
@@ -2544,14 +2550,10 @@ export class MyTeamHost                               {
       }
     }
     try {
-      /* CHG-186（T155b）：任务族实现已搬到 `src/host/tasks.ts`（下面每个 case 只剩一行转发）。
-       * 这行 `service(teamId)` **必须留着**：它是每次成员工具调用「惰性建 TeamService +
-       * 冷启动重放 + 首次 bootstrap」的唯一入口——含 `myteam_read_knowledge` 与未知工具名
-       * （那些 case 不读 `svc`，但侧效应照旧）。挪进各 handler 会改变 read_knowledge 的行为。 */
+      /* CHG-186：这行 `service(teamId)` **必须留着**——成员工具调用「惰性建 TeamService + 冷启动重放 + 首次 bootstrap」的唯一入口（含不读 svc 的 case，侧效应照旧）。 */
       const svc = this.service(teamId)
       switch (name) {
-        /* CHG-186（T155b）：任务族**成员侧**实现已搬到 `src/host/tasks.ts`。这里只转发——
-         * 逻辑/顺序/默认值一个都没改（纯结构重构，行为零变化）。 */
+        /* CHG-186：任务族成员侧实现已搬到 `src/host/tasks.ts`，这里只转发。 */
         case 'myteam_get_task':
           return this.memberTasks.get(teamId, member, args, actor)
         case 'myteam_list_tasks':
@@ -2570,9 +2572,11 @@ export class MyTeamHost                               {
           return this.memberTasks.escalate(teamId, member, args, actor)
         case 'myteam_read_knowledge':
           return this.memberKnowledge.read(args)
-        /* CHG-200（用户定案「任务检查应该由成员自己完成」）：成员提交门禁裁决——审查者 = 调用者。 */
         case 'myteam_submit_review':
           return this.memberTasks.submitReview(teamId, member, args, actor)
+        /* CHG-202y（FR-32 · G1-2）：成员侧委派（实现搬到 `src/host/members.ts`） */
+        case 'myteam_spawn_member': return this.members.spawnAs(teamId, member, args)
+        case 'myteam_release_member': return this.members.releaseAs(teamId, member, args)
         default:
           return { status: 'error', code: 'MT_UNKNOWN_TOOL', message: `unknown member tool: ${name}` }
       }
