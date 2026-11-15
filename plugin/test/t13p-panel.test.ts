@@ -3,7 +3,7 @@
  *
  * 覆盖（对应阶段四十九网关契约）：
  *  - namespace 绑定：typertRemote = { serviceKey:'myteamPanel', namespace:'myteam' }（客户端端点 myteam/* 不变）
- *  - marker：58 个方法全部 direct invocation（gateway srcClaims 来源；含 5 个离线只读 + getAudit/getConfig 审计与配置 + memberOp 成员管理 + CHG-69 项目聚合/角色详情）
+ *  - marker：63 个方法全部 direct invocation（gateway srcClaims 来源；含 6 个离线只读 + getAudit/getConfig 审计与配置 + memberOp 成员管理 + CHG-69 项目聚合/角色详情）
  *  - 方法签名：简单标识符（agent/query）——gateway methodParameterNames 用 Function.toString 读形参名，
  *    首参 `agent` 必须命中 dsh-agent lookup（wire=agentId）；离线视图方法无 agent 首参，只收 query
  *  - 委托：serviceFor(agent,'myteam') → 隔离服务方法透传 query
@@ -66,12 +66,12 @@ test('t13p-1: typertRemote 绑定 serviceKey=myteamPanel + namespace=myteam（�
   assert.equal(binding.namespace, 'myteam')
 })
 
-test('t13p-2: marker 62 方法全部 direct invocation（CHG-201：getGlobalScope/getProjectScope 取代 listTeams）', () => {
+test('t13p-2: marker 63 方法全部 direct invocation（CHG-203：+getOfflinePlanFeedback）', () => {
   const d = (MyTeamPanelFacade.prototype as any)[DESCRIPTOR]
   assert.ok(d, 'prototype 上必须有 remote-methods 描述符')
   assert.equal(d.version, 1)
   const names = d.methods.map((m: any) => m.method)
-  assert.deepEqual(names, ['batch', 'describe', 'watch', 'getGlobalScope', 'getProjectScope', 'getStoreState', 'initStore', 'getProject', 'getRoleDetail', 'saveRole', 'deleteRole', 'getCapabilityCatalog', 'getOfflineBoard', 'getOfflineTaskDetail', 'getOfflineTokens', 'getOfflineAudit', 'getOfflinePresets', 'getBoard', 'getTaskDetail', 'getTokens', 'getInbox', 'getAudit', 'getConfig', 'getPresets', 'getRoles', 'getKnowledge', 'planAction', 'postComment', 'memberOp', 'disband', 'createTask', 'createTasks', 'updateTask', 'assignTask', 'participateTask', 'rescopeTask', 'cancelTask', 'deleteTask', 'getProjectBoard', 'getProjectSummary', 'batchTaskOp', 'reviewTask', 'getArchive', 'getArchives', 'adoptKnowledge', 'roleOp', 'applyRoles', 'handoff', 'getContributions', 'reloadContributions', 'saveTeamConfig', 'resetTeamConfig', 'getPlanFeedback', 'readSessionHistory', 'getTaskGraph', 'listSkills', 'listMembers', 'copyTeam', 'publishTeam', 'exportTeam', 'importTeam', 'createSkill', 'createTool'])
+  assert.deepEqual(names, ['batch', 'describe', 'watch', 'getGlobalScope', 'getProjectScope', 'getStoreState', 'initStore', 'getProject', 'getRoleDetail', 'saveRole', 'deleteRole', 'getCapabilityCatalog', 'getOfflineBoard', 'getOfflineTaskDetail', 'getOfflineTokens', 'getOfflineAudit', 'getOfflinePlanFeedback', 'getOfflinePresets', 'getBoard', 'getTaskDetail', 'getTokens', 'getInbox', 'getAudit', 'getConfig', 'getPresets', 'getRoles', 'getKnowledge', 'planAction', 'postComment', 'memberOp', 'disband', 'createTask', 'createTasks', 'updateTask', 'assignTask', 'participateTask', 'rescopeTask', 'cancelTask', 'deleteTask', 'getProjectBoard', 'getProjectSummary', 'batchTaskOp', 'reviewTask', 'getArchive', 'getArchives', 'adoptKnowledge', 'roleOp', 'applyRoles', 'handoff', 'getContributions', 'reloadContributions', 'saveTeamConfig', 'resetTeamConfig', 'getPlanFeedback', 'readSessionHistory', 'getTaskGraph', 'listSkills', 'listMembers', 'copyTeam', 'publishTeam', 'exportTeam', 'importTeam', 'createSkill', 'createTool'])
   for (const m of d.methods) assert.deepEqual(m.invocation, { kind: 'direct' })
 })
 
@@ -92,7 +92,7 @@ test('t13p-3: 方法签名 = 简单标识符 (agent, query)；listTeams/saveRole
   const gps = proto.getProjectScope.toString()
   assert.match(gps, /^async\s+getProjectScope\s*\(\s*agent\s*\)/, 'getProjectScope 必须收 agent 首参')
   // T25：离线视图方法没有 agent 首参（网关 args 只发 {query}），形参必须是单个 query
-  for (const name of ['getOfflineBoard', 'getOfflineTaskDetail', 'getOfflineTokens', 'getOfflineAudit', 'getOfflinePresets', 'saveRole', 'roleOp', 'getStoreState', 'initStore']) {
+  for (const name of ['getOfflineBoard', 'getOfflineTaskDetail', 'getOfflineTokens', 'getOfflineAudit', 'getOfflinePlanFeedback', 'getOfflinePresets', 'saveRole', 'roleOp', 'getStoreState', 'initStore']) {
     const m = proto[name].toString().match(/^async\s+\w+\s*\(([^)]*)\)/)
     assert.ok(m, `${name} 应为 async 方法`)
     assert.deepEqual(m![1].split(',').map((s) => s.trim()).filter(Boolean), ['query'], `${name} 只接受 query`)

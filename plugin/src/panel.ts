@@ -66,7 +66,9 @@ const PANEL_PROTOCOL_VERSION = 1
 /* CHG-201：项目级索引（`.dsh-myteam/state/teams.json`）；跨工作区全局索引已退役。
  * 全局作用域只需要全局根（`$DSH_HOME/myteam/`）——见 `getGlobalScope`。 */
 import { globalStoreLayout, readWorkspaceIndex } from './core/index/team-index.ts'
-import { buildOfflineAudit, buildOfflineBoard, buildOfflinePresets, buildOfflineProject, buildOfflineTaskDetail, buildOfflineTokens, isSafeTeamId, projectRolePaths, readOfflineTeam, roleUsage } from './core/index/offline-view.ts'
+import { buildOfflineAudit, buildOfflineBoard, buildOfflinePresets, buildOfflineProject, buildOfflineTaskDetail, buildOfflineTokens, foldTolerant, isSafeTeamId, projectRolePaths, readOfflineTeam, roleUsage } from './core/index/offline-view.ts'
+/* CHG-203（FR-11.6 离线面）：离线计划反馈与在线共用同一个纯函数——两条路只差数据来源 */
+import { buildPlanFeedback } from './remote/plan-feedback.ts'
 import { buildProjectView, buildRoleCatalogView, buildRoleDetailView, type ProjectTeamInput, type ProjectView } from './core/index/views.ts'
 /* CHG-202z（FR-33 · M3-7）：项目共享看板——三种分组 + 五个汇总，纯函数单口径 */
 import { buildProjectBoardView, summarizeProjectTasks, type ProjectGroupBy } from './core/index/project-board-view.ts'
@@ -469,6 +471,30 @@ export class MyTeamPanelFacade extends TypertRemoteService {
     const tokens = buildOfflineTokens(workspaceRoot, teamId)
     if (!tokens) return { status: 'empty', readOnly: true, online: false, teamId, workspaceRoot }
     return { status: 'ok', readOnly: true, online: false, teamId, tokens }
+  }
+
+  /**
+   * 离线计划质量反馈（CHG-203 / FR-11.6）：离线团队没有活会话，直接折叠工作区账本。
+   *
+   * 与在线 `getPlanFeedback` **共用** `buildPlanFeedback` 纯函数——两条路只差数据来源
+   * （在线读团队服务投影，离线读 `ledger.jsonl`），口径不可能漂移。
+   * 空账本 → `empty`（不是错误）；坏行/坏事件只降级计数，不抛给 UI。
+   */
+  async getOfflinePlanFeedback(query: Record<string, unknown>) {
+    const target = offlineTarget(query)
+    if (!target) return OFFLINE_INVALID
+    const { workspaceRoot, teamId } = target
+    const read = readOfflineTeam(workspaceRoot, teamId)
+    if (!read || read.events.length === 0) return { status: 'empty', readOnly: true, online: false, teamId, workspaceRoot }
+    const { proj, skippedEvents } = foldTolerant(teamId, read.events)
+    return {
+      status: 'ok',
+      readOnly: true,
+      online: false,
+      teamId,
+      feedback: buildPlanFeedback(proj, read.events),
+      meta: { ...read.meta, skippedEvents, degraded: read.meta.degraded || skippedEvents > 0 },
+    }
   }
 
   /** 离线审计：账本事件流新→旧分页（归档回放，CHG-49） */
@@ -1429,7 +1455,7 @@ export class MyTeamPanelFacade extends TypertRemoteService {
 }
 
 // 手动 Remote 标记：gateway 按 method 名发现端点（namespace=myteam，direct invocation）
-markRemoteMethods(MyTeamPanelFacade.prototype, ['batch', 'describe', 'watch', 'getGlobalScope', 'getProjectScope', 'getStoreState', 'initStore', 'getProject', 'getRoleDetail', 'saveRole', 'deleteRole', 'getCapabilityCatalog', 'getOfflineBoard', 'getOfflineTaskDetail', 'getOfflineTokens', 'getOfflineAudit', 'getOfflinePresets', 'getBoard', 'getTaskDetail', 'getTokens', 'getInbox', 'getAudit', 'getConfig', 'getPresets', 'getRoles', 'getKnowledge', 'planAction', 'postComment', 'memberOp', 'disband', 'createTask', 'createTasks', 'updateTask', 'assignTask', 'participateTask', 'rescopeTask', 'cancelTask', 'deleteTask', 'getProjectBoard', 'getProjectSummary', 'batchTaskOp',
+markRemoteMethods(MyTeamPanelFacade.prototype, ['batch', 'describe', 'watch', 'getGlobalScope', 'getProjectScope', 'getStoreState', 'initStore', 'getProject', 'getRoleDetail', 'saveRole', 'deleteRole', 'getCapabilityCatalog', 'getOfflineBoard', 'getOfflineTaskDetail', 'getOfflineTokens', 'getOfflineAudit', 'getOfflinePlanFeedback', 'getOfflinePresets', 'getBoard', 'getTaskDetail', 'getTokens', 'getInbox', 'getAudit', 'getConfig', 'getPresets', 'getRoles', 'getKnowledge', 'planAction', 'postComment', 'memberOp', 'disband', 'createTask', 'createTasks', 'updateTask', 'assignTask', 'participateTask', 'rescopeTask', 'cancelTask', 'deleteTask', 'getProjectBoard', 'getProjectSummary', 'batchTaskOp',
   // CHG-86：门禁裁决 / 归档快照 / 知识提案策展
   'reviewTask', 'getArchive', 'getArchives', 'adoptKnowledge',
   // CHG-87（FR-13.1/FR-16.1）：角色库统一写入口 + 单角色调用

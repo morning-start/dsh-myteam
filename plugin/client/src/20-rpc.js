@@ -43,6 +43,8 @@
         getOfflineTaskDetail: (query) => rpcCall(connection, 'myteam/getOfflineTaskDetail', { query }),
         getOfflineTokens: (query) => rpcCall(connection, 'myteam/getOfflineTokens', { query }),
         getOfflineAudit: (query) => rpcCall(connection, 'myteam/getOfflineAudit', { query }),
+        /* CHG-203（FR-11.6 离线面）：离线团队的计划质量反馈——折叠工作区账本，不需要活会话 */
+        getOfflinePlanFeedback: (query) => rpcCall(connection, 'myteam/getOfflinePlanFeedback', { query }),
         getOfflinePresets: (query) => rpcCall(connection, 'myteam/getOfflinePresets', { query }),
         // CHG-69：项目级聚合（门面方法只收 query，不需要会话）
         getProject: (query) => rpcCall(connection, 'myteam/getProject', { query }),

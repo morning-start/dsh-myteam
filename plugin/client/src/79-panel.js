@@ -471,13 +471,15 @@
         }
         /* CHG-119（FR-11.6）：计划质量反馈——只读观测，离线团队走离线账本折叠 */
         if (teamTab === 'feedback' && feedback === undefined) {
-          if (selectedTeam.online) {
-            api.getPlanFeedback?.({ teamId: selectedTeamId })
-              .then((r) => { if (alive) setFeedback(r?.status === 'ok' ? (r.feedback ?? null) : null) })
-              .catch(() => { if (alive) setFeedback(null) })
-          } else {
-            setFeedback(null)
-          }
+          /* CHG-203：离线团队折叠 `ledger.jsonl`（不需要活会话），与在线共用同一纯函数；
+           * 旧宿主缺 `getPlanFeedback` 时 `api.getPlanFeedback?.()` 返回 undefined——
+           * 用 Promise.resolve 包一层，避免 `.then` 直接抛 TypeError 绕过 catch。 */
+          const pending = selectedTeam.online
+            ? api.getPlanFeedback?.({ teamId: selectedTeamId })
+            : discoveryApi.getOfflinePlanFeedback({ workspaceRoot: projectRoot, teamId: selectedTeamId })
+          Promise.resolve(pending)
+            .then((r) => { if (alive) setFeedback(r?.status === 'ok' ? (r.feedback ?? null) : null) })
+            .catch(() => { if (alive) setFeedback(null) })
         }
         return () => { alive = false }
       }, [teamTab, selectedTeam, selectedTeamId, projectRoot, api, discoveryApi, kb, audit, config, feedback])
