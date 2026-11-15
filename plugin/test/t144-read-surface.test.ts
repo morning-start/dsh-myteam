@@ -128,6 +128,32 @@ test('t144-2: read_task —— 完整视图（证据/交付物/门禁），且�
   }
 })
 
+test('t144-2b: read_task 必须 lossless JSON —— 未认领任务不得返回 undefined 字段（CHG-204 P0 回归）', () => {
+  const root = mkdtempSync(join(tmpdir(), 'myteam-t144-lossless-'))
+  try {
+    const { host, teamId } = approvedTeam(root)
+    const created = host.executeLeadTool('myteam_create_task', { teamId, task: TASK({ title: '未认领' }) }, {}) as any
+    const read = host.executeLeadTool('myteam_read_task', { teamId, taskId: created.taskId }, {}) as any
+    assert.equal(read.status, 'ok', JSON.stringify(read))
+    /* 宿主工具输出校验要求 lossless JSON：own key 的值可以是 null，但**不能是 undefined**。
+     * 修复前 `attemptId` / `assignee` / `waitingSince` 无条件写成 undefined，
+     * 任何「未认领 / 无 attempt」的任务都会让 myteam_read_task 整体报错。 */
+    const assertLossless = (value: unknown, path = '$'): void => {
+      assert.notEqual(value, undefined, `${path} 不得是 undefined`)
+      if (Array.isArray(value)) return value.forEach((item, index) => assertLossless(item, `${path}[${index}]`))
+      if (value && typeof value === 'object') {
+        for (const [key, child] of Object.entries(value)) assertLossless(child, `${path}.${key}`)
+      }
+    }
+    assertLossless(read)
+    assert.equal('attemptId' in read.task, false)
+    assert.equal('assignee' in read.task, false)
+    assert.equal('waitingSince' in read.task, false)
+  } finally {
+    rmSync(root, { recursive: true, force: true })
+  }
+})
+
 test('t144-3: 队长读面只读 —— 调用前后账本行数一致', () => {
   const root = mkdtempSync(join(tmpdir(), 'myteam-t144-readonly-'))
   try {

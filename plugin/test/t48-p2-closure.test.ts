@@ -45,6 +45,11 @@ test('t48-1: diffTaskInput 只报真正变化的字段；structuralFieldsOf 标�
   // digest 对同内容稳定、对改动敏感
   assert.equal(changesDigest(diffTaskInput(input, { priority: 'P0' })), changesDigest(diffTaskInput(input, { priority: 'P0' })))
   assert.notEqual(changesDigest(diffTaskInput(input, { priority: 'P0' })), changesDigest(diffTaskInput(input, { priority: 'P1' })))
+  /* CHG-204（P0 bug）：writeScopes / verifyCommand 在 validateTaskPatch 的 known 列表里，
+   * diff 白名单漏了它们 → 只改这两项时 `changes: []`（写成功却看不见改了什么）。 */
+  const declared = diffTaskInput(input, { writeScopes: ['docs/'], verifyCommand: { argv: ['node', '--test'] } })
+  assert.deepEqual(declared.map((c) => c.field), ['writeScopes', 'verifyCommand'])
+  assert.deepEqual(structuralFieldsOf(declared), ['writeScopes', 'verifyCommand'], '两项都属于结构字段（证据必须过期重验）')
 })
 
 /* ── 2. 下游闭包 ─────────────────────────────────────────────── */
@@ -329,6 +334,25 @@ test('t48-9: updateTask 落 diff；结构编辑晚于证据 → evidenceStale；
     const cancelled = (await remote.getTaskDetail({ teamId, taskId: created.taskId })) as any
     assert.equal(cancelled.detail.cancellation.reason, '不做了')
     assert.deepEqual(cancelled.detail.actions, { rescope: false, cancel: false, edit: false })
+  } finally {
+    rmSync(root, { recursive: true, force: true })
+  }
+})
+
+test('t48-11: 只改 writeScopes / verifyCommand 也回显字段级 diff（CHG-204 P0 回归）', async () => {
+  const root = mkdtempSync(join(tmpdir(), 't48-declared-fields-'))
+  try {
+    const { host, remote, teamId } = await setupTeam(root)
+    const created = (await remote.createTask({ teamId, task: TASK })) as any
+    const updated = (await remote.updateTask({
+      teamId,
+      taskId: created.taskId,
+      patch: { writeScopes: ['docs/'], verifyCommand: { argv: ['node', '--test'] } },
+    })) as any
+    assert.equal(updated.status, 'updated')
+    assert.deepEqual(updated.changes.map((c: any) => c.field), ['writeScopes', 'verifyCommand'])
+    const detail = (await remote.getTaskDetail({ teamId, taskId: created.taskId })) as any
+    assert.deepEqual(detail.detail.edits[0].changes.map((c: any) => c.field), ['writeScopes', 'verifyCommand'], '详情「改动记录」必须看到这两项')
   } finally {
     rmSync(root, { recursive: true, force: true })
   }

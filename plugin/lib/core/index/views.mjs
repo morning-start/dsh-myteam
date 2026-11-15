@@ -521,15 +521,18 @@ function buildTaskDetailViewUncached(proj                , taskId        , event
     id: t.id,
     state: t.state,
     input: t.input                                      ,
-    attemptId: t.attemptId,
-    assignee: t.assignee,
+    /* CHG-205（P0 bug）：这些字段是**可选**的，缺省时不能写成 `undefined`——
+     * 宿主工具输出校验要求 lossless JSON（own key + undefined 直接拒绝），
+     * `myteam_read_task` 因此在任何「未认领 / 无 attempt」的任务上整体报错。 */
+    ...(t.attemptId !== undefined ? { attemptId: t.attemptId } : {}),
+    ...(t.assignee !== undefined ? { assignee: t.assignee } : {}),
     ...(t.assignees ? { assignees: t.assignees } : {}),
     escalateCount: t.escalateCount,
     gates: t.gates,
     gateVerdicts: t.gateVerdicts,
     ...(t.gateRejects && Object.keys(t.gateRejects).length > 0 ? { gateRejects: { ...t.gateRejects } } : {}),
     createdAt: t.createdAt,
-    waitingSince: t.waitingSince,
+    ...(t.waitingSince !== undefined ? { waitingSince: t.waitingSince } : {}),
     participants: participantsOf(proj, t.id),
     ...(diagnosis ? { diagnosis } : {}),
     actions: taskActionsOf(t),

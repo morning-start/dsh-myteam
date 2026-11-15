@@ -24,6 +24,11 @@ const EDITABLE_FIELDS = [
   'priority',
   'estimate',
   'tags',
+  /* CHG-205（P0 bug）：`writeScopes` / `verifyCommand` 在 `validateTaskPatch` 的 known 列表里，
+   * 但 diff 白名单漏了它们——只改这两项时 `task.updated` 落账了却返回 `changes: []`，
+   * 面板「改动记录」和 `evidenceStale` 都看不到这次修改。两处白名单必须同源。 */
+  'writeScopes',
+  'verifyCommand',
 ] as const
 
 export type EditableField = (typeof EDITABLE_FIELDS)[number]
@@ -39,6 +44,10 @@ const STRUCTURAL_FIELDS: ReadonlySet<string> = new Set([
   'requiredRole',
   'taskType',
   'gateChain',
+  /* CHG-205：与 `validateTaskPatch` 的 STRUCTURAL 同源——声明写入范围 / 验证命令
+   * 改变了任务的完成定义，已有证据必须过期重验。 */
+  'writeScopes',
+  'verifyCommand',
 ])
 
 /** 单字段改动（from/to 为 JSON 值；数组按内容比较，不按引用） */

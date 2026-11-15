@@ -160,17 +160,20 @@ export function applyEvent(proj: TeamProjection, event: LedgerEvent): void {
           title: String(task.title ?? ''),
           description: String(task.description ?? ''),
           acceptanceCriteria: (task.acceptanceCriteria as string[]) ?? [],
-          deliverableSpec: task.deliverableSpec as TaskProjection['input']['deliverableSpec'],
+          /* CHG-205（P0 bug）：可选字段缺省时**不能写成 `undefined` 的 own key**——
+           * 工具输出校验要求 lossless JSON，`myteam_read_task` 会把 `input` 原样带出去，
+           * 一个 `taskType: undefined` 就足以让整次读取报「value is not lossless JSON」。 */
+          ...(task.deliverableSpec !== undefined ? { deliverableSpec: task.deliverableSpec as TaskProjection['input']['deliverableSpec'] } : {}),
           deps: (task.deps as string[]) ?? [],
           requiredRole: String(task.requiredRole ?? ''),
-          taskType: task.taskType as string | undefined,
+          ...(typeof task.taskType === 'string' ? { taskType: task.taskType } : {}),
           gateChain: (task.gateChain as string[]) ?? [],
           priority: (task.priority as TaskProjection['input']['priority']) ?? 'P2',
-          estimate: task.estimate as TaskProjection['input']['estimate'],
-          tags: (task.tags as string[]) ?? undefined,
+          ...(task.estimate !== undefined ? { estimate: task.estimate as TaskProjection['input']['estimate'] } : {}),
+          ...(Array.isArray(task.tags) ? { tags: task.tags as string[] } : {}),
           // CHG-87（FR-5.4/FR-5.3）：scope 审计范围 + command 门禁命令
-          writeScopes: Array.isArray(task.writeScopes) ? (task.writeScopes as unknown[]).map(String) : undefined,
-          verifyCommand: (task.verifyCommand as TaskProjection['input']['verifyCommand']) ?? undefined,
+          ...(Array.isArray(task.writeScopes) ? { writeScopes: (task.writeScopes as unknown[]).map(String) } : {}),
+          ...(task.verifyCommand !== undefined ? { verifyCommand: task.verifyCommand as TaskProjection['input']['verifyCommand'] } : {}),
         },
         state: 'backlog',
         escalateCount: 0,
