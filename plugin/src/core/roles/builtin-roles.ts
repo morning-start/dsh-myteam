@@ -30,7 +30,7 @@ export interface RoleDefinition {
   toolPolicy?: { allow?: string[]; deny?: string[] }
   skills?: string[]
   mcpAllowlist?: string[]
-  model?: { provider: string; model: string }
+  model?: { provider: string; model: string; reasoningEffort?: string }
   /**
    * 兴趣词（CHG-69，FR-20）：角色架构属性，描述它天然关注什么（如实现者「模块边界/结算/灰度」）。
    * 召唤时固化进 identity 快照（C3）；消费面 = 角色卡 chips / 任务详情「派单依据」/ 审计追溯。

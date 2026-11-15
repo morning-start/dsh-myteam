@@ -194,6 +194,48 @@ test('t113-3: host 两阶段 —— 先 provisioning 后 active，同一 memberI
 
 /* ── 4. 创建抛错（落 failed + reason）────────────────────────── */
 
+test('t113-3b: CHG-206 —— 成员 agent 必须带模型选择（角色无 model 时回退宿主默认模型）', () => {
+  const { root, cleanup } = tempWorkspace('myteam-t113-model')
+  try {
+    const agents = syncAgents()
+    const runtime = makeRuntime(root, agents.service)
+    /* 真实 DSH 的默认模型服务；没有它时 agents.create 的 agentOptions 只能是 undefined，
+     * 成员每个 turn 都会以 `has no provider/model` 结束（账本 active 的空壳）。
+     * 走 `ctx.get()` 路径（Cordis 未 inject 的服务不能属性直读）。 */
+    ;(runtime as unknown as { get: (name: string) => unknown }).get = (name: string) =>
+      name === 'agentDefaultModel'
+        ? { currentSelection: () => ({ provider: 'magpie', model: 'wps-lingxi/deepseek-v4.1-flash', reasoningEffort: 'high' }) }
+        : undefined
+    const host = new MyTeamHost(runtime)
+    host.initialize()
+    const teamId = stagedTeam(host, '模型回退')
+    const spawned = host.spawnMember(teamId, 'implementer') as any
+    assert.equal(spawned.status, 'spawned', JSON.stringify(spawned))
+    assert.deepEqual(agents.created[0].agentOptions, {
+      provider: 'magpie',
+      model: 'wps-lingxi/deepseek-v4.1-flash',
+      reasoningEffort: 'high',
+    })
+  } finally {
+    cleanup()
+  }
+})
+
+test('t113-3c: CHG-206 —— handle 没有 followup 时按失败结算（不能静默变成 active 空壳）', () => {
+  const { root, cleanup } = tempWorkspace('myteam-t113-nofollowup')
+  try {
+    const host = new MyTeamHost(makeRuntime(root, { create: () => ({}) }))
+    host.initialize()
+    const teamId = stagedTeam(host, '空壳成员')
+    const spawned = host.spawnMember(teamId, 'implementer') as any
+    assert.equal(spawned.status, 'error')
+    assert.match(String(spawned.message), /no followup/)
+    assert.deepEqual(spawnEventsOf(root, teamId).map((e) => e.payload.status), ['provisioning', 'failed'])
+  } finally {
+    cleanup()
+  }
+})
+
 test('t113-4: agents.create 同步抛错 —— 落 failed + reason，返回结构化错误，投影 spawn_failed', () => {
   const { root, cleanup } = tempWorkspace('myteam-t113-throw')
   try {

@@ -89,7 +89,45 @@ import { outputForTool } from '../tools/output-contract.mjs'
 /** 宿主 agents 服务（`HostRuntime['agents']`；形状未定形，`any` 与 `host.ts` 同口径） */
                                    
               
+     
+                                                           
+    
+                                                                           
+                                             
+     
+                                 
+                                       
+                       
+                                                                                                           
+   
  
+
+/**
+ * CHG-206（P0 bug）：成员 agent 的模型选择。
+ *
+ * 角色声明 `model` 优先；否则用宿主默认模型（`ctx.agentDefaultModel.currentSelection()`）。
+ * 为什么不能省：`agents.create` 不传 `agentOptions` 时，DSH 的 agent loop 在第一个 turn
+ * 直接以 `agent "..." has no provider/model` 结束——账本上成员是 `active`，但永远不会 claim。
+ */
+function defaultModelSelection(rt                  )                                                                            {
+  let service                                       
+  try {
+    service = (typeof rt.get === 'function' ? rt.get('agentDefaultModel') : rt.agentDefaultModel)                                         
+  } catch {
+    return undefined
+  }
+  if (!service || typeof service.currentSelection !== 'function') return undefined
+  try {
+    const selection = service.currentSelection()
+    const provider = typeof selection?.provider === 'string' ? selection.provider.trim() : ''
+    const model = typeof selection?.model === 'string' ? selection.model.trim() : ''
+    if (provider.length === 0 || model.length === 0) return undefined
+    const reasoningEffort = typeof selection?.reasoningEffort === 'string' ? selection.reasoningEffort : undefined
+    return { provider, model, ...(reasoningEffort ? { reasoningEffort } : {}) }
+  } catch {
+    return undefined
+  }
+}
 
 /**
  * spawn 生命周期的宿主面（**只列用到的成员**，不做全能门面）。
@@ -213,11 +251,19 @@ export function createSpawnLifecycle(deps                    ) {
     if (!provisioningEvent.ok) return { status: 'error', code: provisioningEvent.code, message: provisioningEvent.message }
 
     // ② 第二段：建 child。同步抛错与异步 reject 必须走**同一**失败结算（否则失败路径会分叉）
+    // CHG-206（P0 bug）：角色声明 model 优先；没声明时用宿主默认模型。**不能**传 undefined——
+    // 那会让成员 agent 的每个 turn 都以 `has no provider/model` 结束（账本 active 的空壳）。
+    const model = roleDef.model ?? defaultModelSelection(deps.rt())
+    // 没有模型选择 = 成员起来了也不会跑（每个 turn 都以 has no provider/model 结束）。
+    // 不阻断（老宿主可能没有默认模型服务），但必须留痕，不能让「active 空壳」静默存在。
+    if (!model) deps.log('warn', `member ${memberId} has no model selection (role "${roleId}" + agentDefaultModel unavailable); the agent will not run`)
     let created         
     try {
       created = deps.rt().agents.create({
         sessionId,
-        agentOptions: roleDef.model ?? undefined,
+        agentOptions: model
+          ? { provider: model.provider, model: model.model, ...(model.reasoningEffort ? { reasoningEffort: model.reasoningEffort } : {}) }
+          : undefined,
         setup: async (agentCtx     , agent     ) => {
         // ① 成员工具 10 个（仅该成员可见）+ **条件**委派工具（角色 delegation.canSpawn 授权才注册）
         const toolDefs = [
@@ -332,7 +378,8 @@ export function createSpawnLifecycle(deps                    ) {
       // 关闸后 track 返回已拒绝的 Promise（这里必须消费掉，否则卸载期间冒 unhandled rejection）。
       void deps.disposalGate().track(settlement, `spawn:${memberId}`).catch(() => {})
     } else {
-      settleActive(teamId, member, created)
+      const failure = settleActive(teamId, member, created)
+      if (failure) return failure
     }
     // 回显派生树三字段（CHG-187）：调用方（面板/队长）拿得到 depth 才能确认「子成员真的挂上了」
     return { status: 'spawned', memberId, sessionId, ...treeFieldsOf(member) }
@@ -347,15 +394,23 @@ export function createSpawnLifecycle(deps                    ) {
    * 所以「投递没抛错」是这里能拿到的最强证据，真正的 durability 判定留给启动对账。
    * 成员卡（CHG-135）与 handle 回填都在这里：只有真建成的成员才配拥有。
    */
-  function settleActive(teamId        , member                , handle         )       {
+  function settleActive(teamId        , member                , handle         )                                      {
     // ① 初始 prompt（上岗引导）：投不出去 = 成员起来了却不知道做什么 → 按失败结算
+    const agent = deps.agentOf(handle)
+    if (!agent?.followup) {
+      /* 不能静默跳过：optional chain 会让「handle 形状不认识」变成 active 空壳
+       * （账本 active，但成员从没收到过任何消息）。 */
+      const failure = settleFailure(teamId, member, new Error('agent handle has no followup; cannot deliver initial prompt'))
+      try { void (handle                                           )?.dispose?.() } catch { /* 排空尽力而为 */ }
+      return failure
+    }
     try {
-      deps.agentOf(handle)?.followup?.(deps.followupMessage(`[myteam] 你已上岗（团队 ${teamId}，角色 ${member.roleId}）。请读板并领取与角色匹配的就绪任务（myteam_list_tasks → myteam_claim_task）；当前无就绪任务则用 myteam_wait_for_change 等待失效提示。`))
+      agent.followup(deps.followupMessage(`[myteam] 你已上岗（团队 ${teamId}，角色 ${member.roleId}）。请读板并领取与角色匹配的就绪任务（myteam_list_tasks → myteam_claim_task）；当前无就绪任务则用 myteam_wait_for_change 等待失效提示。`))
     } catch (error) {
-      settleFailure(teamId, member, error)
+      const failure = settleFailure(teamId, member, error)
       // 初始 prompt 投不进去的 child 不能留着「假装在跑」：尽力释放（失败只告警）
       try { void (handle                                           )?.dispose?.() } catch { /* 排空尽力而为 */ }
-      return
+      return failure
     }
     // ② 结算 active（同 memberId 的更新事件；fold 按 memberId 覆盖 = 幂等）
     const settled = deps.commit(teamId, {
