@@ -924,6 +924,13 @@ window.__ModuleLoader__.load({
       'role.mcpRef': '已引用',
       'role.builtinTools': '内置工具',
       'role.toolDeny': '无 {tools}',
+      'role.tasksTitle': '这个角色的任务',
+      'role.tasksCount': '在跑 {running} · 待领 {waiting}',
+      'role.tasksRunning': '在跑 / 等裁决',
+      'role.tasksWaiting': '待领（ready / backlog）',
+      'role.tasksNoneRunning': '当前没有在跑的任务',
+      'role.tasksNoneWaiting': '当前没有待领的任务',
+      'role.tasksEmpty': '这个角色在本项目里还没有任务（任务从看板的「任务」tab 创建）',
       'role.snapshotTitle': '快照规则',
       'role.snapshotBody': '快照在召唤那一刻固化：队员带着角色当时的快照上路，之后改这个角色不影响在跑实例 —— 想让新设定生效，重新召唤。',
       'role.actions': '操作',
@@ -1980,6 +1987,13 @@ window.__ModuleLoader__.load({
       'role.mcpRef': 'Referenced',
       'role.builtinTools': 'Built-in tools',
       'role.toolDeny': 'no {tools}',
+      'role.tasksTitle': 'Tasks for this role',
+      'role.tasksCount': '{running} running · {waiting} waiting',
+      'role.tasksRunning': 'Running / awaiting review',
+      'role.tasksWaiting': 'Waiting (ready / backlog)',
+      'role.tasksNoneRunning': 'No running tasks',
+      'role.tasksNoneWaiting': 'No waiting tasks',
+      'role.tasksEmpty': 'This role has no tasks in this project yet (create them from the Tasks tab)',
       'role.snapshotTitle': 'Snapshot rule',
       'role.snapshotBody': 'The snapshot is frozen at summon time: the member carries the role as it was then, so later edits never affect running instances — summon again to apply new settings.',
       'role.actions': 'Actions',
@@ -2806,6 +2820,9 @@ window.__ModuleLoader__.load({
         cancelTask: (query) => call('cancelTask', query),
         /* CHG-202x（P0-1）：删除任务（从账本投影移除；两段确认） */
         deleteTask: (query) => call('deleteTask', query),
+        /* CHG-202z（FR-33 · M3-7）：项目共享看板——三种分组（team/role/rootMember）+ 五个汇总 */
+        getProjectBoard: (query) => call('getProjectBoard', query),
+        getProjectSummary: (query) => call('getProjectSummary', query),
         batchTaskOp: (query) => call('batchTaskOp', query),
         createTask: (query) => call('createTask', query),
         /* CHG-76 B：批量建任务（预览 / 确认同一端点；逐条 task.created 同一 batchId） */
@@ -4936,7 +4953,14 @@ window.__ModuleLoader__.load({
             ] }),
             statusChip,
           ] }),
-          ...rows.map((row) => js('div', { className: 'mt-inst-row', key: row.member.id, children: [
+          /* CHG-202z（FR-32 · M3-5）：名册树**父子缩进**——有父成员的实例按深度缩进（16px/层），
+           * 与深度 chip / 父成员提示同一份数据。一级成员不缩进（避免每条都往右挪）。 */
+          ...rows.map((row) => js('div', {
+            className: 'mt-inst-row' + (row.member.parentMemberId ? ' mt-inst-row-child' : ''),
+            key: row.member.id,
+            style: row.member.parentMemberId ? { paddingLeft: `${16 * Math.max(1, Number(row.member.depth ?? 1))}px` } : undefined,
+            'aria-level': Number(row.member.depth ?? 0) + 1,
+            children: [
             j('span', { className: 'mt-iname', children: row.member.instanceName }),
             /* CHG-187（FR-32 支柱一）：派生深度 chip——有父成员才显示（一级成员不显示，避免噪音）；
              * `title` 给出父成员 id，面板上就能顺着树往回找。 */
@@ -8852,7 +8876,8 @@ window.__ModuleLoader__.load({
       return contributionsBody(t, data, { busy, onReload: reload, err })
     }
 
-    function RoleDetailDrawer({ t, data, onClose, teamName, onEdit, onDelete, deleteHint, onCopyToProject, onGuest, skillTotal, onPublish, copyHint }) {
+    /* CHG-202z（FR-33 · M3-7b）：roleTasks = 这个角色在项目里的任务（「在跑 / 待领」反向视图） */
+    function RoleDetailDrawer({ t, data, onClose, teamName, onEdit, onDelete, deleteHint, onCopyToProject, onGuest, skillTotal, onPublish, copyHint, roleTasks }) {
       const [usage, setUsage] = react.useState(null)
       const [delBusy, setDelBusy] = react.useState(false)
       const [delErr, setDelErr] = react.useState(null)
@@ -9055,6 +9080,28 @@ window.__ModuleLoader__.load({
               ] }),
               j('div', { className: 'mt-kvline', children: j('strong', { children: t('role.membershipCount').replace('{teams}', String(data.usage?.teams ?? 0)).replace('{instances}', String(data.usage?.instances ?? 0)) }) }),
               membershipRows,
+            ] }),
+            /* CHG-202z（FR-33 · M3-7b）：**角色反向视图**——「这个角色手上还有哪些任务」。
+             * 修复前只能从任务看 requiredRole，反过来查不到（G2-4）。两组：在跑 / 待领，各自空态给说明。 */
+            js('section', { className: 'mt-sec', children: [
+              js('div', { className: 'mt-dsec-head', children: [
+                j('h4', { children: t('role.tasksTitle') }),
+                j('span', { className: 'mt-dsec-line', 'aria-hidden': true }),
+              ] }),
+              (() => {
+                const list = Array.isArray(roleTasks) ? roleTasks : []
+                const running = list.filter((task) => task.state === 'in_progress' || task.state === 're-scoping' || String(task.state ?? '').startsWith('gate:'))
+                const waiting = list.filter((task) => task.state === 'ready' || task.state === 'backlog')
+                const rowOf = (task) => j('li', { key: task.key ?? task.id, children: `${task.id} · ${task.title ?? ''}` })
+                if (list.length === 0) return j('div', { className: 'mt-hint', children: t('role.tasksEmpty') })
+                return js('div', { children: [
+                  j('div', { className: 'mt-kvline', children: j('strong', { children: t('role.tasksCount').replace('{running}', String(running.length)).replace('{waiting}', String(waiting.length)) }) }),
+                  j('div', { className: 'mt-mini-chip', children: t('role.tasksRunning') }),
+                  running.length > 0 ? js('ul', { className: 'mt-cmds', children: running.map(rowOf) }) : j('div', { className: 'mt-hint', children: t('role.tasksNoneRunning') }),
+                  j('div', { className: 'mt-mini-chip', children: t('role.tasksWaiting') }),
+                  waiting.length > 0 ? js('ul', { className: 'mt-cmds', children: waiting.map(rowOf) }) : j('div', { className: 'mt-hint', children: t('role.tasksNoneWaiting') }),
+                ] })
+              })(),
             ] }),
             /* 快照规则 */
             js('section', { className: 'mt-sec mt-sec-info', children: [
@@ -13439,6 +13486,10 @@ window.__ModuleLoader__.load({
             /* CHG-89（FR-13.1）：只有「项目库」来源才有发布到全局的语义（内置/全局是复制源不是发布源） */
             onPublish: openRoleEntry?.origin === 'project' ? (confirm) => publishRoleFlow(openRole ?? roleDetail?.roleId, confirm) : undefined,
             skillTotal: (capCatalog?.skills ?? []).length || undefined,
+            /* CHG-202z（FR-33 · M3-7b）：角色反向视图——该角色在本项目的任务（在跑 / 待领） */
+            roleTasks: (project?.tasks ?? [])
+              .filter((task) => task.requiredRole === (openRole ?? roleDetail?.roleId ?? roleDetail?.definition?.id))
+              .map((task) => ({ key: task.key, id: task.id, title: task.title, state: task.state })),
             onDelete: canDeleteOpenRole ? (confirm) => deleteRoleFlow(openRole ?? roleDetail?.roleId, confirm) : undefined,
             /* CHG-73：deleteRole 是根级端点（只要 workspaceRoot）——离线项目也能清理未占用角色，
              * 因此不再按「有无在线团队会话」禁用；唯一门控是 canDelete（项目库 + 无在册 + 未被模板引用）。 */

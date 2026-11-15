@@ -41,6 +41,9 @@ import { markRemoteMethods, normalizeCtx } from './remote/service.mjs'
  * 判定与网关同源：网关用 `Function.toString` 读形参名，首参叫 `agent` 就是 agent 作用域。
  * 批量调用只允许根级方法——批里拿不到 Agent，硬塞就是安全洞。
  */
+/** CHG-202z（FR-33 · M3-7）：项目看板的分组白名单（非法值报 MT_VALIDATION，不静默回落） */
+const PROJECT_GROUP_BY = new Set(['team', 'role', 'rootMember'])
+
 function rootLevelMethods()           {
   const descriptor = (MyTeamPanelFacade.prototype                                                                     )[
     DESCRIPTOR_KEY
@@ -64,7 +67,9 @@ const PANEL_PROTOCOL_VERSION = 1
  * 全局作用域只需要全局根（`$DSH_HOME/myteam/`）——见 `getGlobalScope`。 */
 import { globalStoreLayout, readWorkspaceIndex } from './core/index/team-index.mjs'
 import { buildOfflineAudit, buildOfflineBoard, buildOfflinePresets, buildOfflineProject, buildOfflineTaskDetail, buildOfflineTokens, isSafeTeamId, projectRolePaths, readOfflineTeam, roleUsage } from './core/index/offline-view.mjs'
-import { buildProjectView, buildRoleCatalogView, buildRoleDetailView,                       } from './core/index/views.mjs'
+import { buildProjectView, buildRoleCatalogView, buildRoleDetailView,                                         } from './core/index/views.mjs'
+/* CHG-202z（FR-33 · M3-7）：项目共享看板——三种分组 + 五个汇总，纯函数单口径 */
+import { buildProjectBoardView, summarizeProjectTasks,                     } from './core/index/project-board-view.mjs'
 import { assertValidRole, deleteProjectRoleSafe, listRoleCatalog, readProjectRole, saveProjectRole } from './core/roles/role-store.mjs'
 // CHG-87（docs/04 §2 承诺的 roleOp 端点）：与 host 侧共用同一份角色库写实现
 import { roleOp as roleOpImpl } from './core/roles/role-ops.mjs'
@@ -511,6 +516,32 @@ export class MyTeamPanelFacade extends TypertRemoteService {
       // 模板目录缺失/损坏：按角色库自身结论（删除时服务端仍会二次校验占用面）
     }
     return { status: 'ok', ...view }
+  }
+
+  /**
+   * CHG-202z（FR-33 · M3-7）：**项目共享看板**——三种分组（按团队 / 按角色 / 按父子根）+ 五个汇总。
+   *
+   * 为什么不做成三个视图：同一份任务集的三种投影。做成三处各自计算 = 三个口径
+   * （G2-5「数字对不上时没有唯一口径」）。这里只做「取项目视图 → 调纯函数 → 返回」。
+   *
+   * `groupBy` 缺省 `team`；非法值**不静默回落**（返回 `MT_VALIDATION`），否则 UI 传错没人发现。
+   */
+  async getProjectBoard(query                         ) {
+    const groupBy = String(query?.groupBy ?? 'team')
+    if (!PROJECT_GROUP_BY.has(groupBy)) {
+      return { status: 'error', code: 'MT_VALIDATION', message: `groupBy must be one of team|role|rootMember (got "${groupBy}")` }
+    }
+    const view = await this.getProject(query)
+    if (view?.status !== 'ok') return view
+    return { status: 'ok', workspaceRoot: view.workspaceRoot, ...buildProjectBoardView(view                          , groupBy                  ) }
+  }
+
+  /** CHG-202z（FR-33 · M3-7）：**项目汇总**（五个指标 + 口径说明）——与看板同一个 `summarizeProjectTasks` */
+  async getProjectSummary(query                         ) {
+    const view = await this.getProject(query)
+    if (view?.status !== 'ok') return view
+    const tasks = ((view                          ).tasks ?? [])
+    return { status: 'ok', workspaceRoot: view.workspaceRoot, summary: summarizeProjectTasks(tasks) }
   }
 
   /**
@@ -1398,7 +1429,7 @@ export class MyTeamPanelFacade extends TypertRemoteService {
 }
 
 // 手动 Remote 标记：gateway 按 method 名发现端点（namespace=myteam，direct invocation）
-markRemoteMethods(MyTeamPanelFacade.prototype, ['batch', 'describe', 'watch', 'getGlobalScope', 'getProjectScope', 'getStoreState', 'initStore', 'getProject', 'getRoleDetail', 'saveRole', 'deleteRole', 'getCapabilityCatalog', 'getOfflineBoard', 'getOfflineTaskDetail', 'getOfflineTokens', 'getOfflineAudit', 'getOfflinePresets', 'getBoard', 'getTaskDetail', 'getTokens', 'getInbox', 'getAudit', 'getConfig', 'getPresets', 'getRoles', 'getKnowledge', 'planAction', 'postComment', 'memberOp', 'disband', 'createTask', 'createTasks', 'updateTask', 'assignTask', 'participateTask', 'rescopeTask', 'cancelTask', 'deleteTask', 'batchTaskOp',
+markRemoteMethods(MyTeamPanelFacade.prototype, ['batch', 'describe', 'watch', 'getGlobalScope', 'getProjectScope', 'getStoreState', 'initStore', 'getProject', 'getRoleDetail', 'saveRole', 'deleteRole', 'getCapabilityCatalog', 'getOfflineBoard', 'getOfflineTaskDetail', 'getOfflineTokens', 'getOfflineAudit', 'getOfflinePresets', 'getBoard', 'getTaskDetail', 'getTokens', 'getInbox', 'getAudit', 'getConfig', 'getPresets', 'getRoles', 'getKnowledge', 'planAction', 'postComment', 'memberOp', 'disband', 'createTask', 'createTasks', 'updateTask', 'assignTask', 'participateTask', 'rescopeTask', 'cancelTask', 'deleteTask', 'getProjectBoard', 'getProjectSummary', 'batchTaskOp',
   // CHG-86：门禁裁决 / 归档快照 / 知识提案策展
   'reviewTask', 'getArchive', 'getArchives', 'adoptKnowledge',
   // CHG-87（FR-13.1/FR-16.1）：角色库统一写入口 + 单角色调用

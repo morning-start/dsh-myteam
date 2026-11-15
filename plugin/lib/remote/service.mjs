@@ -46,6 +46,9 @@ export function markRemoteMethods(prototype        , methods          )       {
   })
 }
 
+/** CHG-202z（FR-33 · M3-7）：项目看板分组白名单（非法值报 MT_VALIDATION，不静默回落） */
+const PROJECT_GROUP_BY = new Set(['team', 'role', 'rootMember'])
+
 export class MyTeamRemote extends TypertRemoteService {
           host                    
 
@@ -553,6 +556,36 @@ export class MyTeamRemote extends TypertRemoteService {
     return this.host.executeLeadTool('myteam_disband', { teamId: args.teamId, confirm: true }, {})                           
   }
 
+  /**
+   * CHG-202z（FR-33 · M3-7）：**项目共享看板**（团队会话侧，三种分组 + 五个汇总）。
+   *
+   * 与门面 `getProjectBoard` 是**同一份纯函数**（`core/index/project-board-view.ts`）；
+   * 数据源用 `buildOfflineProject`（从账本折叠）——项目看板本来就该看到全部团队，
+   * 不能只看到「当前这个会话所属的团队」。
+   */
+  async getProjectBoard(args                                       ) {
+    const groupBy = String(args?.groupBy ?? 'team')
+    if (!PROJECT_GROUP_BY.has(groupBy)) {
+      return { status: 'error', code: 'MT_VALIDATION', message: `groupBy must be one of team|role|rootMember (got "${groupBy}")` }
+    }
+    try {
+      const view = buildOfflineProject(this.host.workspaceRoot)
+      return { status: 'ok', workspaceRoot: this.host.workspaceRoot, ...buildProjectBoardView(view, groupBy                  ) }
+    } catch (e) {
+      return { status: 'error', code: 'MT_INTERNAL', message: String(e) }
+    }
+  }
+
+  /** CHG-202z（FR-33 · M3-7）：**项目汇总**（五个指标 + 口径说明）——与看板同一个汇总函数 */
+  async getProjectSummary(args                     ) {
+    try {
+      const view = buildOfflineProject(this.host.workspaceRoot)
+      return { status: 'ok', workspaceRoot: this.host.workspaceRoot, summary: summarizeProjectTasks(view.tasks ?? []) }
+    } catch (e) {
+      return { status: 'error', code: 'MT_INTERNAL', message: String(e) }
+    }
+  }
+
   /* ── 内部 ── */
 
   /** 门面发现通道（M2）：默认团队 id（MyTeamPanelFacade.listTeams 聚合用，不经 remote marker 暴露给网关） */
@@ -622,7 +655,7 @@ export class MyTeamRemote extends TypertRemoteService {
 }
 
 // 手动 Remote 标记（strip-only 环境等价装饰器）：gateway 按 method 名发现端点
-markRemoteMethods(MyTeamRemote.prototype, ['getBoard', 'getTaskDetail', 'getTokens', 'getInbox', 'getAudit', 'getConfig', 'saveTeamConfig', 'resetTeamConfig', 'getPlanFeedback', 'getTaskGraph', 'listSkills', 'listMembers', 'copyTeam', 'publishTeam', 'exportTeam', 'importTeam', 'createSkill', 'createTool', 'readSessionHistory', 'getPresets', 'planAction', 'postComment', 'memberOp', 'disband', 'createTask', 'createTasks', 'updateTask', 'assignTask', 'participateTask', 'rescopeTask', 'cancelTask', 'deleteTask', 'batchTaskOp',
+markRemoteMethods(MyTeamRemote.prototype, ['getBoard', 'getTaskDetail', 'getTokens', 'getInbox', 'getAudit', 'getConfig', 'saveTeamConfig', 'resetTeamConfig', 'getPlanFeedback', 'getTaskGraph', 'listSkills', 'listMembers', 'copyTeam', 'publishTeam', 'exportTeam', 'importTeam', 'createSkill', 'createTool', 'readSessionHistory', 'getPresets', 'planAction', 'postComment', 'memberOp', 'disband', 'createTask', 'createTasks', 'updateTask', 'assignTask', 'participateTask', 'rescopeTask', 'cancelTask', 'deleteTask', 'getProjectBoard', 'getProjectSummary', 'batchTaskOp',
   // CHG-86：门禁裁决 / 归档快照 / 知识提案策展
   'reviewTask', 'getArchive', 'getArchives', 'adoptKnowledge',
   // CHG-87（FR-13.1/FR-16.1）：角色库统一写入口 + 单角色调用
@@ -634,6 +667,9 @@ markRemoteMethods(MyTeamRemote.prototype, ['getBoard', 'getTaskDetail', 'getToke
 
 // views.ts 纯函数复用（buildDetail/buildBoard/buildTokens 薄转发，避免 client 打包拉入 service 类型）
 import { buildAuditView, buildBoardView, buildConfigView, buildTaskDetailView, buildTokensView } from '../core/index/views.mjs'
+/* CHG-202z（FR-33 · M3-7）：项目共享看板——从账本折叠出全项目任务，再按三种分组投影 */
+import { buildOfflineProject } from '../core/index/offline-view.mjs'
+import { buildProjectBoardView, summarizeProjectTasks,                     } from '../core/index/project-board-view.mjs'
 /* CHG-119（FR-11.6）：计划质量反馈投影（纯函数） */
 import { buildPlanFeedback } from './plan-feedback.mjs'
 function buildDetail(service             , events                           , taskId        ) {

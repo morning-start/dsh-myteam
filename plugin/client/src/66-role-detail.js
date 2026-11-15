@@ -1,4 +1,5 @@
-    function RoleDetailDrawer({ t, data, onClose, teamName, onEdit, onDelete, deleteHint, onCopyToProject, onGuest, skillTotal, onPublish, copyHint }) {
+    /* CHG-202z（FR-33 · M3-7b）：roleTasks = 这个角色在项目里的任务（「在跑 / 待领」反向视图） */
+    function RoleDetailDrawer({ t, data, onClose, teamName, onEdit, onDelete, deleteHint, onCopyToProject, onGuest, skillTotal, onPublish, copyHint, roleTasks }) {
       const [usage, setUsage] = react.useState(null)
       const [delBusy, setDelBusy] = react.useState(false)
       const [delErr, setDelErr] = react.useState(null)
@@ -201,6 +202,28 @@
               ] }),
               j('div', { className: 'mt-kvline', children: j('strong', { children: t('role.membershipCount').replace('{teams}', String(data.usage?.teams ?? 0)).replace('{instances}', String(data.usage?.instances ?? 0)) }) }),
               membershipRows,
+            ] }),
+            /* CHG-202z（FR-33 · M3-7b）：**角色反向视图**——「这个角色手上还有哪些任务」。
+             * 修复前只能从任务看 requiredRole，反过来查不到（G2-4）。两组：在跑 / 待领，各自空态给说明。 */
+            js('section', { className: 'mt-sec', children: [
+              js('div', { className: 'mt-dsec-head', children: [
+                j('h4', { children: t('role.tasksTitle') }),
+                j('span', { className: 'mt-dsec-line', 'aria-hidden': true }),
+              ] }),
+              (() => {
+                const list = Array.isArray(roleTasks) ? roleTasks : []
+                const running = list.filter((task) => task.state === 'in_progress' || task.state === 're-scoping' || String(task.state ?? '').startsWith('gate:'))
+                const waiting = list.filter((task) => task.state === 'ready' || task.state === 'backlog')
+                const rowOf = (task) => j('li', { key: task.key ?? task.id, children: `${task.id} · ${task.title ?? ''}` })
+                if (list.length === 0) return j('div', { className: 'mt-hint', children: t('role.tasksEmpty') })
+                return js('div', { children: [
+                  j('div', { className: 'mt-kvline', children: j('strong', { children: t('role.tasksCount').replace('{running}', String(running.length)).replace('{waiting}', String(waiting.length)) }) }),
+                  j('div', { className: 'mt-mini-chip', children: t('role.tasksRunning') }),
+                  running.length > 0 ? js('ul', { className: 'mt-cmds', children: running.map(rowOf) }) : j('div', { className: 'mt-hint', children: t('role.tasksNoneRunning') }),
+                  j('div', { className: 'mt-mini-chip', children: t('role.tasksWaiting') }),
+                  waiting.length > 0 ? js('ul', { className: 'mt-cmds', children: waiting.map(rowOf) }) : j('div', { className: 'mt-hint', children: t('role.tasksNoneWaiting') }),
+                ] })
+              })(),
             ] }),
             /* 快照规则 */
             js('section', { className: 'mt-sec mt-sec-info', children: [

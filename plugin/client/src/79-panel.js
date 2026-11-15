@@ -2035,6 +2035,10 @@
             /* CHG-89（FR-13.1）：只有「项目库」来源才有发布到全局的语义（内置/全局是复制源不是发布源） */
             onPublish: openRoleEntry?.origin === 'project' ? (confirm) => publishRoleFlow(openRole ?? roleDetail?.roleId, confirm) : undefined,
             skillTotal: (capCatalog?.skills ?? []).length || undefined,
+            /* CHG-202z（FR-33 · M3-7b）：角色反向视图——该角色在本项目的任务（在跑 / 待领） */
+            roleTasks: (project?.tasks ?? [])
+              .filter((task) => task.requiredRole === (openRole ?? roleDetail?.roleId ?? roleDetail?.definition?.id))
+              .map((task) => ({ key: task.key, id: task.id, title: task.title, state: task.state })),
             onDelete: canDeleteOpenRole ? (confirm) => deleteRoleFlow(openRole ?? roleDetail?.roleId, confirm) : undefined,
             /* CHG-73：deleteRole 是根级端点（只要 workspaceRoot）——离线项目也能清理未占用角色，
              * 因此不再按「有无在线团队会话」禁用；唯一门控是 canDelete（项目库 + 无在册 + 未被模板引用）。 */

@@ -201,7 +201,14 @@
             ] }),
             statusChip,
           ] }),
-          ...rows.map((row) => js('div', { className: 'mt-inst-row', key: row.member.id, children: [
+          /* CHG-202z（FR-32 · M3-5）：名册树**父子缩进**——有父成员的实例按深度缩进（16px/层），
+           * 与深度 chip / 父成员提示同一份数据。一级成员不缩进（避免每条都往右挪）。 */
+          ...rows.map((row) => js('div', {
+            className: 'mt-inst-row' + (row.member.parentMemberId ? ' mt-inst-row-child' : ''),
+            key: row.member.id,
+            style: row.member.parentMemberId ? { paddingLeft: `${16 * Math.max(1, Number(row.member.depth ?? 1))}px` } : undefined,
+            'aria-level': Number(row.member.depth ?? 0) + 1,
+            children: [
             j('span', { className: 'mt-iname', children: row.member.instanceName }),
             /* CHG-187（FR-32 支柱一）：派生深度 chip——有父成员才显示（一级成员不显示，避免噪音）；
              * `title` 给出父成员 id，面板上就能顺着树往回找。 */

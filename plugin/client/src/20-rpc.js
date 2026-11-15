@@ -61,6 +61,9 @@
         cancelTask: (query) => call('cancelTask', query),
         /* CHG-202x（P0-1）：删除任务（从账本投影移除；两段确认） */
         deleteTask: (query) => call('deleteTask', query),
+        /* CHG-202z（FR-33 · M3-7）：项目共享看板——三种分组（team/role/rootMember）+ 五个汇总 */
+        getProjectBoard: (query) => call('getProjectBoard', query),
+        getProjectSummary: (query) => call('getProjectSummary', query),
         batchTaskOp: (query) => call('batchTaskOp', query),
         createTask: (query) => call('createTask', query),
         /* CHG-76 B：批量建任务（预览 / 确认同一端点；逐条 task.created 同一 batchId） */
