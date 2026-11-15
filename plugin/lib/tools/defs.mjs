@@ -862,6 +862,18 @@ export function leadToolDefs()            {
           skills: arr({ type: 'string' }, '绑定的技能名列表'),
           mcpAllowlist: arr({ type: 'string' }, '可见的 MCP 名列表'),
           interestWords: arr({ type: 'string' }, '兴趣词（≤8 个，描述角色天然关注什么：如 模块边界/结算/灰度；派单软信号，不是权限）'),
+        /* CHG-202y（FR-32 · G1-4）：委派声明——「谁能派生谁」的唯一数据位。缺省 = 不可派生。 */
+        delegation: {
+          type: 'object',
+          description: '委派声明（FR-32）：{canSpawn: boolean（必填）, allowedRoles?: string[]（存在即非空，且 canSpawn 必须为 true）, maxDepth?: 0~2, maxChildren?: 1~5}。缺省 = 不可派生；子成员工具集必须 ⊆ 父成员（C5 第 9 条）。',
+          properties: {
+            canSpawn: { type: 'boolean', description: '是否允许派生（必填；false 与缺省同义）' },
+            allowedRoles: arr({ type: 'string' }, '可派生的角色白名单（角色 id；存在即非空）'),
+            maxDepth: { type: 'number', description: '该角色可再派生的深度（0~2，受团队 limits.memberMaxDepth 约束）' },
+            maxChildren: { type: 'number', description: '单成员直接子 Agent 上限（1~5，受团队 limits.maxChildren 约束）' },
+          },
+          required: ['canSpawn'],
+        },
           toolPolicy: { type: 'object', description: '工具策略（C5 只收窄）：{ allow?: string[], deny?: string[] }' },
           model: { type: 'object', description: '模型路由覆写：{ provider, model }' },
           isCaptain: bool('是否队长角色（默认 false；一个团队只能有一个队长）'),
@@ -878,7 +890,7 @@ export function leadToolDefs()            {
         type: 'object',
         properties: {
           roleId: str('角色 id', true),
-          patch: { type: 'object', description: '要修改的字段：name/description/systemPrompt/skills/mcpAllowlist/interestWords/toolPolicy/model/isCaptain', required: true },
+          patch: { type: 'object', description: '要修改的字段：name/description/systemPrompt/skills/mcpAllowlist/interestWords/toolPolicy/model/isCaptain/delegation（传 delegation:null 表示收回委派权，回到不可派生）', required: true },
           scope: { type: 'string', enum: ['project', 'global'], description: '作用域（缺省 project；global 必须明示且需 confirmGlobal）' },
           confirmGlobal: bool('全局作用域二次确认（scope=global 时必填 true）'),
         },

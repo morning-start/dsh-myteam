@@ -3534,6 +3534,8 @@ export class MyTeamHost implements MyTeamHostContract {
       version: 1,
       ...(isPlainObject(args.toolPolicy) ? { toolPolicy: args.toolPolicy as RoleDefinition['toolPolicy'] } : {}),
       ...(isPlainObject(args.model) ? { model: args.model as RoleDefinition['model'] } : {}),
+      /* CHG-202y（FR-32 · G1-4）：委派声明原样透传（校验在 assertValidRole，这里不做第二套判定） */
+      ...(isPlainObject(args.delegation) ? { delegation: args.delegation as RoleDefinition['delegation'] } : {}),
     }
     if (!def.name.trim()) return { status: 'error', code: 'MT_ROLE_INVALID', message: `role "${roleId}" requires name` }
     // 「创建」语义严格：同名已存在一律 MT_ROLE_EXISTS（不提供覆盖语义——那是 update_role 的事）。
@@ -3599,6 +3601,9 @@ export class MyTeamHost implements MyTeamHostContract {
       }
       if (isPlainObject(patch.toolPolicy)) next.toolPolicy = patch.toolPolicy as RoleDefinition['toolPolicy']
       if (isPlainObject(patch.model)) next.model = patch.model as RoleDefinition['model']
+      /* CHG-202y（FR-32 · G1-4）：委派声明可改；传 null 表示**收回**（回到不可派生） */
+      if (patch.delegation === null) delete next.delegation
+      else if (isPlainObject(patch.delegation)) next.delegation = patch.delegation as RoleDefinition['delegation']
       return next
     }
     if (scope === 'global') {

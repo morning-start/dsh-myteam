@@ -378,8 +378,11 @@ export function copyToProject(
  */
 const TOOL_ALLOW_PATTERNS = [/^myteam_\*$/, /^[A-Za-z][A-Za-z0-9_]*$/]
 
+/** 角色 id 形状（与 `assertValidRole` 的 id 校验同源；`delegation.allowedRoles` 复用） */
+const ROLE_ID_PATTERN = /^[a-z][a-z0-9-]{1,63}$/
+
 export function assertValidRole(def: RoleDefinition): void {
-  if (typeof def.id !== 'string' || !/^[a-z][a-z0-9-]{1,63}$/.test(def.id)) {
+  if (typeof def.id !== 'string' || !ROLE_ID_PATTERN.test(def.id)) {
     throw new RoleError('MT_ROLE_INVALID', `role id "${def.id}" invalid (lowercase alnum + dash)`)
   }
   if (typeof def.systemPrompt !== 'string' || def.systemPrompt.trim().length === 0) {
@@ -391,6 +394,47 @@ export function assertValidRole(def: RoleDefinition): void {
       if (!TOOL_ALLOW_PATTERNS.some((re) => re.test(a))) {
         throw new RoleError('MT_ROLE_INVALID', `role "${def.id}" toolPolicy.allow entry "${a}" is not a valid tool name`)
       }
+    }
+  }
+  /*
+   * CHG-202y（FR-32 · G1-4）：委派声明——「谁能派生谁」的唯一数据位。
+   *
+   * 校验口径（全部拒绝式，不猜）：
+   *  - `canSpawn` **必填布尔**——「没写」和「写了 false」在授权判定里必须同义，
+   *    所以不允许省略（省略即 undefined，读代码的人会以为「没写 = 默认放行」）；
+   *  - `allowedRoles` 存在即非空，每项必须是合法角色 id；`canSpawn:false` 却写了白名单是
+   *    自相矛盾的死配置 → 直接拒（否则实现方要猜哪一句算）；
+   *  - `maxDepth ∈ [0,2]`、`maxChildren ∈ [1,5]`——与 `core/config/team-config.ts` 的
+   *    `PATCH_CEILINGS` 同源（t146 用断言锁死两份常量不漂移）。
+   */
+  if (def.delegation !== undefined) {
+    const d = def.delegation as unknown
+    if (!d || typeof d !== 'object' || Array.isArray(d)) {
+      throw new RoleError('MT_ROLE_INVALID', `role "${def.id}" delegation must be an object`)
+    }
+    const delegation = d as { canSpawn?: unknown; allowedRoles?: unknown; maxDepth?: unknown; maxChildren?: unknown }
+    if (typeof delegation.canSpawn !== 'boolean') {
+      throw new RoleError('MT_ROLE_INVALID', `role "${def.id}" delegation.canSpawn must be a boolean`)
+    }
+    if (delegation.allowedRoles !== undefined) {
+      if (!Array.isArray(delegation.allowedRoles) || delegation.allowedRoles.length === 0) {
+        throw new RoleError('MT_ROLE_INVALID', `role "${def.id}" delegation.allowedRoles must be a non-empty array when present`)
+      }
+      for (const roleId of delegation.allowedRoles) {
+        if (typeof roleId !== 'string' || !ROLE_ID_PATTERN.test(roleId)) {
+          throw new RoleError('MT_ROLE_INVALID', `role "${def.id}" delegation.allowedRoles entry "${String(roleId)}" is not a valid role id`)
+        }
+      }
+      if (!delegation.canSpawn) {
+        throw new RoleError('MT_ROLE_INVALID', `role "${def.id}" delegation.allowedRoles is set but canSpawn is false (contradictory config)`)
+      }
+    }
+    const within = (value: unknown, min: number, max: number) => Number.isInteger(value) && (value as number) >= min && (value as number) <= max
+    if (delegation.maxDepth !== undefined && !within(delegation.maxDepth, 0, 2)) {
+      throw new RoleError('MT_ROLE_INVALID', `role "${def.id}" delegation.maxDepth must be an integer in [0, 2]`)
+    }
+    if (delegation.maxChildren !== undefined && !within(delegation.maxChildren, 1, 5)) {
+      throw new RoleError('MT_ROLE_INVALID', `role "${def.id}" delegation.maxChildren must be an integer in [1, 5]`)
     }
   }
   // 兴趣词（CHG-69）：只能是「描述关注面」的短词，≤8 个、每个 1~16 字；不参与权限判定

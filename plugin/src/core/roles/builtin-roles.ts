@@ -37,6 +37,26 @@ export interface RoleDefinition {
    * 软信号（派单理由、认领排序参考），**不是权限**——权限只由 toolPolicy / skills / mcpAllowlist 决定。
    */
   interestWords?: string[]
+  /**
+   * CHG-202y（FR-32 · G1-4）：**委派声明**——「谁能派生谁」的唯一数据位。
+   *
+   * 为什么必须有：`myteam_spawn_member` / `myteam_release_member` 从 C 档挪到 CM 档之后，
+   * 「成员能不能派生」需要一个**角色级**的事实源。塞进 `toolPolicy.allow` 不行——那是
+   * 「工具有没有交给你」的收窄口径（C5），而「组织上有没有权扩编」是另一回事；混在一起
+   * 会出现「为了用 spawn 而把整串工具名写进 allow」的越权口子。
+   *
+   * **缺省 = 不可派生**（只收窄、无默认放行）：没写 delegation 的角色与 v4.0 之前行为一致。
+   */
+  delegation?: {
+    /** 是否允许派生（false / 缺省 = 不可派生；子成员工具集仍须 ⊆ 父成员，见 C5 第 9 条） */
+    canSpawn: boolean
+    /** 可派生的角色白名单；**存在即非空**（空数组是死配置，校验会拒） */
+    allowedRoles?: string[]
+    /** 该角色可再派生的深度；受团队 `limits.memberMaxDepth` 与硬上限 2 双重约束 */
+    maxDepth?: number
+    /** 单成员直接子 Agent 上限；受团队 `limits.maxChildren` 与硬上限 5 双重约束 */
+    maxChildren?: number
+  }
   /** fork 来源标记（内置→副本时写入 origin: builtin:<id>） */
   origin?: string
   version: number
