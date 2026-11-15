@@ -388,6 +388,57 @@
         "id": "mrp-v1",
         "kind": "gate"
       }
+    },
+    {
+      "actionRisk": "R1",
+      "authority": "observed",
+      "change": {
+        "baseContentHash": null,
+        "mode": "import"
+      },
+      "contentHash": "24649401bc359491758eeca872107189be13c81e6ca2f869849aac470fb3b538",
+      "evidenceRoot": "959d76f0e1169ef98efbdf18e7fb8e62e1e6f8263b527050c5d4fdb1d045661e",
+      "hashVersion": 3,
+      "issuedAt": "2026-11-15T03:26:13Z",
+      "lifecycle": "active",
+      "memoryId": "m_7a39337d",
+      "rollback": {
+        "previousContentHash": null,
+        "previousEvidenceRoot": null
+      },
+      "scopes": [
+        "repo:acme/myteam",
+        "lang:typescript"
+      ],
+      "verifier": {
+        "id": "mrp-v1",
+        "kind": "gate"
+      }
+    },
+    {
+      "actionRisk": "R2",
+      "authority": "observed",
+      "change": {
+        "baseContentHash": null,
+        "mode": "import"
+      },
+      "contentHash": "3cd8de6945a008baad8fef767143348c6453f801b5973ea2234a775f5a9c48be",
+      "evidenceRoot": "b4610337477fb381c8079c55b7f42e0e478b59c38d4e8bda546a3d19cc26d18a",
+      "hashVersion": 3,
+      "issuedAt": "2026-11-15T03:26:36Z",
+      "lifecycle": "active",
+      "memoryId": "clientjs_src_47_4adff084",
+      "rollback": {
+        "previousContentHash": null,
+        "previousEvidenceRoot": null
+      },
+      "scopes": [
+        "repo:acme/myteam"
+      ],
+      "verifier": {
+        "id": "mrp-v1",
+        "kind": "gate"
+      }
     }
   ],
   "schema": "dsh-memory.trust/v1"

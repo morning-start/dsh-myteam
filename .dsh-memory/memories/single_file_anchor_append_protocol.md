@@ -6,10 +6,10 @@ about: "client.js 是手写单文件（现 13,9xx 行），多路并行修改时
 confidence: "verified"
 provenance: "measured"
 authority: "observed"
-status: "active"
+status: "deprecated"
 actionRisk: "R2"
 createdAt: "2026-11-07T10:47:56Z"
-modifiedAt: "2026-11-13T18:59:58Z"
+modifiedAt: "2026-11-15T03:27:25Z"
 lastVerifiedAt: "2026-11-13T18:59:58Z"
 reviewBy: null
 expiresAt: null
