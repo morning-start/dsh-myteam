@@ -2345,8 +2345,8 @@ export class MyTeamHost                               {
       runWithRollback('release-cascade', (log) => {
         if (plan.value.length > 1) snapshotFor(log, svc.ledgerPath)
         for (const id of plan.value) {
-          // CHG-93：排空面**如实**记录（原实现硬编码 running:0/pending:0，「排空完成」是假的）
-          const drained = { running: 0, pending: this.pendingMessagesFor(teamId, id) }
+          // CHG-93/CHG-210 批 6.4：`running` 按 currentTaskId 真算（此前硬编码 0，账本上「排空完成」是假的）
+          const drained = { running: proj.members[id]?.currentTaskId ? 1 : 0, pending: this.pendingMessagesFor(teamId, id) }
           // P1-5：释放 = 这一轮到此为止——同 interrupt，空转只能在「交出控制权」的入口补检查
           this.noteGuardTurnEnd(id)
           // 释放前记忆审计（T21：违规落 memory.audit，不阻断释放——M2 再议 hard 阻断）
