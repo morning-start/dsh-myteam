@@ -42,6 +42,10 @@ test('t178a: 角色纪律 + 记忆纪律都在，且带成员身份', () => {
     assert.match(text, /记忆写入纪律/, '记忆纪律要在')
     assert.match(text, /mt-t1-implementer-1/, '身份连续性：会话 id 要在')
     assert.ok(!text.includes('\n\n\n'), '不能出现连续空段')
+  /* CHG-213（实机）：成员把交付物写到会话 cwd 导致 archive 门找不到 → 简报必须点名落位根 */
+  assert.match(text, /交付物落位/, '落位约定要在简报里')
+  assert.match(text, /团队工作区根：/, '落位根要给出绝对路径')
+  assert.match(text, /deliverableSpec\.path/, '要说清 path 相对哪个根解析')
   } finally {
     rmSync(root, { recursive: true, force: true })
   }

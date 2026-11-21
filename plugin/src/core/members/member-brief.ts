@@ -46,6 +46,14 @@ export function buildMemberBrief(input: MemberBriefInput): string {
 
   const discipline = memoryPromptSection(member, memoryDirFor(workspaceRoot, member.teamId, member.memberId), input.evidenceRequired ?? true)
   parts.push(discipline.text)
+  /* CHG-213（实机）：成员把交付物写到了**会话 cwd** 而不是团队工作区根，于是 archive 门落位校验
+   * 找不到文件（实测成员自己发现并「两处都写」才过关）。根不写清楚，这道坑每次都要踩一遍。 */
+  parts.push([
+    '## 交付物落位（必读）',
+    `团队工作区根：${workspaceRoot}`,
+    '任务里的 `deliverableSpec.path` 是**相对这个根**的路径，archive 门按它做落位校验。',
+    '你的会话工作目录可能不在这个根下——写交付物时用绝对路径（根 + path），否则会落在别处、门禁不过。',
+  ].join('\n'))
 
   return parts.filter((part) => part.trim().length > 0).join('\n\n')
 }

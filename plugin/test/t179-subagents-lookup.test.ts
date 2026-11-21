@@ -346,3 +346,39 @@ test('t179h: 同名成员 id 跨团队不串线（成员 id 只在团队内唯�
     cleanup()
   }
 })
+
+test('t179i: 子代理名撞名（同一队长会话里开第二个团队）→ 去掉 name 重试，不许 spawn 失败', () => {
+  const { root, cleanup } = tempWorkspace('myteam-t179i')
+  try {
+    const captured: Captured = {}
+    const live = new Map<string, unknown>()
+    const used = new Set<string>(['t179-implementer-1']) // 复刻：上个团队已经用过这个模型可见名
+    const names: Array<string | undefined> = []
+    const subagents = {
+      startActivation: (spec: Record<string, unknown>) => {
+        const name = spec['name'] === undefined ? undefined : String(spec['name'])
+        names.push(name)
+        if (name !== undefined && used.has(name)) {
+          throw new Error(`agent name "${name}" is already used by another subagent you created; choose another name`)
+        }
+        if (name !== undefined) used.add(name)
+        captured.spec = spec
+        const childId = String(spec['childId'])
+        live.set(childId, { id: childId, followup: () => {}, session: { header: { parentSession: 'cap-t179i', agentPreset: 'myteam-member' } } })
+        return { childId, name: name ?? 'agent-9', result: Promise.resolve({ stopReason: 'completed' }), dispose: () => Promise.resolve() }
+      },
+    }
+    const runtime = baseRuntime(root, captured, live) as unknown as Record<string, unknown>
+    Object.defineProperty(runtime, 'subagents', { configurable: true, get() { throw new Error(NOT_INJECTED) } })
+    runtime['get'] = (name: string) => (name === 'subagents' ? subagents : undefined)
+    const { host, teamId } = approvedTeam(runtime)
+    const result = host.executeLeadTool('myteam_spawn_member', { teamId, roleId: 'implementer', instanceName: 'implementer-1' }, { agent: { id: 'cap-t179i' } }) as any
+    assert.equal(result.status, 'spawned', `撞名必须能自愈：${JSON.stringify(result)}`)
+    assert.equal(names.length, 2, `第一次带名字撞上，第二次不带名字（实际 ${JSON.stringify(names)}）`)
+    assert.equal(names[0], `${teamId.toLowerCase()}-implementer-1`, '名字要带团队前缀（跨团队不撞）')
+    assert.equal(names[1], undefined, '重试时去掉 name，交给宿主自动分配')
+    assert.equal(lastSpawnEvent(root, teamId, result.memberId).payload.status, 'active')
+  } finally {
+    cleanup()
+  }
+})

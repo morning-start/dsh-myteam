@@ -234,6 +234,16 @@ plan.staged → approve（自动召唤 m1-implementer / m2-reviewer）→ task-1
 | 现象 | 根因 | 修法 |
 |---|---|---|
 | 成员**认领前**读任务报 `invalid output: value is not lossless JSON`，认领后正常 | `myteam_get_task` 把可选字段写成 `key: undefined`（未认领时 `attemptId`、非叶子任务的 `deliverableSpec`），工具返回值要过 lossless JSON 校验，一个 undefined 就整次失败 | 可选字段改成条件展开（`...(x !== undefined ? {x} : {})`） |
+| 同一位队长会话里开**第二个团队**，spawn 直接失败：`agent name "implementer-1" is already used by another subagent you created` | 子代理的模型可见名在**父会话**里必须唯一，而成员实例名是按团队编号的（每个团队都有 `implementer-1`） | 名字改成 `<teamId>-<instanceName>`（按宿主的命名规则 sanitize）；仍撞名（同团队释放后重用）就去掉 `name` 重试，让宿主分配 `agent-N` |
+| 成员把交付物写进**会话 cwd**（`E:\Workplace\extension\dsh-myteam`），archive 门按团队工作区根找不到文件 | 上岗简报从没写过「团队工作区根」是什么、`deliverableSpec.path` 相对谁解析；成员只能猜 | 简报新增「交付物落位（必读）」：给出团队工作区根绝对路径 + 要求用绝对路径写 |
+
+真机复验（重启后，成员自己记录，原样）：
+
+> 在**未认领**状态下调 `myteam_get_task(taskId="task-2")` → `status: ok`、`task.state: ready`、
+> **没有** `attemptId` 字段；**未出现**上一版的报错 `invalid output: value is not lossless JSON`。
+> 结论：认领前读取正常，lossless JSON 回归通过。
+
+（同一条记录里它提到「交付物落位两处都写、逐字节一致」——正是上表第三条缺陷的现场：它自己发现了根不一致。）
 
 **顺序理由**：P1/P2 与成员载体无关，先落地能立刻受益；P3 是 P4 的前置（否则成员视图拿不到服务）；
 P4 风险最高，放在服务分层之后一次完成。

@@ -188,7 +188,7 @@ export function createMembersHandlers(host: MembersHostSurface) {
         : {
           status: 'sent',
           delivered: false,
-          message: `消息已落账，但成员 "${to}" 当前没有在线会话：先 myteam_release_member 再 myteam_spawn_member（或等它上线读账本），不要当成已送达`,
+          message: `消息已落账，但没送到：成员可能**正在上岗**（child 还没就绪）或已经下线。稍等几秒重发一次；若确认是重启后的旧成员，先 myteam_release_member 再 myteam_spawn_member。不要当成已送达。`,
         }
       // CHG-213：子代理通道（sendMessage）异步，根会话通道（followup）同步——两种形状都接受
       const delivered = host.deliverMemberMessage(to, kind, String(args.content), teamId)

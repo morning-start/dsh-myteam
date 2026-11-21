@@ -97,3 +97,6 @@ $RECYCLE.BIN/
 
 # 提交信息临时文件（误入过一次）
 .git-msg.txt
+
+# Runtime artifact: a member whose cwd is this repo writes deliverables under /tasks/.
+/tasks/

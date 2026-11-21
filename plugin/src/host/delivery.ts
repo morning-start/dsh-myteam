@@ -66,11 +66,12 @@ export function isThenable(value: unknown): value is Promise<unknown> {
 /**
  * 子代理通道的**短暂重试**等待表（毫秒）。为什么需要：`startActivation` 刚返回、child 还没进
  * `resident` 时，`sendMessage` 会以 `subagent "…" is unavailable` 拒绝——这条消息本可以送到，
- * 只是早了几百毫秒（实测：spawn 后立刻发第一条消息必失败，第二次就成功）。
+ * 只是早了几百毫秒到几秒（实测：approve 自动召唤后立刻发消息，child 冷启动可能 >1.5s 才就绪）。
  * 只对「还没就绪」这种**瞬时**错误重试；`cannot resume` / `UNAUTHORIZED` 这类确定性拒绝立即放弃。
+ * 总等待 ≈ 5.5s：工具调用可以接受，且远小于人重新点一次的开销。
  */
-const SUBAGENT_RETRY_DELAYS_MS = [0, 150, 400, 900]
-const TRANSIENT_SUBAGENT_ERROR = /unavailable|not yet|admitting/i
+const SUBAGENT_RETRY_DELAYS_MS = [0, 150, 400, 900, 1500, 2500]
+const TRANSIENT_SUBAGENT_ERROR = /unavailable|not yet|admitting|starting/i
 
 export function createDelivery(host: DeliveryHost) {
   async function viaSubagents(

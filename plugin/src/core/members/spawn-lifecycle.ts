@@ -162,6 +162,36 @@ function subagentsOf(rt: SpawnHostRuntime): { startActivation?: unknown } | unde
 }
 
 /**
+ * 子代理的模型可见名字：1–32 位、小写字母/数字/连字符、字母开头、不等于 `lead`。
+ *
+ * 为什么要带团队前缀：名字在**父会话**里必须唯一，而成员实例名是按团队编号的
+ * （每个团队都有 `implementer-1`）——实测同一队长会话里开第二个团队，spawn 直接被拒：
+ * `agent name "implementer-1" is already used by another subagent you created`。
+ * 不合规/超长时返回 undefined（交给宿主自动分配 `agent-N`），不拿非法名字去撞。
+ */
+function subagentNameFor(teamId: string, instanceName: string): string | undefined {
+  const raw = `${teamId}-${instanceName}`.toLowerCase().replace(/[^a-z0-9-]+/g, '-').replace(/-{2,}/g, '-').replace(/^-+|-+$/g, '')
+  if (raw.length === 0) return undefined
+  const name = /^[a-z]/.test(raw) ? raw : `mt-${raw}`
+  if (name.length > 32 || name === 'lead') return undefined
+  return name
+}
+
+/**
+ * 起子代理：名字撞上就**去掉 name 重试一次**（宿主自动分配 `agent-N`）。
+ * 只对「名字已被占用」重试——其它错误（深度超限、provider 变更）必须原样抛出，不能被吞。
+ */
+function activateChild(activation: { startActivation: (spec: Record<string, unknown>) => unknown }, spec: Record<string, unknown>): unknown {
+  try {
+    return activation.startActivation(spec)
+  } catch (error) {
+    if (spec['name'] === undefined || !/already used|already exists/i.test(String((error as Error | undefined)?.message ?? error))) throw error
+    const { name: _drop, ...rest } = spec
+    return activation.startActivation(rest)
+  }
+}
+
+/**
  * spawn 生命周期的宿主面（**只列用到的成员**，不做全能门面）。
  *
  * 加成员前先问：这条逻辑能不能落在 `core/members/**`？只有「宿主进程才有的东西」
@@ -321,18 +351,21 @@ export function createSpawnLifecycle(deps: SpawnLifecycleDeps) {
       const canActivate = spawnCtx?.agent !== undefined
         && typeof activation?.startActivation === 'function'
       if (canActivate) deps.markSubagent?.(memberId)
-      created = canActivate
-        ? (activation as { startActivation: (spec: unknown) => unknown }).startActivation({
-          provider: 'spawn',
-          childId: sessionId,
-          name: member.instanceName,
-          label: member.instanceName,
-          prompt: [{ type: 'text', text: initialPromptText(teamId, member) }],
-          parent: spawnCtx!.agent,
-          agentPreset: 'myteam-member',
-          delivery: 'caller',
-          signal: spawnCtx!.signal ?? new AbortController().signal,
-        })
+      created = canActivate ? activateChild(activation as { startActivation: (spec: Record<string, unknown>) => unknown }, {
+        provider: 'spawn',
+        childId: sessionId,
+        /* CHG-213（实机）：子代理名**在父会话里必须唯一**（同名直接拒绝：
+         * `agent name "implementer-1" is already used by another subagent you created`）。
+         * 成员实例名是按团队编号的（每个团队都有 implementer-1），所以名字必须带团队前缀；
+         * 仍然撞名（同团队释放后重名）就退回「不指定名字，让宿主自动分配」。 */
+        name: subagentNameFor(teamId, member.instanceName),
+        label: member.instanceName,
+        prompt: [{ type: 'text', text: initialPromptText(teamId, member) }],
+        parent: spawnCtx!.agent,
+        agentPreset: 'myteam-member',
+        delivery: 'caller',
+        signal: spawnCtx!.signal ?? new AbortController().signal,
+      })
         : deps.rt().agents.create({
         sessionId,
         agentOptions: model
