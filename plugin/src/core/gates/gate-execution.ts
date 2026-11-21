@@ -410,6 +410,23 @@ export function createGateExecution(deps: GateExecutionDeps) {
         message: `gate "verify" 要求任务声明 verifyCommand（argv 数组）；task "${taskId}" 未声明，无法执行 command 门禁（FR-5.3）。请用 myteam_edit_task 补 verifyCommand 后重试`,
       }
     }
+    /* CHG-210 批 4.3：**打回预算超限后不再重复执行命令**。
+     *
+     * 旧实现只在下面拦 `pass`：verify 门每轮 fail 都要真跑一次命令（最长 120s）、把任务放回
+     * ready、下一轮再跑——于是 `GATE_REJECT_BUDGET` 事实上只挡住了「放行」，没挡住「继续烧」。
+     * 超限后的正确动作是交给人，而不是再跑一遍同一条注定失败的命令。
+     * 人工强制放行（上面那个分支）不受此限：它就是超预算后的出口。 */
+    const spentRejects = task.gateRejects?.verify ?? 0
+    if (spentRejects >= GATE_REJECT_BUDGET) {
+      return {
+        status: 'needs-human',
+        code: 'MT_REJECT_BUDGET',
+        gate: 'verify',
+        taskState: task.state,
+        rejectCount: spentRejects,
+        message: `verify 门已打回 ${spentRejects} 轮（上限 ${GATE_REJECT_BUDGET}），本轮**不再执行命令**；需人工裁决（面板带 confirm=true + 理由可强制放行）`,
+      }
+    }
     const workdir = command.cwd ? join(deps.workspaceRoot(), command.cwd) : deps.workspaceRoot()
     const timeoutMs = resolveTimeoutMs(command.timeoutMs, svc.effectiveConfig.gates?.commandTimeoutMs)
     const run = await runVerifyCommand({ command, workdir, timeoutMs, subprocess: deps.rt().subprocess })
