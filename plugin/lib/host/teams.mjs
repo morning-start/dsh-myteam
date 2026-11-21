@@ -194,6 +194,11 @@ export function createTeamsHandlers(host                  ) {
       try {
         if (readWorkspaceIndex(host.workspaceRoot())) return
         const index = scanWorkspaceIndex(host.workspaceRoot())
+        /* CHG-210：逐团队容错后，「跳过了几条」必须大声播报——否则「少了一个团队」
+         * 会从「列表空」变成「列表里少一条」，更难发现。 */
+        for (const d of index.degraded ?? []) {
+          host.log('warn', `team index: team ${d.teamId} skipped ${d.skippedEvents} illegal event(s)`)
+        }
         writeWorkspaceIndex(host.workspaceRoot(), index)
       } catch (e) {
         host.log('warn', `team index rebuild failed: ${String(e)}`)

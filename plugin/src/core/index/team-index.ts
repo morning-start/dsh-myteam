@@ -21,7 +21,7 @@ import { existsSync, readFileSync, readdirSync } from 'node:fs'
 import { homedir } from 'node:os'
 import { join } from 'node:path'
 import { writeTextAtomic } from '../fs/write-log.ts'
-import { foldEvents } from '../scheduler/fold.ts'
+import { foldTolerant } from '../scheduler/fold.ts'
 import type { TeamProjection } from '../scheduler/state.ts'
 import { storeLayout } from '../workspace/layout.ts'
 
@@ -48,6 +48,15 @@ export interface WorkspaceIndex {
   workspaceRoot: string
   updatedAt: number
   teams: TeamIndexEntry[]
+  /**
+   * CHG-210：**降级清单**——本次重建里有哪些团队读不全（坏行/非法转移被跳过）。
+   *
+   * 为什么必须有这个字段：旧实现用 fail-fast 的 `foldEvents` 扫全部团队，任一团队账本里有
+   * 一条非法转移就整份索引不生成 → **全部团队从列表消失**（用户以为数据丢了，原因只在日志）。
+   * 改成逐团队容错之后，被跳过的事实必须跟着索引走——否则「少了一个团队」会变成新的静默。
+   * 纪律：**A partial read must never look like a clean one**。
+   */
+  degraded?: { teamId: string; skippedEvents: number }[]
 }
 
 const INDEX_FILE = 'teams.json'
@@ -140,6 +149,7 @@ export function readEventsTolerant(ledgerPath: string): { events: Array<{ seq: n
 export function scanWorkspaceIndex(workspaceRoot: string): WorkspaceIndex {
   const teamsDir = storeLayout(workspaceRoot).tasks
   const teams: TeamIndexEntry[] = []
+  const degraded: { teamId: string; skippedEvents: number }[] = []
   let names: string[] = []
   try {
     names = readdirSync(teamsDir)
@@ -149,11 +159,14 @@ export function scanWorkspaceIndex(workspaceRoot: string): WorkspaceIndex {
   for (const teamId of names) {
     const { events } = readEventsTolerant(join(teamsDir, teamId, 'ledger.jsonl'))
     if (events.length === 0) continue
-    const proj = foldEvents(teamId, events as never) as TeamProjection
-    teams.push(entryFromProjection(teamId, proj, events[0]?.ts ?? 0))
+    /* CHG-210：逐团队容错——一个坏团队不该让**全部**团队从列表消失。
+     * 跳过的事件数记进 `degraded`，由调用方大声播报（宁静默比崩溃更难查）。 */
+    const { proj, skippedEvents } = foldTolerant(teamId, events as never)
+    if (skippedEvents > 0) degraded.push({ teamId, skippedEvents })
+    teams.push(entryFromProjection(teamId, proj as TeamProjection, events[0]?.ts ?? 0))
   }
   teams.sort((a, b) => b.updatedAt - a.updatedAt)
-  return { version: 1, workspaceRoot, updatedAt: Date.now(), teams }
+  return { version: 1, workspaceRoot, updatedAt: Date.now(), teams, ...(degraded.length > 0 ? { degraded } : {}) }
 }
 
 /* ── 读写（原子写） ── */

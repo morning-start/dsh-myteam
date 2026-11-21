@@ -63,27 +63,12 @@ export function teamLedgerPath(workspaceRoot: string, teamId: string): string | 
   return teamLedgerPathOf(workspaceRoot, teamId)
 }
 
-export interface TolerantFold {
-  proj: TeamProjection
-  skippedEvents: number
-}
-
-/**
- * 逐事件折叠：单条事件非法只跳过该条，保留此前已折叠的状态。
- * 与 foldEvents 的差别仅在错误策略（全量折叠用于写路径，必须 fail-fast）。
- */
-export function foldTolerant(teamId: string, events: LedgerEvent[]): TolerantFold {
-  const proj = emptyProjection(teamId)
-  let skippedEvents = 0
-  for (const event of events) {
-    try {
-      applyEvent(proj, event)
-    } catch {
-      skippedEvents += 1
-    }
-  }
-  return { proj, skippedEvents }
-}
+/* CHG-210：`foldTolerant` 已搬到 `core/scheduler/fold.ts`（折叠领域，且避免
+ * `index/offline-view ⇄ index/team-index` 互相 import 成环）。这里 **import + re-export**：
+ * 本文件内部还会调用它（`export { x } from` 是再导出，不会在当前作用域绑定名字）。
+ * 类型 `TolerantFold` 不再转出——调用方要类型直接从 `fold.ts` 取，少一层转手就少一处漂移。 */
+import { foldTolerant } from '../scheduler/fold.ts'
+export { foldTolerant }
 
 interface LedgerRead {
   events: LedgerEvent[]

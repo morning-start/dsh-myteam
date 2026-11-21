@@ -531,7 +531,7 @@ interface HandoffSessionRef {
 
 ## 错误码（`MT_*`）
 
-> **本表由 `tools/gen-error-docs.mjs` 从 `plugin/src/core/errors.ts` 生成，共 86 个。**
+> **本表由 `tools/gen-error-docs.mjs` 从 `plugin/src/core/errors.ts` 生成，共 87 个。**
 > 手改会被覆盖，且 `plugin/test/t81-error-codes.test.ts` 会判红。
 >
 > **加码流程**：① `errors.ts` 加一行（含说明）→ ② `node tools/gen-error-docs.mjs` → ③ `cd plugin && npm test`。
@@ -573,7 +573,7 @@ interface HandoffSessionRef {
 | `MT_LEDGER_MISSING_RULES_VERSION` | 新账本的首事件不是 `rules.version.adopted`（I3 前提）。 |
 | `MT_LEDGER_UNKNOWN_TYPE` | 事件 `type` 不在 `EVENT_TYPES` 白名单里（旧版本写的账本用新代码打开时会看到）。 |
 
-### 任务与状态机（15）
+### 任务与状态机（16）
 
 | 码 | 什么时候会看到它 |
 |---|---|
@@ -591,6 +591,7 @@ interface HandoffSessionRef {
 | `MT_TASK_STRUCTURAL_EDIT` | 尝试改任务的**结构字段**（AC / 交付物 / 依赖）但走错了入口——结构改动必须走 `rescope` 管线。 |
 | `MT_TASK_TERMINAL` | 任务已在终态（done / cancelled / failed），不允许再变更。 |
 | `MT_TEAM_STATE` | 团队状态不允许当前操作（如同名 active 团队已存在、非 draft 时批准计划）。 |
+| `MT_TEAM_ARCHIVED` | 团队已归档/废弃，不接受写入（账本零改动）。归档不可逆——要继续做请 myteam_import_team 重建一个新团队。 |
 | `MT_VERIFY_NO_COMMAND` | `gate:verify` 要求任务声明 `verifyCommand`，但没声明（不能用人工裁决冒充真跑命令）。 |
 
 ### 文件系统（原子写 / 收尾闸门）（4）

@@ -62,6 +62,36 @@ const PER_TASK_MESSAGE_TOUCHING_EVENTS = new Set(['message.sent', 'task.deleted'
 
 const INBOX_TOUCHING_EVENTS = new Set(['task.escalated', 'message.sent'])
 
+/** 容错折叠的结果（CHG-210：从 `index/offline-view.ts` 搬来——它属于折叠领域，不属于离线视图） */
+                               
+                      
+                       
+ 
+
+/**
+ * CHG-210：**容错折叠**——单条事件非法只跳过该条，保留此前已折叠的状态。
+ *
+ * 与 `foldEvents` 的唯一区别是错误策略：全量折叠用于**写路径**，必须 fail-fast（账本坏了就不能
+ * 继续追加，否则脏数据越滚越大）；这里用于**读路径**（索引扫描 / 离线回看 / 面板降级），
+ * 目标是「尽量给出一份能看的投影，并如实报告跳过了几条」。
+ *
+ * 为什么搬进 `fold.ts`：它原来是 `index/offline-view.ts` 的导出，而 `index/team-index.ts` 要用它
+ * 做逐团队容错——两个 index 模块互相 import 会成环（A1 门禁）。折叠的两种错误策略放在一起，
+ * 也更容易看出「哪个场合该用哪个」。
+ */
+export function foldTolerant(teamId        , events               )               {
+  const proj = emptyProjection(teamId)
+  let skippedEvents = 0
+  for (const event of events) {
+    try {
+      applyEvent(proj, event)
+    } catch {
+      skippedEvents += 1
+    }
+  }
+  return { proj, skippedEvents }
+}
+
 /**
  * 按事件类型复制**可能被写**的顶层集合（浅拷贝，见上方说明）。
  *

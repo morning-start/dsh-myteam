@@ -198,6 +198,11 @@ export class TeamService {
     return this.projection
   }
 
+  /** 已落账事件数（CHG-210：判断「账本是不是空的」，比读投影里的任何字段都直接） */
+  get eventCount(): number {
+    return this.events.length
+  }
+
   /**
    * CHG-87：按 seq 取事件（投影只存 seq 引用，内容的权威在账本）。
    * 供 scope 完成审计按证据 seq 取回 `task.evidence` 载荷；越界/缺失 → undefined。
@@ -232,6 +237,24 @@ export class TeamService {
     // 1. 领域前置校验（按事件类型）
     const domainCheck = this.checkDomain(draft)
     if (!domainCheck.ok) return domainCheck
+
+    /* 1b. CHG-210：**已归档的团队不再接受写入**。
+     *
+     * 旧实现没有这道闸：`docs/11` 承诺「归档后不再接受写」，实际再调一次工具就会重建
+     * TeamService 并照常 append——归档账本可以被继续改写，而 `revision` 还会跟着涨。
+     * 修法是把「团队状态」变成 commit 的前置条件，而不是靠每个调用方自觉。
+     *
+     * **只拦 `archived`**（终态）。`discarded` 是「弃掉这一版草稿、可以重提」——
+     * `submit_plan → discard_plan → submit_plan` 是 FR-1.2 的合法循环（t17 场景 7 锁着），
+     * 拦它会把「重来一次」变成不可能。
+     * 放行 `team.disbanded` 本身：重复解散不该变成另一种错误码。 */
+    if (this.projection.state === 'archived' && draft.type !== 'team.disbanded') {
+      return {
+        ok: false,
+        code: 'MT_TEAM_ARCHIVED',
+        message: `team "${this.teamId}" is archived; 归档的团队不接受写入（${draft.type} 被拒，账本零改动）。归档不可逆——要继续做请 myteam_import_team 重建一个新团队。`,
+      }
+    }
 
     // 2. 结构校验 → 在副本上增量应用（失败即弃，内存投影与账本都不动）
     let event: LedgerEvent
@@ -840,4 +863,35 @@ function roleErrorToResult(e: unknown): CommitResult {
 /** 团队创建引导：新账本首事件 rules.version.adopted〔I3〕 */
 export function bootstrapTeam(service: TeamService, actor = 'host'): CommitResult {
   return service.commit({ actor, type: 'rules.version.adopted', payload: { version: RULES_VERSION } })
+}
+
+/**
+ * CHG-210：**打开一个团队账本**——reload + 健康告警 + **只在账本为空时**落基线事件。
+ *
+ * 为什么必须有这个函数（而不是在 host 里内联两行）：
+ *   旧实现在 `service()` 构造后**无条件** `bootstrapTeam`，于是「打开团队」= 写账本：
+ *   - 每进程每团队冷启动 +1 条 `rules.version.adopted`（两个独立实测都复现过：seq 0/1 两行同名）；
+ *   - 看一眼已归档团队也会改它的账本；
+ *   - `revision` 与真实业务事件数脱钩，时间线出现重复首事件。
+ *
+ * 修法不是「加判断」，而是把**写权限收进「账本为空」这一个条件**：没有历史才需要基线，
+ * 有历史就说明已经初始化过。写完检查 `ok`——旧实现丢弃返回值，写失败时表现为
+ * 「账本空 + 后续全 MT_LEDGER_MISSING_RULES_VERSION」，与真实原因不符。
+ *
+ * 健康计数（truncated/corrupted/compacted）一并上抛给调用方记日志——旧实现只消费 truncated，
+ * 中部坏行与「账本被重写」这两件事在运行期完全不可观测。
+ */
+export function openTeamLedger(
+  service: TeamService,
+  log: (level: 'info' | 'warn', msg: string) => void,
+): { truncated: number; corrupted: number; compacted: boolean } {
+  const health = service.reload()
+  if (health.truncated > 0) log('warn', `team ${service.teamId} ledger had ${health.truncated} crash-residue line(s), truncated`)
+  if (health.corrupted > 0) log('warn', `team ${service.teamId} ledger had ${health.corrupted} unparsable line(s) skipped`)
+  if (health.compacted) log('warn', `team ${service.teamId} ledger was rewritten to drop unparsable line(s)`)
+  if (service.eventCount === 0) {
+    const booted = bootstrapTeam(service)
+    if (!booted.ok) log('warn', `team ${service.teamId} bootstrap rejected: ${booted.code} ${booted.message}`)
+  }
+  return health
 }

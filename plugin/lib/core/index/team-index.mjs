@@ -21,7 +21,7 @@ import { existsSync, readFileSync, readdirSync } from 'node:fs'
 import { homedir } from 'node:os'
 import { join } from 'node:path'
 import { writeTextAtomic } from '../fs/write-log.mjs'
-import { foldEvents } from '../scheduler/fold.mjs'
+import { foldTolerant } from '../scheduler/fold.mjs'
                                                            
 import { storeLayout } from '../workspace/layout.mjs'
 
@@ -48,6 +48,15 @@ import { storeLayout } from '../workspace/layout.mjs'
                        
                    
                          
+     
+                                                 
+    
+                                                            
+                                                     
+                                                
+                                                            
+     
+                                                        
  
 
 const INDEX_FILE = 'teams.json'
@@ -140,6 +149,7 @@ export function readEventsTolerant(ledgerPath        )                          
 export function scanWorkspaceIndex(workspaceRoot        )                 {
   const teamsDir = storeLayout(workspaceRoot).tasks
   const teams                   = []
+  const degraded                                              = []
   let names           = []
   try {
     names = readdirSync(teamsDir)
@@ -149,11 +159,14 @@ export function scanWorkspaceIndex(workspaceRoot        )                 {
   for (const teamId of names) {
     const { events } = readEventsTolerant(join(teamsDir, teamId, 'ledger.jsonl'))
     if (events.length === 0) continue
-    const proj = foldEvents(teamId, events         )                  
-    teams.push(entryFromProjection(teamId, proj, events[0]?.ts ?? 0))
+    /* CHG-210：逐团队容错——一个坏团队不该让**全部**团队从列表消失。
+     * 跳过的事件数记进 `degraded`，由调用方大声播报（宁静默比崩溃更难查）。 */
+    const { proj, skippedEvents } = foldTolerant(teamId, events         )
+    if (skippedEvents > 0) degraded.push({ teamId, skippedEvents })
+    teams.push(entryFromProjection(teamId, proj                  , events[0]?.ts ?? 0))
   }
   teams.sort((a, b) => b.updatedAt - a.updatedAt)
-  return { version: 1, workspaceRoot, updatedAt: Date.now(), teams }
+  return { version: 1, workspaceRoot, updatedAt: Date.now(), teams, ...(degraded.length > 0 ? { degraded } : {}) }
 }
 
 /* ── 读写（原子写） ── */

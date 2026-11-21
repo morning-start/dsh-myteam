@@ -30,7 +30,7 @@ import { writeTextAtomic, runWithRollback, snapshotFor } from './core/fs/write-l
 import { resolveProjectRoot, storeLayout, teamLedgerPath as teamLedgerPathOf, displayPath, STORE_DIR, tokenSidecarPath, legacyTokenSidecarPath } from './core/workspace/layout.ts'
 // CHG-103：作用域契约（全局 vs 项目级）——角色两级都可用，任务/历史/状态只能项目级
 import { normalizeScope } from './core/workspace/scope.ts'
-import { TeamService, bootstrapTeam, type CommitDraft } from './core/service.ts'
+import { TeamService, openTeamLedger, type CommitDraft } from './core/service.ts'
 /* CHG-186（T155a）：宿主契约下沉 `core/host/contract.ts` —— 解 `host.ts ⇄ remote/service.ts`
  * 的 type 环（arch-report 里唯一那条）。这里只 `import type`（擦除后无运行时依赖、无装载环）；
  * `MyTeamConfig` 仍从本文件 re-export，既有 import 点（如 `test/t123`）一个都不用改。 */
@@ -57,7 +57,7 @@ import { wakeDecisionsFor, changeSince, type WakeDecision } from './core/schedul
 import { TERMINAL_STATES, downstreamOf } from './core/scheduler/state.ts'
 /* A9（报告 KI-5 / CHG-163 冷启动重连）：只读折叠口径。
  * 为什么不用 `this.service(teamId).projectionSnapshot`：`service()` 构造 TeamService 时会
- * `bootstrapTeam` 落 `rules.version.adopted`——重连就成了**写账本**，违反「重连不改账本」不变量。
+ * `openTeamLedger` 在**账本为空时**落 `rules.version.adopted`——重连仍不该走写路径。
  * `readOfflineTeam` + `foldTolerant` 只读文件、坏行/坏事件各自跳过，正好是重连需要的容错面。 */
 import { foldTolerant, isSafeTeamId, readOfflineTeam, readTokensSidecar } from './core/index/offline-view.ts'
 import { diffTaskInput } from './core/tasks/diff.ts'
@@ -1233,10 +1233,10 @@ export class MyTeamHost implements MyTeamHostContract {
     let svc = this.services.get(teamId)
     if (!svc) {
       svc = new TeamService({ workspaceRoot: this.workspaceRoot, teamId, rolePaths: this.rolePaths, configOverride: this.configOverride })
-      const { truncated } = svc.reload()
-      if (truncated > 0) this.log('warn', `team ${teamId} ledger had ${truncated} crash-residue line(s), truncated`)
+      /* CHG-210：打开账本 = 只读 + 健康告警；基线事件**只在账本为空时**落（见 `openTeamLedger`）。
+       * 旧实现在这里无条件 `bootstrapTeam`——每次冷启动给每个团队多写一条 rules.version.adopted。 */
+      openTeamLedger(svc, (level, msg) => this.log(level, msg))
       this.services.set(teamId, svc)
-      bootstrapTeam(svc)
     }
     return svc
   }
@@ -4258,7 +4258,7 @@ export class MyTeamHost implements MyTeamHostContract {
    *
    * 三条硬不变量（重连是**纯内存重建**）：
    *  ① **不改账本**——只用 `readOfflineTeam` + `foldTolerant` 只读折叠。**刻意不用** `this.service()`：
-   *     构造 `TeamService` 会 `bootstrapTeam` 落 `rules.version.adopted`，重连就变成写操作；
+   *     构造 `TeamService` 会打开账本（空账本时落基线事件），重连就变成写操作；
    *  ② **不建会话**——只做 `agents.get(sessionId)` 的官方 lookup（`probeProvisionedSession` 同源口径），
    *     `agents.create` 是 spawn 的事，重连不负责造成员；
    *  ③ **不发消息**——重连只回答「谁还活着」，不 followup（判断活着 ≠ 该被叫醒）。
