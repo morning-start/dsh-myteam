@@ -64,6 +64,9 @@ export const TOOL_TIERS: Record<string, ToolTier> = {
   myteam_create_tasks: 'C',
   myteam_edit_task: 'C',
   myteam_review_task: 'C',
+  /* CHG-210 批 6.1：待批提案清单仅队长可见（成员只看自己的提案没意义，且会把
+   * 「别人提了什么」暴露成协调噪音） */
+  myteam_list_proposals: 'C',
   myteam_rescope_task: 'C',
   myteam_cancel_task: 'C',
   /* CHG-202x（P0-1）：删除任务 = 清理型写操作（与取消同档） */

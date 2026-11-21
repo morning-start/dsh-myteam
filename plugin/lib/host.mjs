@@ -1504,6 +1504,7 @@ export class MyTeamHost                               {
           return this.teams.disband(teamId, args, actor)
         case 'myteam_resolve_proposal':
           return this.plan.resolveProposal(teamId, args, actor)
+        case 'myteam_list_proposals': return this.memberTasks.listProposals(teamId, args) // CHG-210 批 6.1：待批清单（只读投影；工具面仅队长可见，tier C）
         /* CHG-186（T155c）：知识族（采纳 / 提案 / 参与 / 指派）实现已搬到 `src/host/knowledge.ts`。
          * 这里只转发——逻辑/顺序/默认值一个都没改（纯结构重构，行为零变化）。 */
         case 'myteam_adopt_knowledge':

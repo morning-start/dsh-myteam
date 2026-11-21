@@ -24,13 +24,13 @@ test('t147-1: spawn/release 是 CM 档——队长可调，成员默认不可调
     assert.equal(canCall(name, 'member'), false, '成员未授权 = 不可调（CM 没有默认放行）')
     assert.equal(canCall(name, 'member', true), true, '显式授权后成员可调')
   }
-  // 档位分布：A 23 / C 36 / CM 4 / H 6 = 69
+  // 档位分布：A 23 / C 37 / CM 4 / H 6 = 70
   const byTier = toolsByTier()
   assert.equal(byTier.A.length, 23)
-  assert.equal(byTier.C.length, 36)
+  assert.equal(byTier.C.length, 37)
   assert.equal(byTier.CM.length, 4)
   assert.equal(byTier.H.length, 6)
-  assert.equal(byTier.A.length + byTier.C.length + byTier.CM.length + byTier.H.length, 69)
+  assert.equal(byTier.A.length + byTier.C.length + byTier.CM.length + byTier.H.length, 70)
 })
 
 test('t147-2: 委派工具定义按名字从 Lead 表取（不复制 schema），且不在成员固定表里', () => {

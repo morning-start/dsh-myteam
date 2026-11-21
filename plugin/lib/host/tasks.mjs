@@ -482,6 +482,31 @@ export function createMemberTaskHandlers(host                        ) {
       }
     },
 
+    /** CHG-210 批 6.1：待批提案清单（队长侧入口）
+     *
+     * 缺陷现场：`proposalId` 只回给提交者，队长侧没有任何列表面——`read_task` 的 timeline
+     * 只有 `seq/ts/actor/type` 不带 payload，而 `resolve_proposal` 又必须要 proposalId。
+     * 于是 FR-11.4「队长批准才生效」在工具面**断链**：实际只能人去 `ledger.jsonl` 里抄 id。
+     *
+     * 为什么从投影派生而不是维护一个 id 队列：两份真相必然漂移（提案被删/任务被取消后
+     * 队列里的 id 变成幽灵）。派生面永不漂移，代价只是查询时多算一次。 */
+    listProposals(teamId        , args                         )                          {
+      const proj = host.service(teamId).projectionSnapshot
+      const want = typeof args.status === 'string' ? args.status : 'proposed'
+      const items = Object.entries(proj.proposals)
+        .filter(([, p]) => want === 'all' || p.status === want)
+        .map(([proposalId, p]) => ({
+          proposalId,
+          taskId: p.taskId,
+          type: p.type,
+          status: p.status,
+          title: proj.tasks[p.taskId]?.input.title ?? '',
+          ...(p.proposerId ? { proposerId: p.proposerId } : {}),
+        }))
+        .sort((a, b) => a.taskId.localeCompare(b.taskId) || a.proposalId.localeCompare(b.proposalId))
+      return { status: 'ok', count: items.length, proposals: items }
+    },
+
     /** `myteam_peer_message`：成员 → 成员消息（落账后 followup 唤醒） */
     peerMessage(teamId        , member                , args                         , actor        )                          {
       const to = String(args.toMemberId ?? '').trim()

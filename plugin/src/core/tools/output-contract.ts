@@ -226,12 +226,20 @@ export const TOOL_OUTPUT_FIELDS: Record<string, JsonSchemaSpec> = {
       note: { type: 'string', description: '只读口径说明' },
     },
   },
+  /* CHG-210 批 6.1：待批提案清单（队长侧）。字段少但都是决策必需：没有 proposalId
+   * 队长无法调 resolve_proposal；没有 proposerId 驳回后不知道该通知谁。 */
+  myteam_list_proposals: {
+    properties: {
+      teamId: { type: 'string', description: '团队 id' },
+      count: { type: 'number', description: '条数' },
+      proposals: { type: 'array', items: { type: 'object' }, description: '提案行（proposalId/taskId/type/status/title/proposerId）' },
+    },
+  },
   myteam_read_board: {
     properties: {
       teamId: { type: 'string', description: '团队 id' },
       counts: { type: 'object', description: '计数（total/open/done/byState）' },
-      tasks: { type: 'array', items: { type: 'object' }, description: '任务行（id/title/state/priority/requiredRole/assignee/assignees/deps/escalateCount/evidenceCount）' },
-      returnedCount: { type: 'number', description: '本次返回行数（≠ 已读全部内容，NFR-7.6）' },
+      tasks: { type: 'array', items: { type: 'object' }, description: '任务行（id/title/state/priority/requiredRole/assignee/assignees/deps/escalateCount/evidenceCount）' },      returnedCount: { type: 'number', description: '本次返回行数（≠ 已读全部内容，NFR-7.6）' },
       note: { type: 'string', description: '限界读说明' },
     },
   },

@@ -5,7 +5,7 @@ import { TEAM_MEMBER_TOOLS } from '../src/core/members/member-setup.ts'
 
 test('T7 tool defs: 59 lead tools + 10 member tools, names match contract (docs/04 §1 + CHG-17/19/53/57/69/73/76/86/87/91/122~134/163/187/199)', () => {
   const plan = toolRegistryPlan()
-  assert.equal(plan.lead.length, 59)
+  assert.equal(plan.lead.length, 60)
   assert.equal(plan.member.length, 10)
   assert.deepEqual(plan.member, [...TEAM_MEMBER_TOOLS])
   // CHG-86（P0-4）：两个作用域不能有同名工具——旧实现队长侧与成员侧都叫
