@@ -24,16 +24,18 @@ export interface MemberLookupHost {
 }
 
 export function createMemberLookup(host: MemberLookupHost) {
-  function memberMatching(match: (member: MemberInstance) => boolean): MemberInstance | undefined {
+  function memberMatching(match: (member: MemberInstance) => boolean, teamId?: string): MemberInstance | undefined {
     const teamIds = new Set(host.openTeamIds())
     try {
       const tasksDir = storeLayout(host.workspaceRoot()).tasks
-      for (const teamId of readdirSync(tasksDir)) if (existsSync(join(tasksDir, teamId, 'ledger.jsonl'))) teamIds.add(teamId)
+      for (const id of readdirSync(tasksDir)) if (existsSync(join(tasksDir, id, 'ledger.jsonl'))) teamIds.add(id)
     } catch { /* 目录不可读：只查已开团队 */ }
-    for (const teamId of teamIds) {
+    /* 成员 id 只在**团队内**唯一（`m1-implementer` 每个团队都有）——给了 teamId 就只查该团队，
+     * 否则会跨团队串到同名的另一个成员上（实测：新团队的消息被当成老团队同名成员去投递）。 */
+    for (const id of teamId === undefined ? teamIds : [teamId]) {
       try {
-        for (const projected of Object.values(host.membersOf(teamId))) {
-          const member = { ...projected, memberId: projected.id, teamId } as unknown as MemberInstance
+        for (const projected of Object.values(host.membersOf(id))) {
+          const member = { ...projected, memberId: projected.id, teamId: id } as unknown as MemberInstance
           if (match(member)) return member
         }
       } catch { continue }
@@ -42,9 +44,10 @@ export function createMemberLookup(host: MemberLookupHost) {
   }
 
   return {
-    /** 按成员会话 id 找（成员工具 / 上岗简报 / 收窄都走这条） */
+    /** 按成员会话 id 找（成员工具 / 上岗简报 / 收窄都走这条；会话 id 全局唯一，不需要 teamId） */
     bySession: (sessionId: string): MemberInstance | undefined => memberMatching((member) => member.sessionId === sessionId),
-    /** 按 memberId 找（投递通道选择 / 消息投递） */
-    byId: (memberId: string): MemberInstance | undefined => memberMatching((member) => member.memberId === memberId),
+    /** 按 memberId 找（**必须带 teamId**：成员 id 只在团队内唯一） */
+    byId: (memberId: string, teamId?: string): MemberInstance | undefined =>
+      memberMatching((member) => member.memberId === memberId, teamId),
   }
 }

@@ -194,6 +194,12 @@ export interface SpawnLifecycleDeps {
    */
   spawnContext?: () => { agent?: unknown; signal?: AbortSignal } | undefined
   /**
+   * CHG-213：记下「这个成员的载体是子代理」。投递通道据此选择，**不看 child 现在在不在 resident**——
+   * spawn 与首条消息之间、成员一轮跑完被收回之后，`agents.get(childId)` 都是 undefined，
+   * 用活跃度判载体就会把子代理成员误判成根会话，消息直接投不出去（实测两次）。
+   */
+  markSubagent?: (memberId: string) => void
+  /**
    * CHG-213：记下 activation 的 `dispose`（释放成员时要用它停掉 child）。
    * 为什么单独记：settle 之后 handle 换成了 live Agent（投递/打断用），activation 的 dispose 就丢了
    * ——实测结果是 `myteam_release_member` 后账本说已释放、`agents.get(childId)` 里 child 还在跑。
@@ -314,6 +320,7 @@ export function createSpawnLifecycle(deps: SpawnLifecycleDeps) {
       const activation = subagentsOf(deps.rt())
       const canActivate = spawnCtx?.agent !== undefined
         && typeof activation?.startActivation === 'function'
+      if (canActivate) deps.markSubagent?.(memberId)
       created = canActivate
         ? (activation as { startActivation: (spec: unknown) => unknown }).startActivation({
           provider: 'spawn',

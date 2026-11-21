@@ -266,3 +266,83 @@ test('t179e: 释放成员 → activation.dispose 被调用（账本说已释放�
     cleanup()
   }
 })
+
+/** 复刻实测：spawn 刚返回时 child 还没进 resident，`sendMessage` 会拒绝 `is unavailable` */
+function retryRuntime(root: string, captured: Captured, live: Map<string, unknown>, failures: string[]) {
+  const attempts: string[] = []
+  const subagents = {
+    startActivation: activationFake(captured, live).startActivation,
+    sendMessage: (_sender: unknown, target: string) => {
+      attempts.push(target)
+      const next = failures.shift()
+      if (next === 'ok' || next === undefined) return Promise.resolve('msg-1')
+      return Promise.reject(new Error(next))
+    },
+  }
+  const runtime = baseRuntime(root, captured, live) as unknown as Record<string, unknown>
+  Object.defineProperty(runtime, 'subagents', { configurable: true, get() { throw new Error(NOT_INJECTED) } })
+  runtime['get'] = (name: string) => (name === 'subagents' ? subagents : undefined)
+  return { runtime: runtime as unknown as HostRuntime, attempts }
+}
+
+test('t179f: 子代理通道遇「还没就绪」会短暂重试（spawn 后立刻发消息不该白丢）', async () => {
+  const { root, cleanup } = tempWorkspace('myteam-t179f')
+  try {
+    const captured: Captured = {}
+    const live = new Map<string, unknown>()
+    const { runtime, attempts } = retryRuntime(root, captured, live, [
+      'subagent "mt-x" is unavailable',
+      'subagent "mt-x" is unavailable',
+      'ok',
+    ])
+    const { host, teamId } = approvedTeam(runtime)
+    const captain = { id: 'cap-t179f' }
+    const spawned = host.executeLeadTool('myteam_spawn_member', { teamId, roleId: 'implementer', instanceName: 'dev-6' }, { agent: captain }) as any
+    const out = (await host.executeLeadTool('myteam_message', { teamId, to: spawned.memberId, content: '第一条派单' }, { agent: captain })) as any
+    assert.equal(out.delivered, true, JSON.stringify(out))
+    assert.equal(attempts.length, 3, `两次瞬时失败后应重试成功（实际 ${attempts.length} 次）`)
+  } finally {
+    cleanup()
+  }
+})
+
+test('t179g: 确定性拒绝（cannot resume / UNAUTHORIZED）立刻放弃，不做无意义重试', async () => {
+  const { root, cleanup } = tempWorkspace('myteam-t179g')
+  try {
+    const captured: Captured = {}
+    const live = new Map<string, unknown>()
+    const { runtime, attempts } = retryRuntime(root, captured, live, ['cannot resume: child is not resident'])
+    const { host, teamId } = approvedTeam(runtime)
+    const captain = { id: 'cap-t179g' }
+    const spawned = host.executeLeadTool('myteam_spawn_member', { teamId, roleId: 'implementer', instanceName: 'dev-7' }, { agent: captain }) as any
+    const out = (await host.executeLeadTool('myteam_message', { teamId, to: spawned.memberId, content: '再试' }, { agent: captain })) as any
+    assert.equal(out.delivered, false)
+    assert.equal(attempts.length, 1, '确定性拒绝只试一次')
+  } finally {
+    cleanup()
+  }
+})
+
+test('t179h: 同名成员 id 跨团队不串线（成员 id 只在团队内唯一，投递必须带 teamId）', async () => {
+  const { root, cleanup } = tempWorkspace('myteam-t179h')
+  try {
+    const captured: Captured = {}
+    const live = new Map<string, unknown>()
+    const { runtime, attempts } = retryRuntime(root, captured, live, [])
+    const first = approvedTeam(runtime) // 第一个团队：成员 id = m1-implementer
+    const secondPlan = first.host.executeLeadTool('myteam_submit_plan', { teamName: 'T179B', goal: '同名成员', roster: [{ roleId: 'captain' }], tasks: [] }, {}) as any
+    first.host.executeLeadTool('myteam_approve_plan', { teamId: secondPlan.teamId }, {}) as any
+    const captain = { id: 'cap-t179h' }
+    const inA = first.host.executeLeadTool('myteam_spawn_member', { teamId: first.teamId, roleId: 'implementer', instanceName: 'a' }, { agent: captain }) as any
+    const inB = first.host.executeLeadTool('myteam_spawn_member', { teamId: String(secondPlan.teamId), roleId: 'implementer', instanceName: 'b' }, { agent: captain }) as any
+    assert.equal(inA.memberId, inB.memberId, '前置：两个团队里的成员 id 相同（这正是串线的土壤）')
+    assert.notEqual(inA.sessionId, inB.sessionId)
+
+    attempts.length = 0
+    const out = (await first.host.executeLeadTool('myteam_message', { teamId: String(secondPlan.teamId), to: inB.memberId, content: '只给 B 团队' }, { agent: captain })) as any
+    assert.equal(out.delivered, true, JSON.stringify(out))
+    assert.deepEqual(attempts, [inB.sessionId], '必须投给 B 团队那个成员的会话，不能落到 A 团队同名成员上')
+  } finally {
+    cleanup()
+  }
+})

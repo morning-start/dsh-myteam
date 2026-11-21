@@ -151,6 +151,12 @@ toolCount: 25   myteamTools: 13   remember: true   leadLeak: false
 | 4 | 成员「永远收不到消息」：`session "mt-…" cannot append outside a SessionStore` | 子代理 child 的 Agent 是**可续起 seed**，`agent.followup` 不能 append；官方通道是 `subagents.sendMessage(队长, childId, …)` | 新增 `host/delivery.ts`：子代理走 sendMessage（异步），根会话走 followup（同步），双形状调用方都接 | t179d |
 | 5 | `myteam_release_member` 后账本说已释放，`agents.get(childId)` 里 child **还在跑** | settle 时 handle 被换成 live Agent，activation 的 `dispose` 丢了 | `rememberActivation` 记下 dispose，释放时调用 | t179e |
 | 6 | `memberById` **永远**返回 undefined（`member.teamId` 也是 undefined） | 投影是 `MemberProjection`（主键 `id`、不带 `teamId`），成员族用 `MemberInstance`（`memberId`/`teamId`），旧实现 `as` 强转后比较 `memberId` | `host/member-lookup.ts` 就地归一（`id → memberId`，补 `teamId`） | t179c/t179d 触发 |
+| 7 | 新团队的消息投到了**老团队同名成员**上（`agent "mt-live-e2e-s5-implementer-2" is not a member of this subagent tree`） | 成员 id 只在**团队内**唯一（每队都有 `m1-implementer`），而 `memberById` / 投递没带 `teamId`，遍历到第一个同名就返回 | `member-lookup` 支持 `teamId` 作用域；`deliverMemberMessage` / `memberOp(steer)` / 唤醒全部带上 teamId | t179h |
+| 8 | spawn 后**立刻**发第一条消息必然 `delivered:false`（`subagent "…" is unavailable`） | `startActivation` 返回时 child 还没进 `resident`，`sendMessage` 以「还没就绪」拒绝——消息本可送到，只是早了几百毫秒 | `host/delivery.ts` 对**瞬时**错误短暂重试（0/150/400/900ms）；`cannot resume` / `UNAUTHORIZED` 这类确定性拒绝立即放弃、不做无意义等待 | t179f / t179g |
+
+另一个相关修正：**通道选择不再看「child 现在在不在 resident」**。实测有两个窗口（spawn 与首条消息之间、
+成员一轮跑完被收回之后）`agents.get(childId)` 都是 undefined，用活跃度判载体就会把子代理成员误判成
+根会话，消息直接投不出去。现在只认 spawn 时定下来的**载体事实**（`subagentMembers`）。
 
 顺带修掉上一轮记录的双投递：一次 `myteam_message` 曾触发两次投递（消息 + `message.sent` 唤醒），
 现在 `from=lead|human` 的消息不再额外唤醒（成员→成员消息仍靠唤醒送达）。
@@ -178,6 +184,26 @@ stage2              memberSessionAliveAfterRestart=false  delivered=false +「�
 
 **仍未验证**：长跑（多轮派单 → 门禁 → done）下的记忆积累质量；`subagentCatalog` 的服务端列表
 （宿主 `subagents` 服务没有 `list` 方法，探针只能证明「dispose 后 `agents.get` 拿不到」）。
+
+### 4.3 载体与唤醒验收（2026-11-21，第二轮，真机 + 真模型）
+
+成员不是一次性执行器——它必须在**多轮派单**里被反复叫醒。这一轮专测这条：
+
+```
+队伍               wake-s12（新团队；成员 m2-implementer / 会话 mt-wake-s12-implementer-2）
+第一条派单          delivered:true   → 成员跑一轮模型，写 A1
+一轮结束后          childResidentAfterTurn:true（会话在岗，工具面 25 / myteam 13 / leadLeak []）
+第二条派单（空闲后）  delivered:true   → 成员再跑一轮，写 A2
+产物               tasks/live-e2e-wake.md = "A1\nA2\n"
+```
+
+这一轮暴露的正是上面表里的 **7（跨团队同名 id 串线）** 与 **8（spawn 后立刻发消息被判 unavailable）**，
+都已在真机上复现、修掉、并回到真机验证（第二轮 stdout 里不再有 `not delivered` 警告）。
+
+顺带把 **`pwsh` 的可用性归了类**：在同一个实例里让**队长**调 `pwsh`，报同样的
+`sandbox-local: windows-acl workspace grant failed (Win32 5) … or run with danger-full-access`——
+说明这是**宿主沙箱在本机拿不到工作区 ACL**（`E:\Workplace` 权限），**不是 myteam 的缺陷**；
+桌面端因为是 `danger-full-access` 所以看不到这个现象。要在 CLI 实例里跑命令，得给该 profile 放宽文件策略。
 
 **顺序理由**：P1/P2 与成员载体无关，先落地能立刻受益；P3 是 P4 的前置（否则成员视图拿不到服务）；
 P4 风险最高，放在服务分层之后一次完成。

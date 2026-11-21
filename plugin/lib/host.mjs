@@ -508,8 +508,9 @@ export class MyTeamHost                               {
           services = new Map                     ()
           leadExec                                        
           memberHandles = new Map             () // memberId → AgentHandle
-  /** CHG-213：子代理 activation 的 dispose（释放成员时停掉 child；见 rememberActivation） */
+  /** CHG-213：子代理载体的两本台账（activation dispose / 载体事实），见 delivery.ts 与 rememberActivation */
                    memberActivations = new Map                             ()
+                   subagentMembers = new Set        ()
   /**
    * CHG-186（T155b）：成员族端点适配层（`src/host/members.ts`）。
    *
@@ -521,7 +522,7 @@ export class MyTeamHost                               {
     commit: (teamId, draft) => this.commit(teamId, draft),
     spawnMember: (teamId, roleId, instanceName, overrides) => this.spawnMember(teamId, roleId, instanceName, overrides),
     releaseMember: (teamId, memberId, mode, confirm, actor, cascade) => this.releaseMember(teamId, memberId, mode, confirm, actor, cascade),
-    deliverMemberMessage: (memberId, kind, content) => this.deliverMemberMessage(memberId, kind, content),
+    deliverMemberMessage: (memberId, kind, content, teamId) => this.deliverMemberMessage(memberId, kind, content, teamId),
     agentOf: (handle) => this.agentOf(handle),
     memberHandle: (memberId) => this.memberHandles.get(memberId),
     noteGuardTurnEnd: (memberId) => this.noteGuardTurnEnd(memberId),
@@ -697,6 +698,7 @@ export class MyTeamHost                               {
     rt: () => this.rt,
     spawnContext: () => this.leadExec,
     rememberActivation: (memberId, dispose) => { this.memberActivations.set(memberId, dispose) },
+    markSubagent: (memberId) => { this.subagentMembers.add(memberId) },
     log: (level, msg) => this.log(level, msg),
     workspaceRoot: () => this.workspaceRoot,
     rolePaths: () => this.rolePaths,
@@ -1234,16 +1236,17 @@ export class MyTeamHost                               {
    * 传输通道在 `host/delivery.ts`（CHG-213 实机）：子代理成员**不能** `agent.followup`
    * （`cannot append outside a SessionStore`），必须走 `subagents.sendMessage`。
    */
-          deliverMemberMessage(memberId        , kind        , content        )                             {
-    return this.delivery.deliverMessage(memberId, kind, content)
+          deliverMemberMessage(memberId        , kind        , content        , teamId         )                             {
+    return this.delivery.deliverMessage(memberId, kind, content, teamId)
   }
 
   /** 投递层（宿主面装配在 host.ts，逻辑在 host/**） */
                    delivery = createDelivery({
     leadAgent: () => this.leadExec?.agent,
     subagents: () => this.lookup('subagents'),
-    memberSessionId: (memberId) => {
-      const sessionId = this.memberById(memberId)?.sessionId
+    isSubagent: (memberId) => this.subagentMembers.has(memberId),
+    memberSessionId: (memberId, teamId) => {
+      const sessionId = this.memberById(memberId, teamId)?.sessionId
       return sessionId === undefined ? undefined : String(sessionId)
     },
     handle: (memberId) => this.memberHandles.get(memberId),
@@ -1258,15 +1261,11 @@ export class MyTeamHost                               {
     this.teams.refreshIndex(teamId)
     const wakes = wakeDecisionsFor(event)                  
     for (const wake of wakes) {
-      /* CHG-213（实机）：队长/面板发出的消息**已经由调用方同步投递**
-       * （`myteam_message` / `memberOp(steer)` 都走 `deliverMemberMessage`），这里再唤醒一次
-       * 就是同一句话投两遍（实测：一次 `myteam_message` 触发两次 `sendMessage`）。
-       * 成员→成员的消息没有显式投递，仍然靠这条唤醒送达，所以只跳过 from=lead/human 的。 */
+      /* CHG-213：队长/面板的消息已由调用方同步投递，这里再唤醒就是同一句话投两遍（实测）。
+       * 成员→成员消息没有显式投递，仍靠唤醒送达，所以只跳过 from=lead|human 的。 */
       const from = String(event.payload.from ?? '')
       if (wake.cause === 'message' && (from === 'lead' || from === 'human')) continue
-      /* 唤醒与消息同一条投递通道（子代理成员 followup 会抛）——异步，失败只告警。
-       * commit 是同步路径，所以这里 fire-and-forget；未送达在 warn 里留痕（不假装叫醒了）。 */
-      void Promise.resolve(this.delivery.deliverText(wake.memberId, `[myteam] ${wake.cause}: ledger seq ${event.seq}（读 myteam_get_task/myteam_list_tasks 获取详情）`))
+      void Promise.resolve(this.delivery.deliverText(wake.memberId, `[myteam] ${wake.cause}: ledger seq ${event.seq}（读 myteam_get_task/myteam_list_tasks 获取详情）`, teamId))
         .then((delivered) => { if (!delivered) this.log('warn', `wake ${wake.memberId} not delivered`) })
         .catch(() => {})
     }
@@ -2364,7 +2363,7 @@ export class MyTeamHost                               {
           },
         })
         if (!r.ok) return { status: 'error', code: r.code, message: r.message }
-        const delivered = this.deliverMemberMessage(memberId, 'steer', content)
+        const delivered = this.deliverMemberMessage(memberId, 'steer', content, teamId)
         const describe = (ok         )                          => ({
           status: 'steered',
           memberId,
@@ -2528,9 +2527,9 @@ export class MyTeamHost                               {
     return this.memberLookup.bySession(sessionId)
   }
 
-  /** 按 memberId 找成员（跨团队；与 findMemberBySession 同一份遍历口径） */
-          memberById(memberId        )                             {
-    return this.memberLookup.byId(memberId)
+  /** 按 memberId 找成员（跨团队；**给了 teamId 就只查该团队**——成员 id 只在团队内唯一） */
+          memberById(memberId        , teamId         )                             {
+    return this.memberLookup.byId(memberId, teamId)
   }
 
   /** CHG-213：成员查找（跨团队遍历 + 投影字段归一）落在 `host/member-lookup.ts`（A6 只减不增） */

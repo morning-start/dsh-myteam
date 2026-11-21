@@ -194,6 +194,12 @@ function subagentsOf(rt                  )                                      
      
                                                                             
      
+                                                                   
+                                                                  
+                                          
+     
+                                           
+     
                                                          
                                                                             
                                                                                
@@ -314,6 +320,7 @@ export function createSpawnLifecycle(deps                    ) {
       const activation = subagentsOf(deps.rt())
       const canActivate = spawnCtx?.agent !== undefined
         && typeof activation?.startActivation === 'function'
+      if (canActivate) deps.markSubagent?.(memberId)
       created = canActivate
         ? (activation                                                   ).startActivation({
           provider: 'spawn',

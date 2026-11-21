@@ -78,8 +78,9 @@ export interface MembersHostSurface {
   releaseMember(teamId: string, memberId: string, mode: string, confirm: boolean, actor?: string, cascade?: boolean): Record<string, unknown>
 
   /** A10：投递口径的唯一构造点（消息已落账 → 投不进去也不抛，但必须如实回报 false）
-   *  CHG-213：同步通道给布尔，子代理通道（sendMessage）给 Promise——两种形状都要接 */
-  deliverMemberMessage(memberId: string, kind: string, content: string): boolean | Promise<boolean>
+   *  CHG-213：同步通道给布尔，子代理通道（sendMessage）给 Promise——两种形状都要接；
+   *  `teamId` 必须传：成员 id 只在团队内唯一（跨团队同名会串到别人的会话上） */
+  deliverMemberMessage(memberId: string, kind: string, content: string, teamId?: string): boolean | Promise<boolean>
 
   /** FIX-12：`agents.create` 返回形状未实证——双形状兼容（`{agent}` 包装 / agent 本体） */
   agentOf(handle: unknown): { followup?: (msg: unknown) => void; cancel?: (o: unknown) => void } | undefined
@@ -190,7 +191,7 @@ export function createMembersHandlers(host: MembersHostSurface) {
           message: `消息已落账，但成员 "${to}" 当前没有在线会话：先 myteam_release_member 再 myteam_spawn_member（或等它上线读账本），不要当成已送达`,
         }
       // CHG-213：子代理通道（sendMessage）异步，根会话通道（followup）同步——两种形状都接受
-      const delivered = host.deliverMemberMessage(to, kind, String(args.content))
+      const delivered = host.deliverMemberMessage(to, kind, String(args.content), teamId)
       return isThenable(delivered) ? delivered.then(describe) : describe(delivered)
     },
 

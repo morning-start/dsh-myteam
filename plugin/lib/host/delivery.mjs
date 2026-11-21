@@ -33,8 +33,10 @@
                   
                                                                                                                                    
                
-                                               
-                                                           
+                                                                            
+                                                                            
+                                                         
+                                           
                                   
                                        
                                                     
@@ -61,36 +63,52 @@ export function isThenable(value         )                            {
   )
 }
 
+/**
+ * 子代理通道的**短暂重试**等待表（毫秒）。为什么需要：`startActivation` 刚返回、child 还没进
+ * `resident` 时，`sendMessage` 会以 `subagent "…" is unavailable` 拒绝——这条消息本可以送到，
+ * 只是早了几百毫秒（实测：spawn 后立刻发第一条消息必失败，第二次就成功）。
+ * 只对「还没就绪」这种**瞬时**错误重试；`cannot resume` / `UNAUTHORIZED` 这类确定性拒绝立即放弃。
+ */
+const SUBAGENT_RETRY_DELAYS_MS = [0, 150, 400, 900]
+const TRANSIENT_SUBAGENT_ERROR = /unavailable|not yet|admitting/i
+
 export function createDelivery(host              ) {
-  /**
-   * 该会话是不是**子代理 child**（决定用哪条通道）。
-   *
-   * 判据取运行时事实（`session.header.parentSession` / `agentPreset` 有值 = 子代理），
-   * **不用**「本进程登记过 activation」那种簿记：spawn 与首条消息之间可能只隔一个 await，
-   * 簿记还没落，就会误判成根会话 → 走 followup → 抛 `cannot append outside a SessionStore`。
-   */
-  function isSubagentSession(sessionId        )          {
-    const agent = host.agentById(sessionId)                                                                                             
-    const header = agent?.session?.header
-    return header !== undefined && (header.parentSession !== undefined || header.agentPreset !== undefined)
+  async function viaSubagents(
+    service         ,
+    send                                                                                                             ,
+    sender         ,
+    childId        ,
+    text        ,
+  )                   {
+    let lastError         
+    for (const delay of SUBAGENT_RETRY_DELAYS_MS) {
+      if (delay > 0) await new Promise((resolve) => setTimeout(resolve, delay))
+      try {
+        await send.call(service, sender, childId, [{ type: 'text', text }], { signal: new AbortController().signal })
+        return true
+      } catch (error) {
+        lastError = error
+        const message = String((error                     )?.message ?? error)
+        if (!TRANSIENT_SUBAGENT_ERROR.test(message)) break
+      }
+    }
+    host.log('warn', `message to child "${childId}" via subagents failed: ${String((lastError                     )?.message ?? lastError)}`)
+    return false
   }
 
-  function deliverText(memberId        , text        )            {
-    const childId = host.memberSessionId(memberId)
-    if (childId !== undefined && isSubagentSession(String(childId))) {
+  function deliverText(memberId        , text        , teamId         )            {
+    const childId = host.memberSessionId(memberId, teamId)
+    /* 通道选择只看**载体事实**（spawn 时定下来就走了哪条路），不看「child 现在在不在 resident」：
+     * 实测存在两个窗口——spawn 与首条消息之间、以及成员一轮跑完被收回之后——`agents.get(childId)`
+     * 都是 undefined，用活跃度判载体就会把「子代理成员」误判成根会话，消息直接投不出去。 */
+    if (childId !== undefined && host.isSubagent(memberId)) {
       const service = host.subagents()
       const send = service?.sendMessage
       if (service !== undefined && typeof send === 'function') {
         const sender = host.leadAgent()
         /* 没有队长 Agent 就没有「树里的活祖先」，sendMessage 无法授权 → 直接判未送达 */
         if (sender === undefined) return false
-        return Promise.resolve(send.call(service, sender, String(childId), [{ type: 'text', text }], { signal: new AbortController().signal })).then(
-          () => true,
-          (error         ) => {
-            host.log('warn', `message to child "${childId}" via subagents failed: ${String((error                     )?.message ?? error)}`)
-            return false
-          },
-        )
+        return viaSubagents(service, send, sender, String(childId), text)
       }
     }
     const agent = host.agentOf(host.handle(memberId)) ?? (childId === undefined ? undefined : host.agentOf(host.agentById(String(childId))))
@@ -111,8 +129,8 @@ export function createDelivery(host              ) {
   return {
     deliverText,
     /** 队长 → 成员的标准消息（`myteam_message` / 面板 steer 共用这一份文案） */
-    deliverMessage: (memberId        , kind        , content        )            =>
-      deliverText(memberId, `[myteam] 队长消息（${kind}）：${content}`),
+    deliverMessage: (memberId        , kind        , content        , teamId         )            =>
+      deliverText(memberId, `[myteam] 队长消息（${kind}）：${content}`, teamId),
   }
 }
 

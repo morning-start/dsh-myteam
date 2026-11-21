@@ -78,8 +78,9 @@ export function guardRule   (rule         )                                     
                                                                                                                                              
 
                                                    
-                                                             
-                                                                                                   
+                                                           
+                                                   
+                                                                                                                    
 
                                                                        
                                                                                                             
@@ -190,7 +191,7 @@ export function createMembersHandlers(host                    ) {
           message: `消息已落账，但成员 "${to}" 当前没有在线会话：先 myteam_release_member 再 myteam_spawn_member（或等它上线读账本），不要当成已送达`,
         }
       // CHG-213：子代理通道（sendMessage）异步，根会话通道（followup）同步——两种形状都接受
-      const delivered = host.deliverMemberMessage(to, kind, String(args.content))
+      const delivered = host.deliverMemberMessage(to, kind, String(args.content), teamId)
       return isThenable(delivered) ? delivered.then(describe) : describe(delivered)
     },
 
