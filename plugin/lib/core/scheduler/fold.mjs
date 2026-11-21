@@ -419,6 +419,17 @@ export function applyEvent(proj                , event             )       {
       t.deliverables.push({ path: p.path, seq: event.seq })
       break
     }
+    /* CHG-210 批 5.5：**paused = 我主动停的**（与 blocked「等人裁决」分开）。
+     * 语义是「交还任务」：清票据 + 释放成员占用，任务停在 paused 等队长决定回队列还是取消。 */
+    case 'task.paused': {
+      const t = requireTask(proj, p.taskId, event.seq)
+      transition(t, 'paused', event.seq)
+      t.attemptId = undefined
+      t.pausedAt = event.ts
+      t.pausedReason = String(p.reason ?? '')
+      releaseMember(proj, t)
+      break
+    }
     case 'task.failed': {
       const t = requireTask(proj, p.taskId, event.seq)
       transition(t, 'failed', event.seq)

@@ -384,11 +384,13 @@ export function createMemberTaskHandlers(host: MemberTasksHostSurface) {
       const status = String(args.status)
       const attemptId = String(args.attemptId)
       const taskId = String(args.taskId)
-      const eventType = status === 'in_progress' ? 'task.progress' : status === 'done' ? 'task.completed' : 'task.failed'
+      const eventType = status === 'in_progress' ? 'task.progress' : status === 'done' ? 'task.completed' : status === 'paused' ? 'task.paused' : 'task.failed'
       const payload: Record<string, unknown> = { teamId, taskId, attemptId }
       if (status === 'in_progress') payload.progress = args.progress
       if (status === 'done') payload.summary = args.summary
       if (status === 'failed') { payload.reason = args.reason; payload.summary = args.summary }
+      /* CHG-210 批 5.5：暂停只带理由（不带 summary——它没产出任何东西） */
+      if (status === 'paused') payload.reason = args.reason
       if (args.evidence) payload.evidence = args.evidence
       // 证据块先落存证（FR-5.0：completed 前必须有同 attemptId 的 task.evidence 事件）
       if (status === 'done' && args.evidence) {

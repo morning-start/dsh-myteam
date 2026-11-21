@@ -21,6 +21,7 @@
           
             
              
+            
                
 
 export const TERMINAL_STATES                         = new Set(['done', 'failed', 'cancelled'])
@@ -170,6 +171,9 @@ export const GATE_REJECT_BUDGET = 2
      
                     
                         
+                                                               
+                   
+                       
      
                                
                                                    
@@ -214,7 +218,7 @@ const LEGAL_TRANSITIONS                                 = {
   // CHG-73：重新规划（rescope）带结构补丁时，任务可能退回 backlog（新依赖还没完成）——
   // 「ready → backlog」只在 rescope 事件里出现，是补丁生效后的重新调度，不是回退历史。
   ready: ['in_progress', 'blocked', 'cancelled', 'backlog'],
-  in_progress: ['re-scoping', 'gate:review', 'gate:verify', 'gate:archive', 'failed', 'blocked', 'cancelled'],
+  in_progress: ['re-scoping', 'gate:review', 'gate:verify', 'gate:archive', 'failed', 'blocked', 'paused', 'cancelled'],
   're-scoping': ['ready', 'backlog', 'blocked', 'cancelled'],   // rescope→ready / abort→blocked / 队长撤销→cancelled
   'gate:review': ['gate:verify', 'gate:archive', 'in_progress', 'ready', 'failed', 'cancelled'],  // 后继由任务 gateChain 决定；ready = 打回后回到修复队列（CHG-86）
   'gate:verify': ['gate:review', 'gate:archive', 'in_progress', 'ready', 'failed', 'cancelled'],
@@ -222,6 +226,12 @@ const LEGAL_TRANSITIONS                                 = {
   done: [],
   failed: [],
   blocked: ['ready', 'backlog', 'cancelled'],
+  /* CHG-210 批 5.5：**暂停不是失败，也不是阻塞**。
+   * blocked 是「等外部条件」（系统判死的，要人来解）；paused 是「**我主动停的**」
+   * （成员交还任务，说清理由）。两者在面板上必须是两种颜色——否则「等人处理」和
+   * 「我暂时做不了」混成一堆，队长看不出该催谁。
+   * 出口与 blocked 相同（回队列 / 回池 / 取消）：暂停不是终态。 */
+  paused: ['ready', 'backlog', 'cancelled'],
   cancelled: [],
 }
 

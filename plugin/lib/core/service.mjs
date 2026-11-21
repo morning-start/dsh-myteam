@@ -468,6 +468,16 @@ export class TeamService {
         if (stale) return stale
         break
       }
+      /* CHG-210 批 5.5：暂停必须是**持有人**发起，且理由非空。
+       * 理由不是装饰——队长靠它判断「该催、该换人、还是该改定义」，空理由等于把判断推回给队长猜。 */
+      case 'task.paused': {
+        const stale = this.checkAttempt(p.taskId, p.attemptId, draft.actor)
+        if (stale) return stale
+        if (!p.reason || String(p.reason).trim() === '') {
+          return { ok: false, code: 'MT_VALIDATION', message: '暂停必须写清理由（reason 非空）——「为什么停」是队长判断该催谁、还是该改定义的唯一线索' }
+        }
+        break
+      }
       case 'task.escalated': {
         const stale = this.checkAttempt(p.taskId, p.attemptId, draft.actor)
         if (stale) return stale

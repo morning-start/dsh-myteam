@@ -41,6 +41,7 @@ export const EVENT_TYPES = [
   'task.completed',
   'task.failed',
   'task.blocked',       // CHG-207（P1-8）：停下等人（非终态；人工 rescope 可回 ready）
+  'task.paused',        // CHG-210 批 5.5：成员主动暂停（交还任务，非终态；与 blocked 分开）
   'task.escalated',
   'task.rescoped',
   'task.updated',       // CHG-70：任务元数据编辑（补丁合并，不改状态）
