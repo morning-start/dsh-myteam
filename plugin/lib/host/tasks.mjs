@@ -315,7 +315,26 @@ export function createMemberTaskHandlers(host                        ) {
       if (!t) return { status: 'error', code: 'MT_VALIDATION', message: `task "${args.taskId}" not found` }
       // 修订：attemptId 只发给当前持有人（原实现 t.attemptId === t.attemptId 恒真，泄漏给任意成员）
       const ownAttempt = t.assignee === member.memberId ? t.attemptId : undefined
-      return { status: 'ok', task: { id: t.id, title: t.input.title, description: t.input.description, acceptanceCriteria: t.input.acceptanceCriteria, deliverableSpec: t.input.deliverableSpec, deps: t.input.deps, requiredRole: t.input.requiredRole, priority: t.input.priority, state: t.state, attemptId: ownAttempt, escalateCount: t.escalateCount } }
+      /* CHG-213（实机）：可选字段**不能**写成 `key: undefined`。工具返回值要过 lossless JSON
+       * 校验（`tools.register` 的 output schema），一个 undefined 就让整次读取失败——成员在
+       * **认领前**读任务时实测报 `invalid output: value is not lossless JSON`（认领后 task 有
+       * attemptId 才恢复正常）。deliverableSpec 同理（非叶子任务没有它）。 */
+      return {
+        status: 'ok',
+        task: {
+          id: t.id,
+          title: t.input.title,
+          description: t.input.description,
+          acceptanceCriteria: t.input.acceptanceCriteria,
+          deps: t.input.deps,
+          requiredRole: t.input.requiredRole,
+          priority: t.input.priority,
+          state: t.state,
+          escalateCount: t.escalateCount,
+          ...(t.input.deliverableSpec !== undefined ? { deliverableSpec: t.input.deliverableSpec } : {}),
+          ...(ownAttempt !== undefined ? { attemptId: ownAttempt } : {}),
+        },
+      }
     },
 
     /** `myteam_list_tasks`：返回行数 ≠ 已读全部内容（NFR-7.6） */

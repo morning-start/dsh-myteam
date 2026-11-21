@@ -127,6 +127,13 @@ test('t123-1: repeat —— 同工具同参数连续第 3 次 → 结果里带 g
     const first = host.executeMemberTool(implMember, 'myteam_get_task', { taskId }) as any
     assert.equal(first.status, 'ok', '第 1 次正常')
     assert.equal(first.guard, undefined, '未达阈值不打扰')
+    /* CHG-213（实机）：**认领前**的任务视图不许带 undefined 字段——工具返回值要过 lossless JSON
+     * 校验，一个 `attemptId: undefined` 就让整次读取报 `invalid output: value is not lossless JSON`
+     * （成员在长跑里实测到，认领后才有 attemptId 所以「领完就正常」，很容易被误判成偶发）。 */
+    const hasUndefined = (value: unknown): boolean =>
+      value === undefined || (typeof value === 'object' && value !== null && Object.values(value as Record<string, unknown>).some(hasUndefined))
+    assert.equal(hasUndefined(first.task), false, `任务视图不许含 undefined：${JSON.stringify(first.task)}`)
+    assert.equal('attemptId' in (first.task as Record<string, unknown>), false, '未认领时连键都不能出现')
     const second = host.executeMemberTool(implMember, 'myteam_get_task', { taskId }) as any
     assert.equal(second.guard, undefined, '第 2 次还不算打转（一次重试是正常自愈）')
     const third = host.executeMemberTool(implMember, 'myteam_get_task', { taskId }) as any

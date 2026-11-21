@@ -205,6 +205,36 @@ stage2              memberSessionAliveAfterRestart=false  delivered=false +「�
 说明这是**宿主沙箱在本机拿不到工作区 ACL**（`E:\Workplace` 权限），**不是 myteam 的缺陷**；
 桌面端因为是 `danger-full-access` 所以看不到这个现象。要在 CLI 实例里跑命令，得给该 profile 放宽文件策略。
 
+### 4.4 长跑验收（2026-11-21 夜间，桌面端真实队长会话 + 真模型 × 2 成员）
+
+在**重启后的桌面端**（此时插件已含 §4.2/§4.3 的全部修复）里，用真实队长会话（而非探针）跑完整一条链：
+
+```
+长跑团队 longrun-1（名册 captain + implementer + reviewer）
+plan.staged → approve（自动召唤 m1-implementer / m2-reviewer）→ task-1 上板
+成员一轮  myteam_claim_task(attempt at-…) → write tasks/longrun-t1.md（含 [Verification evidence]，
+          kind=commands / 退出码 0 / 断言数 3）→ task.evidence → task.completed
+门禁      gate:review：m2-reviewer 交叉审查 pass → task.deliverable → gate:archive：host 落位校验 pass
+任务      task-1 终态 done（gateVerdicts = { review: pass, archive: pass }）
+成员二轮（空闲后被再次唤醒）  myteam_recall("上岗自述") → returnedCount=1，
+          命中第一轮写入的 m-mwqloe1z-1（id / title / evidence 指针完全一致）
+```
+
+成员自己在交付物里的结论（原样）：
+
+> **记忆跨回合留存成立**。第一轮由 `myteam_remember` 写入的 `m-mwqloe1z-1` 在本轮召回中被原样读出，
+> id / title / evidence 指针与写入时一致，且该 evidence 文件此刻仍在盘上；召回走的是成员私有 bank
+> （SQLite，`member:longrun-1:m1-implementer`），不依赖会话上下文。
+
+成员还自己数清了工具面：**13 个 myteam 工具**、按调用者分叉的队长读面/写面工具**不在**它的工具面里——
+这是 C5 收窄在真机上的自证（不是我们读代码推断的）。
+
+这一轮抓到的缺陷（第 9 个，已修 + 用例）：
+
+| 现象 | 根因 | 修法 |
+|---|---|---|
+| 成员**认领前**读任务报 `invalid output: value is not lossless JSON`，认领后正常 | `myteam_get_task` 把可选字段写成 `key: undefined`（未认领时 `attemptId`、非叶子任务的 `deliverableSpec`），工具返回值要过 lossless JSON 校验，一个 undefined 就整次失败 | 可选字段改成条件展开（`...(x !== undefined ? {x} : {})`） |
+
 **顺序理由**：P1/P2 与成员载体无关，先落地能立刻受益；P3 是 P4 的前置（否则成员视图拿不到服务）；
 P4 风险最高，放在服务分层之后一次完成。
 
