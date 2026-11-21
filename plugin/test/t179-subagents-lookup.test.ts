@@ -347,7 +347,7 @@ test('t179h: 同名成员 id 跨团队不串线（成员 id 只在团队内唯�
   }
 })
 
-test('t179i: 子代理名撞名（同一队长会话里开第二个团队）→ 去掉 name 重试，不许 spawn 失败', () => {
+test('t179i: 子代理名撞名（同一队长会话里开第二个团队）→ 去掉 name 重试，不许 spawn 失败', async () => {
   const { root, cleanup } = tempWorkspace('myteam-t179i')
   try {
     const captured: Captured = {}
@@ -359,7 +359,9 @@ test('t179i: 子代理名撞名（同一队长会话里开第二个团队）→ 
         const name = spec['name'] === undefined ? undefined : String(spec['name'])
         names.push(name)
         if (name !== undefined && used.has(name)) {
-          throw new Error(`agent name "${name}" is already used by another subagent you created; choose another name`)
+          /* 实机里重名检查走的是**异步拒绝**（startActivation 返回的 Promise 才 reject），
+           * 所以这里也用 Promise.reject —— 只 catch 同步异常的实现在这条用例上必须失败。 */
+          return Promise.reject(new Error(`agent name "${name}" is already used by another subagent you created; choose another name`))
         }
         if (name !== undefined) used.add(name)
         captured.spec = spec
@@ -374,6 +376,7 @@ test('t179i: 子代理名撞名（同一队长会话里开第二个团队）→ 
     const { host, teamId } = approvedTeam(runtime)
     const result = host.executeLeadTool('myteam_spawn_member', { teamId, roleId: 'implementer', instanceName: 'implementer-1' }, { agent: { id: 'cap-t179i' } }) as any
     assert.equal(result.status, 'spawned', `撞名必须能自愈：${JSON.stringify(result)}`)
+    await new Promise((resolve) => setTimeout(resolve, 20))
     assert.equal(names.length, 2, `第一次带名字撞上，第二次不带名字（实际 ${JSON.stringify(names)}）`)
     assert.equal(names[0], `${teamId.toLowerCase()}-implementer-1`, '名字要带团队前缀（跨团队不撞）')
     assert.equal(names[1], undefined, '重试时去掉 name，交给宿主自动分配')

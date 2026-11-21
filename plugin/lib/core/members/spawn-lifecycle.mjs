@@ -179,16 +179,34 @@ function subagentNameFor(teamId        , instanceName        )                  
 
 /**
  * 起子代理：名字撞上就**去掉 name 重试一次**（宿主自动分配 `agent-N`）。
+ *
  * 只对「名字已被占用」重试——其它错误（深度超限、provider 变更）必须原样抛出，不能被吞。
+ * **同步抛与异步 reject 都要处理**：实测宿主的重名检查走的是**异步拒绝**（`startActivation`
+ * 返回的 Promise 才 reject），只 catch 同步异常时这条自愈一次都不会触发。
  */
-function activateChild(activation                                                                 , spec                         )          {
-  try {
-    return activation.startActivation(spec)
-  } catch (error) {
-    if (spec['name'] === undefined || !/already used|already exists/i.test(String((error                     )?.message ?? error))) throw error
+function activateChild(
+  activation                                                                 ,
+  spec                         ,
+  isThenable                             ,
+)          {
+  const retriable = (error         )          =>
+    spec['name'] !== undefined && /already used|already exists/i.test(String((error                     )?.message ?? error))
+  const retry = ()          => {
     const { name: _drop, ...rest } = spec
     return activation.startActivation(rest)
   }
+  let created         
+  try {
+    created = activation.startActivation(spec)
+  } catch (error) {
+    if (!retriable(error)) throw error
+    return retry()
+  }
+  if (!isThenable(created)) return created
+  return (created                    ).catch((error         ) => {
+    if (!retriable(error)) throw error
+    return retry()
+  })
 }
 
 /**
@@ -365,7 +383,7 @@ export function createSpawnLifecycle(deps                    ) {
         agentPreset: 'myteam-member',
         delivery: 'caller',
         signal: spawnCtx .signal ?? new AbortController().signal,
-      })
+      }, deps.isThenable)
         : deps.rt().agents.create({
         sessionId,
         agentOptions: model
