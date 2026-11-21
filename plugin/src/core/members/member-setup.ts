@@ -27,6 +27,11 @@ export const TEAM_MEMBER_TOOLS = [
   'myteam_escalate_task',
   'myteam_read_knowledge',
   'myteam_submit_review',
+  /* CHG-212（ADR-010）：长期记忆——子代理会话会被释放，记忆必须落在 SQLite bank 里。
+   * 与任务工具同属 A 档：记忆是成员自己的东西，不需要队长授权。 */
+  'myteam_remember',
+  'myteam_recall',
+  'myteam_forget',
 ] as const
 
 /** 内置团队工具（宿主 experimental agentTeam；hideBuiltinTeamTools 要隐藏的名单，T0 实测 9 个） */

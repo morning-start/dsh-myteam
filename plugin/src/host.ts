@@ -42,6 +42,7 @@ import { createMembersHandlers, guardRule } from './host/members.ts'
 /* CHG-187（FR-32 支柱一）：成员派生树的纯规则（深度 / 子数 / 级联顺序） */
 import { releaseOrder, rosterOf } from './core/members/hierarchy.ts'
 import { createMemberTaskHandlers, createTasksHandlers } from './host/tasks.ts'
+import { createMemoryHandlers } from './host/memory.ts'
 import { createPlanHandlers } from './host/plan.ts'
 import { createRolesHandlers } from './host/roles.ts'
 import { createTeamsHandlers } from './host/teams.ts'
@@ -134,7 +135,7 @@ import { createGateExecution } from './core/gates/gate-execution.ts'
 /* CHG-191（T159c）：批量编排（行为边界下沉——批量操作 / 批量建任务 / 计划拆分物化搬进 core/tasks/**） */
 import { createBatchOrchestration } from './core/tasks/batch-orchestration.ts'
 /* CHG-137/138（docs/19 §3）：工具权限档位（单一事实源 + 运行时门禁） */
-import { canCall, tierOf, type ToolCaller } from './core/tools/tool-tiers.ts'
+import { canCall, tierOf, tierRefusal, type ToolCaller } from './core/tools/tool-tiers.ts'
 /* CHG-124（docs/19 §M6）：任务依赖图谱纯函数（Kahn 分层 + 环检测） */
 import { buildTaskGraph } from './core/scheduler/task-graph.ts'
 import { readWorkspaceIndex, resolveMyteamHome, globalStoreLayout } from './core/index/team-index.ts'
@@ -621,6 +622,8 @@ export class MyTeamHost implements MyTeamHostContract {
     batchTaskOp: (teamId, args, actor) => this.batchTaskOp(teamId, args, actor),
     createTasksBatch: (teamId, args, actor) => this.createTasksBatch(teamId, args, actor),
   })
+  /** CHG-212（ADR-010）：记忆族（SQLite bank；上岗召回由 spawn 生命周期注入，不在这里） */
+  private readonly memory = createMemoryHandlers({ workspaceRoot: () => this.workspaceRoot })
   /**
    * CHG-186（T155c）：计划族端点适配层（`src/host/plan.ts`）。
    *
@@ -1436,15 +1439,8 @@ export class MyTeamHost implements MyTeamHostContract {
      * human-intent 通道留位）。未登记工具**不改原有行为**（走 switch 默认分支）。
      */
     if (exec.enforceTier === true) {
-      const tier = tierOf(name)
-      const caller: ToolCaller = actor === 'human' ? 'human' : 'captain'
-      if (tier && !canCall(name, caller)) {
-        return {
-          status: 'error',
-          code: 'MT_UNAVAILABLE',
-          message: `工具「${name}」是 ${tier} 档（人类专属），当前调用者（${caller}）不可调`,
-        }
-      }
+      const refusal = tierRefusal(name, actor === 'human' ? 'human' : 'captain')
+      if (refusal !== undefined) return { status: 'error', code: 'MT_UNAVAILABLE', message: refusal }
     }
     try {
       switch (name) {
@@ -2584,6 +2580,9 @@ export class MyTeamHost implements MyTeamHostContract {
           return this.memberTasks.escalate(teamId, member, args, actor)
         case 'myteam_read_knowledge':
           return this.memberKnowledge.read(args)
+        /* CHG-212（ADR-010）：长期记忆（SQLite bank）。所有成员都可用，不需要授权。 */
+        case 'myteam_remember': case 'myteam_recall': case 'myteam_forget':
+          return this.memory.handle(name, teamId, member.memberId, args, actor)
         case 'myteam_submit_review':
           return this.memberTasks.submitReview(teamId, member, args, actor)
         case 'myteam_list_members': return this.members.listMembers(teamId) // CHG-210 批 6.6：成员也能看名册（peer_message 要知道队友 id）

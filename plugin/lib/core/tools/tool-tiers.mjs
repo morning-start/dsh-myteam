@@ -53,6 +53,11 @@ export const TOOL_TIERS                           = {
   myteam_read_task: 'A',
   myteam_read_board: 'A',
   myteam_read_knowledge_entry: 'A',
+  /* CHG-212（ADR-010）：**长期记忆**——记忆是成员自己的东西，读写都是自助，不需要队长授权。
+   * 为什么是 A 而不是 C：队长批准的是**团队结构**，不是成员记了什么；写记忆不碰账本状态。 */
+  myteam_remember: 'A',
+  myteam_recall: 'A',
+  myteam_forget: 'A',
   /* CHG-200（用户定案「任务检查应该由成员自己完成」）：**成员提交门禁裁决**——审查者 = 调用者，
    * 强制交叉审查（不能审自己实现的任务）。A 档：检查是成员的份内事，不需要队长先授权；
    * 越权边界由 reviewTask 的 reviewer≠implementer 硬校验守住（MT_CROSS_REVIEW）。 */
@@ -147,6 +152,20 @@ export function canCall(toolName        , caller            , authorized = false
   if (caller === 'captain') return true
   /* member：C 永远不可；CM 仅在显式授权时可用 */
   return tier === 'CM' && authorized
+}
+
+/**
+ * 运行时档位拒绝文案（`undefined` = 允许调用）。
+ *
+ * 判档 + 文案放一处，宿主只负责包错误码——CHG-212 顺带把它从 `host.ts` 抽出来给 A6 腾行，
+ * 行为与文案逐字不变（t121/t133 锁的就是这两句）。
+ */
+export function tierRefusal(toolName        , caller            )                     {
+  const tier = tierOf(toolName)
+  if (!tier || canCall(toolName, caller)) return undefined
+  return caller === 'member'
+    ? `工具「${toolName}」是 ${tier} 档（仅队长可调），成员不可用`
+    : `工具「${toolName}」是 ${tier} 档（人类专属），当前调用者（${caller}）不可调`
 }
 
 /** 按档位分组（面板/文档/测试共用） */

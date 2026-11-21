@@ -248,6 +248,28 @@ export const TOOL_OUTPUT_FIELDS: Record<string, JsonSchemaSpec> = {
       entry: { type: 'object', description: '知识条目（id/title/tags/unverified/staleSince/proofCount/body）；stale 时 body 带待复核前缀' },
     },
   },
+  /* CHG-212（ADR-010）：长期记忆（SQLite bank）三件套。 */
+  myteam_remember: {
+    properties: {
+      id: { type: 'string', description: '记忆条目 id（supersedes / forget 用）' },
+      bank: { type: 'string', description: '落库的 bank（member:<team>:<member> / team:<team>）' },
+      kind: { type: 'string', description: '记忆类型' },
+      title: { type: 'string', description: '标题' },
+    },
+  },
+  myteam_recall: {
+    properties: {
+      entries: { type: 'array', items: { type: 'object' }, description: '召回条目（id/kind/title/body/evidence/importance/score），按 score 降序' },
+      returnedCount: { type: 'number', description: '本次返回条数（空 = 正常结果，不是错误）' },
+      note: { type: 'string', description: '评分口径说明' },
+    },
+  },
+  myteam_forget: {
+    properties: {
+      id: { type: 'string', description: '被归档的条目 id' },
+      forgotten: { type: 'boolean', description: '是否命中活条目（重复归档返回 false）' },
+    },
+  },
   myteam_get_audit: {
     properties: {
       teamId: { type: 'string', description: '团队 id' },

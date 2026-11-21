@@ -93,8 +93,8 @@ trigram 要求 ≥3 字，短查询回退 `LIKE`（bank 过滤 + limit，规模�
 
 | 批 | 内容 | 验收 | 状态 |
 |---|---|---|---|
-| **P1** | `core/memory/store.ts`（SQLite 存储层）+ 6 条测试 | 写入/召回/隔离/归档/重开 全绿 | 代码已写、6/6 通过，**因「未接线导出 / 死模块」门禁搁置**（暂存在本地 `.debug/pending-memory/`，下一批与工具一起入库） |
-| **P2** | `myteam_remember` / `myteam_recall` / `myteam_forget` + 工具契约锁（defs / tiers / output-contract / 4 处计数） | 工具数 70→73、C 档不变、契约锁全绿 | 待做 |
+| **P1** | `core/memory/store.ts`（SQLite 存储层）+ `core/memory/recall.ts`（上岗召回）+ 7 条测试 | 写入/召回/隔离/归档/重开/预算 全绿 | ✅ 已入库（CHG-212） |
+| **P2** | `myteam_remember` / `myteam_recall` / `myteam_forget` + 工具契约锁（defs / tiers / output-contract / 成员工具表 / 4 处计数） | 工具数 59 lead + 13 member = 72，A 档 26，契约锁全绿 | ✅ 已入库（CHG-212） |
 | **P3** | `myteam` 服务移到 root + preset 拆 captain/member | 面板端点不变、A6 不涨、preset 泄漏审计通过 | 待做 |
 | **P4** | `spawn` 改 `subagents.startActivation` + 身份反查 + 成员 preset | `myteam_spawn_member` 起来的成员带 `parentSession` 且工具面 = 成员 preset | 待做 |
 | **P5** | 重启后按需恢复 + 记忆注入（上岗时召回 top-5） | kill 后重启，成员可被唤醒且记忆仍在 | 待做 |

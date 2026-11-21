@@ -65,6 +65,7 @@ import {
 } from '../members/member-setup.ts'
 import { applyCapabilityGuard, buildCapabilityBoundaryText, capabilitySummary, resolveCapabilities } from '../members/capability-guard.ts'
 import { memoryDirFor, seedMemoryIfMissing } from '../members/memory.ts'
+import { memoryBrief } from '../memory/recall.ts'
 import { writeMemberCard } from '../members/member-card.ts'
 import { knowledgeDirOf, listKnowledge, renderIndexSection } from '../knowledge/knowledge.ts'
 import { memberIdentityDir as memberIdentityDirOf, scratchDir as scratchDirOf, storeLayout } from '../workspace/layout.ts'
@@ -328,6 +329,13 @@ export function createSpawnLifecycle(deps: SpawnLifecycleDeps) {
         // ⑥ 记忆纪律 section（T20：FR-6.2 证据指针 + FR-6.4 不宣告交接）
         const memDir = memoryDirFor(deps.workspaceRoot(), teamId, memberId)
         agentCtx.systemPrompt.section(memoryPromptSection(member, memDir, svc.effectiveConfig.memory?.evidenceRequired ?? true))
+        // ⑥b 上岗记忆召回（CHG-212 / ADR-010）：SQLite bank 里的长期记忆压成一段提示词。
+        // 子代理会话会被父级联释放，记忆不随会话走；这里只做「上岗那一刻的一次召回」，
+        // 更多内容由成员自己调 myteam_recall（每轮注入是预算浪费）。失败不阻断 spawn。
+        const brief = memoryBrief(deps.workspaceRoot(), teamId, memberId)
+        if (brief.count > 0) {
+          agentCtx.systemPrompt.section({ name: `myteam:memory-recall-${member.memberId}`, order: 105, text: brief.text })
+        }
         // ⑦ 能力边界（CHG-54 声明 / CHG-58 硬隔离）：成员声明 > 角色声明；空 = 不启用隔离
         const caps = resolveCapabilities(roleDef, member)
         if (caps.skills.length > 0 || caps.mcpAllowlist.length > 0) {

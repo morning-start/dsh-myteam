@@ -34,8 +34,8 @@ import {
 import { leadToolDefs, memberToolDefs, toolOutput } from '../src/tools/defs.ts'
 import { TOOL_TIERS } from '../src/core/tools/tool-tiers.ts'
 
-/* CHG-202x（P0-1）：+myteam_delete_task = 69 */
-const TOOL_COUNT = 70
+/* CHG-212（ADR-010）：+remember/recall/forget = 73 */
+const TOOL_COUNT = 73
 
 /** 69 个真实工具名（defs 侧）——契约清单必须与它一一对应 */
 const defNames = [...leadToolDefs(), ...memberToolDefs()].map((def) => def.name).sort()

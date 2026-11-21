@@ -10,8 +10,8 @@ import {
 } from '../src/core/members/member-setup.ts'
 import { BUILTIN_ROLES } from '../src/core/roles/builtin-roles.ts'
 
-test('T6: exactly 10 member tools (v2.5 +read_knowledge, CHG-200 +submit_review); team tools never in deny mask (FR-3.5)', () => {
-  assert.equal(TEAM_MEMBER_TOOLS.length, 10)
+test('T6: exactly 13 member tools (v2.5 +read_knowledge, CHG-200 +submit_review, CHG-212 +memory×3); team tools never in deny mask (FR-3.5)', () => {
+  assert.equal(TEAM_MEMBER_TOOLS.length, 13)
   assert.ok(TEAM_MEMBER_TOOLS.includes('myteam_claim_task'))
   assert.ok(TEAM_MEMBER_TOOLS.includes('myteam_read_knowledge'))
   // CHG-200（用户定案「任务检查应该由成员自己完成」）：审查者 = 调用者本人

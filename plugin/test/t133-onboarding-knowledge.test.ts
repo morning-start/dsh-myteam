@@ -78,7 +78,7 @@ test('t133-1: 新工具三表一致 —— leadToolDefs() / TOOL_TIERS / describ
   // CHG-200：+3 队长读面（read_task / read_board / read_knowledge_entry）+1 成员检查面（submit_review）
   /* CHG-202x（P0-1）：+myteam_delete_task = 59 */
   assert.equal(lead.length, 60, 'Lead 工具数必须是 60')
-  assert.equal(lead.length + memberToolDefs().length, 70, '工具总数必须是 70')
+  assert.equal(lead.length + memberToolDefs().length, 73, '工具总数必须是 73')
 
   // 档位：C（仅队长）—— 写面走团队账本，成员不能替团队立「团队级理解」
   assert.equal(TOOL_TIERS[TOOL], 'C', `${TOOL} 必须是 C 档（仅队长）`)

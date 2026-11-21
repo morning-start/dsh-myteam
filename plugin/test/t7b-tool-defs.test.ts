@@ -3,10 +3,10 @@ import assert from 'node:assert/strict'
 import { leadToolDefs, memberToolDefs, toolRegistryPlan, toolOutput, EVIDENCE_PARAM } from '../src/tools/defs.ts'
 import { TEAM_MEMBER_TOOLS } from '../src/core/members/member-setup.ts'
 
-test('T7 tool defs: 59 lead tools + 10 member tools, names match contract (docs/04 §1 + CHG-17/19/53/57/69/73/76/86/87/91/122~134/163/187/199)', () => {
+test('T7 tool defs: 59 lead tools + 13 member tools, names match contract (docs/04 §1 + CHG-17/19/53/57/69/73/76/86/87/91/122~134/163/187/199/212)', () => {
   const plan = toolRegistryPlan()
   assert.equal(plan.lead.length, 60)
-  assert.equal(plan.member.length, 10)
+  assert.equal(plan.member.length, 13)
   assert.deepEqual(plan.member, [...TEAM_MEMBER_TOOLS])
   // CHG-86（P0-4）：两个作用域不能有同名工具——旧实现队长侧与成员侧都叫
   // myteam_update_task，同名跨层注册时解析顺序决定谁生效（成员可能绕过 attemptId 校验）。

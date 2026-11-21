@@ -238,6 +238,45 @@ export function memberToolDefs(): ToolDef[] {
         required: ['taskId', 'verdict'],
       },
     },
+    {
+      /* CHG-212（ADR-010）：长期记忆三件套。为什么给成员：子代理会话会被父级联释放，
+       * 「任务里学到的坑」必须落在 SQLite 而不是会话里；上岗时 host 已召回一次，
+       * 这三个工具是成员自己补充/纠偏/查历史的入口。 */
+      name: 'myteam_remember',
+      description: '写一条长期记忆（SQLite bank，跨会话/跨成员释放保留）。**证据必填**（FR-6.2）：taskId / 账本 seq / 文件路径；无证据会被拒。scope=member（默认，私有）| team（团队公共口径，慎用）。修正旧结论用 supersedes 指向旧 id——旧条目归档不删除（refine not overwrite）。',
+      parameters: {
+        type: 'object',
+        properties: {
+          kind: { type: 'string', enum: ['fact', 'decision', 'pitfall', 'convention', 'episode'], description: '记忆类型（默认 fact）' },
+          title: str('一行标题（召回时显示）', true),
+          body: str('正文（结论/口径/踩坑的经过）', true),
+          evidence: str('证据指针：taskId / 账本 seq / 文件路径（必填）', true),
+          scope: { type: 'string', enum: ['member', 'team'], description: 'member=我的私有 bank（默认）/ team=团队公共 bank' },
+          importance: num('重要度 1..5（默认 3，影响召回排序）'),
+          taskId: str('关联任务 id（可省）'),
+          supersedes: str('被本条取代的旧条目 id（可省）'),
+        },
+        required: ['title', 'body', 'evidence'],
+      },
+    },
+    {
+      name: 'myteam_recall',
+      description: '检索长期记忆（只在本成员/本队的 bank 内）。空结果是正常结果（不是错误）。返回按 score 排序并带出处；score = 匹配 0.5 + 重要度 0.3 + 新鲜度 0.2。',
+      parameters: {
+        type: 'object',
+        properties: {
+          query: str('关键词（中文 ≥3 字走全文索引；更短走模糊匹配；空 = 按重要度/新鲜度取）'),
+          scope: { type: 'string', enum: ['member', 'team'], description: 'member=我的私有（默认）/ team=团队公共' },
+          kind: { type: 'string', enum: ['fact', 'decision', 'pitfall', 'convention', 'episode'], description: '只看某类（可省）' },
+          limit: num('最多返回条数（默认 8，上限 50）'),
+        },
+      },
+    },
+    {
+      name: 'myteam_forget',
+      description: '归档一条记忆（软删：保留历史，不再被召回）。物理删除不提供——记忆是审计面的一部分。',
+      parameters: { type: 'object', properties: { id: str('记忆条目 id（myteam_remember / myteam_recall 返回）', true) }, required: ['id'] },
+    },
   ]
 }
 
