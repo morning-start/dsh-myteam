@@ -403,3 +403,86 @@
 - 官方四包的**单元测试**（未随包分发）。
 - 官方 `dsh-experimental-agent-team-profile` 在 **headless / CLI / SDK profile** 下的行为差异（本轮只看了 Web/Desktop 路径）。
 - 本插件 `client/client.js`（785.9 KB）的逐行审阅——本轮只核对了它对外暴露的插槽与数据来源。
+
+---
+
+## 9. 成员实现形态复核：会话还是子代理（2026-11，重审 ADR-001）
+
+> 触发：用户提问「每个成员是用会话来做，还是用子代理来做？」
+> 复核结论：**两者不是对立物**；真正要决定的是「成员跑在哪个组合里」。
+
+### 9.1 先去掉伪二分：DSH 的子代理就是会话
+
+| 事实 | 证据（本机 `app.asar`，0.2.2-rc.5） |
+|---|---|
+| 子代理的本地 backend 调的是**同一个** `agents.create` | `dsh-subagent/src/manager.ts:857-865` |
+| 子代理比普通会话多三样：会话头三字段、父会话 catalog 条目、运行时 activation | `dsh-subagent/src/child-agent.ts:146-152`（`parentSession` / `origin:'subagent'` / `delegationDepth`） |
+| 所以「会话 vs 子代理」= **谁拥有这个会话的生命周期**，不是两种载体 | — |
+
+### 9.2 现状（ADR-001 的实装）
+
+`spawn-lifecycle.ts:262-348`：`agents.create({sessionId, agentOptions, setup})`，**不设 `meta`**
+（无 `parentSession` / `origin` / `cwd` / `agentPreset`）；`setup` 里注册 10 个成员工具、
+角色 `restrict`、知识索引/记忆/scratch section。
+
+### 9.3 比形态更急的发现：成员的工具面来自**根组合**，而根组合在 desktop profile 里几乎是空的
+
+| 事实 | 证据 |
+|---|---|
+| agent 的 scope 挂在 **loopCtx**（根），不是调用方（preset）的 ctx；`ownerCtx` 只用于归属/effect | `dsh-agent-loop/src/index.ts:574`（`new ReactLoopAgent(loopCtx, …)`） |
+| `agents.create` **不会**挂 preset | `dsh-agent-loop/src/**` 全文无 `agentPresets` 引用；`meta.agentPreset` 只是会话头元数据 |
+| 官方子代理反而会挂：`presets.mount(child, agentPreset)` 或 `composeFrom` 加入父的 preset 代际 | `dsh-subagent/src/child-agent.ts:187-201` |
+| desktop profile 根组合里 `tool-fs` / `tool-fs-search` / `tool-bash` / `tool-pwsh` / `tool-subagent`（×3）/ `tool-web` / `tool-todo` / `tool-skill` 全部 `enabled:false`（`dsh-web-app` patch 关掉，靠 preset 各自启用） | `plugin_manager list_plugins`（本机 desktop 实测） |
+
+**推论**：在 desktop profile 下，成员实际能调的是 **10 个 myteam 工具 + 官方 9 个团队工具 +
+`working_directory` + 第三方插件工具**，**没有 read/write/edit/pwsh/web**。
+除 provider/model 那个 bug 之外，成员就算跑起来也读不了项目文件、写不了交付物——
+与 CHG-211「队长缺文件工具」同一类问题，低一层。
+
+> **标注**：本节是「代码 + 本机插件清单」推导，未逐工具实测。历史成员会话日志里没有
+> `request/header`（第一次请求前就因 provider/model 失败），所以拿不到真实工具表。
+> 实证方式：spawn 一个成员，让它报告自己的工具清单。
+
+### 9.4 三个选项
+
+| | A 现状：根会话（无 preset） | B 子代理：`subagents.start` | C 根会话 + 显式挂 member preset（**建议**） |
+|---|---|---|---|
+| 工具面 | 根组合（desktop 下几乎为空） | **默认 join 父 preset** → 成员拿到队长 60 个 Lead 工具（违反 C5），除非显式指定 `agentPreset` | 由 `myteam-member` preset 声明：fs / fs-search（按角色可加 pwsh） |
+| 每成员动态面（角色掩码/知识/记忆/技能） | ✅ `setup` 可任意 | ❌ 管理器 setup 私有（`manager.ts:826`），只能靠 preset | ✅ `setup` 仍归我们 |
+| 生命周期 | 我们（handle + 账本对账） | 宿主（池 / 深度 / dispose / 父级联） | 我们 |
+| 宿主 UI | 无（面板自建） | 子代理树 + `subagent/start`、`subagent/end` 事件 | 无（面板自建） |
+| 团队存活 | workspace 级，跨会话 | 绑父会话，父会话结束即级联 | workspace 级 |
+| 上限 | 自定 `maxMembers` | `maxActiveSubagents`（desktop 10）/ `maxDepth`（3） | 自定 |
+
+### 9.5 建议
+
+**保持成员为根会话（C）**，三条理由：
+
+1. 成员要的不是「一次委派」，而是**稳定身份 + 每次任务换工具面**——只有 `setup` 给得了；
+2. B 的默认行为会把队长工具带给成员（C5 铁律），要避免就得指定成员 preset，
+   那和 C 一样要造 preset，却白白丢掉 `setup`；
+3. 团队是 workspace 级资源（多团队 / 归档 / 离线读），绑父会话会推翻这个前提（§5.1）。
+
+**落地三步**（每步可独立验证）：
+
+1. 新增 `myteam-member` preset（`tool-fs` + `tool-fs-search`；`pwsh` 按角色另配），
+   与 `myteam-captain` 同构，但**不列** Lead 工具；
+2. spawn 时在 `setup` 里 `agentPresets.mount(agentCtx, 'myteam-member')`，
+   并写 `meta: { agentPreset, cwd }`；
+3. 角色 `toolPolicy` 继续在 `setup` 里 `restrict`（preset 只是基线，收窄仍归 C5）。
+
+**明确不做**：把长驻成员改成 `subagents`（B）——除非将来必须要有子代理树 UI。
+
+### 9.6 无论选哪条都要补的两处（本轮顺带发现）
+
+| 处 | 事实 | 影响 |
+|---|---|---|
+| 重启恢复 | `reconcileProvisioningOnBoot`（`host.ts:2266-2270`）只结算 `provisioning`；`active` 成员从不 `agents.resume` | 重启后账本 active 但 `memberHandles` 为空 → 投递 `delivered:false`，成员是「账本活人、运行时死人」 |
+| 会话可见性 | 成员会话不设 `meta.cwd`；`list()` 对 **live** 会话无条件列出、对 **cold** 会话要求 `cwd`（`dsh-api-session-controller/src/list.ts:154-159`） | 成员活着时出现在会话列表，重启后消失——同一件事两种表现 |
+
+### 9.7 顺带：官方 9 个团队工具会漏进成员
+
+`hideBuiltinTeamTools` 的 `restrict` 作用在**宿主插件自己的 ctx**（= 队长 preset scope，
+`host.ts:1110-1114`），而成员 scope 挂在根 → 成员**能看到** `spawn_teammate` / `team_task_*` 等 9 个官方工具，
+可以绕过账本自建一个官方小队。CHG-211 之后队长有文件工具、成员没有，这个落差会更明显。
+建议：成员 `setup` 里也 `restrict({ deny: HOST_TEAM_TOOLS_TO_HIDE })`（与队长共用同一份名单）。
