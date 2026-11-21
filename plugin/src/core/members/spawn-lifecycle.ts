@@ -90,6 +90,8 @@ export interface SpawnToolDef {
 /** 宿主 agents 服务（`HostRuntime['agents']`；形状未定形，`any` 与 `host.ts` 同口径） */
 export interface SpawnHostRuntime {
   agents?: any
+  /** `ctx.subagents`（CHG-212 / ADR-010 P4a：成员优先走子代理 activation） */
+  subagents?: any
   /**
    * Cordis 显式服务查找（CHG-206：`ctx.get('agentDefaultModel')`）。
    *
@@ -157,6 +159,11 @@ export interface SpawnLifecycleDeps {
   disposalGate: () => AdmissionGate
   /** 成员 handle 表（memberId → AgentHandle；`settleActive` 回填） */
   memberHandles: () => Map<string, any>
+  /**
+   * CHG-212（ADR-010 P4a）：本次 spawn 的调用方上下文。
+   * 子代理必须有 `parent`（船长 Agent），它只存在于工具 `execute(args, exec)` 的第二参里。
+   */
+  spawnContext?: () => { agent?: unknown; signal?: AbortSignal } | undefined
   /** `agents.create` 返回形状适配（FIX-12：宿主可能是 agent 本体或 `{agent}` 包装） */
   agentOf: (handle: unknown) => { followup?: (msg: unknown) => void; cancel?: (o: unknown) => void } | undefined
   /** followup 消息构造（FIX-16 实弹形状：`{role,id,content,source}`；全插件唯一构造点） */
@@ -178,6 +185,11 @@ export interface SpawnLifecycleDeps {
   readLedgerEvents: (ledgerPath: string) => { events: Record<string, any>[]; warnings: string[] }
   /** `PromiseLike` 判定（同步桩返回 handle、异步宿主返回 Promise——两种形状都要先拿 handle 再结算） */
   isThenable: (value: unknown) => value is PromiseLike<unknown>
+}
+
+/** 上岗引导文案（CHG-212 P4a：子代理路径把它放进 activation 的 prompt，旧路径仍走 followup——只此一处构造） */
+function initialPromptText(teamId: string, member: { roleId: string }): string {
+  return `[myteam] 你已上岗（团队 ${teamId}，角色 ${member.roleId}）。请读板并领取与角色匹配的就绪任务（myteam_list_tasks → myteam_claim_task）；当前无就绪任务则用 myteam_wait_for_change 等待失效提示。`
 }
 
 export function createSpawnLifecycle(deps: SpawnLifecycleDeps) {
@@ -260,7 +272,26 @@ export function createSpawnLifecycle(deps: SpawnLifecycleDeps) {
     if (!model) deps.log('warn', `member ${memberId} has no model selection (role "${roleId}" + agentDefaultModel unavailable); the agent will not run`)
     let created: unknown
     try {
-      created = deps.rt().agents.create({
+      /* CHG-212（ADR-010 P4a）：能走子代理就走子代理——成员进入子代理树，生命周期交给宿主。
+       * 只在「角色没有工具收窄策略」时走这条：restrict 需要角色身份，而子代理的 setup 是管理器
+       * 私有的（P4b 用成员 preset 的懒收窄补上，届时放开条件）。C5 不能被顺手破坏。 */
+      const spawnCtx = deps.spawnContext?.()
+      const canActivate = buildToolMask(roleDef).mode === 'none'
+        && spawnCtx?.agent !== undefined
+        && typeof deps.rt().subagents?.startActivation === 'function'
+      created = canActivate
+        ? deps.rt().subagents.startActivation({
+          provider: 'spawn',
+          childId: sessionId,
+          name: member.instanceName,
+          label: member.instanceName,
+          prompt: [{ type: 'text', text: initialPromptText(teamId, member) }],
+          parent: spawnCtx!.agent,
+          agentPreset: 'myteam-member',
+          delivery: 'caller',
+          signal: spawnCtx!.signal ?? new AbortController().signal,
+        })
+        : deps.rt().agents.create({
         sessionId,
         agentOptions: model
           ? { provider: model.provider, model: model.model, ...(model.reasoningEffort ? { reasoningEffort: model.reasoningEffort } : {}) }
@@ -403,17 +434,22 @@ export function createSpawnLifecycle(deps: SpawnLifecycleDeps) {
    * 成员卡（CHG-135）与 handle 回填都在这里：只有真建成的成员才配拥有。
    */
   function settleActive(teamId: string, member: MemberInstance, handle: unknown): Record<string, unknown> | undefined {
+    /* CHG-212（ADR-010 P4a）：子代理 activation 的 prompt 已随 `startActivation` 投递，
+     * 不能再 followup（会重复上岗）。后续消息改用 live Agent 投递，所以 handle 换成 Agent 本体。 */
+    const activation = handle as { childId?: string; dispose?: () => unknown } | undefined
+    const activated = activation?.childId !== undefined && typeof activation.dispose === 'function'
+    if (activated) handle = deps.rt().agents?.get(String(activation!.childId)) ?? handle
     // ① 初始 prompt（上岗引导）：投不出去 = 成员起来了却不知道做什么 → 按失败结算
-    const agent = deps.agentOf(handle)
-    if (!agent?.followup) {
+    const agent = activated ? undefined : deps.agentOf(handle)
+    if (!activated && !agent?.followup) {
       /* 不能静默跳过：optional chain 会让「handle 形状不认识」变成 active 空壳
        * （账本 active，但成员从没收到过任何消息）。 */
       const failure = settleFailure(teamId, member, new Error('agent handle has no followup; cannot deliver initial prompt'))
       try { void (handle as { dispose?: () => unknown } | undefined)?.dispose?.() } catch { /* 排空尽力而为 */ }
       return failure
     }
-    try {
-      agent.followup(deps.followupMessage(`[myteam] 你已上岗（团队 ${teamId}，角色 ${member.roleId}）。请读板并领取与角色匹配的就绪任务（myteam_list_tasks → myteam_claim_task）；当前无就绪任务则用 myteam_wait_for_change 等待失效提示。`))
+    if (!activated) try {
+      agent!.followup(deps.followupMessage(initialPromptText(teamId, member)))
     } catch (error) {
       const failure = settleFailure(teamId, member, error)
       // 初始 prompt 投不进去的 child 不能留着「假装在跑」：尽力释放（失败只告警）

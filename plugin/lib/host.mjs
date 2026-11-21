@@ -563,6 +563,7 @@ function pickDefaultTeamId(workspaceRoot        )         {
 export class MyTeamHost                               {
           rt             
           services = new Map                     ()
+          leadExec                                        
           memberHandles = new Map             () // memberId → AgentHandle
   /**
    * CHG-186（T155b）：成员族端点适配层（`src/host/members.ts`）。
@@ -602,7 +603,6 @@ export class MyTeamHost                               {
     batchTaskOp: (teamId, args, actor) => this.batchTaskOp(teamId, args, actor),
     createTasksBatch: (teamId, args, actor) => this.createTasksBatch(teamId, args, actor),
   })
-  /** CHG-212（ADR-010）：记忆族（SQLite bank；上岗召回由 spawn 生命周期注入，不在这里） */
                    memory = createMemoryHandlers({ workspaceRoot: () => this.workspaceRoot })
   /**
    * CHG-186（T155c）：计划族端点适配层（`src/host/plan.ts`）。
@@ -750,6 +750,7 @@ export class MyTeamHost                               {
    */
                    spawn = createSpawnLifecycle({
     rt: () => this.rt,
+    spawnContext: () => this.leadExec,
     log: (level, msg) => this.log(level, msg),
     workspaceRoot: () => this.workspaceRoot,
     rolePaths: () => this.rolePaths,
@@ -1422,6 +1423,7 @@ export class MyTeamHost                               {
       const refusal = tierRefusal(name, actor === 'human' ? 'human' : 'captain')
       if (refusal !== undefined) return { status: 'error', code: 'MT_UNAVAILABLE', message: refusal }
     }
+    this.leadExec = exec
     try {
       switch (name) {
         /* CHG-186（T155c）：计划族（提交 / 批准 / 修订 / 丢弃）实现已搬到 `src/host/plan.ts`。
@@ -2580,7 +2582,6 @@ export class MyTeamHost                               {
           return this.memberTasks.escalate(teamId, member, args, actor)
         case 'myteam_read_knowledge':
           return this.memberKnowledge.read(args)
-        /* CHG-212（ADR-010）：长期记忆（SQLite bank）。所有成员都可用，不需要授权。 */
         case 'myteam_remember': case 'myteam_recall': case 'myteam_forget':
           return this.memory.handle(name, teamId, member.memberId, args, actor)
         case 'myteam_submit_review':
