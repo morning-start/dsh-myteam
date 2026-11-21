@@ -543,6 +543,8 @@ export function applyEvent(proj                , event             )       {
         type: p.type,
         payload: (p.payload                           ) ?? {},
         status: 'proposed',
+        // CHG-210 批 6.2：记提交者，驳回才通知得到人（老账本无此字段 → 省略）
+        ...(event.actor.startsWith('member:') ? { proposerId: event.actor.slice('member:'.length) } : {}),
       }
       break
     }

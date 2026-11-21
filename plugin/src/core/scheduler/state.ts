@@ -358,7 +358,20 @@ export interface TeamProjection {
   members: Record<string, MemberProjection>
   /** CHG-69：任务参与关系（任务 × 团队多对多边；本团队账本记录自己主责/协作的任务） */
   participations: Record<string, TaskParticipation>
-  proposals: Record<string, { taskId: string; type: string; payload: Record<string, unknown>; status: 'proposed' | 'approved' | 'rejected' }>
+  proposals: Record<string, {
+    taskId: string
+    type: string
+    payload: Record<string, unknown>
+    status: 'proposed' | 'approved' | 'rejected'
+    /**
+     * CHG-210 批 6.2：**提交者**（取自 `task.proposal` 事件的 `actor`）。
+     *
+     * 旧投影只存 taskId/type/payload/status——驳回时找不到该通知谁，于是「提案被驳回」
+     * 对提交者完全静默：它只能原地猜「是不是还没人看」，然后无限重提。
+     * 老账本没有这个字段 → 保持 undefined（重放逐字不变）。
+     */
+    proposerId?: string
+  }>
   perTaskMessages: Record<string, number[]>
   inbox: { seq: number; kind: string; read?: boolean }[]
 }

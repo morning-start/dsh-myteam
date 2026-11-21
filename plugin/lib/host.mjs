@@ -237,12 +237,9 @@ export function resolveTeamLedgerPath(workspaceRoot        , teamId        )    
 /** CHG-71：可能改变「有哪些任务可领」的事件——提交后触发一次派单扫描 */
 const DISPATCH_TRIGGER_TYPES = new Set(['task.created', 'task.completed', 'task.rescoped', 'task.updated', 'task.gate.result', 'task.cancelled'])
 
-/** FIX-17：团队名 → 合法 teamId（小写、非字母数字折叠为连字符、去首尾连字符；空则回退 'team'） */
-/**
- * 团队名 → teamId slug。纯 ASCII 名直接 slug；**全中文/非 ASCII 名**用名字哈希派生稳定 id
- * （CHG-70：旧实现回退成固定 'team'，两个中文团队会撞同一个账本目录）。
- * 同名 → 同 id（续提/澄清计数语义不变）；不同名 → 不同 id。
- */
+/** 团队名 → teamId slug。纯 ASCII 名直接 slug；**全中文/非 ASCII 名**用名字哈希派生稳定 id
+ *  （CHG-70：旧实现回退成固定 'team'，两个中文团队会撞同一个账本目录）。
+ *  同名 → 同 id（续提/澄清计数语义不变）；不同名 → 不同 id。 */
 export function slugifyTeamName(name        )         {
   const slug = String(name ?? '')
     .toLowerCase()
@@ -1982,6 +1979,9 @@ export class MyTeamHost                               {
     // 驳回：只留痕，不动结构。
     if (decision === 'rejected') {
       const r = this.commit(teamId, { actor, type: 'task.proposal.resolved', payload: { teamId, proposalId, decision, note: args.note } })
+      /* CHG-210 批 6.2：驳回要通知提交者（旧实现只落账，提交者只能无限重提） */
+      const handle = r.ok ? this.memberHandles.get(proposal.proposerId ?? '') : undefined
+      if (handle) this.agentOf(handle)?.followup?.(this.followupMessage(`[myteam] 你的提案 ${proposalId} 被驳回${args.note ? `：${String(args.note)}` : '（未写理由）'}；结构未改动，可按原 AC 继续或改提新提案`))
       return r.ok
         ? { status: 'rejected', note: '提案已驳回留痕；结构未改动' }
         : { status: 'error', code: r.code, message: r.message }
