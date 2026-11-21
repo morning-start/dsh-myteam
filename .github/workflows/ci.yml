@@ -26,6 +26,13 @@ jobs:
           # 项目用 Node 原生 TS type stripping（engines: >=22.18），不需要编译步骤
           node-version: '22'
 
+      - name: 安装测试依赖
+        working-directory: plugin
+        # `src/remote/service.ts` 运行时 `extends TypertRemoteService`（宿主协议包，npm 公开）。
+        # 版本钉死在本机实测通过的 0.2.1-rc.3：CI 不装它 → 每个 import 该模块的测试都
+        # ERR_MODULE_NOT_FOUND（首轮 CI 的真实失败原因）。
+        run: npm ci
+
       - name: 构建产物（client.js + lib/）
         working-directory: plugin
         run: npm run bundle

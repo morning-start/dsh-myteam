@@ -51,5 +51,8 @@
     "check:client": "node scripts/build-client.mjs --check",
     "test": "node --test test/*.test.ts test/*.test.js"
   },
-  "license": "MIT"
+  "license": "MIT",
+  "devDependencies": {
+    "@deepseek-ai/dsh-typert-protocol": "0.2.1-rc.3"
+  }
 }
