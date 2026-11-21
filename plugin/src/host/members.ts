@@ -224,7 +224,15 @@ export function createMembersHandlers(host: MembersHostSurface) {
         // 读不到名册（账本损坏 / 团队不存在）→ 空数组：**不编造成员**，也不让面板整体炸
         roster = []
       }
-      const members = roster.map((member) => ({ ...member, childCount: childrenOf(roster, member.id).length }))
+      /* CHG-213（实机）：投影里的可选字段可能是 `undefined`（旧账本迁移前 / 未认领 / 没 sessionId），
+       * 而工具返回值要过 lossless JSON 校验——一个 undefined 就让**整行名册**读取失败，
+       * 面板的团队视图因此打不开（实测 4 个团队 `myteam_list_members` 全部报 invalid output）。
+       * 只挑值为 undefined 的键剔掉：其余字段原样带出去，不填默认值假装有。 */
+      const members = roster.map((member) => {
+        const row: Record<string, unknown> = { ...member, childCount: childrenOf(roster, member.id).length }
+        for (const [key, value] of Object.entries(row)) if (value === undefined) delete row[key]
+        return row
+      })
       return { status: 'ok', teamId, total: members.length, members }
     },
   }
