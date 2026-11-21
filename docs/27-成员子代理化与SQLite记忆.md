@@ -26,13 +26,28 @@
 
 ## 2. 目标形态
 
-### 2.1 服务与工具分层（ADR-005 修订）
+### 2.1 服务与工具分层（**修订 2026-11-21：不需要把服务挪到 root**）
 
-| 层 | 放什么 | 为什么 |
+原方案是「服务移到 root + preset 拆 captain/member」。查完执行链后否掉了——有一条更小的路：
+
+| 事实 | 证据 |
+|---|---|
+| 工具 `execute(input)` 的 `input.agent` 就是**拥有该作用域的 Agent**；「Owning Agent supplies scoped tools and execution context」 | `dsh-tools/src/executor.ts:29-32` |
+| 面板门面已经用 `agentPresets.serviceFor(agent, 'myteam')` 拿到**队长 preset 作用域里**的服务，且工作正常 | `plugin/src/panel.ts:216-220` |
+
+所以：**成员的工具由成员 preset 里的一个小插件注册**；每次 `execute(args, exec)` 时用
+`exec.agent`（成员自己）→ `exec.agent.session.header.parentSession`（队长会话）→
+`agents.get(parentSessionId)`（队长 Agent）→ `serviceFor(captain, 'myteam')`（同一个服务实例、同一个单写者）
+→ 调宿主执行。**服务留在原地**，账本单写者与面板门面都不动。
+
+| 层 | 放什么 | 变化 |
 |---|---|---|
-| **root** | `myteam` 服务（账本 / 投影 / 调度）+ 面板门面 | 账本是 **workspace 级**，不是会话级；成员（子代理）与船长必须在同一服务实例上，单写者才成立 |
-| **preset `myteam-captain`** | 60 个 Lead 工具 + 队长 persona | 保持现状（只在本会话可见） |
-| **preset `myteam-member`** | 成员工具（10 + 记忆 3）+ 角色 section | 子代理只能经 preset 拿到工具面（事实 3） |
+| **队长 preset** | `myteam` 服务 + 60 个 Lead 工具 + 队长 persona | 不动 |
+| **成员 preset** | 新的 `dsh-plugin-myteam/member` 入口：注册 13 个成员工具，执行时按上表解析服务 | 新增 |
+| root | 面板门面 `myteamPanel`（namespace `myteam`） | 不动 |
+
+代价：成员工具调用多一次「父会话 → 队长 Agent → 服务」的解析（O(1) 查表），失败时返回
+`MT_UNAVAILABLE` 并说明「队长会话不在线」——**不静默**。
 
 ### 2.2 成员创建
 
@@ -95,8 +110,8 @@ trigram 要求 ≥3 字，短查询回退 `LIKE`（bank 过滤 + limit，规模�
 |---|---|---|---|
 | **P1** | `core/memory/store.ts`（SQLite 存储层）+ `core/memory/recall.ts`（上岗召回）+ 7 条测试 | 写入/召回/隔离/归档/重开/预算 全绿 | ✅ 已入库（CHG-212） |
 | **P2** | `myteam_remember` / `myteam_recall` / `myteam_forget` + 工具契约锁（defs / tiers / output-contract / 成员工具表 / 4 处计数） | 工具数 59 lead + 13 member = 72，A 档 26，契约锁全绿 | ✅ 已入库（CHG-212） |
-| **P3** | `myteam` 服务移到 root + preset 拆 captain/member | 面板端点不变、A6 不涨、preset 泄漏审计通过 | 待做 |
-| **P4** | `spawn` 改 `subagents.startActivation` + 身份反查 + 成员 preset | `myteam_spawn_member` 起来的成员带 `parentSession` 且工具面 = 成员 preset | 待做 |
+| **P3** | 新增 `dsh-plugin-myteam/member` 入口（注册 13 个成员工具；执行时 `exec.agent → parentSession → serviceFor` 解析服务）+ `myteam-member` preset | 假 ctx 单测：注册齐全、解析失败返回 `MT_UNAVAILABLE`、解析成功转发到宿主 | 待做（**不需要**把服务挪到 root，见 §2.1） |
+| **P4** | `spawn` 改 `subagents.startActivation({childId, agentPreset:'myteam-member', parent: exec.agent})` + 身份反查 | `myteam_spawn_member` 起来的成员带 `parentSession`、工具面 = 成员 preset、看不到 Lead 工具 | 待做 |
 | **P5** | 重启后按需恢复 + 记忆注入（上岗时召回 top-5） | kill 后重启，成员可被唤醒且记忆仍在 | 待做 |
 
 **顺序理由**：P1/P2 与成员载体无关，先落地能立刻受益；P3 是 P4 的前置（否则成员视图拿不到服务）；
