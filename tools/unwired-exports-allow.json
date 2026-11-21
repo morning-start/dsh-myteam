@@ -1,10 +1,9 @@
 {
   "_comment": "CHG-210：未接线导出的棘轮基线。status=keep 是有意保留（测试/诊断设施，不算债）；status=todo 是待接线或待删的真债，只许减不许增。maxTodo 必须等于 todo 条数——清掉一条就同步下调，防止「清理了但基线没动」的假进度。",
-  "maxTodo": 11,
+  "maxTodo": 10,
   "entries": [
     { "file": "plugin/src/core/scheduler/state.ts", "name": "claimOrder", "status": "todo", "reason": "优先级 + FIFO 防饿死已实现且有单测，但 claim 入口没调用——实际按账本建单顺序（scout-scale 报、已人工核实）" },
     { "file": "plugin/src/core/scheduler/recovery.ts", "name": "recoveryEventFor", "status": "todo", "reason": "恢复事件映射：生产由 host/recovery.ts 直接 commit，这个纯函数只剩测试调用——要么接线要么删" },
-    { "file": "plugin/src/core/errors.ts", "name": "isMtCode", "status": "todo", "reason": "错误码判定函数生产零调用，与「MTError 未被 instanceof 透传」是同一个根因" },
     { "file": "plugin/src/core/fs/write-log.ts", "name": "currentWriteLog", "status": "todo", "reason": "写日志上下文读取：生产只用 bindWriteLog 写入、没人读回来核对——待核是否应进面板/审计" },
     { "file": "plugin/src/core/members/member-card.ts", "name": "listMemberCards", "status": "todo", "reason": "成员卡列表生产零调用——面板走的是视图层，待核是否重复实现或该删" },
     { "file": "plugin/src/core/roles/role-store.ts", "name": "deleteProjectRole", "status": "todo", "reason": "删项目角色生产零调用——面板删除走 role-ops 的另一条路，待核是否有两条实现" },

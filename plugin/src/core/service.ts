@@ -41,6 +41,7 @@ import { storeLayout } from './workspace/layout.ts'
 // CHG-87（FR-5.3/FR-5.4/FR-16.4③）：command 门禁 / scope 审计 / 证据指针
 import { validateVerifyCommand } from './gates/command-gate.ts'
 import { validateEvidencePointer } from './knowledge/evidence-pointer.ts'
+import { isMtCode } from './errors.ts'
 
 export interface CommitDraft {
   actor: string
@@ -264,9 +265,7 @@ export class TeamService {
       // P1-3：copy-on-write 副本——未触及集合保持原引用（视图缓存零 frame），隔离性由深克隆保证
       nextProjection = applyEventOnCopyOnWriteProjection(this.projection, event)
     } catch (e) {
-      if (e instanceof LedgerValidationError) return { ok: false, code: e.code, message: e.message }
-      if (e instanceof FoldError) return { ok: false, code: 'MT_INTERNAL_FOLD', message: e.message }
-      return { ok: false, code: 'MT_INTERNAL', message: String(e) }
+      return commitFailureOf(e)
     }
 
     // 3. P0-2：revision 必须恰好 +1 且等于「已应用事件数 + 1」——不成立即拒绝写入（见 checkRevisionContinuity）
@@ -277,8 +276,7 @@ export class TeamService {
     try {
       appendEvent(this.ledgerPath, event)
     } catch (e) {
-      if (e instanceof LedgerValidationError) return { ok: false, code: e.code, message: e.message }
-      return { ok: false, code: 'MT_INTERNAL', message: String(e) }
+      return commitFailureOf(e)
     }
 
     // 5. 账本已 durable，才切换内存投影 / 推进 seq（此前任何一步失败都不该走到这里）
@@ -863,6 +861,40 @@ function roleErrorToResult(e: unknown): CommitResult {
 /** 团队创建引导：新账本首事件 rules.version.adopted〔I3〕 */
 export function bootstrapTeam(service: TeamService, actor = 'host'): CommitResult {
   return service.commit({ actor, type: 'rules.version.adopted', payload: { version: RULES_VERSION } })
+}
+
+/**
+ * CHG-210：**领域异常 → 工具面结果**的唯一翻译点。
+ *
+ * 修的是什么：旧实现的两处 catch 只认 `LedgerValidationError` 与 `FoldError`，其余一律压成
+ * `MT_INTERNAL`。于是 `FsError('MT_FS_WRITE_FAILED', '…确认该路径可写、磁盘没满，然后重跑')`
+ * 这种**自带可执行提示**的码，到用户面前变成一句 `Error: EPERM: operation not permitted`——
+ * 提示白写了，用户也失去了唯一能自救的信息。
+ *
+ * 为什么按**形状**认（`isMtCode(code)`）而不是 `instanceof MTError`：
+ *   `FsError` 与 `MTError` 是两个互不继承的类（前者在 `core/fs`，后者在 `core/errors`），
+ *   但它们的契约相同——都带 `code: MtCode`。按继承认会漏掉另一半，按形状认不会。
+ *   这也顺带把 `isMtCode` 从「有测试无生产调用」变成真接线。
+ */
+function commitFailureOf(e: unknown): CommitResult {
+  if (e instanceof LedgerValidationError) return { ok: false, code: e.code, message: e.message }
+  if (e instanceof FoldError) return { ok: false, code: 'MT_INTERNAL_FOLD', message: e.message }
+  const code = (e as { code?: unknown } | undefined)?.code
+  if (isMtCode(code)) return { ok: false, code, message: e instanceof Error ? e.message : String(e) }
+  return { ok: false, code: 'MT_INTERNAL', message: String(e) }
+}
+
+/**
+ * CHG-210：**工具面兜底**——把任意异常翻译成 `{status:'error', code, message}`。
+ *
+ * 为什么放在 `core/service.ts` 而不是 `host.ts`：`host.ts` 的 A6 行数棘轮已经顶格（4,377），
+ * 而这里正是「工具面结果」的语义源头（`CommitResult` 同模块）。`host.ts` 只多一个具名 import，
+ * 行数不变——这也是「入口层只减不增」纪律下正确的落点。
+ */
+export function toolFailureOf(e: unknown): { status: 'error'; code: string; message: string } {
+  const failure = commitFailureOf(e)
+  if (failure.ok) return { status: 'error', code: 'MT_INTERNAL', message: String(e) }
+  return { status: 'error', code: failure.code, message: failure.message }
 }
 
 /**

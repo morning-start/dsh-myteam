@@ -30,7 +30,7 @@ import { writeTextAtomic, runWithRollback, snapshotFor } from './core/fs/write-l
 import { resolveProjectRoot, storeLayout, teamLedgerPath as teamLedgerPathOf, displayPath, STORE_DIR, tokenSidecarPath, legacyTokenSidecarPath } from './core/workspace/layout.ts'
 // CHG-103：作用域契约（全局 vs 项目级）——角色两级都可用，任务/历史/状态只能项目级
 import { normalizeScope } from './core/workspace/scope.ts'
-import { TeamService, openTeamLedger, type CommitDraft } from './core/service.ts'
+import { TeamService, openTeamLedger, toolFailureOf, type CommitDraft } from './core/service.ts'
 /* CHG-186（T155a）：宿主契约下沉 `core/host/contract.ts` —— 解 `host.ts ⇄ remote/service.ts`
  * 的 type 环（arch-report 里唯一那条）。这里只 `import type`（擦除后无运行时依赖、无装载环）；
  * `MyTeamConfig` 仍从本文件 re-export，既有 import 点（如 `test/t123`）一个都不用改。 */
@@ -1609,7 +1609,7 @@ export class MyTeamHost implements MyTeamHostContract {
           return { status: 'error', code: 'MT_UNKNOWN_TOOL', message: `unknown lead tool: ${name}` }
       }
     } catch (e) {
-      return { status: 'error', code: 'MT_INTERNAL', message: String(e) }
+      return toolFailureOf(e)
     }
   }
 
@@ -2594,7 +2594,7 @@ export class MyTeamHost implements MyTeamHostContract {
           return { status: 'error', code: 'MT_UNKNOWN_TOOL', message: `unknown member tool: ${name}` }
       }
     } catch (e) {
-      return { status: 'error', code: 'MT_INTERNAL', message: String(e) }
+      return toolFailureOf(e)
     }
   }
 
