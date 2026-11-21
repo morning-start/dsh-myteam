@@ -39,6 +39,7 @@ import {
   renameSync,
   statSync,
   unlinkSync,
+  writeFileSync,
   writeSync,
 } from 'node:fs'
 import { createHash, randomBytes } from 'node:crypto'
@@ -117,6 +118,53 @@ export interface WriteTextAtomicOptions {
 }
 
 /**
+ * CHG-210：`rename` 的 Windows 句柄占用兜底。
+ *
+ * 现场：Windows 上编辑器打开着目标文件、杀软正在扫、或索引器正在读时，`rename` 会被打回
+ * `EPERM` / `EACCES` / `EBUSY`。旧实现直接失败——而本项目就跑在 Windows 上，这是真实的
+ * 可用性风险（不是理论问题：参考项目 `dsh-agent-teams` 专门为它写了重试 + 降级）。
+ *
+ * 处置分两级：
+ *   ① 重试 3 次（同步忙等 50ms，总计 ≤150ms）——绝大多数占用是瞬时扫描；
+ *   ② 仍失败则**就地直写**：内容已经完整写在临时文件里，等价降级只放弃「无半截」保证。
+ *
+ * ⚠ 降级只对**可重建文件**成立（配置 / 侧车 / 索引 / 导出快照）。账本不走这条路径
+ * （它走 `appendTextSync` 的 append + fsync），所以「账本绝不能半截」没有被削弱。
+ */
+function renameWithRetry(tmp: string, target: string): void {
+  try {
+    renameSync(tmp, target)
+    return
+  } catch (error) {
+    const code = (error as NodeJS.ErrnoException | undefined)?.code
+    if (code !== 'EPERM' && code !== 'EACCES' && code !== 'EBUSY') throw error
+  }
+  for (let attempt = 0; attempt < 3; attempt += 1) {
+    busyWaitMs(50)
+    try {
+      renameSync(tmp, target)
+      return
+    } catch {
+      // 继续重试；三次都失败才降级
+    }
+  }
+  writeFileSync(target, readFileSync(tmp))
+  try {
+    unlinkSync(tmp)
+  } catch {
+    // 临时文件清不掉不影响结果（同名临时文件下次写入会覆盖）
+  }
+}
+
+/** 同步忙等（调用链是同步函数，没有 await 可用；50ms 级等待对写盘路径可接受） */
+function busyWaitMs(ms: number): void {
+  const until = Date.now() + ms
+  while (Date.now() < until) {
+    // 故意空转：这里没有异步上下文
+  }
+}
+
+/**
  * 原子写文本：同目录唯一临时文件 → 写入 → fsync(file) → 继承权限 → rename → fsync(dir)。
  *
  * @param path 目标文件绝对路径
@@ -171,7 +219,7 @@ export function writeTextAtomicRaw(path: string, text: string, options: WriteTex
     fd = undefined
     chmodSync(tmp, mode)
     // rename 之后目标文件已是新内容；此后的失败只影响目录项持久性，不再回滚
-    renameSync(tmp, path)
+    renameWithRetry(tmp, path)
   } catch (error) {
     if (fd !== undefined) {
       try {
