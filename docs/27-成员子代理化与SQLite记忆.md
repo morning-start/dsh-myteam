@@ -110,8 +110,29 @@ trigram 要求 ≥3 字，短查询回退 `LIKE`（bank 过滤 + limit，规模�
 |---|---|---|---|
 | **P1** | `core/memory/store.ts`（SQLite 存储层）+ `core/memory/recall.ts`（上岗召回）+ 7 条测试 | 写入/召回/隔离/归档/重开/预算 全绿 | ✅ 已入库（CHG-212） |
 | **P2** | `myteam_remember` / `myteam_recall` / `myteam_forget` + 工具契约锁（defs / tiers / output-contract / 成员工具表 / 4 处计数） | 工具数 59 lead + 13 member = 72，A 档 26，契约锁全绿 | ✅ 已入库（CHG-212） |
-| **P3** | 新增 `dsh-plugin-myteam/member` 入口（注册 13 个成员工具；执行时 `exec.agent → parentSession → serviceFor` 解析服务）+ `myteam-member` preset | 假 ctx 单测：注册齐全、解析失败返回 `MT_UNAVAILABLE`、解析成功转发到宿主 | 待做（**不需要**把服务挪到 root，见 §2.1） |
-| **P4** | `spawn` 改 `subagents.startActivation({childId, agentPreset:'myteam-member', parent: exec.agent})` + 身份反查 | `myteam_spawn_member` 起来的成员带 `parentSession`、工具面 = 成员 preset、看不到 Lead 工具 | 待做 |
+| **P3** | `dsh-plugin-myteam/member` 入口（注册 13 个成员工具）+ `myteam-member` preset | 假 ctx 单测 + 活体探针：preset 挂载、13 工具、无 Lead 泄漏 | ✅ 已入库（CHG-212） |
+| **P4** | `spawn` 改 `subagents.startActivation({childId, agentPreset:'myteam-member', parent})` + 身份反查 + C5 懒收窄 + 上岗简报 | 活体探针：`parent=<captain>` / `preset=myteam-member` / `depth=1` / `13 myteam tools` / `leadLeak=false` | ✅ 已入库（CHG-212） |
+| **P5** | 重启后按账本身份回落 `agents.get(sessionId)` + 投递失败如实回报 | t177c：新 host + 空句柄表 + 活着的成员会话 → 消息投得出去 | ✅ 已入库（CHG-212） |
+
+### 4.1 活体验证记录（2026-11-21，真实 host、不经模型）
+
+用一次性探针（`--patch` 注入，不入库）在 `myteam-web` profile 的真实 host 里执行：
+
+```
+captain service: MyTeamRemote  memberToolBySession: function  policy: function  brief: function
+child: mt-probe-implementer-xxx   name: probe1
+childLive: true   parent: probe-cap-xxx   preset: myteam-member   depth: 1
+toolCount: 25   myteamTools: 13   remember: true   leadLeak: false
+```
+
+这一轮**抓到两个只在真机上才暴露的断点**（都已修）：
+
+| 断点 | 现象 | 根因 |
+|---|---|---|
+| 成员入口调不到宿主 | `svc.executeLeadTool is not a function` | `agentPresets.serviceFor(agent,'myteam')` 返回的是 **MyTeamRemote**（隔离门面），不是 MyTeamHost |
+| 成员 preset 整行激活失败 | `cannot get property "systemPrompt" without inject` | 插件读 `ctx.systemPrompt` 却没在 `inject` 里声明 → preset 变 broken（与 CHG-211a 同一类事故） |
+
+**未验证的部分**（诚实记录）：成员真正跑一轮模型（需要可用的队长会话与模型路由）、以及长跑中记忆的积累质量。工具面、父子链、preset 挂载已由上面的探针证实。
 | **P5** | 重启后按需恢复 + 记忆注入（上岗时召回 top-5） | kill 后重启，成员可被唤醒且记忆仍在 | 待做 |
 
 **顺序理由**：P1/P2 与成员载体无关，先落地能立刻受益；P3 是 P4 的前置（否则成员视图拿不到服务）；
