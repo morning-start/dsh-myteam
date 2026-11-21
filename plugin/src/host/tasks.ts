@@ -484,9 +484,26 @@ export function createMemberTaskHandlers(host: MemberTasksHostSurface) {
 
     /** `myteam_peer_message`：成员 → 成员消息（落账后 followup 唤醒） */
     peerMessage(teamId: string, member: MemberInstance, args: Record<string, unknown>, actor: string): Record<string, unknown> {
-      const r = host.commit(teamId, { actor, type: 'message.sent', payload: { teamId, messageId: `msg-${Date.now()}`, from: member.memberId, to: args.toMemberId, taskId: args.taskId, content: args.content } })
+      const to = String(args.toMemberId ?? '').trim()
+      if (!to) return { status: 'error', code: 'MT_VALIDATION', message: 'toMemberId is required（发给谁？）' }
+      /* CHG-210 批 6.5：**收件人必须存在**。
+       *
+       * 旧实现不校验：发给一个不存在的 id（包括 `'lead'`），账本照落 `message.sent`，
+       * `agentOf(handle)` 拿到 undefined → followup 静默跳过，**发送方以为送达了**。
+       * 这是最难查的一类失败：账本上说有、收件人那边什么都没有。
+       *
+       * 顺带把出口写进错误里：向队长上报是 `myteam_escalate_task`（会改状态、进 inbox、
+       * 会被调度看见），发给人类是 `myteam_message({to:'inbox'})`——私讯不是这两个。 */
+      if (!host.memberHandle(to)) {
+        return {
+          status: 'error',
+          code: 'MT_VALIDATION',
+          message: `成员 "${to}" 不在本团队（或已释放），消息**没有发送**。向队长上报请用 myteam_escalate_task；发给人类请用 myteam_message({ to: 'inbox' })`,
+        }
+      }
+      const r = host.commit(teamId, { actor, type: 'message.sent', payload: { teamId, messageId: `msg-${Date.now()}`, from: member.memberId, to, taskId: args.taskId, content: args.content } })
       if (!r.ok) return { status: 'error', code: r.code, message: r.message }
-      host.agentOf(host.memberHandle(String(args.toMemberId)))?.followup?.(host.followupMessage(`[myteam] 来自 ${member.instanceName} 的消息：${String(args.content)}`))
+      host.agentOf(host.memberHandle(to))?.followup?.(host.followupMessage(`[myteam] 来自 ${member.instanceName} 的消息：${String(args.content)}`))
       return { status: 'sent' }
     },
 
