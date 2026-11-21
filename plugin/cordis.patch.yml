@@ -93,27 +93,41 @@
                    任务检查由成员自己完成（成员用 myteam_submit_review 提交门禁裁决，审查者 = 成员本人，强制交叉审查），
                    你只做**任务同步与成果检查**：读证据块与交付物、核对 AC 与落位，不代替成员重做实现检查，
                    也不用 write/edit 写交付物（写代码/文档/数据是成员的事；章程与团队配置除外）。
-          # CHG-211（用户实测发现）：**队长会话此前没有任何基础文件工具**。
+          # CHG-212（可用性实测）：**能力必须挂在根层，不能只挂在 preset 里**。
           #
-          # preset 的 plugins 是「显式启用」语义——profile 顶层的 tool-fs / tool-fs-search 是
-          # `disabled: true`，由各 preset 自己挂。对照 preset-standard：它显式列了
-          # tool-bash / tool-pwsh / tool-fs / tool-fs-search / tool-jobs / tool-schedule …
-          # 而本 preset 只列了 myteam-host + myteam-persona-captain。
+          # 实测结论（真实队长会话 + 真模型成员）：
+          #   队长会话 = 根层工具 + preset 追加项 → 有 read/write/edit
+          #   成员会话 = **只有根层工具**（`agents.create` 继承的是 root 工具面）
+          # 所以 CHG-211 把文件工具只加进 preset，队长能干活、成员一个文件都写不出来，
+          # 成员只能 escalate 说「我没有命令执行、没有文件写入」——产品空转。
           #
-          # 后果：队长读不了项目文件（规划只能凭用户口述）、写不了 structure.md，
-          # persona 第 2 条「维护 docs/ 与 .team-workplace/ 的落位约定」和第 8 条的
-          # 「也不用 write/edit 写交付物」都成了空话——它根本没有 write/edit。
-          #
-          # 只补文件工具、**不补 pwsh/bash**：保住「队长不做领域工作」这条边界。
-          - id: tool-fs
-            name: '@deepseek-ai/dsh-tool-fs'
-            config:
-              applyPatch: false
-          - id: tool-fs-search
-            name: '@deepseek-ai/dsh-tool-fs-search'
-            # 必填、且**没有 schema 默认值**：漏了它这一行会 invalid config，
-            # 整个 preset 被判定 broken，然后**从新建会话的 preset 选择器里静默消失**
-            # （客户端 presetOptions 只列出 healthy 的 preset），而不是报错。
-            # 对照 preset-standard 的同名行，值一致。
-            config:
-              sampleOverCapGlobResults: false
+          # 修法：把文件与命令工具**开在根层**（见文件末尾的根层 patch 段），
+          # 队长与成员同时继承；preset 不再重复声明（重复声明 = 两处配置漂移）。
+          # 队长「不做领域工作」靠 persona 约束，不靠「不给他工具」——工具面是能力，不是纪律。
+
+# ── 根层能力（CHG-212）：队长与成员**共同继承** ─────────────────────────────
+#
+# 为什么放根层：成员由 `agents.create` 继承的是**根 host 工具面**，preset 追加项到不了
+# 成员会话（实测：队长有 read/write，成员一个都没有）。根层开这三组，成员才可能产出交付物。
+#
+# profile 仍可覆盖：`preset-minimal` 的 `read: false` 之类 preset 变体会遮蔽这里的同名工具。
+# 本文件不写 `applyPatch: true`：apply_patch 不是成员产出的必需品，edit/write 足够。
+- id: tool-fs
+  name: '@deepseek-ai/dsh-tool-fs'
+  # base/web-app 层把根层 tool-fs 设成了 `disabled: true`：只写 config 不会把它打开，
+  # 必须**显式** `disabled: false`（漏了这一行的表现是「配置看起来全对，成员还是没有 read」）。
+  disabled: false
+  config:
+    applyPatch: false
+- id: tool-fs-search
+  name: '@deepseek-ai/dsh-tool-fs-search'
+  disabled: false
+  # 必填且**无 schema 默认值**：漏了就是 invalid config（CHG-211a 让整个 preset 静默消失的正是这条）
+  config:
+    sampleOverCapGlobResults: false
+- id: tool-pwsh
+  name: '@deepseek-ai/dsh-tool-pwsh'
+  disabled: !!js process.platform !== 'win32'
+- id: tool-bash
+  name: '@deepseek-ai/dsh-tool-bash'
+  disabled: !!js process.platform === 'win32'

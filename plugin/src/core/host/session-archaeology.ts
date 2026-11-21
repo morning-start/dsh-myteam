@@ -171,6 +171,17 @@ export interface SessionHistoryCapability {
 }
 
 /**
+ * 永不中止的 signal——**必须传给宿主**。
+ *
+ * 真实宿主的 `sessionController.page` 实现里无条件调用 `signal.throwIfAborted()`，而它的
+ * 类型把 signal 标成可选。修复前这里原样透传调用方省略后的 `undefined`，于是每次
+ * `myteam_read_session` 都炸在 `Cannot read properties of undefined (reading 'throwIfAborted')`
+ * （实测账本外错误：MT_HISTORY_FAILED）。本插件没有「取消读取」的需求，用共享的未中止
+ * AbortSignal 兜底，比要求每个调用方记得传更稳。
+ */
+const NEVER_ABORT_SIGNAL = new AbortController().signal
+
+/**
  * 从宿主运行时取 `sessionController` 并确认它有 `page`。
  *
  * 与 handoff 的 `resolveSessionHandoffCapability` 同一套三路探测（`ctx.get` →
@@ -200,7 +211,7 @@ export function resolveSessionHistoryCapability(rt: unknown): SessionHistoryCapa
     const controller = candidate as { page?: unknown }
     if (typeof controller?.page !== 'function') continue
     const source = candidate as SessionHistoryCapability
-    return { page: (request, signal) => source.page.call(source, request, signal) }
+    return { page: (request, signal) => source.page.call(source, request, signal ?? NEVER_ABORT_SIGNAL) }
   }
   return undefined
 }

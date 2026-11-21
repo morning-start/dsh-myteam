@@ -104,6 +104,26 @@ test('t93-4: 能力探测 —— 必须有 page（create/prompt 不能顶替）'
   })
 })
 
+test('t93-4b: 省略 signal 时补 never-abort —— 宿主无条件 throwIfAborted 不再炸', async () => {
+  /* 真实宿主的 page 实现内部直接 `signal.throwIfAborted()`（类型却标成可选）。
+     修复前本插件原样透传 undefined → `Cannot read properties of undefined (reading 'throwIfAborted')`，
+     myteam_read_session 每次都失败。这条断言就是那次的回归锁：宿主实现照旧，不传 signal 也必须成功。 */
+  const seen: Array<{ aborted: boolean; hasThrow: boolean }> = []
+  const capability = resolveSessionHistoryCapability({
+    sessionController: {
+      page: async (_request: unknown, signal?: { readonly aborted: boolean; throwIfAborted(): void }) => {
+        seen.push({ aborted: signal!.aborted, hasThrow: typeof signal!.throwIfAborted === 'function' })
+        signal!.throwIfAborted()
+        return { records: [], hasMore: false }
+      },
+    },
+  })
+  assert.ok(capability, '有 page → 可用')
+  const result = await capability.page({ address: { kind: 'session', sessionId: 's1' }, throughSeq: -1 })
+  assert.deepEqual(result, { records: [], hasMore: false })
+  assert.deepEqual(seen, [{ aborted: false, hasThrow: true }], '补的是未中止、可 throwIfAborted 的 signal')
+})
+
 function setup(rt: Record<string, unknown>) {
   const base = {
     set: () => {},
