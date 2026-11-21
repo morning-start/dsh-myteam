@@ -62,9 +62,9 @@ import { TERMINAL_STATES, downstreamOf } from './core/scheduler/state.ts'
  * `readOfflineTeam` + `foldTolerant` 只读文件、坏行/坏事件各自跳过，正好是重连需要的容错面。 */
 import { foldTolerant, isSafeTeamId, readOfflineTeam, readTokensSidecar } from './core/index/offline-view.ts'
 import { diffTaskInput } from './core/tasks/diff.ts'
-import { treeFieldsOf, HOST_TEAM_TOOLS_TO_HIDE, type MemberInstance } from './core/members/member-setup.ts'
+import { treeFieldsOf, HOST_TEAM_TOOLS_TO_HIDE, buildToolMask, type MemberInstance } from './core/members/member-setup.ts'
 import { memoryDirFor, auditMemoryContent, type MemoryFinding } from './core/members/memory.ts'
-import { copyToProject, listRoleCatalog, readGlobalRole, readProjectRole, saveGlobalRole, writeProjectRole, assertValidRole, deleteProjectRoleSafe, type RoleStorePaths } from './core/roles/role-store.ts'
+import { copyToProject, listRoleCatalog, resolveRuntimeRole, readGlobalRole, readProjectRole, saveGlobalRole, writeProjectRole, assertValidRole, deleteProjectRoleSafe, type RoleStorePaths } from './core/roles/role-store.ts'
 // CHG-87（docs/04 §2 承诺的 roleOp 端点）：host 与面板共用同一份实现
 import { roleOp as roleOpImpl } from './core/roles/role-ops.ts'
 import type { RoleDefinition } from './core/roles/builtin-roles.ts'
@@ -277,58 +277,11 @@ export function readLedgerEvents(ledgerPath: string): { events: Record<string, a
 import { deliverableMinLength } from './core/tasks/deliverable.ts'
 export { DELIVERABLE_MIN_LENGTH, deliverableMinLength } from './core/tasks/deliverable.ts'
 
-/**
- * 拍基线时文件**还不存在**的哨兵指纹。
- *
- * 为什么需要它：产物通常由成员在本阶段**创建**，阶段起点上它并不存在。若按
- * `artifactBaseline` 的「读不到就不写键」处理，`artifactIsStale` 会把「本阶段新建的文件」
- * 判成陈旧（缺键 = 不可判 = 不认交付）——正常交付反而全被拒。
- * 哨兵与任何真实指纹（`size:mtimeMs`）都不相等，于是：后来出现 = 指纹变了 = 新鲜；
- * 一直没出现 = 当前读不到 = 陈旧。两种情形都判对。
- */
-export const ABSENT_PATH_FINGERPRINT = 'absent'
-
-/**
- * 产物内容读取上限（字符）：交付判定只需要「非空 + 够长」，不需要把整个大文件读进内存
- * （产物可能是几 MB 的构建日志；判定在 gate 路径上，不该因为读文件拖慢卸载 / 裁决）。
- */
+/* P1-1 产物基线搬到 `core/tasks/artifact-baseline.ts`；导出面保持不变（host.ts 是历史入口）。 */
+import { ABSENT_PATH_FINGERPRINT, readArtifactBaselineRecord, writeArtifactBaselineRecord } from './core/tasks/artifact-baseline.ts'
+export { ABSENT_PATH_FINGERPRINT, readArtifactBaselineRecord, writeArtifactBaselineRecord, type ArtifactBaselineRecord } from './core/tasks/artifact-baseline.ts'
+/** 产物内容读取上限（字符）：判定只需要「非空 + 够长」，不把几 MB 的构建日志读进内存 */
 const ARTIFACT_TEXT_READ_LIMIT = 512 * 1024
-
-/** 产物基线落盘结构（`.dsh-myteam/state/artifacts/<teamId>/<taskId>.json`） */
-export interface ArtifactBaselineRecord {
-  version: 1
-  teamId: string
-  taskId: string
-  /** **首次**拍基线的时间（ISO）：重拍只补缺失键，这个时间不被覆盖 */
-  capturedAt: string
-  /** 路径 → 指纹（`size:mtimeMs`，或 `ABSENT_PATH_FINGERPRINT`） */
-  baseline: ArtifactBaseline
-}
-
-/** 读产物基线记录（缺失 / 坏 JSON → undefined：调用方据此判「这个任务没拍过基线」） */
-export function readArtifactBaselineRecord(filePath: string): ArtifactBaselineRecord | undefined {
-  if (!existsSync(filePath)) return undefined
-  try {
-    const parsed = JSON.parse(readFileSync(filePath, 'utf8')) as Partial<ArtifactBaselineRecord> | null
-    if (!parsed || typeof parsed !== 'object' || !parsed.baseline || typeof parsed.baseline !== 'object') return undefined
-    return {
-      version: 1,
-      teamId: String(parsed.teamId ?? ''),
-      taskId: String(parsed.taskId ?? ''),
-      capturedAt: typeof parsed.capturedAt === 'string' ? parsed.capturedAt : new Date(0).toISOString(),
-      baseline: parsed.baseline as ArtifactBaseline,
-    }
-  } catch {
-    // 坏记录当「没拍过」：宁可走兼容分支（有告警留痕），也不因为一条坏 JSON 让 archive 门炸掉
-    return undefined
-  }
-}
-
-/** 写产物基线记录（父目录自动创建；返回落盘路径） */
-export function writeArtifactBaselineRecord(filePath: string, record: ArtifactBaselineRecord): string {
-  writeTextAtomic(filePath, `${JSON.stringify(record, null, 2)}\n`, { ensureParent: true })
-  return filePath
-}
 
 /**
  * 从 `deliverableSpec` 抽取候选产物路径：`path` + `candidates`（若存在）+ 调用方追加的申报路径。
@@ -2526,19 +2479,39 @@ export class MyTeamHost implements MyTeamHostContract {
    * 找不到返回 `MT_UNAVAILABLE`（队长可能刚重启），**不静默丢调用**。实现见 docs/27 §2.1。
    */
   executeMemberToolBySession(sessionId: string, name: string, args: Record<string, unknown>): Record<string, unknown> | Promise<Record<string, unknown>> {
+    const member = this.findMemberBySession(sessionId)
+    if (member === undefined) return { status: 'error', code: 'MT_UNAVAILABLE', message: `member session "${sessionId}" is not in any team roster（未落账或已释放）` }
+    return this.executeMemberTool(member, name, args)
+  }
+
+  /**
+   * CHG-212（ADR-010 P4b）：成员 preset 的**懒收窄**入口——返回该成员的 `toolPolicy` 掩码。
+   * 子代理的 `setup` 插不进去，`restrict` 只能由 preset 在首次提示词组装时补做（见 `src/member.ts`）。
+   */
+  memberPolicyBySession(sessionId: string): Record<string, unknown> {
+    const member = this.findMemberBySession(sessionId)
+    if (member === undefined) return { status: 'error', code: 'MT_UNAVAILABLE', message: `member session "${sessionId}" is not in any team roster` }
+    const role = resolveRuntimeRole(this.rolePaths, member.roleId)
+    if (!role) return { status: 'error', code: 'MT_UNAVAILABLE', message: `role "${member.roleId}" is not in the project library` }
+    const mask = buildToolMask(role.definition)
+    return { status: 'ok', memberId: member.memberId, roleId: member.roleId, mode: mask.mode, allow: mask.allow ?? [], deny: mask.deny ?? [] }
+  }
+
+  /** 按成员会话 id 找成员（已开 + 磁盘上有账本的团队；重启后懒打开） */
+  private findMemberBySession(sessionId: string): MemberInstance | undefined {
     const teamIds = new Set(this.services.keys())
     try {
       const tasksDir = storeLayout(this.workspaceRoot).tasks
       for (const teamId of readdirSync(tasksDir)) if (existsSync(join(tasksDir, teamId, 'ledger.jsonl'))) teamIds.add(teamId)
     } catch { /* 目录不可读：只查已开团队 */ }
     for (const teamId of teamIds) {
-      let svc: TeamService
-      try { svc = this.service(teamId) } catch { continue }
-      const members = svc.projectionSnapshot.members as Record<string, MemberInstance>
-      const member = Object.values(members).find((m) => m.sessionId === sessionId)
-      if (member) return this.executeMemberTool(member, name, args)
+      try {
+        const members = this.service(teamId).projectionSnapshot.members as Record<string, MemberInstance>
+        const member = Object.values(members).find((m) => m.sessionId === sessionId)
+        if (member) return member
+      } catch { continue }
     }
-    return { status: 'error', code: 'MT_UNAVAILABLE', message: `member session "${sessionId}" is not in any team roster（未落账或已释放）` }
+    return undefined
   }
 
   /* CHG-200：`myteam_submit_review` 在 verify 门要等命令执行（FR-5.3）——返回类型补实为

@@ -38,11 +38,13 @@ function unavailable(message        )                          {
                                  
                                                  
                                                                            
-                                                                    
+                                                                                                                                      
+                                                                                                                                  
  
 
                           
                                                                                                               
+                                                                        
  
 
 /** 成员会话 id（`Agent.id` 就是会话 id；兼容只暴露 `session.id` 的宿主形状） */
@@ -80,6 +82,29 @@ export function runMemberTool(ctx                , toolName        , args       
   return resolved.host .executeMemberToolBySession (resolved.sessionId , toolName, args)
 }
 
+/**
+ * C5 收窄的懒应用（ADR-010 P4b）：子代理的 `setup` 插不进去，`restrict` 只能由 preset 补。
+ *
+ * 为什么挂在 `systemPrompt.section` 的惰性 `text({agent})` 上：提示词在**每次请求前**组装，
+ * 早于模型的第一次工具调用，所以收窄仍然发生在「模型看见工具面」之前；而且这个回调拿得到
+ * agent（工具注册期拿不到）。每个会话只应用一次；宿主不支持 restrict 时保持不收窄并留待重试。
+ */
+function applyMemberPolicyOnce(ctx                , agent         , applied             )       {
+  if (agent === undefined) return
+  const sessionId = memberSessionIdOf(agent                                  )
+  if (sessionId === undefined || applied.has(sessionId)) return
+  const resolved = resolveMemberHost(ctx, { agent: agent                                   })
+  if (resolved.error !== undefined) return
+  const policy = resolved.host .memberPolicyBySession?.(sessionId)
+  if (policy === undefined || policy['status'] !== 'ok') return
+  if (policy['mode'] === 'none') { applied.add(sessionId); return }
+  try {
+    if (policy['mode'] === 'allow') ctx.tools.restrict?.({ allow: policy['allow']             })
+    else ctx.tools.restrict?.({ deny: policy['deny']             })
+    applied.add(sessionId)
+  } catch { /* 宿主没有 restrict / 形状不符：不标记已应用，下次提示词组装再试 */ }
+}
+
 export function apply(ctx                )       {
   for (const def of memberToolDefs()) {
     const compiled = compileParameters(def)
@@ -90,6 +115,16 @@ export function apply(ctx                )       {
       execute: (args                         , exec          ) => runMemberTool(ctx, def.name, args, exec),
     })
   }
+  // C5：角色 toolPolicy 的收窄（第一次提示词组装时应用；空文本 = 不占提示词预算）
+  const applied = new Set        ()
+  ctx.systemPrompt?.section({
+    name: 'myteam:member-policy',
+    order: 90,
+    text: ({ agent }) => {
+      applyMemberPolicyOnce(ctx, agent, applied)
+      return ''
+    },
+  })
 }
 
 //# sourceURL=./src/member.ts

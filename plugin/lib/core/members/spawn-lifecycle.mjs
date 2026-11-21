@@ -276,8 +276,7 @@ export function createSpawnLifecycle(deps                    ) {
        * 只在「角色没有工具收窄策略」时走这条：restrict 需要角色身份，而子代理的 setup 是管理器
        * 私有的（P4b 用成员 preset 的懒收窄补上，届时放开条件）。C5 不能被顺手破坏。 */
       const spawnCtx = deps.spawnContext?.()
-      const canActivate = buildToolMask(roleDef).mode === 'none'
-        && spawnCtx?.agent !== undefined
+      const canActivate = spawnCtx?.agent !== undefined
         && typeof deps.rt().subagents?.startActivation === 'function'
       created = canActivate
         ? deps.rt().subagents.startActivation({

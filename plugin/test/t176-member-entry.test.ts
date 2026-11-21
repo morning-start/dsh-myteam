@@ -74,3 +74,20 @@ test('t176g: 会话 id 兼容 agent.id 与 agent.session.id 两种形状', () =>
   assert.equal(memberSessionIdOf({ session: { id: 'b' } }), 'b')
   assert.equal(memberSessionIdOf({}), undefined)
 })
+test('t176h: C5 懒收窄——首次提示词组装时按角色策略 restrict，一次后不再重复', () => {
+  const restricted: unknown[] = []
+  let section: { text: (scope: { agent?: unknown }) => string } | undefined
+  const host = { executeMemberToolBySession: () => ({ status: 'ok' }), memberPolicyBySession: () => ({ status: 'ok', mode: 'deny', deny: ['pwsh'] }) }
+  const ctx = {
+    tools: { register: () => {}, restrict: (mask: unknown) => { restricted.push(mask) } },
+    agents: { get: () => ({ id: 'cap-1' }) },
+    agentPresets: { serviceFor: () => host },
+    systemPrompt: { section: (s: typeof section) => { section = s } },
+  }
+  apply(ctx as never)
+  const agent = { id: 'mt-t1-dev-1', session: { header: { parentSession: 'cap-1' } } }
+  assert.equal(section!.text({ agent }), '')
+  assert.deepEqual(restricted, [{ deny: ['pwsh'] }])
+  section!.text({ agent }) // 第二次：已应用，不再 restrict
+  assert.equal(restricted.length, 1)
+})
