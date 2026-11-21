@@ -25,6 +25,13 @@ const checks = [
   { name: '死词条', argv: ['tools/find-dead-locale.mjs'], expect: ['死词条（zh 侧）: 0'] },
   { name: '死导出', argv: ['tools/find-dead-exports.mjs'], expect: ['死导出: 0'] },
   {
+    // CHG-210：写了、测了、没接线——`find-dead-exports` 抓不到（测试引用了它）。
+    // 判定看「新增 0」：存量债走棘轮（tools/unwired-exports-allow.json 的 maxTodo），只减不增。
+    name: '未接线导出（棘轮）',
+    argv: ['tools/find-unwired-exports.mjs', '--strict'],
+    expect: ['新增 0'],
+  },
+  {
     name: '死模块',
     argv: ['tools/find-dead-modules.mjs', 'plugin/src/host.ts', 'plugin/src/panel.ts', 'plugin/src/smoke.ts'],
     expect: ['不可达: 0'],

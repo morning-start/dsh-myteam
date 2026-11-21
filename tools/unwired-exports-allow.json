@@ -1,0 +1,28 @@
+{
+  "_comment": "CHG-210：未接线导出的棘轮基线。status=keep 是有意保留（测试/诊断设施，不算债）；status=todo 是待接线或待删的真债，只许减不许增。maxTodo 必须等于 todo 条数——清掉一条就同步下调，防止「清理了但基线没动」的假进度。",
+  "maxTodo": 11,
+  "entries": [
+    { "file": "plugin/src/core/scheduler/state.ts", "name": "claimOrder", "status": "todo", "reason": "优先级 + FIFO 防饿死已实现且有单测，但 claim 入口没调用——实际按账本建单顺序（scout-scale 报、已人工核实）" },
+    { "file": "plugin/src/core/scheduler/recovery.ts", "name": "recoveryEventFor", "status": "todo", "reason": "恢复事件映射：生产由 host/recovery.ts 直接 commit，这个纯函数只剩测试调用——要么接线要么删" },
+    { "file": "plugin/src/core/errors.ts", "name": "isMtCode", "status": "todo", "reason": "错误码判定函数生产零调用，与「MTError 未被 instanceof 透传」是同一个根因" },
+    { "file": "plugin/src/core/fs/write-log.ts", "name": "currentWriteLog", "status": "todo", "reason": "写日志上下文读取：生产只用 bindWriteLog 写入、没人读回来核对——待核是否应进面板/审计" },
+    { "file": "plugin/src/core/members/member-card.ts", "name": "listMemberCards", "status": "todo", "reason": "成员卡列表生产零调用——面板走的是视图层，待核是否重复实现或该删" },
+    { "file": "plugin/src/core/roles/role-store.ts", "name": "deleteProjectRole", "status": "todo", "reason": "删项目角色生产零调用——面板删除走 role-ops 的另一条路，待核是否有两条实现" },
+    { "file": "plugin/src/core/members/member-setup.ts", "name": "scratchPathFor", "status": "todo", "reason": "scratch 路径派生生产零调用——待核成员是否真的需要 scratch 区" },
+    { "file": "plugin/src/core/members/hierarchy.ts", "name": "depthOf", "status": "todo", "reason": "深度查询生产零调用——派生树深度由 spawn 落账时算好，读面未用" },
+    { "file": "plugin/src/core/workspace/scope.ts", "name": "scopeDir", "status": "todo", "reason": "作用域目录派生生产零调用——待核是否被 layout 的等价实现取代" },
+    { "file": "plugin/src/core/ledger/token-sidecar.ts", "name": "cacheHitRate", "status": "todo", "reason": "命中率计算生产零调用——views 里有另一份 hitRateOf，可能是双实现" },
+    { "file": "plugin/src/core/knowledge/evidence-pointer.ts", "name": "isSessionPointer", "status": "todo", "reason": "session: 前缀判定生产零调用——待核调用方是否内联了同样的判断" },
+
+    { "file": "plugin/src/core/index/views.ts", "name": "__clearViewCache", "status": "keep", "reason": "双下划线测试设施，本来就只给测试用" },
+    { "file": "plugin/src/core/index/views.ts", "name": "viewCacheStats", "status": "keep", "reason": "缓存诊断读数，测试与排查用；面板未接是已知取舍" },
+    { "file": "plugin/src/core/tools/tool-tiers.ts", "name": "toolsByTier", "status": "keep", "reason": "档位清单查询，文档与审计口径用" },
+    { "file": "plugin/src/core/workspace/scope.ts", "name": "scopeMatrix", "status": "keep", "reason": "作用域矩阵，docs/19 的口径来源" },
+    { "file": "plugin/src/tools/defs.ts", "name": "toolRegistryPlan", "status": "keep", "reason": "工具注册计划，供文档与一致性测试核对" },
+    { "file": "plugin/src/core/workspace/scope.ts", "name": "PROJECT_ONLY_KINDS", "status": "keep", "reason": "常量：测试断言用的项目级种类清单" },
+    { "file": "plugin/src/core/host/session-archaeology.ts", "name": "ARCHAEOLOGY_DEFAULT_MAX_MESSAGES", "status": "keep", "reason": "常量：默认上限，测试断言用" },
+    { "file": "plugin/src/core/scheduler/waves.ts", "name": "explainWaves", "status": "keep", "reason": "波次解释，诊断面（面板未接）" },
+    { "file": "plugin/src/core/tasks/diff.ts", "name": "changesDigest", "status": "keep", "reason": "改动摘要，审计面用" },
+    { "file": "plugin/src/core/tasks/graph.ts", "name": "dependencyChain", "status": "keep", "reason": "依赖链，诊断/图渲染口径" }
+  ]
+}
