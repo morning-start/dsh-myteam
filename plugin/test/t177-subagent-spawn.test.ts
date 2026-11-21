@@ -124,3 +124,32 @@ test('t177b: 拿不到队长 Agent 时回落 agents.create（老路径仍可用�
     cleanup()
   }
 })
+test('t177c: 重启后按账本身份回落到 agents.get(sessionId)，消息仍投得出去', () => {
+  const { root, cleanup } = tempWorkspace('myteam-t177c')
+  try {
+    const captured: Captured = {}
+    const live1 = new Map<string, unknown>()
+    const first = approvedTeam(root, captured, live1)
+    const spawned = first.host.executeLeadTool(
+      'myteam_spawn_member',
+      { teamId: first.teamId, roleId: 'implementer', instanceName: 'dev-3' },
+      { agent: { id: 'cap-1' } },
+    ) as any
+    assert.equal(spawned.status, 'spawned', JSON.stringify(spawned))
+
+    // 「重启」：新 host、空 memberHandles，但成员会话已经活着（agents.get 拿得到）
+    const followups: unknown[] = []
+    const reviveAgent = { id: spawned.sessionId, followup: (m: unknown) => { followups.push(m) }, session: { header: { parentSession: 'cap-1' } } }
+    const live2 = new Map<string, unknown>([[spawned.sessionId, reviveAgent]])
+    const second = new MyTeamHost(makeRuntime(root, {}, live2), { dispatchTeamCooldownMs: 0, dispatchMemberCooldownMs: 0 })
+    second.initialize()
+    const sent = second.executeLeadTool('myteam_message', { teamId: first.teamId, to: spawned.memberId, content: '继续做 t-1' }, {}) as any
+    assert.equal(sent.status, 'sent', JSON.stringify(sent))
+    // 至少一次投递即可——实测存在「message + 唤醒」双投递（见本轮报告，另案）
+    assert.ok(followups.length >= 1, '投递到活的成员会话')
+    // 投递的是「去账本读」的指针（正文落账，不塞模型上下文）
+    assert.match(String((followups[0] as { content?: Array<{ text?: string }> }).content?.[0]?.text ?? JSON.stringify(followups[0])), /ledger seq/)
+  } finally {
+    cleanup()
+  }
+})

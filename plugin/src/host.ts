@@ -1239,8 +1239,16 @@ export class MyTeamHost implements MyTeamHostContract {
    * 调用方必须如实回报 `delivered:false`——**账本落了 ≠ 送到了**（项目纪律：不假装成功）。
    */
   private deliverMemberMessage(memberId: string, kind: string, content: string): boolean {
+    /* CHG-212（P5）：重启后 memberHandles 是空的，但成员会话可能已经活着（子代理按 childId 建过）；
+     * 先按账本身份回落到 agents.get(sessionId)，拿到就回填——否则成员永远叫不醒。 */
+    const member = this.memberById(memberId)
     const agent = this.agentOf(this.memberHandles.get(memberId))
-    if (!agent?.followup) return false
+      ?? (member === undefined ? undefined : this.agentOf(this.rt.agents?.get?.(member.sessionId)))
+    if (!agent?.followup) {
+      this.log('warn', `message to ${memberId} not delivered: no live agent（重启后未恢复：先 release 再 spawn，或等队列恢复）`)
+      return false
+    }
+    if (!this.memberHandles.has(memberId)) this.memberHandles.set(memberId, agent)
     try {
       agent.followup(this.followupMessage(`[myteam] 队长消息（${kind}）：${content}`))
       return true
@@ -2510,6 +2518,15 @@ export class MyTeamHost implements MyTeamHostContract {
 
   /** 按成员会话 id 找成员（已开 + 磁盘上有账本的团队；重启后懒打开） */
   private findMemberBySession(sessionId: string): MemberInstance | undefined {
+    return this.memberMatching((member) => member.sessionId === sessionId)
+  }
+
+  /** 按 memberId 找成员（跨团队；与 findMemberBySession 同一份遍历口径） */
+  private memberById(memberId: string): MemberInstance | undefined {
+    return this.memberMatching((member) => member.memberId === memberId)
+  }
+
+  private memberMatching(match: (member: MemberInstance) => boolean): MemberInstance | undefined {
     const teamIds = new Set(this.services.keys())
     try {
       const tasksDir = storeLayout(this.workspaceRoot).tasks
@@ -2517,8 +2534,7 @@ export class MyTeamHost implements MyTeamHostContract {
     } catch { /* 目录不可读：只查已开团队 */ }
     for (const teamId of teamIds) {
       try {
-        const members = this.service(teamId).projectionSnapshot.members as Record<string, MemberInstance>
-        const member = Object.values(members).find((m) => m.sessionId === sessionId)
+        const member = Object.values(this.service(teamId).projectionSnapshot.members as Record<string, MemberInstance>).find(match)
         if (member) return member
       } catch { continue }
     }
