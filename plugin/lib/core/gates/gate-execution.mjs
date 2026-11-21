@@ -264,6 +264,11 @@ export function createGateExecution(deps                   ) {
         teamId, taskId, gate, verdict,
         ...(reason ? { reason } : {}),
         reviewerMemberId: reviewer,
+        /* CHG-210 批 3.3：**把这次裁决钉在被审的那一世产物上**。
+         * 光有「review 过了」不够——必须能回答「过的是哪一版」。落账后：
+         *   - 审计面能看出「这条 pass 对应的 attempt」；
+         *   - `task.claimed`（新 attempt）会清空 gate 裁决（见 fold），旧结论不会自动继承。 */
+        ...(task.attemptId ? { reviewedAttempt: task.attemptId } : {}),
         ...(scopeAudit ? { scopeAudit } : {}),
         delivery,
       },

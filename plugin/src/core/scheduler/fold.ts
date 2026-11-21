@@ -254,6 +254,20 @@ export function applyEvent(proj: TeamProjection, event: LedgerEvent): void {
       if (Number.isFinite(generation) && generation > 0) t.attempt = generation
       t.reassigning = undefined
       t.handoffId = undefined
+      /* CHG-210 批 3.3：**新 attempt = 新产物，旧裁决一律作废**。
+       *
+       * 旧实现不清 `gateVerdicts` / `gateResults`：上一世过的 review/verify 会留在投影里，
+       * 面板据此显示「已过审」、交付判定也可能据此放行——而当前这一世的产物**根本没被看过**。
+       * 这正是参考项目 NM 用 `reviewedAttempt` 绑字节要堵的那条路：串通最省事的作弊不是编造
+       * 意见，而是「拿旧结论过新代码」。
+       *
+       * 打回预算（`gateRejects`）**不清**：它是跨轮累计的成本闸（FR-5.2），清了等于把
+       * 「反复打回」的成本抹掉，正好帮了刷轮数的人。
+       *
+       * 只在**确实有旧裁决**时才清：赋空对象会把「从没裁决过」从 `undefined` 变成 `{}`，
+       * 而 `t78-11` 锁着「没裁决过就是 undefined，不造假」。 */
+      if (t.gateVerdicts && Object.keys(t.gateVerdicts).length > 0) t.gateVerdicts = {}
+      if (t.gateResults && Object.keys(t.gateResults).length > 0) t.gateResults = {}
       if (proj.members[p.memberId]) proj.members[p.memberId].currentTaskId = p.taskId
       break
     }
@@ -364,6 +378,8 @@ export function applyEvent(proj: TeamProjection, event: LedgerEvent): void {
         ...(typeof p.executedBy === 'string' ? { executedBy: p.executedBy } : {}),
         ...(typeof p.forcedBy === 'string' ? { forcedBy: p.forcedBy } : {}),
         ...(typeof p.exitCode === 'number' || p.exitCode === null ? { exitCode: p.exitCode as number | null } : {}),
+        /* CHG-210 批 3.3：裁决钉在被审的那一世（老账本没有这个字段 → 保持省略，重放逐字不变） */
+        ...(typeof p.reviewedAttempt === 'string' ? { reviewedAttempt: p.reviewedAttempt } : {}),
         at: event.ts,
       }
       // CHG-87（FR-5.4）：scope 审计结论随门禁结果落投影（看板徽标 / 详情审计块的唯一来源）
