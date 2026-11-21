@@ -94,3 +94,6 @@ $RECYCLE.BIN/
 *.swp
 *.swo
 *~
+
+# 提交信息临时文件（误入过一次）
+.git-msg.txt
