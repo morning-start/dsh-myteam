@@ -929,6 +929,30 @@ function commitFailureOf(e: unknown): CommitResult {
 }
 
 /**
+ * CHG-210 批 6.4b：**级联释放前，把子成员手上在跑的任务交还**。
+ *
+ * 缺陷现场：`releaseMember` 级联释放子成员时，只把 `drained.running` 记成 1（或者更早以前
+ * 恒记 0），**任务本身留在 in_progress**——原主人已经没了，票据还在，任务既跑不完也领不走。
+ *
+ * 为什么生成 draft 而不是自己 commit：调用方（host）要在 `runWithRollback` 里统一提交，
+ * 失败时整批回滚。这里是纯函数，好测也好复用。
+ *
+ * 为什么用 `task.paused` 而不是直接回 ready：级联释放是「主人没了」，不是「主人想继续」。
+ * 停在 `paused` 让面板能显示「这个任务是被级联释放留下的」，队长再决定 rescope 还是取消——
+ * 直接回 ready 会让它悄悄混进队列，没人知道它已经换过一次主人。
+ */
+export function pausedDraftsForRelease(proj: TeamProjection, memberId: string, actor: string): CommitDraft[] {
+  const taskId = proj.members[memberId]?.currentTaskId
+  const task = taskId ? proj.tasks[taskId] : undefined
+  if (!task || task.state !== 'in_progress' || !task.attemptId) return []
+  return [{
+    actor,
+    type: 'task.paused',
+    payload: { teamId: proj.teamId, taskId: task.id, attemptId: task.attemptId, reason: `cascade-release: 成员 ${memberId} 被级联释放，任务交还待处置` },
+  }]
+}
+
+/**
  * CHG-210：**工具面兜底**——把任意异常翻译成 `{status:'error', code, message}`。
  *
  * 为什么放在 `core/service.ts` 而不是 `host.ts`：`host.ts` 的 A6 行数棘轮已经顶格（4,377），

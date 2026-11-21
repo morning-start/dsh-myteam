@@ -30,7 +30,7 @@ import { writeTextAtomic, runWithRollback, snapshotFor } from './core/fs/write-l
 import { resolveProjectRoot, storeLayout, teamLedgerPath as teamLedgerPathOf, displayPath, STORE_DIR, tokenSidecarPath, legacyTokenSidecarPath } from './core/workspace/layout.ts'
 // CHG-103：作用域契约（全局 vs 项目级）——角色两级都可用，任务/历史/状态只能项目级
 import { normalizeScope } from './core/workspace/scope.ts'
-import { TeamService, openTeamLedger, toolFailureOf, type CommitDraft } from './core/service.ts'
+import { TeamService, openTeamLedger, pausedDraftsForRelease, toolFailureOf, type CommitDraft } from './core/service.ts'
 /* CHG-186（T155a）：宿主契约下沉 `core/host/contract.ts` —— 解 `host.ts ⇄ remote/service.ts`
  * 的 type 环（arch-report 里唯一那条）。这里只 `import type`（擦除后无运行时依赖、无装载环）；
  * `MyTeamConfig` 仍从本文件 re-export，既有 import 点（如 `test/t123`）一个都不用改。 */
@@ -2332,7 +2332,6 @@ export class MyTeamHost implements MyTeamHostContract {
     if (mode === 'remove' && confirm !== true) {
       return { status: 'confirm-required', message: '移除是两段确认操作（私有空间将删除），请带 confirm=true 重调' }
     }
-    // 排空检查（FR-3.11）：在跑任务/待处理输入
     if (member.currentTaskId) {
       return { status: 'drain-pending', code: 'MT_DRAIN_PENDING', running: 1, note: `成员仍有在跑任务 ${member.currentTaskId}；先 revoke/reassign 或等完成` }
     }
@@ -2345,7 +2344,8 @@ export class MyTeamHost implements MyTeamHostContract {
       runWithRollback('release-cascade', (log) => {
         if (plan.value.length > 1) snapshotFor(log, svc.ledgerPath)
         for (const id of plan.value) {
-          // CHG-93/CHG-210 批 6.4：`running` 按 currentTaskId 真算（此前硬编码 0，账本上「排空完成」是假的）
+          /* CHG-210 批 6.4b：先交还在跑的任务，再释放成员（逻辑在 core，这里只提交） */
+          for (const draft of pausedDraftsForRelease(proj, id, actor)) { const pr = this.commit(teamId, draft); if (!pr.ok) throw Object.assign(new Error(pr.message), { code: pr.code }) }
           const drained = { running: proj.members[id]?.currentTaskId ? 1 : 0, pending: this.pendingMessagesFor(teamId, id) }
           // P1-5：释放 = 这一轮到此为止——同 interrupt，空转只能在「交出控制权」的入口补检查
           this.noteGuardTurnEnd(id)
