@@ -181,6 +181,22 @@ export class MyTeamRemote extends TypertRemoteService {
     return this.host.executeLeadTool('myteam_list_members', { teamId }, { actor: 'human' }) as Record<string, unknown>
   }
 
+  /* CHG-212（ADR-010 P4）：**子代理成员入口**。
+   * 为什么挂在这里：成员 preset 在子代理作用域里只有 `agentPresets.serviceFor(captain,'myteam')`
+   * 这一个口子，而它返回的是本 Remote（隔离服务），不是 MyTeamHost。所以三个成员入口方法
+   * 必须由本类转发（实机探针发现的：直接调 host 方法会 `is not a function`）。 */
+  memberToolBySession(sessionId: string, name: string, args: Record<string, unknown>) {
+    return this.host.executeMemberToolBySession(sessionId, name, args)
+  }
+
+  memberPolicyBySession(sessionId: string) {
+    return this.host.memberPolicyBySession(sessionId)
+  }
+
+  memberBriefBySession(sessionId: string, evidenceRequired?: boolean) {
+    return this.host.memberBriefBySession(sessionId, evidenceRequired)
+  }
+
   /** 知识库面板视图（FR-17.5 数据面，M2-0b）：条目 + 待审提案 + 演化时间线（读投影，不进模型上下文） */
   async getKnowledge(args: { teamId?: string } = {}) {
     return { status: 'ok', knowledge: this.host.knowledgeView() }

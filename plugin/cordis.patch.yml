@@ -124,7 +124,7 @@
           - id: myteam-member-tools
             name: 'dsh-plugin-myteam/member'
             # 行级 inject 与插件上的 .inject 双保险（同 myteam-host 行的理由）
-            inject: ['tools', 'agents', 'agentPresets']
+            inject: ['tools', 'agents', 'agentPresets', 'systemPrompt']
 
 # ── 根层能力（CHG-212）：队长与成员**共同继承** ─────────────────────────────
 #

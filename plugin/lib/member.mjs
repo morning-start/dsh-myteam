@@ -19,7 +19,7 @@ import { compileParameters } from './host.mjs'
 import { memberToolDefs } from './tools/defs.mjs'
 
 export const name = 'myteam-member-tools'
-export const inject = ['tools', 'agents', 'agentPresets']
+export const inject = ['tools', 'agents', 'agentPresets', 'systemPrompt']
 
 /** 成员工具执行结果的错误形状（与宿主其它工具一致） */
 function unavailable(message        )                          {
@@ -43,6 +43,9 @@ function unavailable(message        )                          {
  
 
                           
+                                  
+                                                                                                       
+                              
                                                                                                               
                                                                         
                                                                        
@@ -70,7 +73,8 @@ export function resolveMemberHost(ctx                , exec                     
     return { error: unavailable(`队长会话 ${parentSessionId} 当前不在线：成员工具需要一个存活的队长会话（先恢复队长再重试）`) }
   }
   const host = ctx.agentPresets?.serviceFor?.(captain, 'myteam')                              
-  if (host === undefined || typeof host.executeMemberToolBySession !== 'function') {
+  const run = host?.memberToolBySession ?? host?.executeMemberToolBySession
+  if (host === undefined || typeof run !== 'function') {
     return { error: unavailable('解析不到 myteam 服务：队长会话没有挂载 myteam preset（检查 myteam-preset-captain）') }
   }
   return { host, sessionId }
@@ -80,7 +84,8 @@ export function resolveMemberHost(ctx                , exec                     
 export function runMemberTool(ctx                , toolName        , args                         , exec                      )          {
   const resolved = resolveMemberHost(ctx, exec)
   if (resolved.error !== undefined) return resolved.error
-  return resolved.host .executeMemberToolBySession (resolved.sessionId , toolName, args)
+  const run = resolved.host .memberToolBySession ?? resolved.host .executeMemberToolBySession 
+  return run(resolved.sessionId , toolName, args)
 }
 
 /**

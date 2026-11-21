@@ -1,0 +1,16 @@
+﻿fix(member): 成员入口改由 MyTeamRemote 转发 + 补 systemPrompt inject（活体探针发现）
+
+活体验证（真实 host + 真实 agents/agentPresets/subagents，不经模型）暴露两处致命断点：
+
+1) serviceFor(captain,'myteam') 返回的是 MyTeamRemote（隔离服务），不是 MyTeamHost。
+   成员入口直接调 host 方法会 is not a function —— 三个方法改由 Remote 转发。
+2) 成员 preset 插件读 ctx.systemPrompt 但 inject 里没有它 —— 整行激活失败，
+   成员 preset 会变成 broken（错误：cannot get property systemPrompt without inject）。
+
+修复后探针输出：
+  captain service: MyTeamRemote（三个成员方法都在）
+  child: mt-probe-implementer-xxx parent: probe-cap-xxx preset: myteam-member depth: 1
+  toolCount: 25 myteamTools: 13 remember: true leadLeak: false
+
+即：成员确实是队长的子代理、挂成员 preset、拿到 13 个成员工具、看不到队长工具。
+测试 1058 pass / 0 fail；门禁 8/8。
