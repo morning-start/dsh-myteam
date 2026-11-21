@@ -240,11 +240,13 @@ test('T17/场景4-机制部分: 杀进程重启 → 账本重放一致 + 滞留 
     const before = host.service(teamId).projectionSnapshot.revision
     // 模拟重启：全新 host 实例（同 workspaceRoot，services 缓存清空）
     const host2 = new MyTeamHost(makeRuntime(root))
+    /* CHG-207（P1-8）：恢复**由 `initialize()` 自动触发**（修复前手动调且生产零调用——
+     * 重启一次所有在跑任务就变成无人推进的僵尸）。 */
     host2.initialize()
-    const rec = host2.recoverOnBoot(teamId)
-    assert.ok(rec.recovered >= 1, `滞留 attempt 被恢复表处理（${rec.actions.join('; ')}）`)
     const after = host2.service(teamId).projectionSnapshot
-    assert.equal(after.tasks[cr.taskId].state, 'ready', '恢复后任务回 ready 供重新 claim')
+    assert.equal(after.tasks[cr.taskId].state, 'ready', '启动恢复：滞留 attempt 被撤，任务回 ready 供重新 claim')
+    // 幂等：启动已经恢复过，再显式调一次没有可恢复项
+    assert.deepEqual(host2.recoverOnBoot(teamId), { recovered: 0, actions: [] })
     // 账本重放一致性：旧事件数 + 新恢复事件
     const led = readFileSync(join(root, '.dsh-myteam', 'tasks', teamId, 'ledger.jsonl'), 'utf8')
     const events = led.split('\n').filter((l) => l.trim()).map((l) => JSON.parse(l))

@@ -153,6 +153,16 @@ export interface TaskProjection {
   cancelReason?: string
   cancelDownstream?: 'leave' | 'cancel' | 'rewire'
   /**
+   * CHG-207（P1-8）：**blocked 留痕**——「停下等人」的时刻与原因。
+   *
+   * 为什么 blocked 需要自己的事件（而不是复用 failed）：`failed` 是终态（`LEGAL_TRANSITIONS.failed = []`，
+   * 重放后永不复活）；`blocked` 有出口（`blocked → ready / backlog / cancelled`），
+   * 是「等人裁决」的中间态。旧实现里两者共用一条路，于是「不可自动恢复的失败」和
+   * 「等人处理」在投影上分不开，面板只能显示成 failed。
+   */
+  blockedAt?: number
+  blockedReason?: string
+  /**
    * CHG-75：最近一次被改挂的记录（下游换了上游）。
    * removed = 被换掉的依赖 id；added 缺省 = 解除依赖（该任务变独立任务）。
    */

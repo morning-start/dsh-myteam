@@ -47,6 +47,7 @@ const MEMBER_TOUCHING_EVENTS = new Set([
   'task.claimed',
   'task.completed',
   'task.failed',
+  'task.blocked',   // CHG-207：blocked 会 releaseMember（成员回到 idle）
   'task.escalated',
   'task.cancelled',
   'task.attempt.revoked',
@@ -372,6 +373,23 @@ export function applyEvent(proj                , event             )       {
       const t = requireTask(proj, p.taskId, event.seq)
       transition(t, 'failed', event.seq)
       t.attemptId = undefined
+      releaseMember(proj, t)
+      break
+    }
+    /*
+     * CHG-207（P1-8）：**blocked = 停下等人**（不是终态）。
+     *
+     * 与 `task.failed` 的区别：failed 的合法后继是空集（重放后永不复活，只能人重建任务）；
+     * blocked 的后继是 `ready / backlog / cancelled`——人工用 `myteam_rescope_task` 放行后任务能回去重跑。
+     * 修复前**没有任何事件能写 blocked**：状态机里有这个状态、有迁移边、看板也统计它，
+     * 实际永远是 0（解散文案承诺的「未完成任务转 blocked」从未发生）。
+     */
+    case 'task.blocked': {
+      const t = requireTask(proj, p.taskId, event.seq)
+      transition(t, 'blocked', event.seq)
+      t.attemptId = undefined
+      t.blockedAt = event.ts
+      t.blockedReason = String(p.reason ?? '')
       releaseMember(proj, t)
       break
     }

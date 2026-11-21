@@ -418,6 +418,7 @@ interface HandoffSessionRef {
 | `task.progress` | taskId, attemptId, progress | 成员工具 |
 | `task.evidence` | taskId, attemptId, evidence(EvidenceBlock) | 成员工具 |
 | `task.completed / task.failed` | taskId, attemptId, summary | 成员工具 |
+| `task.blocked`（CHG-207 新增） | taskId, reason（必填）, recovery?（是否来自启动对账） | host（启动恢复）/ 队长工具 |
 | `task.escalated` | taskId, attemptId, reason, evidence, suggestion, count | 成员工具 |
 | `task.rescoped` | taskId, reason（**CHG-73 必填**）, patch（合入任务输入）, changes（字段级 diff）, batchId? | Lead 工具 / 面板（actor=human） |
 | `task.updated`（CHG-70 新增） | taskId, patch（白名单：title/description/acceptanceCriteria/deliverableSpec/deps/requiredRole/taskType/gateChain/priority/estimate/tags）, changes?（**CHG-73**：字段级 diff）, reason?, batchId? | Lead 工具 / 面板（myteam_update_task） |

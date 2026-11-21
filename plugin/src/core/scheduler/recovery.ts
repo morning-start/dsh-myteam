@@ -50,6 +50,11 @@ export type TaskRuntimeFacts = {
   reassigning?: boolean
   /** 已停放的 attempt → 原因（`attemptId` 为键；见 `TaskProjection.parkedAttempts` 为什么不是 Map） */
   parkedAttempts?: Record<string, string>
+  /**
+   * CHG-207（P1-8）：当前执行世代号（`TaskProjection.attempt`；缺省 = 旧账本 / 从未 claim）。
+   * 只用于崩溃重试上限——见 {@link MAX_RECOVERY_ATTEMPTS}。
+   */
+  attempts?: number
 }
 
 export type RecoveryAction =
@@ -58,6 +63,16 @@ export type RecoveryAction =
   | { kind: 're-activate-new-attempt' }  // 滞留 attempt 用新 attemptId 重试
   | { kind: 'to-blocked' }               // 引导人工
   | { kind: 'noop' }
+
+/**
+ * CHG-207（P1-8）：**崩溃重试上限**——同一个任务被反复撤权重跑，说明它根本跑不起来。
+ *
+ * 为什么必须有上限：`re-activate-new-attempt` 是「偶发崩溃」的处置；如果某任务每次都让成员
+ * 崩在同一个地方（缺依赖 / 环境不对 / 定义自相矛盾），恢复表会一轮一轮撤权重跑，**永远到不了
+ * 人工**——预算烧光、看板一直「运行中」、没人知道该修什么。超过上限转 `blocked`，
+ * 让人看见并决定（改定义 / 补环境 / 取消）。
+ */
+export const MAX_RECOVERY_ATTEMPTS = 3
 
 /**
  * 恢复决策表（FR-4.6：按有序表选一条路径，不并行多策）。
@@ -79,7 +94,12 @@ export function recoveryAction(facts: TaskRuntimeFacts): RecoveryAction {
   if (facts.state === 'in_progress') {
     if (phase === 'parked') return { kind: 'to-blocked' }
     if (phase === 'reassigning' || phase === 'handoff') return { kind: 're-activate-new-attempt' }
-    if (phase === 'claimed') return liveMember ? { kind: 're-activate-in-place' } : { kind: 're-activate-new-attempt' }
+    if (phase === 'claimed') {
+      if (liveMember) return { kind: 're-activate-in-place' }
+      // CHG-207（P1-8）：重试上限——同一任务反复被撤权重跑 = 它根本跑不起来，
+      // 再撤一次只会再崩一轮（无限重试永远到不了人工）。转 blocked 交给人看见。
+      return (facts.attempts ?? 0) >= MAX_RECOVERY_ATTEMPTS ? { kind: 'to-blocked' } : { kind: 're-activate-new-attempt' }
+    }
     return liveMember ? { kind: 're-activate-in-place' } : { kind: 'to-blocked' }
   }
   if (facts.state === 'ready' || facts.state === 'backlog') return { kind: 'noop' } // 调度层自然接管
@@ -240,7 +260,9 @@ export function recoveryEventFor(action: RecoveryAction, taskId: string, newAtte
         payload: { taskId, attemptId: `revoked-on-recovery`, reason: 'host restart recovery (FR-4.6)', prevAssignee: undefined },
       }
     case 'to-blocked':
-      return { type: 'task.rescoped', payload: { taskId, patch: { recoveryBlocked: true } } }
+      /* CHG-207（P1-8）：落 `task.blocked`（不是 `task.rescoped`+`recoveryBlocked`——那个字段
+       * 全仓零消费，而 rescoped 会被 fold 转回 ready/backlog，等于把「该停下」的任务静默重排队）。 */
+      return { type: 'task.blocked', payload: { taskId, reason: 'host restart recovery: no recoverable attempt (retry budget exhausted or attempt parked)' } }
     default:
       return undefined
   }

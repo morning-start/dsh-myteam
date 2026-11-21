@@ -49,6 +49,7 @@ import { createKnowledgeHandlers, createMemberKnowledgeHandlers } from './host/k
 import { createQueryHandlers } from './host/query.ts'
 /* CHG-200：队长读面适配层（只读 / 不含 attemptId / 限界读，见 `src/host/read.ts` 文件头） */
 import { createReadHandlers } from './host/read.ts'
+import { createBootRecovery } from './host/recovery.ts'
 import { DELEGATION_TOOL_NAMES, delegationToolDefs, leadToolDefs, memberToolDefs, type ToolDef } from './tools/defs.ts'
 // CHG-148（P1-6）：按工具名取完整结果契约（jsonOutput 双声明），不再用统一空 schema
 import { outputForTool } from './core/tools/output-contract.ts'
@@ -111,7 +112,7 @@ import {
   summarizeSessionRecords,
   type SessionRecordView,
 } from './core/host/session-archaeology.ts'
-import { recoveryAction, reconcileProvisioning, type ProvisioningMember, type ProvisioningProbeResult, type ProvisioningSettlement } from './core/scheduler/recovery.ts'
+import { reconcileProvisioning, type ProvisioningMember, type ProvisioningProbeResult, type ProvisioningSettlement } from './core/scheduler/recovery.ts'
 /* P1-1/P1-2 接线（docs/21 §6，CHG-144 的纯函数模块）：产物新鲜度指纹 + 交付判定三级信号 */
 import type { ArtifactBaseline, ArtifactStat } from './core/gates/artifact-freshness.ts'
 import type { DeliveryJudgement } from './core/gates/delivery-verdict.ts'
@@ -790,6 +791,14 @@ export class MyTeamHost implements MyTeamHostContract {
     readLedgerEvents,
     isThenable,
   })
+  /** CHG-207（P1-8）：冷启动恢复的落账端（`src/host/recovery.ts`；启动时对全部团队跑一遍） */
+  private readonly recovery = createBootRecovery({
+    service: (teamId) => this.service(teamId),
+    commit: (teamId, draft) => this.commit(teamId, draft),
+    memberLive: (memberId) => this.memberHandles.has(memberId),
+    workspaceRoot: () => this.workspaceRoot,
+    log: (level, msg) => this.log(level, msg),
+  })
   /**
    * CHG-190（T159b）：**门禁执行**（`src/core/gates/gate-execution.ts`）——入口层下沉三刀里的
    * 第二刀。12 个私有方法（`reviewTask` / `runVerifyGate` / `scopeAuditFor` /
@@ -1069,6 +1078,10 @@ export class MyTeamHost implements MyTeamHostContract {
     } catch (e) {
       this.log('warn', `spawn reconcile on boot failed (startup continues): ${String(e)}`)
     }
+    /* CHG-207（P1-8）：冷启动恢复——重启后滞留 in_progress 的任务按恢复表落事件（attempt 撤权
+     * 回 ready / 没有活持有人的真落 `task.blocked`）。修复前方法写好却**零调用**：重启一次所有
+     * 在跑任务就变成无人推进的僵尸。逐团队兜底在 `recoverAll` 内部，失败不阻断启动。 */
+    this.recovery.recoverAll()
     // CHG-91（插件团队贡献契约 v1）：装载第三方插件贡献的角色与团队模板。
     // **必须早于** registerLeadTools / registerRemote——工具与面板都要读这份目录。
     // 纪律：只读（JSON.parse 文件）、失败隔离（坏插件只进 warnings）、大声（warn 日志 + 面板红条）。
@@ -4326,22 +4339,9 @@ export class MyTeamHost implements MyTeamHostContract {
     return summary
   }
 
-  /** 冷启动恢复（T16）：对滞留 in_progress 任务按恢复表落事件 */
+  /** 冷启动恢复（T16）→ 落账端下沉 `src/host/recovery.ts`（CHG-207）；这里只转发 */
   recoverOnBoot(teamId: string): { recovered: number; actions: string[] } {
-    const svc = this.service(teamId)
-    const actions: string[] = []
-    for (const t of Object.values(svc.projectionSnapshot.tasks)) {
-      if (t.state !== 'in_progress') continue
-      const memberLive = t.assignee ? this.memberHandles.has(t.assignee) : false
-      const action = recoveryAction({ state: t.state, attemptId: t.attemptId, assignee: t.assignee, memberLive })
-      if (action.kind === 're-activate-new-attempt') {
-        this.commit(teamId, { actor: 'host', type: 'task.attempt.revoked', payload: { teamId, taskId: t.id, attemptId: t.attemptId ?? 'unknown', reason: 'host restart recovery (FR-4.6)', prevAssignee: t.assignee } })
-        actions.push(`task ${t.id}: attempt revoked for re-claim`)
-      } else if (action.kind === 'to-blocked') {
-        actions.push(`task ${t.id}: needs manual (no attempt, no live member)`)
-      }
-    }
-    return { recovered: actions.length, actions }
+    return this.recovery.recoverTeam(teamId)
   }
 }
 
