@@ -531,7 +531,7 @@ interface HandoffSessionRef {
 
 ## 错误码（`MT_*`）
 
-> **本表由 `tools/gen-error-docs.mjs` 从 `plugin/src/core/errors.ts` 生成，共 87 个。**
+> **本表由 `tools/gen-error-docs.mjs` 从 `plugin/src/core/errors.ts` 生成，共 88 个。**
 > 手改会被覆盖，且 `plugin/test/t81-error-codes.test.ts` 会判红。
 >
 > **加码流程**：① `errors.ts` 加一行（含说明）→ ② `node tools/gen-error-docs.mjs` → ③ `cd plugin && npm test`。
@@ -573,11 +573,12 @@ interface HandoffSessionRef {
 | `MT_LEDGER_MISSING_RULES_VERSION` | 新账本的首事件不是 `rules.version.adopted`（I3 前提）。 |
 | `MT_LEDGER_UNKNOWN_TYPE` | 事件 `type` 不在 `EVENT_TYPES` 白名单里（旧版本写的账本用新代码打开时会看到）。 |
 
-### 任务与状态机（16）
+### 任务与状态机（17）
 
 | 码 | 什么时候会看到它 |
 |---|---|
 | `MT_ATTEMPT_STALE` | 针对的 attempt 已被撤销或已结束（并发重试、或成员被 interrupt 后回写）。 |
+| `MT_ATTEMPT_FOREIGN` | attempt 属于别的成员：票据只对**它的持有人**有效，拿别人的 attemptId 代写会被拒（账本零改动，CHG-210）。 |
 | `MT_CROSS_REVIEW` | `gate:review` 要求 `reviewerMemberId` 必填且 ≠ 实现者；同成员自审被拒（FR-5.1）。 |
 | `MT_DEPENDENCY_FAILED` | 批量建任务时，本条依赖的前序条目创建失败，本条目跳过。 |
 | `MT_DRAIN_PENDING` | 释放成员前还有未排空的运行中/待处理任务（FR-3.11：排空后才报成功）。 |

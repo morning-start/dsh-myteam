@@ -435,12 +435,12 @@ export class TeamService {
         break
       }
       case 'task.progress': {
-        const stale = this.checkAttempt(p.taskId, p.attemptId)
+        const stale = this.checkAttempt(p.taskId, p.attemptId, draft.actor)
         if (stale) return stale
         break
       }
       case 'task.evidence': {
-        const stale = this.checkAttempt(p.taskId, p.attemptId)
+        const stale = this.checkAttempt(p.taskId, p.attemptId, draft.actor)
         if (stale) return stale
         // FR-5.0/ADR-007：证据块结构校验（done 必附；此处 progress/中间申报也允许带）
         const evidence = p.evidence                                       
@@ -451,7 +451,7 @@ export class TeamService {
         break
       }
       case 'task.completed': {
-        const stale = this.checkAttempt(p.taskId, p.attemptId)
+        const stale = this.checkAttempt(p.taskId, p.attemptId, draft.actor)
         if (stale) return stale
         // done 必附证据块（FR-5.0 硬校验）——completed 事件必须先带同 attemptId 的 evidence
         const t = proj.tasks[p.taskId]
@@ -463,12 +463,12 @@ export class TeamService {
         break
       }
       case 'task.failed': {
-        const stale = this.checkAttempt(p.taskId, p.attemptId)
+        const stale = this.checkAttempt(p.taskId, p.attemptId, draft.actor)
         if (stale) return stale
         break
       }
       case 'task.escalated': {
-        const stale = this.checkAttempt(p.taskId, p.attemptId)
+        const stale = this.checkAttempt(p.taskId, p.attemptId, draft.actor)
         if (stale) return stale
         // FR-11.7：escalate 必带 evidence（已尝试什么+卡在哪）
         if (!p.evidence || typeof p.evidence !== 'object') {
@@ -781,7 +781,7 @@ export class TeamService {
     return false
   }
 
-          checkAttempt(taskId        , attemptId        )                      {
+          checkAttempt(taskId        , attemptId        , actor         )                      {
     const t = this.projection.tasks[taskId]
     if (!t) return { ok: false, code: 'MT_VALIDATION', message: `task "${taskId}" not found` }
     /* CHG-78（真实宿主实弹）：终态任务不再接收成员上报。
@@ -796,6 +796,22 @@ export class TeamService {
         ok: false,
         code: 'MT_ATTEMPT_STALE',
         message: `attempt "${attemptId}" is stale for task "${taskId}"; current: ${t.attemptId ?? 'none'} (FR-4.3)`,
+      }
+    }
+    /* CHG-210 批 3：**票据绑人**——attemptId 不是通行证。
+     *
+     * 旧实现只比 attemptId：任何人（含另一个成员、或拿到日志/会话考古里那张票的模型）都能
+     * 用它对别人的任务写 evidence/completed/progress——`assignee` 字段形同虚设。
+     * `actor` 由宿主按会话注入（`member:<id>`），**不是模型可自报的入参**，所以拿它做归属判定
+     * 才是可靠的那条信道（参考做法：NM 用 `exec.agent.id` 反查 identity 再比 assignee）。
+     *
+     * 旧账本兼容：`t.assignee` 为空的存量任务放行（那时还没有归属语义）。
+     * 队长/人类不受限：他们本来就能代成员处置（rescope / 强制裁决）。 */
+    if (actor?.startsWith('member:') && t.assignee && actor !== `member:${t.assignee}`) {
+      return {
+        ok: false,
+        code: 'MT_ATTEMPT_FOREIGN',
+        message: `attempt "${attemptId}" belongs to ${t.assignee}, not to ${actor}; 用别人的票据写别人的任务被拒（账本零改动）`,
       }
     }
     return null

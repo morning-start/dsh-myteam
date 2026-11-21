@@ -305,7 +305,9 @@ test('t48-9: updateTask 落 diff；结构编辑晚于证据 → evidenceStale；
     host.executeMemberTool(handle as never, 'myteam_claim_task', { taskId: created.taskId })
     const attemptId = host.service(teamId).projectionSnapshot.tasks[created.taskId].attemptId
     host.commit(teamId, {
-      actor: 'member:implementer',
+      /* CHG-210 批 3：票据绑人——actor 必须与任务 assignee 一致，否则 `MT_ATTEMPT_FOREIGN`。
+       * 这里用 handle 的真实 memberId（此前写死的 `member:implementer` 是伪造身份）。 */
+      actor: `member:${(handle as unknown as { memberId: string }).memberId}`,
       type: 'task.evidence',
       payload: { teamId, taskId: created.taskId, attemptId, evidence: { kind: 'na', na: { reason: '手工核对' } } },
     })

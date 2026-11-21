@@ -49,6 +49,7 @@ export const MT_CODES = [
 
   // ── 任务与状态机 ────────────────────────────────────────────
   'MT_ATTEMPT_STALE',
+  'MT_ATTEMPT_FOREIGN',
   'MT_CROSS_REVIEW',
   'MT_DEPENDENCY_FAILED',
   'MT_DRAIN_PENDING',
@@ -177,6 +178,7 @@ export const MT_CODE_DOCS: Record<MtCode, string> = {
 
   // 任务与状态机
   MT_ATTEMPT_STALE: '针对的 attempt 已被撤销或已结束（并发重试、或成员被 interrupt 后回写）。',
+  MT_ATTEMPT_FOREIGN: 'attempt 属于别的成员：票据只对**它的持有人**有效，拿别人的 attemptId 代写会被拒（账本零改动，CHG-210）。',
   MT_CROSS_REVIEW: '`gate:review` 要求 `reviewerMemberId` 必填且 ≠ 实现者；同成员自审被拒（FR-5.1）。',
   MT_DEPENDENCY_FAILED: '批量建任务时，本条依赖的前序条目创建失败，本条目跳过。',
   MT_DRAIN_PENDING: '释放成员前还有未排空的运行中/待处理任务（FR-3.11：排空后才报成功）。',
