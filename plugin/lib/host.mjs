@@ -149,11 +149,9 @@ import { roleUsage } from './core/index/offline-view.mjs'
 /* 宿主编译辅助（T0 实证：register 前必须编译成完整 JSON Schema）。
  * 导出仅供单测（t7b 编译产物审计）；运行时语义不变。 */
 export function compileParameters(tool         )          {
-  // strip-only 环境下无宿主 parameterSchemaSpecToJsonSchema；本编译器实现宿主
-  // spec 语义的等价子集：属性级 required:true 收集 → 顶层 required 数组（递归）。
-  // 修订：递归必须同时下钻 items——items 内的属性级 required:true 若残留，
-  // 产出的布尔 required 不是宿主 schema 子集关键字（assertSupportedJsonSchema
-  // 报 "not a supported keyword"），如 EVIDENCE_PARAM.commands.items、rosterItem。
+  // strip-only 下无宿主 parameterSchemaSpecToJsonSchema，本编译器实现等价子集：属性级
+  // required:true → 顶层 required 数组，**递归必须下钻 items**（否则布尔 required 不是宿主
+  // schema 子集关键字，assertSupportedJsonSchema 报 not a supported keyword，见 commands.items）。
   const compile = (spec                         )                          => {
     const out                          = { ...spec }
     if (out.properties && typeof out.properties === 'object') {
@@ -2587,6 +2585,7 @@ export class MyTeamHost                               {
           return this.memberKnowledge.read(args)
         case 'myteam_submit_review':
           return this.memberTasks.submitReview(teamId, member, args, actor)
+        case 'myteam_list_members': return this.members.listMembers(teamId) // CHG-210 批 6.6：成员也能看名册（peer_message 要知道队友 id）
         /* CHG-202y（FR-32 · G1-2）：成员侧委派（实现搬到 `src/host/members.ts`） */
         case 'myteam_spawn_member': return this.members.spawnAs(teamId, member, args)
         case 'myteam_release_member': return this.members.releaseAs(teamId, member, args)
