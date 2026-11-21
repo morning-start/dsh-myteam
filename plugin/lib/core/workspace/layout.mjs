@@ -516,6 +516,13 @@ export function readManifest(projectRoot        )                               
  */
 export function displayPath(absPath        , env                    = process.env)         {
   if (!absPath) return absPath
+  /* CHG-209：**异平台路径原样返回**。
+   *
+   * `resolve` / `relative` 用的是**本机**的 path 实现：在 posix 上处理 Windows 盘符路径
+   * 会算出 `~\Users\...` 这种毫无意义的结果（跨机器导出的账本 / 团队快照里就有这种路径）。
+   * 判定只看形状——盘符或反斜杠，且本机不是 Windows。
+   * 这条同时替 CI（ubuntu）挡住「Windows 路径用例在 Linux 上必然失败」的假红。 */
+  if (process.platform !== 'win32' && (/^[A-Za-z]:[\\/]/.test(absPath) || absPath.includes('\\'))) return absPath
   const home = env.USERPROFILE || env.HOME || homedir()
   if (!home) return absPath
   try {

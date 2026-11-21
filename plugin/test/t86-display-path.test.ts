@@ -20,7 +20,12 @@ import { displayPath } from '../src/core/workspace/layout.ts'
 const clientSource = readFileSync(join(import.meta.dirname, '..', 'client', 'client.js'), 'utf8')
 const env = (home: string) => ({ USERPROFILE: home, HOME: home }) as unknown as NodeJS.ProcessEnv
 
-test('t86-1: 家目录内的路径 → ~ 前缀（Windows 反斜杠）', () => {
+/* CHG-209：`displayPath` 用本机 `path` 实现做相对化，所以「Windows 路径 + Windows home」
+ * 只可能在 Windows 上证。非 Windows 上正确行为是**原样返回**（异平台路径不做相对化）——
+ * 这两条分支各自钉住，避免「CI 红了就 skip」变成「永远不测」。 */
+const WINDOWS = process.platform === 'win32'
+
+test('t86-1: 家目录内的路径 → ~ 前缀（Windows 反斜杠）', { skip: !WINDOWS && '仅 Windows：需本机 path 语义' }, () => {
   const home = 'C:\\Users\\Hanes'
   assert.equal(
     displayPath('C:\\Users\\Hanes\\.dsh\\myteam\\plugins', env(home)),
@@ -29,13 +34,20 @@ test('t86-1: 家目录内的路径 → ~ 前缀（Windows 反斜杠）', () => {
   assert.equal(displayPath('C:\\Users\\Hanes\\.dsh', env(home)), '~\\.dsh')
 })
 
-test('t86-2: 家目录本身 → 单个 ~', () => {
+test('t86-1b: 异平台路径原样返回（posix 上不把 C:\\… 相对化成 ~\\Users\\…）', { skip: WINDOWS && '仅 posix：Windows 上它是本机路径' }, () => {
+  const home = 'C:\\Users\\Hanes'
+  assert.equal(displayPath('C:\\Users\\Hanes\\.dsh\\myteam\\plugins', env(home)), 'C:\\Users\\Hanes\\.dsh\\myteam\\plugins')
+  // 本机 posix 路径仍然照常缩（不能因为加了异平台判断就把自己家目录也漏了）
+  assert.equal(displayPath('/home/u/.dsh', env('/home/u')), '~/.dsh')
+})
+
+test('t86-2: 家目录本身 → 单个 ~', { skip: !WINDOWS && '仅 Windows：需本机 path 语义' }, () => {
   const home = 'C:\\Users\\Hanes'
   assert.equal(displayPath(home, env(home)), '~')
   assert.equal(displayPath('C:\\Users\\Hanes\\', env(home)), '~')
 })
 
-test('t86-3: 家目录外的路径原样返回（不能把别人的路径也缩成 ~）', () => {
+test('t86-3: 家目录外的路径原样返回（不能把别人的路径也缩成 ~）', { skip: !WINDOWS && '仅 Windows：需本机 path 语义' }, () => {
   const home = 'C:\\Users\\Hanes'
   assert.equal(displayPath('E:\\Workplace\\extension\\dsh-myteam', env(home)), 'E:\\Workplace\\extension\\dsh-myteam')
   // 前缀相同但不是子目录：不能误判（Hanes2 不是 Hanes 的子目录）

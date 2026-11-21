@@ -32,7 +32,8 @@ jobs:
 
       - name: 测试套件
         working-directory: plugin
-        run: node --test test/*.test.ts test/*.test.js
+        # spec reporter：失败时直接看到用例名（默认 dot reporter 在多平台首跑时只能看到退出码）。
+        run: node --test --test-reporter=spec test/*.test.ts test/*.test.js
 
       # 门禁与本地同一个入口（不在 CI 里另写一套命令，否则两套会漂移）
       - name: 门禁（架构 / 指纹 / 文档 / 客户端 / 死代码）
