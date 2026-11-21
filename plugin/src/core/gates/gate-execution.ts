@@ -65,7 +65,7 @@
  */
 import { existsSync, readFileSync } from 'node:fs'
 import { isAbsolute, join } from 'node:path'
-import { runVerifyCommand, validateVerifyCommand, classifyVerifyResult, resolveTimeoutMs, type VerifyCommand } from './command-gate.ts'
+import { runVerifyCommand, validateVerifyCommand, classifyVerifyResult, resolveTimeoutMs, type VerifyCommand, type VerifyFailureKind } from './command-gate.ts'
 import { auditWriteScopes, filesTouchedOf, type ScopeAudit } from './scope-audit.ts'
 import { artifactBaseline, artifactIsStale, mergeBaseline, type ArtifactBaseline, type ArtifactStat } from './artifact-freshness.ts'
 import { extractEvidenceBlock, judgeDeliverable, type DeliveryJudgement } from './delivery-verdict.ts'
@@ -354,6 +354,25 @@ export function createGateExecution(deps: GateExecutionDeps) {
    *  - 任务没声明 verifyCommand → `MT_VERIFY_NO_COMMAND`（不是静默 pass）；
    *  - 宿主没 subprocess 服务 → `MT_UNAVAILABLE`（**不静默降级成人工点通过**）。
    */
+  /**
+   * CHG-210 批 4.4：**失败原因分线，每条带下一步**。
+   *
+   * 旧实现只有一句 `verify 门 fail（exit 1）；任务已回到修复队列`——用户分不清
+   * 「环境缺东西」还是「代码错」，而这两件事该做的事完全相反。
+   */
+  function verifyFailureNote(kind: VerifyFailureKind | undefined, code: number | string | null | undefined): string {
+    switch (kind) {
+      case 'not-run':
+        return `命令没跑起来（exit ${code}）——**不是代码问题**：确认 verifyCommand 的可执行文件在 PATH 上、cwd 存在`
+      case 'timed-out':
+        return '命令超时未跑完，按未通过处理——可缩小 verifyCommand 范围，或调高 gates.commandTimeoutMs'
+      case 'signaled':
+        return `命令被信号中断（${code}）——确认没有外部 kill / OOM`
+      default:
+        return `断言失败（exit ${code}）——修完重新申报 done 再跑`
+    }
+  }
+
   async function runVerifyGate(
     teamId: string,
     taskId: string,
@@ -432,7 +451,10 @@ export function createGateExecution(deps: GateExecutionDeps) {
     const run = await runVerifyCommand({ command, workdir, timeoutMs, subprocess: deps.rt().subprocess })
     if (!run.ok) return { status: 'error', code: run.code, message: run.message }
 
-    const verdict = classifyVerifyResult(run.result)
+    /* CHG-210 批 4.2：分类带 `failureKind`——「命令没跑起来」与「测试真挂了」在界面上必须分开，
+     * 因为用户要做的事完全相反（修环境 vs 改代码）。 */
+    const classified = classifyVerifyResult(run.result)
+    const verdict = classified.verdict
     const scopeAudit = scopeAuditFor(teamId, taskId)
     const rejectCount = task.gateRejects?.verify ?? 0
     if (verdict === 'pass' && rejectCount >= GATE_REJECT_BUDGET && !(actor === 'human' && args.confirm === true)) {
@@ -460,6 +482,7 @@ export function createGateExecution(deps: GateExecutionDeps) {
         signal: run.result.signal,
         durationMs: run.result.durationMs,
         outputTail: run.result.outputTail,
+        ...(classified.failureKind ? { failureKind: classified.failureKind } : {}),
         executedBy: 'host',
         ...(reason ? { reason } : {}),
         ...(scopeAudit ? { scopeAudit } : {}),
@@ -476,6 +499,7 @@ export function createGateExecution(deps: GateExecutionDeps) {
       signal: run.result.signal,
       durationMs: run.result.durationMs,
       outputTail: run.result.outputTail,
+      ...(classified.failureKind ? { failureKind: classified.failureKind } : {}),
       ...(scopeAudit ? { scopeAudit } : {}),
     }
     if (verdict === 'fail') {
@@ -484,7 +508,7 @@ export function createGateExecution(deps: GateExecutionDeps) {
         ...base,
         taskState: deps.service(teamId).projectionSnapshot.tasks[taskId]?.state ?? 'gate:verify',
         rejectCount: rejectCount + 1,
-        note: `verify 门 fail（exit ${run.result.exitCode ?? run.result.signal ?? '?'}）；任务已回到修复队列，修完重新申报 done 再跑`,
+        note: `verify 门 fail（${verifyFailureNote(classified.failureKind, run.result.exitCode ?? run.result.signal)}）；任务已回到修复队列`,
       }
     }
     const auto = autoEvaluateGateChain(teamId, taskId, actor)

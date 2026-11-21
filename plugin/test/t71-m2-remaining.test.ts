@@ -91,11 +91,11 @@ function complete(host: MyTeamHost, teamId: string, member: any, over: Record<st
  * ══════════════════════════════════════════════════════════════════ */
 
 test('t71-1: command-gate 纯函数——exit code 定裁决 / 超时算 fail / 输出尾部有界', () => {
-  assert.equal(classifyVerifyResult({ exitCode: 0, signal: null, timedOut: false }), 'pass')
-  assert.equal(classifyVerifyResult({ exitCode: 1, signal: null, timedOut: false }), 'fail')
-  assert.equal(classifyVerifyResult({ exitCode: null, signal: 'SIGKILL', timedOut: true }), 'fail')
+  assert.equal(classifyVerifyResult({ exitCode: 0, signal: null, timedOut: false }).verdict, 'pass')
+  assert.equal(classifyVerifyResult({ exitCode: 1, signal: null, timedOut: false }).verdict, 'fail')
+  assert.equal(classifyVerifyResult({ exitCode: null, signal: 'SIGKILL', timedOut: true }).verdict, 'fail')
   // 被信号杀但没标 timedOut 也算 fail（进程没正常退出）
-  assert.equal(classifyVerifyResult({ exitCode: null, signal: 'SIGSEGV', timedOut: false }), 'fail')
+  assert.equal(classifyVerifyResult({ exitCode: null, signal: 'SIGSEGV', timedOut: false }).verdict, 'fail')
 
   const short = 'ok'
   assert.equal(truncateOutput(short), short)

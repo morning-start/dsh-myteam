@@ -93,16 +93,43 @@ export function validateVerifyCommand(command: unknown): { ok: false; code: stri
 }
 
 /**
- * 退出码 → 门禁结论。
+ * 失败子类（CHG-210 批 4.2）：回答「是命令根本没跑起来，还是跑起来但断言失败」。
+ *
+ * `not-run` 与 `assertion` 的用户动作完全相反：前者要修环境/路径（重试一万次也不会过，
+ * 只会把打回预算烧光），后者才是回到修复队列改代码。
+ */
+export type VerifyFailureKind = 'assertion' | 'not-run' | 'timed-out' | 'signaled'
+
+export interface VerifyClassification {
+  verdict: VerifyVerdict
+  /** 仅 fail 时给出 */
+  failureKind?: VerifyFailureKind
+}
+
+/**
+ * 退出码 → 门禁结论 + 失败子类。
  *
  * 判定只看**真实退出码**（FR-5.3）：exit 0 = pass；非 0 / 被信号杀 = fail。
  * 超时也算 fail（超时不是"没结论"——它意味着命令没跑完，按未通过处理，
  * 同时 timedOut 另存，面板可区分"跑挂了"与"跑超时"）。
+ *
+ * **CHG-210 批 4.2**：旧实现只回 `'pass' | 'fail'`，于是 `exit 127`（命令不存在）与
+ * 「测试真的挂了」在界面上同形。参考项目在进程级做同一刀并写明混在一起的代价是
+ * 「排查方向错」——所以这里把 fail 再分四类，文案与熔断才有依据。
  */
-export function classifyVerifyResult(result: Pick<CommandRunResult, 'exitCode' | 'signal' | 'timedOut'>): VerifyVerdict {
-  if (result.timedOut) return 'fail'
-  if (result.signal) return 'fail'
-  return result.exitCode === 0 ? 'pass' : 'fail'
+export function classifyVerifyResult(
+  result: Pick<CommandRunResult, 'exitCode' | 'signal' | 'timedOut'> & { outputTail?: string },
+): VerifyClassification {
+  if (result.timedOut) return { verdict: 'fail', failureKind: 'timed-out' }
+  if (result.signal) return { verdict: 'fail', failureKind: 'signaled' }
+  if (result.exitCode === 0) return { verdict: 'pass' }
+  /* 127 = shell 找不到可执行文件 —— 归类为「没跑起来」而不是断言失败 */
+  if (result.exitCode === 127) return { verdict: 'fail', failureKind: 'not-run' }
+  const tail = result.outputTail ?? ''
+  if (/(ENOENT|EACCES|command not found|not recognized as an internal|不是内部或外部命令)/i.test(tail)) {
+    return { verdict: 'fail', failureKind: 'not-run' }
+  }
+  return { verdict: 'fail', failureKind: 'assertion' }
 }
 
 /**
