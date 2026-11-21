@@ -135,6 +135,17 @@ export interface GateExecutionDeps {
   guardPayloadOf: (verdict: GuardVerdict) => Record<string, unknown>
 }
 
+/* CHG-210 批 4.1：verify 门的环境熔断。
+ * 同一命令连续「没跑起来」达阈值即熔断（转 needs-human，不再重复执行）。
+ * 状态按**命令签名**隔离——换一条命令是新的开始。 */
+const VERIFY_ENV_LATCH = 3
+const verifyEnvFailures = new Map<string, number>()
+
+/** 测试用：清空 verify 环境熔断状态（否则用例之间会串） */
+export function __resetVerifyEnvLatch(): void {
+  verifyEnvFailures.clear()
+}
+
 export function createGateExecution(deps: GateExecutionDeps) {
   /**
    * CHG-55：任务类型 → 门禁链展开（团队模板 taskTypes 生效）。
@@ -435,6 +446,27 @@ export function createGateExecution(deps: GateExecutionDeps) {
      * ready、下一轮再跑——于是 `GATE_REJECT_BUDGET` 事实上只挡住了「放行」，没挡住「继续烧」。
      * 超限后的正确动作是交给人，而不是再跑一遍同一条注定失败的命令。
      * 人工强制放行（上面那个分支）不受此限：它就是超预算后的出口。 */
+    /* CHG-210 批 4.1：**环境类失败优先于预算类**（必须在预算闸之前）。
+     *
+     * 为什么：`GATE_REJECT_BUDGET` 默认 2，而 verify 每轮 fail 都会 +1——第 3 次进来时预算闸
+     * 先拦（`MT_REJECT_BUDGET`），熔断的名额永远轮不到。但两句话对用户的价值完全不同：
+     * 「你已打回 2 轮，转人工」vs「这条命令连续 2 次根本没跑起来，去查 PATH」——后者可行动。
+     *
+     * 判据用**上一轮的结果**（所以阈值是 `-1`）：第 1/2 次正常跑命令并计数，第 3 次进来时
+     * 看到「前两次都是 not-run」就直接熔断，不再浪费一次执行。 */
+    const verifySig = Array.isArray(task.input.verifyCommand?.argv) ? (task.input.verifyCommand!.argv as string[]).join('\u0000') : ''
+    const envSeen = verifySig ? (verifyEnvFailures.get(verifySig) ?? 0) : 0
+    if (envSeen >= VERIFY_ENV_LATCH - 1) {
+      return {
+        status: 'needs-human',
+        code: 'MT_ENV_UNAVAILABLE',
+        gate: 'verify',
+        taskState: task.state,
+        failureKind: 'not-run',
+        failures: envSeen,
+        message: `这条命令已连续 ${envSeen} 次没跑起来（**不是代码问题**）；不再重复执行，等环境修好后由人工确认重跑。检查可执行文件是否在 PATH、cwd 是否存在。`,
+      }
+    }
     const spentRejects = task.gateRejects?.verify ?? 0
     if (spentRejects >= GATE_REJECT_BUDGET) {
       return {
@@ -455,6 +487,13 @@ export function createGateExecution(deps: GateExecutionDeps) {
      * 因为用户要做的事完全相反（修环境 vs 改代码）。 */
     const classified = classifyVerifyResult(run.result)
     const verdict = classified.verdict
+    /* CHG-210 批 4.1：这里只**计数**，不返回——真正的熔断判断在下一轮进入时做
+     * （见上面的「环境类失败优先于预算类」）。计数按命令签名隔离。 */
+    {
+      const signature = command.argv.join('\u0000')
+      if (classified.failureKind === 'not-run') verifyEnvFailures.set(signature, (verifyEnvFailures.get(signature) ?? 0) + 1)
+      else verifyEnvFailures.delete(signature)
+    }
     const scopeAudit = scopeAuditFor(teamId, taskId)
     const rejectCount = task.gateRejects?.verify ?? 0
     if (verdict === 'pass' && rejectCount >= GATE_REJECT_BUDGET && !(actor === 'human' && args.confirm === true)) {
