@@ -1,0 +1,125 @@
+# 27-成员子代理化与 SQLite 记忆（ADR-010 草案）
+
+> 用户定案（2026-11-21）：**成员改用子代理**；记忆等长期状态要存下来，
+> 借鉴 Hindsight 的记忆方法，用 SQLite。
+> 本文只写「怎么改、按什么顺序改、怎么验收」；取证见 [docs/15 §9](15-官方AgentTeam对照与借鉴.md)。
+
+## 0. 一句话
+
+把成员从「插件自建的**根会话**」换成「DSH **子代理**（子会话 + 父链 + preset 组合）」，
+把记忆从「成员目录下的 `memory.md`」换成「workspace 级 **SQLite**（bank / evidence / refine / recall）」。
+账本仍是唯一权威，服务仍是单写者。
+
+---
+
+## 1. 机制事实（本机解包 0.2.2-rc.5，写代码前必须先认这五条）
+
+| # | 事实 | 证据 |
+|---|---|---|
+| 1 | 子代理的服务入口是 `subagents.startActivation(spec)`，spec 里可给 `childId`（稳定身份）、`agentPreset`、`parent`、`prompt`、`maxDepth` | `dsh-subagent/src/index.ts:252-272`、`types.ts:144-190` |
+| 2 | **子代理默认 join 父的 preset 代际**；不指定 `agentPreset` 就会拿到队长那 60 个 Lead 工具（违反 C5） | `dsh-subagent/src/child-agent.ts:187-201`（`composeFrom`） |
+| 3 | 子代理的 local child `setup` 是**管理器私有**的（composition / descriptor / cwd / outputSchema），插件插不进去 → 成员工具只能经 **preset** 装 | `dsh-subagent/src/manager.ts:826-865` |
+| 4 | 工具的 `execute(args, exec)` 第二参带 **调用方 Agent**（`exec.agent`），所以我们的 `myteam_spawn_member` 能拿到船长 Agent 去 `startActivation` | `dsh-tool-agent-team/src/index.ts:83-86,131-132` |
+| 5 | `node:sqlite` 在宿主可用（`DatabaseSync`/`StatementSync`），官方 `dsh-session-query-sqlite` 也无原生依赖 | 本机 `require('node:sqlite')` 实测 + 该包 `package.json` 依赖只有 schemastery |
+
+---
+
+## 2. 目标形态
+
+### 2.1 服务与工具分层（ADR-005 修订）
+
+| 层 | 放什么 | 为什么 |
+|---|---|---|
+| **root** | `myteam` 服务（账本 / 投影 / 调度）+ 面板门面 | 账本是 **workspace 级**，不是会话级；成员（子代理）与船长必须在同一服务实例上，单写者才成立 |
+| **preset `myteam-captain`** | 60 个 Lead 工具 + 队长 persona | 保持现状（只在本会话可见） |
+| **preset `myteam-member`** | 成员工具（10 + 记忆 3）+ 角色 section | 子代理只能经 preset 拿到工具面（事实 3） |
+
+### 2.2 成员创建
+
+```
+myteam_spawn_member(roleId)
+  → exec.agent（船长 Agent）
+  → subagents.startActivation({
+      parent: exec.agent,
+      childId: 'mt-<teamId>-<roleSlug>-<n>',   // 与账本 sessionId 同一份，稳定、可对账
+      agentPreset: 'myteam-member',            // 必须显式，否则拿队长工具（事实 2）
+      label: '<roleId>-<n>',
+      prompt: 上岗引导（读板 → 认领）
+    })
+  → 账本仍走两阶段（provisioning → active），handle 换成 activation
+```
+
+成员身份反查：`myteam-member` preset 的插件在 `setup(agentCtx, agent)` 里用
+`agent.session.id`（即 childId）查账本 → `memberId / roleId / teamId` → 装配角色 section 与工具收窄。
+
+### 2.3 生命周期与恢复
+
+- 释放成员 = `activation.dispose()`；父会话结束 = 宿主级联，**成员会话会被释放**。
+- 重启后：账本 + 子代理会话日志都在，但**没有 live activation** → 与今天同一个缺口，
+  需要「按需恢复」策略（收到消息时 `startActivation({childId})` 续上，或显式拒绝并给出可行动错误）。
+- 这一条是记忆必须落 DB 的根本原因：会话会被释放，记忆不能跟着没。
+
+---
+
+## 3. SQLite 记忆（借鉴 Hindsight 的三件事）
+
+位置：`<ws>/.dsh-myteam/history/memory.db`（`history/` 已在 `.gitignore`）。
+
+| Hindsight 概念 | 本插件落地 | 差异 |
+|---|---|---|
+| bank | `team:<teamId>` / `member:<teamId>:<memberId>` | 同构；召回只在单个 bank 内 |
+| evidence / provenance | `entries.evidence` **必填**，无证据写入直接抛 | 比 Hindsight 更硬（FR-6.2 审计口径） |
+| refine not overwrite | `supersedes` 指针 + 旧条目归档（不删） | 与知识库 `knowledge.revised` 同源 |
+| recall | FTS5 `trigram` + `bm25` + 重要度 + 新鲜度（30 天半衰） | 不做向量检索（本地无 embedding 服务） |
+| observations → pages | `kind` 五型：fact / decision / pitfall / convention / episode | 先不做自动「页维护」，只做显式写入 |
+
+表：`banks` / `entries`（含 `seq`、`evidence`、`importance`、`supersedes`、`archived_at`）/
+`entries_fts`（FTS5 external content + 三个触发器）。
+
+**中文检索**：FTS5 用 `trigram`（`unicode61` 对中文不切词，等于没有索引）；
+trigram 要求 ≥3 字，短查询回退 `LIKE`（bank 过滤 + limit，规模可控）。
+
+新增工具（A 档全员，成员与队长共用）：
+
+| 工具 | 语义 |
+|---|---|
+| `myteam_remember` | `{bank, kind, title, body, evidence, importance?, supersedes?}` → 条目 id |
+| `myteam_recall` | `{bank, query?, kind?, limit?}` → 带 score 与出处的条目 |
+| `myteam_forget` | `{id}` → 归档（软删，不物理删） |
+
+---
+
+## 4. 分批（每批：测试 + 8 门禁 + 提交推送）
+
+| 批 | 内容 | 验收 | 状态 |
+|---|---|---|---|
+| **P1** | `core/memory/store.ts`（SQLite 存储层）+ 6 条测试 | 写入/召回/隔离/归档/重开 全绿 | 代码已写、6/6 通过，**因「未接线导出 / 死模块」门禁搁置**（暂存在本地 `.debug/pending-memory/`，下一批与工具一起入库） |
+| **P2** | `myteam_remember` / `myteam_recall` / `myteam_forget` + 工具契约锁（defs / tiers / output-contract / 4 处计数） | 工具数 70→73、C 档不变、契约锁全绿 | 待做 |
+| **P3** | `myteam` 服务移到 root + preset 拆 captain/member | 面板端点不变、A6 不涨、preset 泄漏审计通过 | 待做 |
+| **P4** | `spawn` 改 `subagents.startActivation` + 身份反查 + 成员 preset | `myteam_spawn_member` 起来的成员带 `parentSession` 且工具面 = 成员 preset | 待做 |
+| **P5** | 重启后按需恢复 + 记忆注入（上岗时召回 top-5） | kill 后重启，成员可被唤醒且记忆仍在 | 待做 |
+
+**顺序理由**：P1/P2 与成员载体无关，先落地能立刻受益；P3 是 P4 的前置（否则成员视图拿不到服务）；
+P4 风险最高，放在服务分层之后一次完成。
+
+---
+
+## 5. 验收（P4 完成后）
+
+- Given 队长会话 / When `myteam_spawn_member(roleId)` / Then
+  新会话 `origin='subagent'`、`parentSession=队长会话`、`delegationDepth=1`，且**看不到** Lead 工具。
+- Given 成员正在跑 / When 释放成员 / Then activation 被 dispose、账本落 `member.released`、子代理树里消失。
+- Given 成员写完一条记忆 / When `myteam_recall` / Then 召回带 evidence 与 score，且另一个 team 的 bank 查不到。
+- Given 重启 / When 船长再发消息给成员 / Then 要么成员被续起（childId 复用），要么返回可行动错误（不静默丢消息）。
+
+---
+
+## 6. 风险与不做的部分
+
+| 风险 | 处置 |
+|---|---|
+| 面板 `MyTeamRemote` 端点随服务迁移而变 | 门面留在 root、namespace 不变；迁移后跑 t13p/t13r/t143 |
+| `host.ts` A6 顶格 4377 | 新逻辑落 `host/` 族与 `core/`；必要时先做结构重构 |
+| 子代理树 UI 的 `subagentCatalog` 由宿主写 | 不自己拼 catalog；身份只认账本 + `childId` |
+| 老 `memory.md` | P2 提供一次性导入（`import:memory.md`），文件保留只读，不双写 |
+| 明确不做 | 向量检索、自动页维护（Hindsight 服务端能力）、把知识库也搬进 SQLite（知识库仍是策展文件，记忆才是 SQLite） |
