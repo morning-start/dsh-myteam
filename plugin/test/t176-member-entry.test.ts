@@ -76,18 +76,20 @@ test('t176g: 会话 id 兼容 agent.id 与 agent.session.id 两种形状', () =>
 })
 test('t176h: C5 懒收窄——首次提示词组装时按角色策略 restrict，一次后不再重复', () => {
   const restricted: unknown[] = []
+  const sections: Array<{ name: string; text: (scope: { agent?: unknown }) => string }> = []
   let section: { text: (scope: { agent?: unknown }) => string } | undefined
   const host = { executeMemberToolBySession: () => ({ status: 'ok' }), memberPolicyBySession: () => ({ status: 'ok', mode: 'deny', deny: ['pwsh'] }) }
   const ctx = {
     tools: { register: () => {}, restrict: (mask: unknown) => { restricted.push(mask) } },
     agents: { get: () => ({ id: 'cap-1' }) },
     agentPresets: { serviceFor: () => host },
-    systemPrompt: { section: (s: typeof section) => { section = s } },
+    systemPrompt: { section: (s: { name: string; text: (scope: { agent?: unknown }) => string }) => { sections.push(s); section = s } },
   }
   apply(ctx as never)
   const agent = { id: 'mt-t1-dev-1', session: { header: { parentSession: 'cap-1' } } }
-  assert.equal(section!.text({ agent }), '')
+  const policy = sections.find((s) => s.name === 'myteam:member-policy')!
+  assert.equal(policy.text({ agent }), '')
   assert.deepEqual(restricted, [{ deny: ['pwsh'] }])
-  section!.text({ agent }) // 第二次：已应用，不再 restrict
+  policy.text({ agent }) // 第二次：已应用，不再 restrict
   assert.equal(restricted.length, 1)
 })

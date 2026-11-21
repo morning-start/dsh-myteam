@@ -1,10 +1,10 @@
 {
   "schema": 1,
-  "builtAt": "2026-11-21T13:32:36.911Z",
+  "builtAt": "2026-11-21T13:34:46.382Z",
   "node": "v22.23.2",
   "entry": "./lib/host.mjs",
-  "modules": 80,
-  "sourceHash": "c05952bf9b7d371dacd1a4cd914febc8ac361a24931cb5387fbe1d1322750241",
+  "modules": 81,
+  "sourceHash": "51e3d04fa9f62b9f40ed9429ba29624e3ef2ab79a884f56b9583a7cc03798c2f",
   "clientFile": "client/client.js",
   "clientHash": "270fa4f3626545707434c1de804ed4dd0695a51f0118e3dd2ee67e7e69aa448d",
   "files": [
@@ -40,6 +40,7 @@
     "core/lifecycle.ts",
     "core/members/capability-guard.ts",
     "core/members/hierarchy.ts",
+    "core/members/member-brief.ts",
     "core/members/member-card.ts",
     "core/members/member-setup.ts",
     "core/members/memory.ts",

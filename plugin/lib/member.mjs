@@ -45,6 +45,7 @@ function unavailable(message        )                          {
                           
                                                                                                               
                                                                         
+                                                                       
  
 
 /** 成员会话 id（`Agent.id` 就是会话 id；兼容只暴露 `session.id` 的宿主形状） */
@@ -123,6 +124,27 @@ export function apply(ctx                )       {
     text: ({ agent }) => {
       applyMemberPolicyOnce(ctx, agent, applied)
       return ''
+    },
+  })
+  /* 上岗简报（角色纪律 + 知识索引 + 记忆召回）：子代理的 setup 注入不了，只能在首次组装时补。
+   * 每个会话算一次并缓存文本——后续每轮原样返回，成员的身份与记忆要保持连续。 */
+  const briefs = new Map                ()
+  ctx.systemPrompt?.section({
+    name: 'myteam:member-brief',
+    order: 95,
+    text: ({ agent }) => {
+      if (agent === undefined) return ''
+      const sessionId = memberSessionIdOf(agent                                  )
+      if (sessionId === undefined) return ''
+      const cached = briefs.get(sessionId)
+      if (cached !== undefined) return cached
+      const resolved = resolveMemberHost(ctx, { agent: agent                                   })
+      if (resolved.error !== undefined) return ''
+      const brief = resolved.host .memberBriefBySession?.(sessionId)
+      if (brief === undefined || brief['status'] !== 'ok') return ''
+      const text = String(brief['text'] ?? '')
+      briefs.set(sessionId, text)
+      return text
     },
   })
 }

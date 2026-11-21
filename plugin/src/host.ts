@@ -63,6 +63,7 @@ import { TERMINAL_STATES, downstreamOf } from './core/scheduler/state.ts'
 import { foldTolerant, isSafeTeamId, readOfflineTeam, readTokensSidecar } from './core/index/offline-view.ts'
 import { diffTaskInput } from './core/tasks/diff.ts'
 import { treeFieldsOf, HOST_TEAM_TOOLS_TO_HIDE, buildToolMask, type MemberInstance } from './core/members/member-setup.ts'
+import { buildMemberBrief } from './core/members/member-brief.ts'
 import { memoryDirFor, auditMemoryContent, type MemoryFinding } from './core/members/memory.ts'
 import { copyToProject, listRoleCatalog, resolveRuntimeRole, readGlobalRole, readProjectRole, saveGlobalRole, writeProjectRole, assertValidRole, deleteProjectRoleSafe, type RoleStorePaths } from './core/roles/role-store.ts'
 // CHG-87（docs/04 §2 承诺的 roleOp 端点）：host 与面板共用同一份实现
@@ -2495,6 +2496,16 @@ export class MyTeamHost implements MyTeamHostContract {
     if (!role) return { status: 'error', code: 'MT_UNAVAILABLE', message: `role "${member.roleId}" is not in the project library` }
     const mask = buildToolMask(role.definition)
     return { status: 'ok', memberId: member.memberId, roleId: member.roleId, mode: mask.mode, allow: mask.allow ?? [], deny: mask.deny ?? [] }
+  }
+
+  /** 成员上岗简报（角色纪律 + 知识索引 + 记忆召回）：子代理形态下由成员 preset 首次组装提示词时取 */
+  memberBriefBySession(sessionId: string, evidenceRequired = true): Record<string, unknown> {
+    const member = this.findMemberBySession(sessionId)
+    if (member === undefined) return { status: 'error', code: 'MT_UNAVAILABLE', message: `member session "${sessionId}" is not in any team roster` }
+    const role = resolveRuntimeRole(this.rolePaths, member.roleId)
+    if (!role) return { status: 'error', code: 'MT_UNAVAILABLE', message: `role "${member.roleId}" is not in the project library` }
+    const text = buildMemberBrief({ role: role.definition, member, workspaceRoot: this.workspaceRoot, evidenceRequired })
+    return { status: 'ok', text, memberId: member.memberId, roleId: member.roleId }
   }
 
   /** 按成员会话 id 找成员（已开 + 磁盘上有账本的团队；重启后懒打开） */
