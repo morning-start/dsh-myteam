@@ -242,6 +242,7 @@ export function applyEvent(proj                , event             )       {
       transition(t, 'in_progress', event.seq)
       t.attemptId = p.attemptId
       t.assignee = p.memberId
+      t.lastProgressAt = event.ts  // CHG-210 批 5.4：claim 即一次进展
       // ── CHG-158（报告 A5）：attempt 四字段接线（fold **只读 payload，不生成**）──
       // ① 执行世代号由写入方算好（host 取「上一世代 + 1」）。为什么不能在 fold 里自增：
       //    重放时若事件被裁剪/跳号，自增会与首次 fold 分叉；`randomUUID()` 更直接——同一本账本
@@ -347,10 +348,12 @@ export function applyEvent(proj                , event             )       {
     }
     case 'task.progress': {
       const t = requireTask(proj, p.taskId, event.seq)
+      t.lastProgressAt = event.ts  // CHG-210 批 5.4：停滞判定的参照时刻
       break
     }
     case 'task.evidence': {
       const t = requireTask(proj, p.taskId, event.seq)
+      t.lastProgressAt = event.ts  // CHG-210 批 5.4
       t.evidenceRefs.push(event.seq)
       // CHG-73：新证据覆盖当前定义 → 过期标记清除（过期只对"旧定义下的旧证据"成立）
       t.evidenceStale = undefined
@@ -371,6 +374,7 @@ export function applyEvent(proj                , event             )       {
     case 'task.gate.result': {
       const t = requireTask(proj, p.taskId, event.seq)
       t.gateVerdicts[p.gate] = p.verdict                   
+      t.lastProgressAt = event.ts  // CHG-210 批 5.4：门禁裁决也是一次活动
       // CHG-93：同时记下「谁执行的 / 是否人工强制放行」——面板据此显示 badge（否则账本有、界面无）
       t.gateResults = { ...(t.gateResults ?? {}) }
       t.gateResults[p.gate] = {
@@ -512,6 +516,7 @@ export function applyEvent(proj                , event             )       {
       t.input.deps = deps
       t.rewiredFrom = { removed, ...(added ? { added } : {}), ts: event.ts }
       t.lastEditAt = event.ts
+      t.lastProgressAt = event.ts  // CHG-210 批 5.4：编辑也是一次活动
       // 解除依赖后该任务可能已经"无待完成依赖"——补一次 backlog→ready 的判定
       // （否则它会一直躺在待规划列里，claim 口径与看板列不一致）
       if (t.state === 'backlog' && deps.every((dep) => proj.tasks[dep]?.state === 'done')) {
@@ -621,6 +626,7 @@ function applyEditWithDiff(t                , patch                         , ts
   const changes = diffTaskInput(before, patch)
   applyTaskPatch(t, patch)
   t.lastEditAt = ts
+  t.lastProgressAt = ts  // CHG-210 批 5.4
   const structural = structuralFieldsOf(changes)
   if (structural.length > 0 && t.evidenceRefs.length > 0) {
     t.evidenceStale = { since: ts, fields: structural }

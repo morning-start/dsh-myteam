@@ -141,6 +141,14 @@ export interface TaskProjection {
   deliverables: { path: string; seq: number }[]
   createdAt: number
   waitingSince?: number       // ready 起始时刻（FIFO 用）
+  /* ── CHG-210 批 5.4：停滞判定的事实底座 ── */
+  /**
+   * 最近一次「有进展」的时刻（claim / progress / evidence / 门禁结论 / 元数据编辑）。
+   *
+   * 只存**事件时间戳**，不存「距今多久」——投影必须对重放确定，`Date.now()` 一旦进投影，
+   * 同一本账本两次重放就会得出不同结果（t124 的纪律）。年龄由读面用 `stallOf(task, now)` 现算。
+   */
+  lastProgressAt?: number
   /* ── CHG-73：执行期编辑闭环的投影事实 ── */
   /** 最近一次元数据编辑/重新规划的时刻（详情页"改动记录"与证据过期判定共用） */
   lastEditAt?: number

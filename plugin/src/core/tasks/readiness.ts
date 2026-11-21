@@ -67,6 +67,63 @@ function moving(state: TaskProjection['state']): boolean {
  * 任务的「无人可领」诊断。返回 undefined = 没有阻塞（可能正被 claim，或本来就该由人处理）。
  * 只看 backlog / ready：blocked / failed 是已有出口的人为状态，不需要再解释。
  */
+/* ── CHG-210 批 5.4：停滞判定 ── */
+
+/** 停滞阈值：超过这么久没有任何进展信号，就认为「卡住了」。 */
+export const DEFAULT_STALL_MS = 30 * 60 * 1000
+
+export interface StallInfo {
+  /** 距最近一次进展多久（毫秒） */
+  stalledFor: number
+  /** 参照时刻（来自投影里的事件时间戳，不是 now） */
+  since: number
+  /** 参照的是哪个信号，便于面板说清「30 分钟没有进展」还是「等了 3 小时没人领」 */
+  basedOn: 'lastProgressAt' | 'waitingSince' | 'createdAt'
+}
+
+/**
+ * CHG-210 批 5.4：**这条任务卡住多久了**（纯函数，`now` 由调用方传入）。
+ *
+ * 为什么单独一个函数、不塞进 `diagnoseTask`：
+ *   `diagnoseTask` 回答的是「为什么**没人领**」（只对 backlog/ready 有意义）；而停滞还包括
+ *   「领了但不动」（in_progress 很久没有 progress / evidence / 裁决）。两件事的处置完全相反——
+ *   前者要改配置或加人，后者要查执行者是不是挂了。混成一个码，面板只能显示一句「有问题」。
+ *
+ * 为什么 `now` 必须由调用方传：投影里只存事件时间戳。`Date.now()` 一旦进 fold，
+ * 同一本账本两次重放就会得出不同结果（t124 的纪律）。
+ *
+ * 判据按状态取参照点：`in_progress`/`re-scoping` 看最近进展；`ready`/`backlog` 看等领取的时刻；
+ * 门禁态与终态不判（它们本来就在等人，不是「停滞」）。
+ */
+export function stallOf(task: TaskProjection, now: number, thresholdMs = DEFAULT_STALL_MS): StallInfo | undefined {
+  let since: number
+  let basedOn: StallInfo['basedOn']
+  if (task.state === 'in_progress' || task.state === 're-scoping') {
+    if (task.lastProgressAt !== undefined) {
+      since = task.lastProgressAt
+      basedOn = 'lastProgressAt'
+    } else if (task.lastEditAt !== undefined) {
+      since = task.lastEditAt
+      basedOn = 'lastProgressAt'
+    } else {
+      since = task.createdAt
+      basedOn = 'createdAt'
+    }
+  } else if (task.state === 'ready' || task.state === 'backlog') {
+    if (task.waitingSince !== undefined) {
+      since = task.waitingSince
+      basedOn = 'waitingSince'
+    } else {
+      since = task.createdAt
+      basedOn = 'createdAt'
+    }
+  } else {
+    return undefined
+  }
+  const stalledFor = now - since
+  return stalledFor >= thresholdMs ? { stalledFor, since, basedOn } : undefined
+}
+
 export function diagnoseTask(proj: TeamProjection, taskId: string): TaskDiagnosis | undefined {
   const task = proj.tasks[taskId]
   if (!task) return undefined

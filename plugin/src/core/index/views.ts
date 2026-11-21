@@ -432,7 +432,6 @@ function buildBoardViewUncached(proj: TeamProjection, columnMapping: Record<stri
       gates: t.gates,
       gateVerdicts: t.gateVerdicts,
       ...(t.gateRejects && Object.keys(t.gateRejects).length > 0 ? { gateRejects: { ...t.gateRejects } } : {}),
-    ...(t.gateResults && Object.keys(t.gateResults).length > 0 ? { gateResults: { ...t.gateResults } } : {}),
       ...(t.gateResults && Object.keys(t.gateResults).length > 0 ? { gateResults: { ...t.gateResults } } : {}),
       evidenceCount: t.evidenceRefs.length,
       participants: participantsOf(proj, t.id),
@@ -443,6 +442,13 @@ function buildBoardViewUncached(proj: TeamProjection, columnMapping: Record<stri
       ...(t.rewiredFrom ? { rewired: true } : {}),
       // CHG-87（FR-5.4）：scope 审计（越界才需要徽标；未声明 writeScopes 时投影里没有该字段）
       ...(t.scopeAudit ? { scopeAudit: scopeAuditView(t.scopeAudit) } : {}),
+      /* CHG-210 批 5.4：**最近一次进展的锚点**（事件时间戳，确定性）。
+       *
+       * 这里**不能**输出「停滞了多久」——年龄依赖 `now`，而 `Date.now()` 一旦进视图，
+       * 同一份账本在不同时刻算出的卡片就会不同，`t119-4`（缓存视图 vs 清空重算逐字段相等）
+       * 立刻会红。正确分工：视图给**事实**（这个时刻），读面用 `Date.now() - since` 算年龄，
+       * 判定阈值用 `stallOf(task, now)`（`core/tasks/readiness.ts`）。 */
+      progressSince: t.lastProgressAt ?? t.waitingSince ?? t.createdAt,
     })
   }
   return {
