@@ -111,3 +111,9 @@
               applyPatch: false
           - id: tool-fs-search
             name: '@deepseek-ai/dsh-tool-fs-search'
+            # 必填、且**没有 schema 默认值**：漏了它这一行会 invalid config，
+            # 整个 preset 被判定 broken，然后**从新建会话的 preset 选择器里静默消失**
+            # （客户端 presetOptions 只列出 healthy 的 preset），而不是报错。
+            # 对照 preset-standard 的同名行，值一致。
+            config:
+              sampleOverCapGlobResults: false
