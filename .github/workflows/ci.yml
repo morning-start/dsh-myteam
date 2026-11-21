@@ -1,0 +1,39 @@
+# CHG-209：最小 CI —— 只做一件事：让「绿」可复核。
+#
+# 为什么必须有：本仓库的六道门禁 + 984 条测试此前全靠人手跑。「我本地跑过了」
+# 既不可复核也不可回溯，而这一轮连续三个 P0（读面 lossless JSON / 成员 agent 缺模型 /
+# 冷启动恢复未接线）恰好都是**测试绿着、真实会话坏着**——没有流水线，没人能发现绿的边界。
+#
+# 为什么跑 `npm run bundle` 而不是 `--check`：产物（`plugin/lib/**`、`plugin/client/client.js`）
+# 是**入库存**的（package.json 的 main 指向 lib），t42 会比对指纹——先重新生成再比对，
+# 才能区分「仓库里的产物是旧的」与「生成器本身坏了」。
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          # 项目用 Node 原生 TS type stripping（engines: >=22.18），不需要编译步骤
+          node-version: '22'
+
+      - name: 构建产物（client.js + lib/）
+        working-directory: plugin
+        run: npm run bundle
+
+      - name: 测试套件
+        working-directory: plugin
+        run: node --test test/*.test.ts test/*.test.js
+
+      # 门禁与本地同一个入口（不在 CI 里另写一套命令，否则两套会漂移）
+      - name: 门禁（架构 / 指纹 / 文档 / 客户端 / 死代码）
+        run: node tools/check-all.mjs
