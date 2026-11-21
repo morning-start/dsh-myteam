@@ -25,6 +25,7 @@ import {
 import { applyEvent, foldEvents, FoldError } from './scheduler/fold.ts'
 import {
   canClaim,
+  claimOrder,
   validatePlan,
   TERMINAL_STATES,
   type TaskInput,
@@ -827,7 +828,7 @@ export class TeamService {
   /** 就绪任务可领视图（成员 list_tasks 用；NFR-7.6 限界由调用方执行） */
   claimableTasks(roleId: string): TaskProjection[] {
     const proj = this.projection
-    return Object.values(proj.tasks).filter((t) => {
+    const eligible = Object.values(proj.tasks).filter((t) => {
       if (TERMINAL_STATES.has(t.state)) return false
       if (t.state !== 'ready' && t.state !== 'backlog') return false
       if (t.input.requiredRole !== roleId) return false
@@ -835,6 +836,14 @@ export class TeamService {
       const depsDone = t.input.deps.every((d) => proj.tasks[d]?.state === 'done')
       return depsDone
     })
+    /* CHG-210 批 5.1：**按 `claimOrder` 排序**（P0→P3，同级按 `waitingSince ?? createdAt` FIFO）。
+     *
+     * 旧实现直接返回 `Object.values(...)` —— 那是账本插入序。而 `claimOrder` 早已实现、
+     * 有单测、文档也承诺「优先级最高 + 同级 FIFO 防饿死」，**生产零调用**：
+     * 结果 P3 只要建得早就能一直压着 P0，低优先级也不会因等待变旧而升值。
+     * 排序只改变**顺序**，进出集合与判定条件一字未动（`canClaim` 仍是唯一准入闸）。 */
+    const rank = new Map(claimOrder(eligible).map((id, index) => [id, index]))
+    return eligible.sort((a, b) => (rank.get(a.id) ?? 0) - (rank.get(b.id) ?? 0))
   }
 }
 
