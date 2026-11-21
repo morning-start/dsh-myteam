@@ -122,8 +122,10 @@ export const FROZEN_A2 = []
  * 入口层 4,405 → **4,400**（4 个新工具的路由成本 + 读面装配已由这次下沉抵消）。
  * CHG-202：`sessionCwdOf`（会话工作目录解析）下沉 `src/host/session-cwd.ts`，入口层
  * 4,400 → **4,377**（同一个 bug 的修复落在了入口层，靠这次下沉抵消）。
+ * CHG-213：成员查找（跨团队遍历 + 投影字段归一）与消息投递通道下沉 `src/host/member-lookup.ts`
+ * / `src/host/delivery.ts`，4,377 → **4,376**（同轮的投递修复又落回入口层，靠这次下沉抵消）。
  * 新代码一律落到 `src/host/<族>.ts`——入口层只留「工具名 → 适配层」一行转发。 */
-export const A6_LIMIT = { 'host.ts': 4377 }
+export const A6_LIMIT = { 'host.ts': 4376 }
 
 /** 递归列出 dir 下扩展名为 ext 的文件（确定性排序；Dirent 直接给答案，不 try/catch 猜目录） */
 function walk(dir, ext) {

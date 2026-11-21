@@ -145,10 +145,10 @@ test('t177c: 重启后按账本身份回落到 agents.get(sessionId)，消息仍
     second.initialize()
     const sent = second.executeLeadTool('myteam_message', { teamId: first.teamId, to: spawned.memberId, content: '继续做 t-1' }, {}) as any
     assert.equal(sent.status, 'sent', JSON.stringify(sent))
-    // 至少一次投递即可——实测存在「message + 唤醒」双投递（见本轮报告，另案）
-    assert.ok(followups.length >= 1, '投递到活的成员会话')
-    // 投递的是「去账本读」的指针（正文落账，不塞模型上下文）
-    assert.match(String((followups[0] as { content?: Array<{ text?: string }> }).content?.[0]?.text ?? JSON.stringify(followups[0])), /ledger seq/)
+    /* CHG-213：队长消息**只投一次**（旧实现 message.sent 还会额外触发一次唤醒 → 同一句话两遍，
+     * 实机已确认并修掉）。 */
+    assert.equal(followups.length, 1, `恰好一次投递（实际 ${JSON.stringify(followups)}）`)
+    assert.match(String((followups[0] as { content?: Array<{ text?: string }> }).content?.[0]?.text ?? JSON.stringify(followups[0])), /继续做 t-1/)
   } finally {
     cleanup()
   }

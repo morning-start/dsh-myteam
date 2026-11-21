@@ -1,10 +1,10 @@
 {
   "schema": 1,
-  "builtAt": "2026-11-21T13:43:10.722Z",
+  "builtAt": "2026-11-21T14:27:22.294Z",
   "node": "v22.23.2",
   "entry": "./lib/host.mjs",
-  "modules": 81,
-  "sourceHash": "ca03e08d12305c8573851aae937260eb62b3eda63cf8e5551a04f3442801aea3",
+  "modules": 83,
+  "sourceHash": "0f91a7a4441ad1eed1fc68b80f5412ff1a81a8bb8e78c6f2531a3209278960fe",
   "clientFile": "client/client.js",
   "clientHash": "270fa4f3626545707434c1de804ed4dd0695a51f0118e3dd2ee67e7e69aa448d",
   "files": [
@@ -72,7 +72,9 @@
     "core/workspace/scope.ts",
     "host-workspace.ts",
     "host.ts",
+    "host/delivery.ts",
     "host/knowledge.ts",
+    "host/member-lookup.ts",
     "host/members.ts",
     "host/memory.ts",
     "host/plan.ts",

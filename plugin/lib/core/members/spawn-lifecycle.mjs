@@ -133,6 +133,35 @@ function defaultModelSelection(rt                  )                            
 }
 
 /**
+ * `ctx.subagents` 的**安全取值**（CHG-213 实机：整条 spawn 挂在 `without inject` 上）。
+ *
+ * 为什么不能直接 `rt().subagents`：插件 `inject` 只声明了 `tools/agents`，未 inject 的服务
+ * **属性读会抛** `cannot get property "subagents" without inject` —— 这个异常发生在
+ * `canActivate` 里，于是「子代理分支」和「回落 agents.create」一起挂掉，成员永远起不来，
+ * 账本只留一条 `member.spawned{failed}`。把它写进 `inject` 也不行：那会让没有
+ * subagents 服务的宿主**整个插件不激活**（队长工具也没了）。
+ *
+ * 与 CHG-206 的 `agentDefaultModel` 同一个坑 → 走显式 `get()`；老宿主没有 `get()` 时
+ * 才回退属性读（包在 try 里）。取不到 = `undefined` = 回落 `agents.create`。
+ */
+function subagentsOf(rt                  )                                            {
+  let service         
+  try {
+    service = typeof rt.get === 'function' ? rt.get('subagents') : undefined
+  } catch {
+    service = undefined
+  }
+  if (service === undefined) {
+    try {
+      service = (rt                                      ).subagents
+    } catch {
+      service = undefined
+    }
+  }
+  return service                                             
+}
+
+/**
  * spawn 生命周期的宿主面（**只列用到的成员**，不做全能门面）。
  *
  * 加成员前先问：这条逻辑能不能落在 `core/members/**`？只有「宿主进程才有的东西」
@@ -164,6 +193,12 @@ function defaultModelSelection(rt                  )                            
                                                                    
      
                                                                             
+     
+                                                         
+                                                                            
+                                                                               
+     
+                                                                               
                                                                     
                                                                                                                 
                                                                        
@@ -273,13 +308,14 @@ export function createSpawnLifecycle(deps                    ) {
     let created         
     try {
       /* CHG-212（ADR-010 P4a）：能走子代理就走子代理——成员进入子代理树，生命周期交给宿主。
-       * 只在「角色没有工具收窄策略」时走这条：restrict 需要角色身份，而子代理的 setup 是管理器
-       * 私有的（P4b 用成员 preset 的懒收窄补上，届时放开条件）。C5 不能被顺手破坏。 */
+       * C5 收窄由成员 preset 的懒应用负责（P4b），所以**所有角色**都走这条。
+       * CHG-213：subagents 服务经 `subagentsOf` 取（未 inject 的属性直读会抛，见该函数注释）。 */
       const spawnCtx = deps.spawnContext?.()
+      const activation = subagentsOf(deps.rt())
       const canActivate = spawnCtx?.agent !== undefined
-        && typeof deps.rt().subagents?.startActivation === 'function'
+        && typeof activation?.startActivation === 'function'
       created = canActivate
-        ? deps.rt().subagents.startActivation({
+        ? (activation                                                   ).startActivation({
           provider: 'spawn',
           childId: sessionId,
           name: member.instanceName,
@@ -437,7 +473,10 @@ export function createSpawnLifecycle(deps                    ) {
      * 不能再 followup（会重复上岗）。后续消息改用 live Agent 投递，所以 handle 换成 Agent 本体。 */
     const activation = handle                                                             
     const activated = activation?.childId !== undefined && typeof activation.dispose === 'function'
-    if (activated) handle = deps.rt().agents?.get(String(activation .childId)) ?? handle
+    if (activated) {
+      deps.rememberActivation?.(member.memberId, () => activation .dispose())
+      handle = deps.rt().agents?.get(String(activation .childId)) ?? handle
+    }
     // ① 初始 prompt（上岗引导）：投不出去 = 成员起来了却不知道做什么 → 按失败结算
     const agent = activated ? undefined : deps.agentOf(handle)
     if (!activated && !agent?.followup) {

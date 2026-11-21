@@ -84,8 +84,15 @@ export function resolveMemberHost(ctx                , exec                     
 export function runMemberTool(ctx                , toolName        , args                         , exec                      )          {
   const resolved = resolveMemberHost(ctx, exec)
   if (resolved.error !== undefined) return resolved.error
-  const run = resolved.host .memberToolBySession ?? resolved.host .executeMemberToolBySession 
-  return run(resolved.sessionId , toolName, args)
+  /* CHG-213（实机）：**必须带接收者调用**。把方法取出来再调（`const run = host.foo; run(...)`）
+   * 会让 `this` 变 undefined，MyTeamRemote 里的 `this.host` 当场抛
+   * `Cannot read properties of undefined (reading 'host')`——成员的**所有** myteam 工具
+   * 都是这条路，于是整族工具一起失效（活体验收里成员逐条试过，全部同一句错误）。 */
+  const host = resolved.host 
+  const sessionId = resolved.sessionId 
+  return typeof host.memberToolBySession === 'function'
+    ? host.memberToolBySession(sessionId, toolName, args)
+    : host.executeMemberToolBySession (sessionId, toolName, args)
 }
 
 /**

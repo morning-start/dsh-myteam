@@ -306,6 +306,13 @@ export const TOOL_OUTPUT_FIELDS: Record<string, JsonSchemaSpec> = {
       },
     },
   },
+  /* CHG-213（实机）：`myteam_message` 必须如实回报「有没有送到」——账本落了 ≠ 送到了。
+   * 旧实现只回 `{status:'sent'}`，成员根本没起来时队长也以为送达了（本次验收正是被它掩盖）。 */
+  myteam_message: {
+    properties: {
+      delivered: { type: 'boolean', description: '是否真的投递到活着的成员会话（false = 已落账未送达，按 message 给的下一步处理）' },
+    },
+  },
   myteam_get_task_graph: {
     properties: {
       teamId: { type: 'string', description: '团队 id' },

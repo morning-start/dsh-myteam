@@ -21,6 +21,10 @@
  * 的返回类型是 `Record | Promise<Record>`）。给这几个方法加 `async` 会让原本同步的
  * 结果变成 Promise——调用方（`test/`、面板远程面）就地拿到 `[object Promise]`。
  * 所以保持同步：搬实现不搬异步语义。
+ *
+ * 唯一例外是 `myteam_message`（CHG-213 实机）：子代理成员的投递通道
+ * （`subagents.sendMessage`）只给 Promise，而根会话通道（`followup`）是同步的。所以它按
+ * 「同步结果 | Promise」双形状返回（与 FIX-14 对 `agents.create` 的处置同一口径）。
  */
                                                                   
                                                           
@@ -30,6 +34,7 @@ import { childrenOf } from '../core/members/hierarchy.mjs'
 import { buildToolMask } from '../core/members/member-setup.mjs'
 import { resolveRuntimeRole,                     } from '../core/roles/role-store.mjs'
 import { DELEGATION_TOOL_NAMES } from '../tools/defs.mjs'
+import { isThenable } from './delivery.mjs'
 
 /**
  * 纯规则层（`core/**`）只抛 `MTError`，工具面必须**返回**错误结果。
@@ -72,8 +77,9 @@ export function guardRule   (rule         )                                     
                                                                                 
                                                                                                                                              
 
-                                        
-                                                                                
+                                                   
+                                                             
+                                                                                                   
 
                                                                        
                                                                                                             
@@ -166,15 +172,26 @@ export function createMembersHandlers(host                    ) {
     },
 
     /** `myteam_message`：队长 → 成员消息（落账在前，投递在后） */
-    message(teamId        , args                         , actor        )                          {
+    message(teamId        , args                         , actor        )                                                             {
       const to = String(args.to)
       const kind = String(args.kind ?? 'notify')
       const r = host.commit(teamId, { actor, type: 'message.sent', payload: { teamId, messageId: `msg-${Date.now()}`, from: 'lead', to, taskId: args.taskId, kind, content: args.content } })
       if (!r.ok) return { status: 'error', code: r.code, message: r.message }
-      // A10：投递口径收敛到 `deliverMemberMessage`（与面板 `memberOp(op:'steer')` 同一份构造）。
-      // 投不进去不抛：消息已落账，收件人下次上线读账本仍能拿到；抛错只会把「已记账」变成「失败」。
-      if (to !== 'inbox') host.deliverMemberMessage(to, kind, String(args.content))
-      return { status: 'sent' }
+      /* A10：投递口径收敛到 `deliverMemberMessage`（与面板 `memberOp(op:'steer')` 同一份构造）。
+       * 投不进去不抛：消息已落账，收件人下次上线读账本仍能拿到；抛错只会把「已记账」变成「失败」。
+       * CHG-213（实机）：返回值必须带 `delivered` —— 旧实现无条件 `{status:'sent'}`，
+       * 于是「成员根本没起来」时队长也看到 sent（本次验收就是被这条掩盖了 spawn 失败）。 */
+      if (to === 'inbox') return { status: 'sent' }
+      const describe = (delivered         )                          => delivered
+        ? { status: 'sent', delivered: true }
+        : {
+          status: 'sent',
+          delivered: false,
+          message: `消息已落账，但成员 "${to}" 当前没有在线会话：先 myteam_release_member 再 myteam_spawn_member（或等它上线读账本），不要当成已送达`,
+        }
+      // CHG-213：子代理通道（sendMessage）异步，根会话通道（followup）同步——两种形状都接受
+      const delivered = host.deliverMemberMessage(to, kind, String(args.content))
+      return isThenable(delivered) ? delivered.then(describe) : describe(delivered)
     },
 
     /** `myteam_interrupt`：只停当前轮，会话保留（不是释放） */

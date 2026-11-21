@@ -122,12 +122,13 @@ function teamWithLiveMember(root: string) {
 
 /* ── 1. 在线成员：落账 + 真投递 ─────────────────────────────────── */
 
-test('t131-1: 在线成员 steer —— 落 message.sent（kind=steer / from=human / actor=human）且真的 followup 投递', () => {
+test('t131-1: 在线成员 steer —— 落 message.sent（kind=steer / from=human / actor=human）且真的 followup 投递', async () => {
   const { root, cleanup } = tempWorkspace('myteam-t131-online')
   try {
     const { agents, host, teamId, memberId } = teamWithLiveMember(root)
     const before = agents.followups.length
-    const r = host.memberOp(teamId, memberId, 'steer', false, { content: '  先补一个回归用例再改实现  ' }) as any
+    /* CHG-213：投递是异步的（子代理成员要走 subagents.sendMessage，只能 await） */
+    const r = (await host.memberOp(teamId, memberId, 'steer', false, { content: '  先补一个回归用例再改实现  ' })) as any
 
     assert.equal(r.status, 'steered', JSON.stringify(r))
     assert.equal(r.memberId, memberId)
@@ -164,7 +165,7 @@ test('t131-1: 在线成员 steer —— 落 message.sent（kind=steer / from=hum
 
 /* ── 2. 边界：空 content / 成员不存在 / 终态 ────────────────────── */
 
-test('t131-2: content 为空（空串 / 纯空白 / 缺省）——MT_VALIDATION(field=content)，账本零写入', () => {
+test('t131-2: content 为空（空串 / 纯空白 / 缺省）——MT_VALIDATION(field=content)，账本零写入', async () => {
   const { root, cleanup } = tempWorkspace('myteam-t131-empty')
   try {
     const { agents, host, teamId, memberId } = teamWithLiveMember(root)
@@ -172,7 +173,7 @@ test('t131-2: content 为空（空串 / 纯空白 / 缺省）——MT_VALIDATION
     const followupsBefore = agents.followups.length
 
     for (const content of ['', '   ', '\n\t ', undefined, 42]) {
-      const r = host.memberOp(teamId, memberId, 'steer', false, { content }) as any
+      const r = (await host.memberOp(teamId, memberId, 'steer', false, { content })) as any
       assert.equal(r.status, 'error', `content=${JSON.stringify(content)} 必须被拒`)
       assert.equal(r.code, 'MT_VALIDATION')
       assert.equal(r.field, 'content', '错误必须点名字段（面板据此高亮输入框）')
@@ -184,20 +185,20 @@ test('t131-2: content 为空（空串 / 纯空白 / 缺省）——MT_VALIDATION
   }
 })
 
-test('t131-3: 成员不存在 / 已 removed / 已 archived —— 拒绝并说清状态（MT_VALIDATION）', () => {
+test('t131-3: 成员不存在 / 已 removed / 已 archived —— 拒绝并说清状态（MT_VALIDATION）', async () => {
   const { root, cleanup } = tempWorkspace('myteam-t131-terminal')
   try {
     const { agents, host, teamId, memberId } = teamWithLiveMember(root)
 
-    const ghost = host.memberOp(teamId, 'no-such-member', 'steer', false, { content: 'hi' }) as any
+    const ghost = (await host.memberOp(teamId, 'no-such-member', 'steer', false, { content: 'hi' })) as any
     assert.equal(ghost.status, 'error')
     assert.equal(ghost.code, 'MT_VALIDATION')
     assert.match(String(ghost.message), /not found/)
 
     // removed 是终态：往已移除的成员会话投消息没有收件人
-    const removed = host.memberOp(teamId, memberId, 'remove', true) as any
+    const removed = (await host.memberOp(teamId, memberId, 'remove', true)) as any
     assert.equal(removed.status, 'remove', JSON.stringify(removed))
-    const afterRemove = host.memberOp(teamId, memberId, 'steer', false, { content: '还在吗' }) as any
+    const afterRemove = (await host.memberOp(teamId, memberId, 'steer', false, { content: '还在吗' })) as any
     assert.equal(afterRemove.status, 'error')
     assert.equal(afterRemove.code, 'MT_VALIDATION')
     assert.match(String(afterRemove.message), /removed/, '文案必须点名状态，不能只说「失败」')
@@ -205,9 +206,9 @@ test('t131-3: 成员不存在 / 已 removed / 已 archived —— 拒绝并说�
     // archived 同理（另建一个成员走归档路径）
     const second = host.spawnMember(teamId, 'implementer') as any
     assert.equal(second.status, 'spawned', JSON.stringify(second))
-    const archived = host.memberOp(teamId, String(second.memberId), 'archive', false) as any
+    const archived = (await host.memberOp(teamId, String(second.memberId), 'archive', false)) as any
     assert.equal(archived.status, 'archive', JSON.stringify(archived))
-    const afterArchive = host.memberOp(teamId, String(second.memberId), 'steer', false, { content: '还在吗' }) as any
+    const afterArchive = (await host.memberOp(teamId, String(second.memberId), 'steer', false, { content: '还在吗' })) as any
     assert.equal(afterArchive.status, 'error')
     assert.equal(afterArchive.code, 'MT_VALIDATION')
     assert.match(String(afterArchive.message), /archived/)
@@ -221,7 +222,7 @@ test('t131-3: 成员不存在 / 已 removed / 已 archived —— 拒绝并说�
 
 /* ── 3. 会话不在线：账本照落 + delivered:false + 原因 ────────────── */
 
-test('t131-4: 成员会话不在线（无 handle）——账本照落、delivered:false + reason（不假装送达）', () => {
+test('t131-4: 成员会话不在线（无 handle）——账本照落、delivered:false + reason（不假装送达）', async () => {
   const { root, cleanup } = tempWorkspace('myteam-t131-offline')
   try {
     const first = teamWithLiveMember(root)
@@ -231,7 +232,7 @@ test('t131-4: 成员会话不在线（无 handle）——账本照落、delivere
     // 模拟重启：新 host 实例，宿主 lookup 拿不到会话（成员会话真的不在线）
     const logs: LogEntry[] = []
     const restarted = new MyTeamHost(makeRuntime(root, { create: () => { throw new Error('no spawn here') }, get: () => undefined }, logs))
-    const r = restarted.memberOp(teamId, memberId, 'steer', false, { content: '重启后还能看到吗' }) as any
+    const r = (await restarted.memberOp(teamId, memberId, 'steer', false, { content: '重启后还能看到吗' })) as any
 
     assert.equal(r.status, 'steered', '账本已落 → 状态必须是 steered（不是 error）')
     assert.equal(r.memberId, memberId)
@@ -249,7 +250,7 @@ test('t131-4: 成员会话不在线（无 handle）——账本照落、delivere
 
 /* ── 4. 在跑任务自动带 taskId ───────────────────────────────────── */
 
-test('t131-5: 成员在跑任务时自动带 taskId（显式 taskId 优先）', () => {
+test('t131-5: 成员在跑任务时自动带 taskId（显式 taskId 优先）', async () => {
   const { root, cleanup } = tempWorkspace('myteam-t131-task')
   try {
     const { host, teamId, memberId, sessionId } = teamWithLiveMember(root)
@@ -264,14 +265,14 @@ test('t131-5: 成员在跑任务时自动带 taskId（显式 taskId 优先）', 
     assert.equal(host.service(teamId).projectionSnapshot.members[memberId].currentTaskId, created.taskId)
 
     // ① 没显式给 → 自动带成员当前任务
-    const auto = host.memberOp(teamId, memberId, 'steer', false, { content: '按新的验收标准改' }) as any
+    const auto = (await host.memberOp(teamId, memberId, 'steer', false, { content: '按新的验收标准改' })) as any
     assert.equal(auto.status, 'steered')
     assert.equal(auto.taskId, created.taskId, '返回里要带 taskId')
     const autoEvent = messagesOf(root, teamId).at(-1)!
     assert.equal(autoEvent.payload.taskId, created.taskId, '账本里也要带（成员据此知道指导的是哪一单）')
 
     // ② 显式给了 → 用调用方的（例如指导的是另一单的上下文）
-    const explicit = host.memberOp(teamId, memberId, 'steer', false, { content: '顺带看下另一单', taskId: 'task-explicit' }) as any
+    const explicit = (await host.memberOp(teamId, memberId, 'steer', false, { content: '顺带看下另一单', taskId: 'task-explicit' })) as any
     assert.equal(explicit.taskId, 'task-explicit')
     assert.equal(messagesOf(root, teamId).at(-1)!.payload.taskId, 'task-explicit')
   } finally {

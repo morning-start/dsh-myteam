@@ -93,3 +93,21 @@ test('t176h: C5 懒收窄——首次提示词组装时按角色策略 restrict�
   policy.text({ agent }) // 第二次：已应用，不再 restrict
   assert.equal(restricted.length, 1)
 })
+
+test('t176i: 服务方法必须带接收者调用（`this` 一丢，MyTeamRemote 的 this.host 当场炸）', () => {
+  /* CHG-213 实机缺陷：旧实现 `const run = host.memberToolBySession; run(...)` 把方法取出再调，
+   * `this` 变 undefined → `Cannot read properties of undefined (reading 'host')`，
+   * 成员的**所有** myteam 工具一起失效（活体验收里成员逐条试过，全部同一句错误）。 */
+  const service = {
+    host: { run: (sessionId: string, name: string) => ({ status: 'ok', sessionId, name }) },
+    memberToolBySession(sessionId: string, name: string) {
+      // 复刻 MyTeamRemote 的方法体：读 this.host
+      return this.host.run(sessionId, name)
+    },
+  }
+  const { ctx } = fakeCtx({ parent: { id: 'cap-1' }, service })
+  const result = runMemberTool(ctx, 'myteam_recall', {}, { agent: { id: 'mt-t1-dev-1', session: { header: { parentSession: 'cap-1' } } } }) as Record<string, unknown>
+  assert.equal(result['status'], 'ok', JSON.stringify(result))
+  assert.equal(result['sessionId'], 'mt-t1-dev-1')
+  assert.equal(result['name'], 'myteam_recall')
+})

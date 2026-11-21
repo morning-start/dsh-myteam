@@ -39,6 +39,8 @@ import { TeamService, openTeamLedger, pausedDraftsForRelease, toolFailureOf,    
 /* CHG-186（T155b）：端点族适配层。本文件只留**装配 + 分发**（switch 里一行转发），
  * 族实现落在 `src/host/<族>.ts`——入口层只减不增（A6 棘轮）。 */
 import { createMembersHandlers, guardRule } from './host/members.mjs'
+import { createDelivery, isThenable } from './host/delivery.mjs'
+import { createMemberLookup } from './host/member-lookup.mjs'
 /* CHG-187（FR-32 支柱一）：成员派生树的纯规则（深度 / 子数 / 级联顺序） */
 import { releaseOrder, rosterOf } from './core/members/hierarchy.mjs'
 import { createMemberTaskHandlers, createTasksHandlers } from './host/tasks.mjs'
@@ -217,19 +219,6 @@ function safeRead(obj         , prop        )      {
   } catch {
     return undefined
   }
-}
-
-/**
- * FIX-14（KI-2）：`agents.create` 的返回形状未实证——真实宿主是 `Promise<AgentHandle>`，
- * 单测桩是 handle 本体。两阶段 spawn 必须「先拿到 handle 再结算 active」，
- * 所以这个判定只写一处，避免两处各判一遍然后行为分叉。
- */
-function isThenable(value         )                                {
-  return (
-    (typeof value === 'object' || typeof value === 'function') &&
-    value !== null &&
-    typeof (value                      ).then === 'function'
-  )
 }
 
 export function resolveTeamLedgerPath(workspaceRoot        , teamId        )         {
@@ -519,6 +508,8 @@ export class MyTeamHost                               {
           services = new Map                     ()
           leadExec                                        
           memberHandles = new Map             () // memberId → AgentHandle
+  /** CHG-213：子代理 activation 的 dispose（释放成员时停掉 child；见 rememberActivation） */
+                   memberActivations = new Map                             ()
   /**
    * CHG-186（T155b）：成员族端点适配层（`src/host/members.ts`）。
    *
@@ -705,6 +696,7 @@ export class MyTeamHost                               {
                    spawn = createSpawnLifecycle({
     rt: () => this.rt,
     spawnContext: () => this.leadExec,
+    rememberActivation: (memberId, dispose) => { this.memberActivations.set(memberId, dispose) },
     log: (level, msg) => this.log(level, msg),
     workspaceRoot: () => this.workspaceRoot,
     rolePaths: () => this.rolePaths,
@@ -990,6 +982,15 @@ export class MyTeamHost                               {
     }
   }
 
+  /** 显式服务查找（CHG-206 口径）：未 inject 的属性直读会抛，`get()` 不会 */
+          lookup         (name        )                {
+    try {
+      const ctx = this.rt                                                 
+      if (typeof ctx.get !== 'function') return undefined
+      return ctx.get(name)                 
+    } catch { return undefined }
+  }
+
   /* ── 初始化（apply 调用；同步部分直接执行，异步收尾进 ctx.effect）── */
 
   initialize()       {
@@ -1229,47 +1230,45 @@ export class MyTeamHost                               {
   }
 
   /**
-   * A10（FR-14.2 指导档，CHG-163）：成员消息投递的**唯一**构造点。
-   *
-   * 为什么收敛成一个方法：`myteam_message`（队长工具）与面板 `memberOp(op:'steer')` 是同一个语义
-   * （给成员发一条消息并立刻投递）。两处各写一份「文案 + 消息形状」必然漂移，而
-   * `followupMessage` 的 `{role,id,content,source}` 形状是 FIX-16 的实弹结论——不要在这里另造格式。
-   *
-   * 边界：返回**是否真的投递出去**。没有 handle（成员会话不在线）或 followup 抛错都返回 `false`，
-   * 调用方必须如实回报 `delivered:false`——**账本落了 ≠ 送到了**（项目纪律：不假装成功）。
+   * A10：成员消息投递的**唯一**入口（`myteam_message` 与面板 `memberOp(op:'steer')` 同一条）。
+   * 传输通道在 `host/delivery.ts`（CHG-213 实机）：子代理成员**不能** `agent.followup`
+   * （`cannot append outside a SessionStore`），必须走 `subagents.sendMessage`。
    */
-          deliverMemberMessage(memberId        , kind        , content        )          {
-    /* CHG-212（P5）：重启后 memberHandles 是空的，但成员会话可能已经活着（子代理按 childId 建过）；
-     * 先按账本身份回落到 agents.get(sessionId)，拿到就回填——否则成员永远叫不醒。 */
-    const member = this.memberById(memberId)
-    const agent = this.agentOf(this.memberHandles.get(memberId))
-      ?? (member === undefined ? undefined : this.agentOf(this.rt.agents?.get?.(member.sessionId)))
-    if (!agent?.followup) {
-      this.log('warn', `message to ${memberId} not delivered: no live agent（重启后未恢复：先 release 再 spawn，或等队列恢复）`)
-      return false
-    }
-    if (!this.memberHandles.has(memberId)) this.memberHandles.set(memberId, agent)
-    try {
-      agent.followup(this.followupMessage(`[myteam] 队长消息（${kind}）：${content}`))
-      return true
-    } catch (e) {
-      this.log('warn', `message delivery to ${memberId} failed: ${String(e)}`)
-      return false
-    }
+          deliverMemberMessage(memberId        , kind        , content        )                             {
+    return this.delivery.deliverMessage(memberId, kind, content)
   }
+
+  /** 投递层（宿主面装配在 host.ts，逻辑在 host/**） */
+                   delivery = createDelivery({
+    leadAgent: () => this.leadExec?.agent,
+    subagents: () => this.lookup('subagents'),
+    memberSessionId: (memberId) => {
+      const sessionId = this.memberById(memberId)?.sessionId
+      return sessionId === undefined ? undefined : String(sessionId)
+    },
+    handle: (memberId) => this.memberHandles.get(memberId),
+    agentOf: (handle) => this.agentOf(handle),
+    agentById: (sessionId) => this.rt.agents?.get?.(sessionId),
+    rememberHandle: (memberId, handle) => { this.memberHandles.set(memberId, handle) },
+    followupMessage: (text) => this.followupMessage(text),
+    log: (level, message) => this.log(level, message),
+  })
 
           afterCommit(teamId        , event                                                                 )       {
     this.teams.refreshIndex(teamId)
     const wakes = wakeDecisionsFor(event)                  
     for (const wake of wakes) {
-      const agent = this.agentOf(this.memberHandles.get(wake.memberId))
-      if (agent?.followup) {
-        try {
-          agent.followup(this.followupMessage(`[myteam] ${wake.cause}: ledger seq ${event.seq}（读 myteam_get_task/myteam_list_tasks 获取详情）`))
-        } catch (e) {
-          this.log('warn', `wake ${wake.memberId} failed: ${String(e)}`)
-        }
-      }
+      /* CHG-213（实机）：队长/面板发出的消息**已经由调用方同步投递**
+       * （`myteam_message` / `memberOp(steer)` 都走 `deliverMemberMessage`），这里再唤醒一次
+       * 就是同一句话投两遍（实测：一次 `myteam_message` 触发两次 `sendMessage`）。
+       * 成员→成员的消息没有显式投递，仍然靠这条唤醒送达，所以只跳过 from=lead/human 的。 */
+      const from = String(event.payload.from ?? '')
+      if (wake.cause === 'message' && (from === 'lead' || from === 'human')) continue
+      /* 唤醒与消息同一条投递通道（子代理成员 followup 会抛）——异步，失败只告警。
+       * commit 是同步路径，所以这里 fire-and-forget；未送达在 warn 里留痕（不假装叫醒了）。 */
+      void Promise.resolve(this.delivery.deliverText(wake.memberId, `[myteam] ${wake.cause}: ledger seq ${event.seq}（读 myteam_get_task/myteam_list_tasks 获取详情）`))
+        .then((delivered) => { if (!delivered) this.log('warn', `wake ${wake.memberId} not delivered`) })
+        .catch(() => {})
     }
     // CHG-71：任务被编辑 → 提醒当前执行者（不改变调度，不属于四种因果唤醒）
     if (event.type === 'task.updated') this.notifyTaskEdited(teamId, event)
@@ -2302,6 +2301,12 @@ export class MyTeamHost                               {
       return failed.ok ? { status: 'error', code: 'MT_INTERNAL', message: String(error) } : failed.result
     }
     for (const id of plan.value) {
+      /* CHG-213：子代理成员必须 dispose activation——否则账本说「已释放」、child 还在跑（实测） */
+      const disposeActivation = this.memberActivations.get(id)
+      if (disposeActivation) {
+        this.memberActivations.delete(id)
+        void disposeActivation().catch((e) => this.log('warn', `dispose activation for ${id} failed: ${String(e)}`))
+      }
       const handle = this.memberHandles.get(id)
       if (!handle) continue
       if (mode === 'remove') {
@@ -2326,7 +2331,7 @@ export class MyTeamHost                               {
    * `MT_VALIDATION`；`removed`/`archived` 是终态 → 拒绝（否则是一条永远读不到的假账）；
    * 跑任务中自动带上 `taskId`——成员要能对上「指导的是哪一单」。
    */
-  memberOp(teamId        , memberId        , op        , confirm         , extra                                                             = {})                          {
+  memberOp(teamId        , memberId        , op        , confirm         , extra                                                             = {})                                                             {
     const member = this.service(teamId).projectionSnapshot.members[memberId]
     if (!member) return { status: 'error', code: 'MT_VALIDATION', message: `member "${memberId}" not found` }
     switch (op) {
@@ -2360,16 +2365,18 @@ export class MyTeamHost                               {
         })
         if (!r.ok) return { status: 'error', code: r.code, message: r.message }
         const delivered = this.deliverMemberMessage(memberId, 'steer', content)
-        return {
+        const describe = (ok         )                          => ({
           status: 'steered',
           memberId,
-          delivered,
+          delivered: ok,
           // 未送达必须点名原因（客户端据此显示警示文案，而不是成功提示）
-          ...(delivered
+          ...(ok
             ? {}
             : { reason: 'member session is offline (no live handle); the steer message is recorded in the ledger and stays readable after reconnect' }),
           ...(taskId ? { taskId } : {}),
-        }
+        })
+        /* CHG-213：子代理通道是异步的（sendMessage），根会话通道是同步的——两种形状都要接受 */
+        return isThenable(delivered) ? delivered.then(describe) : describe(delivered)
       }
       case 'suspend':
       case 'archive':
@@ -2518,28 +2525,20 @@ export class MyTeamHost                               {
 
   /** 按成员会话 id 找成员（已开 + 磁盘上有账本的团队；重启后懒打开） */
           findMemberBySession(sessionId        )                             {
-    return this.memberMatching((member) => member.sessionId === sessionId)
+    return this.memberLookup.bySession(sessionId)
   }
 
   /** 按 memberId 找成员（跨团队；与 findMemberBySession 同一份遍历口径） */
           memberById(memberId        )                             {
-    return this.memberMatching((member) => member.memberId === memberId)
+    return this.memberLookup.byId(memberId)
   }
 
-          memberMatching(match                                     )                             {
-    const teamIds = new Set(this.services.keys())
-    try {
-      const tasksDir = storeLayout(this.workspaceRoot).tasks
-      for (const teamId of readdirSync(tasksDir)) if (existsSync(join(tasksDir, teamId, 'ledger.jsonl'))) teamIds.add(teamId)
-    } catch { /* 目录不可读：只查已开团队 */ }
-    for (const teamId of teamIds) {
-      try {
-        const member = Object.values(this.service(teamId).projectionSnapshot.members                                  ).find(match)
-        if (member) return member
-      } catch { continue }
-    }
-    return undefined
-  }
+  /** CHG-213：成员查找（跨团队遍历 + 投影字段归一）落在 `host/member-lookup.ts`（A6 只减不增） */
+                   memberLookup = createMemberLookup({
+    openTeamIds: () => [...this.services.keys()],
+    membersOf: (teamId) => this.service(teamId).projectionSnapshot.members                                                         ,
+    workspaceRoot: () => this.workspaceRoot,
+  })
 
   /* CHG-200：`myteam_submit_review` 在 verify 门要等命令执行（FR-5.3）——返回类型补实为
    * 「同步结果 | Promise」，与 `executeLeadTool` 同形（结算由 `executeMemberTool` 的 thenable 分支负责）。 */

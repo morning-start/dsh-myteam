@@ -132,8 +132,52 @@ toolCount: 25   myteamTools: 13   remember: true   leadLeak: false
 | 成员入口调不到宿主 | `svc.executeLeadTool is not a function` | `agentPresets.serviceFor(agent,'myteam')` 返回的是 **MyTeamRemote**（隔离门面），不是 MyTeamHost |
 | 成员 preset 整行激活失败 | `cannot get property "systemPrompt" without inject` | 插件读 `ctx.systemPrompt` 却没在 `inject` 里声明 → preset 变 broken（与 CHG-211a 同一类事故） |
 
-**未验证的部分**（诚实记录）：成员真正跑一轮模型（需要可用的队长会话与模型路由）、以及长跑中记忆的积累质量。工具面、父子链、preset 挂载已由上面的探针证实。
-| **P5** | 重启后按需恢复 + 记忆注入（上岗时召回 top-5） | kill 后重启，成员可被唤醒且记忆仍在 | 待做 |
+**当时的未验证部分**（诚实记录）：成员真正跑一轮模型（需要可用的队长会话与模型路由）、以及长跑中记忆的积累质量。
+工具面、父子链、preset 挂载由上面的探针证实；**这些探针绕过了 `myteam_spawn_member`**，所以「成员真能跑起来」当时并没有被证明。
+
+### 4.2 活体验收（2026-11-21，真实 host + 真模型，走真实工具入口）
+
+做法：一次性探针（`--patch` 注入，不入库）在 `myteam-web` profile 里建一个**真队长会话**（挂 `myteam-captain` preset），
+然后经 `ctx.tools.execute({ agent: 队长 })` 调**真实 lead 工具**：`myteam_submit_plan` → `myteam_approve_plan` →
+`myteam_spawn_member` → `myteam_message`；成员侧是**真模型**（magpie / `workbuddy/deepseek-v4.1-flash`）跑一轮。
+
+**这一轮抓到 4 个「只有真机才暴露」的缺陷，全部已修 + 有回归用例**：
+
+| # | 现象 | 根因 | 修法 | 用例 |
+|---|---|---|---|---|
+| 1 | `myteam_spawn_member` 直接 `MT_INTERNAL: cannot get property "subagents" without inject` | `spawn` 读 `ctx.subagents` 用**属性直读**，而插件 `inject` 只有 `tools/agents`；异常抛在 `canActivate` 里，子代理分支与回落分支**一起**挂 | `subagentsOf()` 走显式 `get('subagents')`（与 CHG-206 的 `agentDefaultModel` 同一口径），取不到才回落 `agents.create` | t179a / t179b |
+| 2 | 队长看到 `{status:'sent'}`，成员却一条都没收到 | `myteam_message` 无条件回 sent（`deliverMemberMessage` 的布尔被丢掉） | 返回值带 `delivered`，未送达给可行动下一步 | t179c |
+| 3 | 成员**所有** `myteam_*` 工具都报 `Cannot read properties of undefined (reading 'host')` | 成员入口把服务方法**取出来再调**（`const run = host.foo; run(...)`）→ `this` 丢失，MyTeamRemote 的 `this.host` 当场炸 | 带接收者调用 | t176i |
+| 4 | 成员「永远收不到消息」：`session "mt-…" cannot append outside a SessionStore` | 子代理 child 的 Agent 是**可续起 seed**，`agent.followup` 不能 append；官方通道是 `subagents.sendMessage(队长, childId, …)` | 新增 `host/delivery.ts`：子代理走 sendMessage（异步），根会话走 followup（同步），双形状调用方都接 | t179d |
+| 5 | `myteam_release_member` 后账本说已释放，`agents.get(childId)` 里 child **还在跑** | settle 时 handle 被换成 live Agent，activation 的 `dispose` 丢了 | `rememberActivation` 记下 dispose，释放时调用 | t179e |
+| 6 | `memberById` **永远**返回 undefined（`member.teamId` 也是 undefined） | 投影是 `MemberProjection`（主键 `id`、不带 `teamId`），成员族用 `MemberInstance`（`memberId`/`teamId`），旧实现 `as` 强转后比较 `memberId` | `host/member-lookup.ts` 就地归一（`id → memberId`，补 `teamId`） | t179c/t179d 触发 |
+
+顺带修掉上一轮记录的双投递：一次 `myteam_message` 曾触发两次投递（消息 + `message.sent` 唤醒），
+现在 `from=lead|human` 的消息不再额外唤醒（成员→成员消息仍靠唤醒送达）。
+
+**验收结果（真机实测）**：
+
+```
+checks.child        origin=subagent  parentSession=live-cap-s5  agentPreset=myteam-member
+                    delegationDepth=1  toolCount=25  myteamTools=13  leadLeak=[]
+checks.memory       bank=member:live-e2e-s5:m2-implementer  evidence=file:…/tasks/live-e2e-report.md
+memberReport        记忆 id：m-mwqhzgtc-1 / recall returnedCount：1 / 「remember 与 recall 均成功返回」
+stage2              memberSessionAliveAfterRestart=false  delivered=false +「先 release 再 spawn」
+                    w2AliveAfterRelease=false  ledger: member.released(seq 19)
+```
+
+成员那一轮的模型输出（原样，未加工）：
+
+> 记忆 id：m-mwqhzgtc-1
+> recall returnedCount：1；前两条 title：「子代理成员上岗验证」（仅 1 条，无第二条）
+> 一句话结论：子代理成员可正常调用记忆工具，remember 与 recall 均成功返回。
+
+**这一轮也证明了两件产品侧的纪律在真机上成立**：① 成员在没有证据时会**如实写「受阻，AC 未达成」**
+而不是编造记忆 id（第 4 个缺陷窗口里的报告原文）；② 同队自动召唤的成员（`m1-implementer`）确实
+`task.claimed` 并写了自己的记忆条目（`bank=member:live-e2e-s5:m1-implementer`）。
+
+**仍未验证**：长跑（多轮派单 → 门禁 → done）下的记忆积累质量；`subagentCatalog` 的服务端列表
+（宿主 `subagents` 服务没有 `list` 方法，探针只能证明「dispose 后 `agents.get` 拿不到」）。
 
 **顺序理由**：P1/P2 与成员载体无关，先落地能立刻受益；P3 是 P4 的前置（否则成员视图拿不到服务）；
 P4 风险最高，放在服务分层之后一次完成。
@@ -142,11 +186,14 @@ P4 风险最高，放在服务分层之后一次完成。
 
 ## 5. 验收（P4 完成后）
 
-- Given 队长会话 / When `myteam_spawn_member(roleId)` / Then
-  新会话 `origin='subagent'`、`parentSession=队长会话`、`delegationDepth=1`，且**看不到** Lead 工具。
-- Given 成员正在跑 / When 释放成员 / Then activation 被 dispose、账本落 `member.released`、子代理树里消失。
-- Given 成员写完一条记忆 / When `myteam_recall` / Then 召回带 evidence 与 score，且另一个 team 的 bank 查不到。
-- Given 重启 / When 船长再发消息给成员 / Then 要么成员被续起（childId 复用），要么返回可行动错误（不静默丢消息）。
+四条都已在真机跑过（§4.2，2026-11-21，真模型 + 真实工具入口）：
+
+| Given / When / Then | 结果 |
+|---|---|
+| 队长 spawn / 新会话 `origin='subagent'`、`parentSession=队长会话`、`delegationDepth=1`、**看不到** Lead 工具 | ✅ 实测 `leadLeak=[]`，25 个工具 = 13 成员工具 + 12 根层工具 |
+| 成员在跑 / 释放 / activation 被 dispose、账本 `member.released`、子代理树里消失 | ✅ dispose 后 `agents.get(childId)` 为 undefined（§4.2 缺陷 5 修好后） |
+| 成员写记忆 / `myteam_recall` / 召回带 evidence，且别的 team 的 bank 查不到 | ✅ 两个成员 bank 各 1 条，互不可见（`bank=member:<team>:<member>`） |
+| 重启 / 队长再发消息 / 要么续起，要么可行动错误（不静默丢） | ✅ `delivered:false` +「先 release 再 spawn」，账本照落 |
 
 ---
 
@@ -155,7 +202,7 @@ P4 风险最高，放在服务分层之后一次完成。
 | 风险 | 处置 |
 |---|---|
 | 面板 `MyTeamRemote` 端点随服务迁移而变 | 门面留在 root、namespace 不变；迁移后跑 t13p/t13r/t143 |
-| `host.ts` A6 顶格 4377 | 新逻辑落 `host/` 族与 `core/`；必要时先做结构重构 |
+| `host.ts` A6 顶格 4376 | 新逻辑落 `host/` 族与 `core/`；必要时先做结构重构（本轮拆出 `host/delivery.ts` / `host/member-lookup.ts`） |
 | 子代理树 UI 的 `subagentCatalog` 由宿主写 | 不自己拼 catalog；身份只认账本 + `childId` |
 | 老 `memory.md` | P2 提供一次性导入（`import:memory.md`），文件保留只读，不双写 |
 | 明确不做 | 向量检索、自动页维护（Hindsight 服务端能力）、把知识库也搬进 SQLite（知识库仍是策展文件，记忆才是 SQLite） |
