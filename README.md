@@ -109,7 +109,7 @@ tools\boot-myteam.cmd
 | [`design/`](design/README.md) | 面板 UI 设计稿：27 屏 HTML 终稿 + tokens / app.css / icons.svg / dag.js |
 | [`skills/`](skills/README.md) | 对外 skill 包：[`myteam-plugin-team/`](skills/myteam-plugin-team/README.md)（契约 + 模板 + 可执行校验器） |
 | [`tools/`](tools/README.md) | 实弹与探针工具：CLI boot、网关 RPC、CDP 调试、演示数据、漂移检查、性能冒烟 |
-| [`refs/`](refs/README.md) | 本地参考资产（**不入库**）：竞品源码、宿主源码快照、测试证据 |
+| `refs/` | 本地参考资产（**不入库**，在 `.gitignore` 里）：竞品源码、宿主源码快照、测试证据。克隆后没有这个目录是正常的 |
 
 全部项目级内容（角色 / 团队 / 任务账本 / 成员记忆 / token 侧车）由插件在项目目录下的 `.dsh-myteam/` 生成，随队长会话首开初始化。上传纪律住在存储目录**自己的** `.gitignore` 里（CHG-102 起不再往项目根写规则；旧目录 `.team-workplace/` 走一次性迁移）。
 
