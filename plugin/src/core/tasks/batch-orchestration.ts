@@ -371,7 +371,19 @@ export function createBatchOrchestration(deps: BatchOrchestrationDeps) {
   function createTasksBatch(teamId: string, args: Record<string, unknown>, actor: string): Record<string, unknown> {
     const raw = Array.isArray(args.tasks) ? (args.tasks as unknown[]) : []
     if (raw.length === 0) return { status: 'error', code: 'MT_VALIDATION', message: 'tasks requires at least 1 draft' }
-    if (raw.length > 30) return { status: 'error', code: 'MT_VALIDATION', message: 'at most 30 tasks per batch' }
+    /* CHG-210 批 5.3：单批上限与**本团队任务上限**取更严格者。
+     * 旧实现只看 30：25 条的批能过批检，团队空时只能落 20 条，第 21 条起逐条 `MT_VALIDATION`——
+     * 用户得到「部分成功」而不是「你该分两批」。现在批检就直接拒绝并给出分批建议。 */
+    const taskCap = deps.service(teamId).effectiveConfig.limits.maxTasks
+    const batchCap = Math.min(30, taskCap)
+    if (raw.length > batchCap) {
+      const batches = Math.ceil(raw.length / batchCap)
+      return {
+        status: 'error',
+        code: 'MT_VALIDATION',
+        message: `一批最多 ${batchCap} 条（单批上限 30；本团队任务上限 ${taskCap}）；本次**没有创建任何任务**。请分成 ${batches} 批提交，或先清掉不用的任务。`,
+      }
+    }
     const proj = deps.service(teamId).projectionSnapshot
     let maxN = 0
     for (const id of Object.keys(proj.tasks)) {

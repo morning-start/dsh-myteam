@@ -94,6 +94,12 @@ export const PATCH_CEILINGS = {
   'limits.memberMaxDepth': 2,
   // CHG-187（FR-32）：单成员子数硬上限 5（默认 3）
   'limits.maxChildren': 5,
+  /* CHG-210 批 5.3：**任务数也要有硬顶**。
+   * 旧实现只钳前三项，`maxTasks` 可以配到任意大——「配额」形同建议，且与批量建任务
+   * 的单批上限（30）互相打架：25 条的批能过批检，团队空时只能落 20 条，第 21 条起逐条报错，
+   * 用户得到「部分成功」而不是「你该分两批」。硬顶取 100：足够容纳真实项目，又能拦住
+   * 手滑写成 1e9 的配置。 */
+  'limits.maxTasks': 100,
 } as const
 
 export interface MergeResult {

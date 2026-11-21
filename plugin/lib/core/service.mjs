@@ -551,7 +551,16 @@ export class TeamService {
         // 只有「新 memberId 首次进场」才校验上限。
         const existingMember = proj.members[String(p.memberId)]
         if (!existingMember && Object.values(proj.members).filter((m) => m.status === 'active' || m.status === 'suspended').length >= this.effectiveConfig.limits.maxMembers) {
-          return { ok: false, code: 'MT_MEMBER_LIMIT', message: `maxMembers ${this.effectiveConfig.limits.maxMembers} reached (ADR-008 self-managed quota)` }
+          /* CHG-210 批 5.2：配额拒绝写成**三段式**（现状与上限 / 我没做什么 / 你该做什么）。
+           * 旧文案 `maxMembers 6 reached (ADR-008 self-managed quota)` 只说上限——而且是英文 +
+           * 一个对用户无意义的 ADR 编号，队长模型只能靠猜。参考项目 BA 的写法值得原样搬：
+           * 把「当前几人 / 上限几人 / 什么都没创建 / 三条出口」一次说全，模型一轮就能自纠。 */
+          const occupied = Object.values(proj.members).filter((m) => m.status === 'active' || m.status === 'suspended').length
+          return {
+            ok: false,
+            code: 'MT_MEMBER_LIMIT',
+            message: `团队已有 ${occupied} 名成员（上限 ${this.effectiveConfig.limits.maxMembers}）；本次**没有创建任何成员**（账本零改动）。出口：① 用 myteam_release_member 释放不用的成员（suspend / archive / remove 都让出名额）；② 拆成两个团队；③ 调高 limits.maxMembers（硬上限见配置钳制）。`,
+          }
         }
         // 运行时只认项目库
         if (!resolveRuntimeRole(this.opts.rolePaths, String(p.roleId))) {

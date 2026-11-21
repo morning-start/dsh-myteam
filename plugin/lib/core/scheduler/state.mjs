@@ -245,7 +245,14 @@ export function validatePlan(tasks                           , maxTasks        ,
     return { ok: true, errors: [] }
   }
   if (ids.length > maxTasks) {
-    errors.push({ taskId: '-', code: 'MT_VALIDATION', message: `task count ${ids.length} exceeds limit ${maxTasks}` })
+    /* CHG-210 批 5.2：三段式（现状与上限 / 我没做什么 / 你该做什么）。
+     * 旧文案 `task count 21 exceeds limit 20` 只说数字——用户不知道该删哪条、能不能调高、
+     * 还是该换团队。注意 `maxTasks` 是**团队终身上限**（取消的任务也占位）。 */
+    errors.push({
+      taskId: '-',
+      code: 'MT_VALIDATION',
+      message: `本次计划有 ${ids.length} 条任务（团队上限 ${maxTasks}）；本次**没有创建任何任务**。出口：① 用 myteam_cancel_task / myteam_delete_task 清掉不用的（已取消的仍占名额）；② 分到另一个团队；③ 调高 limits.maxTasks。`,
+    })
   }
   const referenced = new Set        ()
   for (const id of ids) {
