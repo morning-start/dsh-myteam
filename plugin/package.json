@@ -7,6 +7,7 @@
   "exports": {
     ".": "./lib/host.mjs",
     "./host": "./lib/host.mjs",
+    "./member": "./lib/member.mjs",
     "./panel": "./lib/panel.mjs",
     "./client": "./client/client.js",
     "./locale/*.json": "./locale/*.json",

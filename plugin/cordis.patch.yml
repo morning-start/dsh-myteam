@@ -93,8 +93,7 @@
                    任务检查由成员自己完成（成员用 myteam_submit_review 提交门禁裁决，审查者 = 成员本人，强制交叉审查），
                    你只做**任务同步与成果检查**：读证据块与交付物、核对 AC 与落位，不代替成员重做实现检查，
                    也不用 write/edit 写交付物（写代码/文档/数据是成员的事；章程与团队配置除外）。
-          # CHG-212（可用性实测）：**能力必须挂在根层，不能只挂在 preset 里**。
-          #
+          # CHG-212（可用性实测）：**能力必须挂在根层，不能只挂在 preset 里**。          #
           # 实测结论（真实队长会话 + 真模型成员）：
           #   队长会话 = 根层工具 + preset 追加项 → 有 read/write/edit
           #   成员会话 = **只有根层工具**（`agents.create` 继承的是 root 工具面）
@@ -104,6 +103,28 @@
           # 修法：把文件与命令工具**开在根层**（见文件末尾的根层 patch 段），
           # 队长与成员同时继承；preset 不再重复声明（重复声明 = 两处配置漂移）。
           # 队长「不做领域工作」靠 persona 约束，不靠「不给他工具」——工具面是能力，不是纪律。
+
+    # CHG-212（ADR-010 P3）：**成员 preset**——子代理成员的工具面。
+    #
+    # 为什么需要它：成员改成 `subagents.startActivation({agentPreset})` 后，宿主的
+    # local child `setup` 是管理器私有的（dsh-subagent/manager.ts:826），插件插不进去；
+    # 成员工具只能由 preset 装。本行的小插件在成员会话作用域注册 13 个成员工具，
+    # 执行时按 `exec.agent → parentSession → agentPresets.serviceFor(captain,'myteam')`
+    # 找回**同一个** host 服务（账本单写者不变，见 docs/27 §2.1）。
+    #
+    # 文件/命令工具不在这里重复声明：已在文件末尾的根层段落里开给「队长与成员共同继承」。
+    - id: myteam-preset-member
+      name: '@deepseek-ai/dsh-agent-preset'
+      config:
+        id: myteam-member
+        name: 团队成员
+        description: '团队模式成员（子代理）：13 个成员工具 + 根层文件/命令工具；角色与工作纪律由上岗 prompt 注入。'
+        order: 101
+        plugins:
+          - id: myteam-member-tools
+            name: 'dsh-plugin-myteam/member'
+            # 行级 inject 与插件上的 .inject 双保险（同 myteam-host 行的理由）
+            inject: ['tools', 'agents', 'agentPresets']
 
 # ── 根层能力（CHG-212）：队长与成员**共同继承** ─────────────────────────────
 #

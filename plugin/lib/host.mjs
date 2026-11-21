@@ -2519,6 +2519,26 @@ export class MyTeamHost                               {
     return this.observeMemberCall(member, name, args, result)
   }
 
+  /**
+   * CHG-212（ADR-010 P3）：子代理成员入口——按成员会话 id 在「已开 + 磁盘上有账本」的团队里找成员。
+   * 找不到返回 `MT_UNAVAILABLE`（队长可能刚重启），**不静默丢调用**。实现见 docs/27 §2.1。
+   */
+  executeMemberToolBySession(sessionId        , name        , args                         )                                                             {
+    const teamIds = new Set(this.services.keys())
+    try {
+      const tasksDir = storeLayout(this.workspaceRoot).tasks
+      for (const teamId of readdirSync(tasksDir)) if (existsSync(join(tasksDir, teamId, 'ledger.jsonl'))) teamIds.add(teamId)
+    } catch { /* 目录不可读：只查已开团队 */ }
+    for (const teamId of teamIds) {
+      let svc             
+      try { svc = this.service(teamId) } catch { continue }
+      const members = svc.projectionSnapshot.members                                  
+      const member = Object.values(members).find((m) => m.sessionId === sessionId)
+      if (member) return this.executeMemberTool(member, name, args)
+    }
+    return { status: 'error', code: 'MT_UNAVAILABLE', message: `member session "${sessionId}" is not in any team roster（未落账或已释放）` }
+  }
+
   /* CHG-200：`myteam_submit_review` 在 verify 门要等命令执行（FR-5.3）——返回类型补实为
    * 「同步结果 | Promise」，与 `executeLeadTool` 同形（结算由 `executeMemberTool` 的 thenable 分支负责）。 */
           executeMemberToolInner(member                , name        , args                         )                                                             {

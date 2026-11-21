@@ -33,7 +33,7 @@ const checks = [
   },
   {
     name: '死模块',
-    argv: ['tools/find-dead-modules.mjs', 'plugin/src/host.ts', 'plugin/src/panel.ts', 'plugin/src/smoke.ts'],
+    argv: ['tools/find-dead-modules.mjs', 'plugin/src/host.ts', 'plugin/src/panel.ts', 'plugin/src/member.ts', 'plugin/src/smoke.ts'],
     expect: ['不可达: 0'],
   },
 ]
