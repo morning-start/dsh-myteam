@@ -272,30 +272,10 @@ export function readLedgerEvents(ledgerPath        )                            
 
 /* ── P1-1 / P1-2 接线（docs/21 §6）：产物基线 + 交付判定 ───────────────── */
 
-/**
- * P1-2 交付判定的正文长度下限（按任务类型）。
- *
- * 为什么按类型分档：实现类（dev）的产出主要在文件里，正文只需要简短汇报；
- * 需求 / 验收类（prd/qa）的交付物**就是文字结论**，短正文必然信息不足。
- * 为什么导出常量：面板、提示词、文档要引用同一组数字——各写一份必然漂移。
- */
-const DELIVERABLE_MIN_LENGTH                                                 = {
-  dev: 60,
-  qa: 250,
-  prd: 400,
-}
-
-/**
- * 任务类型 → 正文长度下限。未知类型按 `dev`（实现类最常见、下限最宽松）：
- * 挡住「空话冒充交付」靠的是下限本身，不是分档的精度。
- */
-export function deliverableMinLength(taskType         )         {
-  const type = String(taskType ?? '').trim().toLowerCase()
-  if (type.length === 0) return DELIVERABLE_MIN_LENGTH.dev
-  if (type.includes('qa') || type.includes('test') || type.includes('accept')) return DELIVERABLE_MIN_LENGTH.qa
-  if (type.includes('prd') || type.includes('req') || type.includes('design') || type.includes('doc')) return DELIVERABLE_MIN_LENGTH.prd
-  return DELIVERABLE_MIN_LENGTH.dev
-}
+/* P1-2 的长度下限规则搬到 `core/tasks/deliverable.ts`（纯函数，与宿主无关）。
+ * 这里既要用、也要保持原来的导出面（`host.ts` 是这批规则的历史入口）。 */
+import { deliverableMinLength } from './core/tasks/deliverable.mjs'
+export { DELIVERABLE_MIN_LENGTH, deliverableMinLength } from './core/tasks/deliverable.mjs'
 
 /**
  * 拍基线时文件**还不存在**的哨兵指纹。
