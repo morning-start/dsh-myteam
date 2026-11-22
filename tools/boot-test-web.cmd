@@ -1,34 +1,38 @@
 @echo off
 rem ============================================================================
-rem 无密码测试实例（CHG-213 测试约定：**桌面端写、web 实例测**）
+rem My own WEB instance for testing dsh-plugin-myteam.
 rem
-rem 为什么这么分工：桌面端进程只在启动时加载 lib/*.mjs —— 改完插件必须重启才生效；
-rem 而这个 CLI 实例**每次启动都重新加载**，所以永远跑最新代码，测试端不需要重启桌面端。
-rem 登录门（dsh-web-login）在这里被关掉（见 .debug/test-web/patch*.yml），
-rem 启动后直接用打印出来的 http://127.0.0.1:3080/?token=... 打开，没有密码页。
+rem Hard rule: NEVER launch the desktop binary here
+rem ("DeepSeek Harness.exe ... dsh-desktop-host\lib\cli.js"). That shares the
+rem desktop's process identity/state and has crashed the user's running
+rem desktop app. Use the runtime CLI's web app instead: `dsh --profile <name>`.
 rem
-rem 用法：
-rem   tools\boot-test-web.cmd            只起 web（不跑探针，进程常驻）
-rem   tools\boot-test-web.cmd 5 w3       起 web 并跑 stage=5 的活体探针（跑完自动退出）
-rem   tools\boot-test-web.cmd 3          同上，stage=3（wake/载体验收）
+rem The profile is a throwaway test profile whose package.json links this repo:
+rem   dsh plugin --profile myteam-web add link:E:/Workplace/extension/dsh-myteam/plugin
+rem (do it with the CLI, never by editing profile files by hand).
+rem
+rem Usage:
+rem   tools\boot-test-web.cmd            serve on 3099
+rem   tools\boot-test-web.cmd 3104       serve on another port
+rem   tools\boot-test-web.cmd 3104 log   also disable the password gate for a
+rem                                      passwordless test instance (patch file
+rem                                      overlay only, nothing on disk changes)
+rem
+rem Stop it by closing this window, or kill the process listening on the port.
 rem ============================================================================
 setlocal
-set "STAGE=%~1"
-set "TAG=%~2"
-if "%TAG%"=="" set "TAG=tweb"
-if "%STAGE%"=="" goto webonly
-goto probe
+set "PORT=%~1"
+if "%PORT%"=="" set "PORT=3099"
+set "MODE=%~2"
+set "PATCH="
+if /i "%MODE%"=="log" set "PATCH=--patch .debug\test-web\patch-noprobe.yml"
 
-:webonly
-set "PATCH=E:\Workplace\extension\dsh-myteam\.debug\test-web\patch-noprobe.yml"
-goto boot
+set "DSH=C:\APP\agent\DeepSeek Harness\resources\runtime\cli\bin\dsh.cmd"
+if not exist "%DSH%" (
+  echo dsh CLI not found: %DSH%
+  exit /b 1
+)
 
-:probe
-set "PATCH=E:\Workplace\extension\dsh-myteam\.debug\test-web\patch.yml"
-set "LIVE_STAGE=%STAGE%"
-set "LIVE_TAG=%TAG%"
-
-:boot
-set "ELECTRON_RUN_AS_NODE=1"
-cd /d E:\Workplace\extension\mt-e2e-test
-"C:\APP\agent\DeepSeek Harness\DeepSeek Harness.exe" --expose-internals "C:\APP\agent\DeepSeek Harness\resources\app.asar\dsh\node_modules\@deepseek-ai\dsh-desktop-host\lib\cli.js" --profile myteam-web --patch "%PATCH%" --no-open
+cd /d "%~dp0.."
+echo [boot-test-web] profile=myteam-web port=%PORT% patch=%PATCH%
+"%DSH%" --profile myteam-web --host 127.0.0.1 --port %PORT% --no-open %PATCH%
