@@ -145,6 +145,6 @@ window.__ModuleLoader__.load({
       }
     }
 
-    return { apply, inject: [] }
+    return { apply, inject: ['slots', 'connection'] }
   },
 })

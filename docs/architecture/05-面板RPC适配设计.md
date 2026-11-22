@@ -1,6 +1,6 @@
 # 面板 RPC 适配（待实现）
 
-> 状态：**门面已实现并在 Web profile 启动通过**（src/composition/panel.ts，	30）；客户端 bundle 未接。目标是把已完成的 `PanelService` 挂到 DSH 的
+> 状态：**已打通**。门面 src/composition/panel.ts（	30）+ 客户端会话页「团队」视图（client/client.js）在 Web profile 实测：tab 出现、myteam/board 返回真实看板（共 3 · 完成 1）。目标是把已完成的 `PanelService` 挂到 DSH 的
 > Remote 上，让 Web 客户端能 `ctx.remote.myteam.*` 调用。
 
 ## 已具备

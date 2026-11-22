@@ -84,9 +84,31 @@ export function createPanelFacade(ctx: PanelHostContext): PanelFacade {
  */
 export const inject = ['agents', 'workingDirectory']
 
+/**
+ * 解析 `@deepseek-ai/dsh-typert-protocol`：它只存在于宿主安装目录，不是本包的
+ * 依赖，所以先试裸包名，失败再从 `DSH_INSTALL_DIR` 的兄弟包里按需解析。
+ */
+async function loadProtocol(): Promise<unknown> {
+  try {
+    return await import('@deepseek-ai/dsh-typert-protocol')
+  } catch {
+    // 落到宿主安装目录
+  }
+  const installDir = process.env.DSH_INSTALL_DIR
+  if (installDir === undefined || installDir.length === 0) {
+    throw new Error('DSH_INSTALL_DIR 未设置，无法定位 typert 协议包')
+  }
+  const { createRequire } = await import('node:module')
+  const { pathToFileURL } = await import('node:url')
+  const { join } = await import('node:path')
+  const requireFromHost = createRequire(join(installDir, 'package.json'))
+  const resolved = requireFromHost.resolve('@deepseek-ai/dsh-typert-protocol')
+  return await import(pathToFileURL(resolved).href)
+}
+
 export function apply(ctx: PanelHostContext): void {
   const facade = createPanelFacade(ctx)
-  void import('@deepseek-ai/dsh-typert-protocol')
+  void loadProtocol()
     .then((protocol: unknown) => {
       const base = (protocol as { TypertRemoteService?: new (ctx: unknown, key: string, options: unknown) => object })
         .TypertRemoteService
@@ -118,7 +140,14 @@ export function apply(ctx: PanelHostContext): void {
           ),
         }),
       })
-      new MyTeamPanelFacade()
+      try {
+        new MyTeamPanelFacade()
+        ctx.logger?.warn('myteam.panel.registered', { namespace: 'myteam', methods: PANEL_METHODS.length })
+      } catch (error) {
+        ctx.logger?.warn('myteam.panel.construct-failed', {
+          error: error instanceof Error ? error.message : String(error),
+        })
+      }
     })
     .catch((error: unknown) => {
       ctx.logger?.warn('myteam.panel.protocol-import-failed', {
