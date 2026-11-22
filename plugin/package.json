@@ -1,7 +1,7 @@
 {
   "name": "dsh-plugin-myteam",
   "version": "2.0.0-alpha.1",
-  "description": "myteam v2 — DSH 内的项目级多智能体团队运行时：定义资产、项目事件真源、任务 DAG、门禁与统一投影。",
+  "description": "myteam v2 —— DSH 内的项目级多智能体团队运行时：定义资产、项目事件真源、任务 DAG、门禁与统一投影。",
   "type": "module",
   "main": "./lib/composition/host.mjs",
   "exports": {

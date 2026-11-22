@@ -26,10 +26,10 @@
     # 树之外），扫描也看不到。故顶层必须挂一行裸包名；config.carrier=true 让
     # apply 直接返回（宿主职责全部留在 preset 作用域，NFR-7.4；也避免 root 侧
     # 再 provide 'myteam' 与门面造成网关端点歧义）。
-    - id: myteam-carrier
-      name: 'dsh-plugin-myteam'
-      config:
-        carrier: true
+    # v2 暂不挂客户端载体行：本包还没有 client bundle（R5 面板 RPC 未接）。
+    # 留着裸包名行会让 dsh-client-modules 去解析一个不存在的客户端入口，
+    # 表现是整个 Web 前端起不来（「前端资源不可用 / 无法读取前端 index.html」）。
+    # 恢复条件：client 入口与 bundle 落地后，再把 myteam-carrier 加回来。
     # M2 门面行（官方 SessionController 模式，dsh-api-session-controller/lib/index.js:2952）：
     # 根级 typert remote 服务，namespace 仍 'myteam' → 客户端端点 myteam/<method> 不变。
     # 为什么必需：preset 挂载审计要求队长内的 MyTeamRemote isolate（entry-local realm），
