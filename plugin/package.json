@@ -25,6 +25,7 @@
   "files": [
     "lib",
     "src",
+    "client",
     "scripts",
     "cordis.patch.yml",
     "icon.svg"

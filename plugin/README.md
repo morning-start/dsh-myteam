@@ -79,12 +79,13 @@ composition → infrastructure → application → domain → contracts
 | cutover 前必须证明候选未过期（来源 hash 对得上） | `infrastructure/migration/v1/cutover.ts` | `t19` |
 | 记忆属于 bank 不属于会话；跨 bank 读取视为不存在；硬删除仅人类 | `infrastructure/memory-store/sqlite-memory.ts` | `t20` |
 | 演练在临时副本上完成切换与回滚，不触碰真实工作区 | `tools/rehearse-cutover.mjs` | `t21` |
+| 面板视图模型只做排序/分组/标签，不重算业务；未知状态显示为未知 | `client/panel-model.js` | `t22` |
 
 ## 运行
 
 ```bash
 cd plugin
-node --test test/*.test.ts        # 106 个测试
+node --test test/*.test.ts        # 111 个测试
 node ../tools/check-architecture.mjs   # ARCH_OK files=47 violations=0
 node scripts/build-lib.mjs        # 47 个模块 → lib/（入口 lib/composition/host.mjs）
 node ../tools/gen-panel-contract.mjs --check   # 面板契约文档与代码一致
