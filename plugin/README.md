@@ -68,14 +68,19 @@ composition → infrastructure → application → domain → contracts
 | 工具身份只来自会话绑定；未知会话 = FORBIDDEN | `application/actor-resolution.ts` | `t12` |
 | 队长 12 个工具、成员 3 个工具，互不泄漏 | `composition/host.ts`、`composition/member.ts` | `t12` |
 | 同一工作区只开一个项目运行时（并发打开折叠为一个 Promise） | `infrastructure/dsh/project-hosts.ts` | `t12` |
+| 迁移影响面可复现：CLI 与报告同一结构，阻断时不给导入顺序 | `infrastructure/migration/v1/report.ts` | `t13` |
 
 ## 运行
 
 ```bash
 cd plugin
-node --test test/*.test.ts        # 73 个测试
-node ../tools/check-architecture.mjs   # ARCH_OK files=37 violations=0
-node scripts/build-lib.mjs        # 37 个模块 → lib/（入口 lib/composition/host.mjs）
+node --test test/*.test.ts        # 76 个测试
+node ../tools/check-architecture.mjs   # ARCH_OK files=38 violations=0
+node scripts/build-lib.mjs        # 38 个模块 → lib/（入口 lib/composition/host.mjs）
+
+# v1 数据只读分析（不写旧文件、不迁移）
+node ../tools/myteam-migrate.mjs analyze --root "E:\Workplace\extension\dsh-myteam"
+node ../tools/myteam-migrate.mjs plan    --root "E:\Workplace\extension\dsh-myteam" --json
 ```
 
 不需要 `npm install`：Node ≥ 22.18 直接擦除类型运行 `.ts`，仓库保持零运行时依赖。
