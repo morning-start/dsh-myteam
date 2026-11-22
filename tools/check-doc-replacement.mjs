@@ -50,7 +50,13 @@ for (const line of lines) {
 const counts = Object.fromEntries(STATUSES.map((status) => [status, 0]))
 for (const row of rows) counts[row.status] += 1
 
-const deletable = rows.filter((row) => row.status === '已替代').map((row) => row.file)
+const fileExists = (row) => {
+  const dir = row.section.includes('historical') ? 'historical' : row.section.includes('contracts') ? 'contracts' : null
+  if (dir === null) return false
+  return existsSync(join(ROOT, 'docs', dir, row.file))
+}
+const deletable = rows.filter((row) => row.status === '已替代' && fileExists(row)).map((row) => row.file)
+const alreadyDeleted = rows.filter((row) => row.status === '已替代' && !fileExists(row)).map((row) => row.file)
 const blocking = rows.filter((row) => row.status === '待补写')
 const needConfirm = rows.filter((row) => row.status === '待确认')
 const partial = rows.filter((row) => row.status === '部分替代')
@@ -63,7 +69,10 @@ const missing = []
 for (const row of rows) {
   const base = row.file.split('/').pop()
   const candidates = [join(ROOT, 'docs', 'historical', base), join(ROOT, 'docs', 'contracts', base)]
-  if (!candidates.some((candidate) => existsSync(candidate))) missing.push(row.file)
+  if (!candidates.some((candidate) => existsSync(candidate))) {
+    // 「已替代」的文件在删除执行后本就不存在：那是完成态，不是清单错误。
+    if (row.status !== '已替代' && !fileExists(row)) missing.push(row.file)
+  }
 }
 if (missing.length > 0) {
   console.log('\n清单指向的文件不存在（清单本身有误）：')
@@ -73,6 +82,10 @@ if (missing.length > 0) {
 if (deletable.length > 0) {
   console.log('\n可直接删除（已替代）：')
   for (const file of deletable) console.log(`  - ${file}`)
+}
+if (alreadyDeleted.length > 0) {
+  console.log(`\n已删除（${alreadyDeleted.length} 份，文件已不在磁盘上）：`)
+  for (const file of alreadyDeleted) console.log(`  - ${file}`)
 }
 if (partial.length > 0) {
   console.log('\n可删但会有信息缺口（部分替代）：')

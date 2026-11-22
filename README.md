@@ -64,7 +64,7 @@ myteam 将系统分为三层：
 | [`docs/features/`](docs/features/README.md) | 后续六组功能实现设计 |
 | [`docs/contracts/`](docs/contracts/README.md) | as-is v1 与未来目标契约 |
 | [`docs/delivery/`](docs/delivery/README.md) | 执行、风险、验收方法与变更记录 |
-| [`docs/research/`](docs/research/README.md) · [`docs/audits/`](docs/audits/README.md) · [`docs/historical/`](docs/historical/README.md) | 研究、时点证据与历史文档 |
+| [`docs/research/`](docs/research/README.md) · [`docs/audits/`](docs/audits/README.md) · [`docs/historical/`](./docs/architecture/README.md) | 研究、时点证据与历史文档 |
 | [`docs/historical/dsh-myteam-requirements.md`](docs/historical/dsh-myteam-requirements.md) | 原根目录 PRD，已历史化 |
 | [`plugin/`](plugin/README.md) | 插件实现：`src/`、`lib/`、`client/`、`test/`、装载 patch 与 locale |
 | [`design/`](design/README.md) | UI 设计资产 |
