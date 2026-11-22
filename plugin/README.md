@@ -58,6 +58,7 @@ composition → infrastructure → application → domain → contracts
 | 配置分层合并后按安全上限钳制，钳制项写进快照；未知键报错 | `domain/config/merge.ts` | `t04` |
 | 人类专属动作对任何 agent 返回 `HUMAN_ONLY` | `domain/permissions/policy.ts` | `t04` |
 | 项目重开后的投影与关闭前逐字段一致 | `application/project-runtime.ts` | `t06` |
+| 外部写入后先按 seq 重建投影再判身份（陈旧读会导致队长被误判 FORBIDDEN） | `application/project-runtime.ts` `refresh()` | 真机复现（`a144b2e`） |
 | 每个事件类型都有投影处理（目录与 switch 不漂移） | `application/projections/project-state.ts` | `t07` |
 | Run 实例化 = 一个原子批次；完成条件满足时同批次关 Run | `application/run-commands.ts`、`task-commands.ts` | `t08` |
 | 完成一个任务时同批次放开已满足依赖的下游任务 | `application/task-commands.ts` | `t08` |
