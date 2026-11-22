@@ -9,13 +9,14 @@
   （`application/actor-resolution.ts`），解析不到即 `FORBIDDEN`。
 - 队长 preset 只注册队长工具，成员 preset 只注册成员工具；两侧不共享注册表。
 
-## 队长工具（12）
+## 队长工具（13）
 
 | 工具 | 说明 | 必填参数 |
 |---|---|---|
 | `myteam_read_board` | 读取项目看板的当前投影（按状态分列、含阻塞上游与总计数）。 | — |
 | `myteam_read_task` | 读取单个任务详情：正文、验收标准、依赖状态、Attempt、门禁裁决与证据。 | `taskId` |
 | `myteam_read_team` | 读取团队概览：队长世代、成员、任务与生效配置。 | — |
+| `myteam_create_team` | 创建一支团队并让**当前会话**成为它的队长。只能在当前会话还不属于任何团队时调用（新项目的第一步）。 | `name`、`goal` |
 | `myteam_create_task` | 在项目里创建一个任务（默认归当前队长的团队）。 | `title`、`acceptance` |
 | `myteam_start_workflow` | 用一份工作流定义实例化一次运行（Run），生成全部任务并返回 taskId 映射。 | `workflowId` |
 | `myteam_create_workflow` | 定义一份可复用的工作流（任务模板 + 依赖 + 完成条件）。 | `name`、`templates` |

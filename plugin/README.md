@@ -5,7 +5,7 @@ Git 标签 `v1-backup`，本分支从新的分层骨架开始重新实现。
 
 > 状态：`2.0.0-alpha.1`。R0～R3（契约、领域内核、事件库与投影、项目用例）已落地并有测试；
 > R4 完成队长/成员工具面与装配（尚未安装进 DSH 验证）；R5～R7 未完成。
-> **可安装性**：`lib/composition/host.mjs` 已能构建并通过冒烟（12 个队长工具注册、读看板可用），
+> **可安装性**：`lib/composition/host.mjs` 已能构建并通过冒烟（13 个队长工具注册、读看板与引导建队可用），
 > 但 `panel` RPC 与 `cordis.patch.yml` 的 preset 行尚未接上，因此 R5 前不要安装到 profile。
 
 ## 为什么要重写
@@ -66,7 +66,7 @@ composition → infrastructure → application → domain → contracts
 | Effect 只能 `requested→accepted→completed`；未知结果不重放 | `application/effect-commands.ts` | `t10` |
 | v1 分析：未知事件/序号断裂阻断，索引孤儿只告警 | `infrastructure/migration/v1/analyze.ts` | `t11` |
 | 工具身份只来自会话绑定；未知会话 = FORBIDDEN | `application/actor-resolution.ts` | `t12` |
-| 队长 12 个工具、成员 3 个工具，互不泄漏 | `composition/host.ts`、`composition/member.ts` | `t12` |
+| 队长 13 个工具、成员 3 个工具，互不泄漏 | `composition/host.ts`、`composition/member.ts` | `t12` |
 | 同一工作区只开一个项目运行时（并发打开折叠为一个 Promise） | `infrastructure/dsh/project-hosts.ts` | `t12` |
 | 迁移影响面可复现：CLI 与报告同一结构，阻断时不给导入顺序 | `infrastructure/migration/v1/report.ts` | `t13` |
 | 面板只读服务：协议版本不匹配即拒绝，未知方法/缺参数结构化报错 | `application/panel-service.ts` | `t14` |
@@ -90,7 +90,7 @@ composition → infrastructure → application → domain → contracts
 
 ```bash
 cd plugin
-node --test test/*.test.ts        # 125 个测试
+node --test test/*.test.ts        # 126 个测试
 node ../tools/check-architecture.mjs   # ARCH_OK files=49 violations=0
 node scripts/build-lib.mjs        # 49 个模块 → lib/（入口 lib/composition/host.mjs）
 node ../tools/gen-panel-contract.mjs --check   # 面板契约文档与代码一致

@@ -18,6 +18,7 @@ import {
   claimTaskCommand,
   createProjectWorkflowCommand,
   createTaskCommand,
+  createTeamCommand,
 } from './commands.ts'
 import { completeTaskCommand, recordEvidenceCommand, recordProgressCommand, recordVerdictCommand, submitReviewCommand } from './task-commands.ts'
 import { startWorkflowRunCommand } from './run-commands.ts'
@@ -194,6 +195,56 @@ export function leadToolSpecs(): MyTeamToolSpec[] {
         const record = asRecord(args)
         const actor = actorOf(context)
         return jsonSafe({ ok: true, data: teamView(context.runtime.state, defaultTeamId(actor, record)) })
+      },
+    },
+    {
+      name: 'myteam_create_team',
+      description:
+        '创建一支团队并让**当前会话**成为它的队长。只能在当前会话还不属于任何团队时调用（新项目的第一步）。',
+      parameters: {
+        type: 'object',
+        properties: {
+          name: { type: 'string', description: '团队名' },
+          goal: { type: 'string', description: '团队目标（一句话）' },
+          blueprintId: { type: 'string', description: '可选：用哪份蓝图初始化角色与配置' },
+        },
+        required: ['name', 'goal'],
+        additionalProperties: false,
+      },
+      outputSchema: OUTPUT_SCHEMA,
+      execute(args, context) {
+        const record = asRecord(args)
+        const state = context.runtime.state
+
+        // 引导规则：只有「还不属于任何团队」的会话可以建队，避免一个会话反复建队。
+        let existing: ActorRef | null = null
+        try {
+          existing = resolveAgentActor(state, context.sessionId)
+        } catch {
+          existing = null
+        }
+        if (existing !== null) {
+          fail(ERROR_CODES.CONFLICT, '当前会话已经属于某个团队，不能重复建队', {
+            details: { teamId: existing.kind === 'member' ? existing.teamId : existing.kind === 'captain' ? existing.teamId : null },
+          })
+        }
+
+        const actor: ActorRef = { kind: 'captain', teamId: '', sessionId: context.sessionId, generation: 1 }
+        const result = createTeamCommand(context.runtime, {
+          actor,
+          name: requireString(record, 'name'),
+          goal: requireString(record, 'goal'),
+          captainSessionId: context.sessionId,
+          ...(optionalString(record, 'blueprintId') === undefined
+            ? {}
+            : { blueprintId: optionalString(record, 'blueprintId')! }),
+        })
+        const created = result.events.find((event) => event.type === 'team.created')
+        if (created === undefined) {
+          fail(ERROR_CODES.INTERNAL, '建队没有产生 team.created 事件')
+        }
+        const teamId = (created.payload as { team: { id: string } }).team.id
+        return jsonSafe({ ok: true, data: { teamId, captainSessionId: context.sessionId } })
       },
     },
     {
