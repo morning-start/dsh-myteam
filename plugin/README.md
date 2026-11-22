@@ -78,12 +78,13 @@ composition → infrastructure → application → domain → contracts
 | 知识保留「提案→采纳」链；被驳回的提案不迁移 | `infrastructure/migration/v1/convert.ts` | `t18` |
 | cutover 前必须证明候选未过期（来源 hash 对得上） | `infrastructure/migration/v1/cutover.ts` | `t19` |
 | 记忆属于 bank 不属于会话；跨 bank 读取视为不存在；硬删除仅人类 | `infrastructure/memory-store/sqlite-memory.ts` | `t20` |
+| 演练在临时副本上完成切换与回滚，不触碰真实工作区 | `tools/rehearse-cutover.mjs` | `t21` |
 
 ## 运行
 
 ```bash
 cd plugin
-node --test test/*.test.ts        # 105 个测试
+node --test test/*.test.ts        # 106 个测试
 node ../tools/check-architecture.mjs   # ARCH_OK files=47 violations=0
 node scripts/build-lib.mjs        # 47 个模块 → lib/（入口 lib/composition/host.mjs）
 node ../tools/gen-panel-contract.mjs --check   # 面板契约文档与代码一致
@@ -95,6 +96,8 @@ node ../tools/myteam-migrate.mjs plan    --root "E:\Workplace\extension\dsh-myte
 node ../tools/myteam-migrate.mjs candidate --root "E:\Workplace\extension\dsh-myteam" --candidate "<候选目录>"
 # cutover 计划：检查候选完整性、源是否变化、列出步骤与回滚边界（不执行切换）
 node ../tools/myteam-migrate.mjs cutover-plan --root "E:\Workplace\extension\dsh-myteam" --candidate "<候选目录>"
+# cutover 演练：在临时副本上跑完分析→候选→切换→首次打开→回滚，不碰真实工作区
+node ../tools/rehearse-cutover.mjs --root "E:\Workplace\extension\dsh-myteam"
 ```
 
 不需要 `npm install`：Node ≥ 22.18 直接擦除类型运行 `.ts`，仓库保持零运行时依赖。
