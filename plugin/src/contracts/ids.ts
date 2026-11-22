@@ -25,6 +25,7 @@ export const ID_PREFIXES = {
   attempt: 'att',
   verdict: 'gd',
   knowledge: 'kn',
+  memory: 'memo',
   effect: 'eff',
   message: 'msg',
   batch: 'bat',

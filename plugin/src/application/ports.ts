@@ -47,3 +47,41 @@ export const silentLogger: LoggerPort = {
   warn: () => undefined,
   error: () => undefined,
 }
+
+// —— 长期记忆端口 ——
+
+export interface MemoryEntryRecord {
+  id: string
+  bankId: string
+  text: string
+  tags: string[]
+  evidence: string[]
+  revision: number
+  createdAt: string
+  updatedAt: string
+  forgottenAt: string | null
+}
+
+export interface MemoryRememberInput {
+  id: string
+  bankId: string
+  text: string
+  tags?: string[]
+  evidence?: string[]
+  now: string
+}
+
+export interface MemoryRecallInput {
+  bankId: string
+  query?: string
+  limit?: number
+  includeForgotten?: boolean
+}
+
+export interface MemoryPort {
+  remember(input: MemoryRememberInput): MemoryEntryRecord
+  recall(input: MemoryRecallInput): MemoryEntryRecord[]
+  get(bankId: string, id: string): MemoryEntryRecord
+  forget(input: { bankId: string; id: string; reason: string; hard: boolean; now: string }): void
+  close(): void
+}
