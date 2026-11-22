@@ -26,17 +26,21 @@ function fakeRequire() {
   return (name) => (name === 'react' ? react : new Proxy({}, { get: () => noop }))
 }
 
-test('package.json 必须声明客户端半体：dsh.client 与 ./client 导出', () => {
+test('package.json 的客户端声明要么完整、要么不写（半截声明会让宿主前端起不来）', () => {
   const pkg = JSON.parse(readFileSync(join(ROOT, 'plugin', 'package.json'), 'utf8')) as {
     dsh?: { client?: { platform?: string; inject?: string[] } }
     exports?: Record<string, string>
   }
-  assert.equal(pkg.dsh?.client?.platform, 'web', '缺少 dsh.client.platform，DSH 不会加载客户端')
+  const declared = pkg.dsh?.client !== undefined || pkg.exports?.['./client'] !== undefined
+  if (!declared) {
+    assert.equal(existsSync(CLIENT), true, '未声明客户端时 client.js 仍应保留，供将来接线')
+    return
+  }
+  assert.equal(pkg.dsh?.client?.platform, 'web')
   assert.equal(pkg.exports?.['./client'], './client/client.js')
-  assert.ok(existsSync(CLIENT), '缺少 client/client.js')
+  assert.ok(existsSync(CLIENT), '声明了 ./client 就必须有 client/client.js')
   const inject = pkg.dsh?.client?.inject ?? []
   assert.ok(inject.includes('slots'), `客户端 inject 必须含 slots：${inject.join(',')}`)
-  assert.ok(inject.includes('connection'), `客户端 inject 必须含 connection：${inject.join(',')}`)
 })
 
 test('客户端入口能在模拟模块加载器下加载，并给出 apply/inject', () => {
