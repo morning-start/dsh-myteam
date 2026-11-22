@@ -74,6 +74,7 @@
     <script type="module">
       import { toBoardModel, toOverviewModel, toTaskModel } from './panel-model.js'
       import { renderBoard, renderOverview, renderTask } from './panel-render.js'
+      import { createPanelClient } from './panel-client.js'
 
       const overviewFixture = {
         totals: { all: 6, done: 2, blocked: 1, review: 2 },
@@ -123,10 +124,24 @@
         dependents: [],
       }
 
+      // 演示用传输：与正式面板同一条客户端契约，只是数据来自 fixture。
+      const client = createPanelClient(async (method) => ({
+        ok: true,
+        data:
+          method === 'overview'
+            ? overviewFixture
+            : method === 'board'
+              ? boardFixture
+              : method === 'task'
+                ? taskFixture
+                : { items: [] },
+      }))
+
+      const [overview, board, task] = await Promise.all([client.overview(), client.board(), client.task('task_4')])
       document.getElementById('root').innerHTML = [
-        renderOverview(toOverviewModel(overviewFixture)),
-        renderBoard(toBoardModel(boardFixture)),
-        renderTask(toTaskModel(taskFixture)),
+        renderOverview(toOverviewModel(overview)),
+        renderBoard(toBoardModel(board)),
+        renderTask(toTaskModel(task)),
       ].join('')
     </script>
   </body>
