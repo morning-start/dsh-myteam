@@ -10,7 +10,7 @@
  * 不能伪装成「命令没提交」。这里只做前几步，Effect 由上层在 commit 返回后
  * 调度，并且结果必须另写事件。
  */
-import type { EventEnvelope, ActorRef, EntityRef, EventType } from '../contracts/events.ts'
+import type { EventEnvelope, ActorRef, EntityRef, EventType, LegacyOrigin } from '../contracts/events.ts'
 import { ERROR_CODES, fail } from '../contracts/errors.ts'
 import type { IdKind } from '../contracts/ids.ts'
 import { canonicalJson } from '../contracts/json.ts'
@@ -30,6 +30,8 @@ export interface DraftEvent {
   configRevision?: number
   causationId?: string
   correlationId?: string
+  /** 迁移事件保留旧来源；普通命令不填。 */
+  legacy?: LegacyOrigin
 }
 
 export interface CommitResult {
@@ -140,6 +142,7 @@ export class ProjectRuntime {
       if (draft.configRevision !== undefined) envelope.configRevision = draft.configRevision
       if (draft.causationId !== undefined) envelope.causationId = draft.causationId
       if (draft.correlationId !== undefined) envelope.correlationId = draft.correlationId
+      if (draft.legacy !== undefined) envelope.legacy = draft.legacy
       return envelope
     })
 

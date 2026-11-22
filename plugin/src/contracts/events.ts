@@ -233,7 +233,11 @@ export interface EventPayloads {
 
   'team.created': {
     team: Team
-    captain: { sessionId: SessionId; generation: number }
+    /**
+     * 建团时的队长会话。迁移来的历史团队没有可信会话，这里必须是 `null`：
+     * 旧 sessionId 已失效，伪造一个会让「谁能发指令」变得不可判定。
+     */
+    captain: { sessionId: SessionId; generation: number } | null
     formation: FormationSlot[]
   }
   'team.updated': { teamId: TeamId; revision: number; name?: string; goal?: string }

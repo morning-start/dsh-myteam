@@ -72,19 +72,23 @@ composition → infrastructure → application → domain → contracts
 | 面板只读服务：协议版本不匹配即拒绝，未知方法/缺参数结构化报错 | `application/panel-service.ts` | `t14` |
 | 人类确认令牌绑定 operationId/action/targetHash/impactHash/一次性 nonce | `domain/permissions/human-authorizer.ts` | `t15` |
 | 解散团队/队长接管：预览 → 确认 → 执行；影响面变化即失效 | `application/human-actions.ts` | `t16` |
+| 候选导入只支持已确认的事件形状；其他事件阻断而非跳过 | `infrastructure/migration/v1/convert.ts` | `t18` |
+| 候选写入后从磁盘重放对账，数量不符即失败 | `infrastructure/migration/v1/convert.ts` | `t18` |
 
 ## 运行
 
 ```bash
 cd plugin
-node --test test/*.test.ts        # 92 个测试
-node ../tools/check-architecture.mjs   # ARCH_OK files=42 violations=0
-node scripts/build-lib.mjs        # 42 个模块 → lib/（入口 lib/composition/host.mjs）
+node --test test/*.test.ts        # 96 个测试
+node ../tools/check-architecture.mjs   # ARCH_OK files=43 violations=0
+node scripts/build-lib.mjs        # 43 个模块 → lib/（入口 lib/composition/host.mjs）
 node ../tools/gen-panel-contract.mjs --check   # 面板契约文档与代码一致
 
 # v1 数据只读分析（不写旧文件、不迁移）
 node ../tools/myteam-migrate.mjs analyze --root "E:\Workplace\extension\dsh-myteam"
 node ../tools/myteam-migrate.mjs plan    --root "E:\Workplace\extension\dsh-myteam" --json
+# 候选导入：写到一个独立目录，旧工作区不动；写完立即对账
+node ../tools/myteam-migrate.mjs candidate --root "E:\Workplace\extension\dsh-myteam" --candidate "<候选目录>"
 ```
 
 不需要 `npm install`：Node ≥ 22.18 直接擦除类型运行 `.ts`，仓库保持零运行时依赖。

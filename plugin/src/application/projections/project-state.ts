@@ -325,15 +325,17 @@ export function applyEvent(state: ProjectState, event: EventEnvelope): void {
     }
 
     case 'team.created': {
-      const payload = event.payload as { team: Team; captain: { sessionId: string; generation: number } }
+      const payload = event.payload as { team: Team; captain: { sessionId: string; generation: number } | null }
       state.teams.set(payload.team.id, payload.team)
-      state.captains.set(payload.team.id, {
-        teamId: payload.team.id,
-        sessionId: payload.captain.sessionId,
-        generation: payload.captain.generation,
-        reason: 'initial',
-        assignedAt: event.occurredAt,
-      })
+      if (payload.captain !== null) {
+        state.captains.set(payload.team.id, {
+          teamId: payload.team.id,
+          sessionId: payload.captain.sessionId,
+          generation: payload.captain.generation,
+          reason: 'initial',
+          assignedAt: event.occurredAt,
+        })
+      }
       return
     }
     case 'team.updated': {
