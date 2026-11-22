@@ -171,10 +171,42 @@ function findTab(node: unknown, label: string): ElementLike | null {
   return findTab(element.children ?? element.props?.children ?? null, label)
 }
 
+/** 在渲染树里找文本含 label 的按钮（不限 role=tab）。 */
+function findButton(node: unknown, label: string): ElementLike | null {
+  if (Array.isArray(node)) {
+    for (const item of node) {
+      const found = findButton(item, label)
+      if (found !== null) return found
+    }
+    return null
+  }
+  if (node === null || typeof node !== 'object') return null
+  const element = node as ElementLike
+  if (element.type === 'button' && textOf(element.children ?? element.props.children).includes(label)) return element
+  return findButton(element.children ?? element.props.children ?? null, label)
+}
+
+/** 按 placeholder 找输入框。 */
+function findByPlaceholder(node: unknown, placeholder: string): ElementLike | null {
+  if (Array.isArray(node)) {
+    for (const item of node) {
+      const found = findByPlaceholder(item, placeholder)
+      if (found !== null) return found
+    }
+    return null
+  }
+  if (node === null || typeof node !== 'object') return null
+  const element = node as ElementLike
+  if (element.props?.placeholder === placeholder) return element
+  return findByPlaceholder(element.children ?? element.props?.children ?? null, placeholder)
+}
+
 interface Harness {
   view: AnyComponent
   panel: AnyComponent
   calls: string[]
+  writes: string[]
+  writeBody: Record<string, unknown> | null
   restore: () => void
 }
 
@@ -217,10 +249,22 @@ function loadClient(data: Record<string, unknown>): Harness {
   assert.ok(panel !== undefined, '缺左栏 main 面板组件')
 
   const calls: string[] = []
+  const writes: string[] = []
+  let writeBody: Record<string, unknown> | null = null
   const original = globalThis.fetch
-  globalThis.fetch = (async (input: unknown) => {
+  globalThis.fetch = (async (input: unknown, init?: { body?: string }) => {
     const url = String(input)
     const method = url.slice(url.lastIndexOf('__myteam/') + '__myteam/'.length).split('?')[0] ?? ''
+    if (method.startsWith('write/')) {
+      const name = method.slice('write/'.length)
+      writes.push(name)
+      writeBody = init?.body === undefined ? null : (JSON.parse(init.body) as Record<string, unknown>)
+      return {
+        status: 200,
+        text: async () =>
+          JSON.stringify({ ok: true, data: { method: name, operationId: 'op_new', committed: { task: { id: 'task_new', status: 'ready' } } } }),
+      }
+    }
     calls.push(method)
     const payload = method in data ? data[method] : undefined
     if (payload === undefined) {
@@ -229,7 +273,18 @@ function loadClient(data: Record<string, unknown>): Harness {
     return { status: 200, text: async () => JSON.stringify({ ok: true, data: payload }) }
   }) as typeof fetch
 
-  return { view: view!, panel: panel!, calls, restore: () => { globalThis.fetch = original } }
+  return {
+    view: view!,
+    panel: panel!,
+    calls,
+    writes,
+    get writeBody() {
+      return writeBody
+    },
+    restore: () => {
+      globalThis.fetch = original
+    },
+  }
 }
 
 const EMPTY: Record<string, unknown> = {
@@ -249,6 +304,16 @@ const EMPTY: Record<string, unknown> = {
 
 const FILLED: Record<string, unknown> = {
   ...EMPTY,
+  overview: {
+    name: '示例视图',
+    totals: { all: 1, done: 0, blocked: 0, review: 1 },
+    attention: { review: 1, blocked: 0, unknownEffects: 0 },
+    teams: [
+      { id: 'team_1', name: '甲队', status: 'active', members: 1, tasks: 1, captain: { sessionId: 'ses_captain_1', generation: 1 } },
+    ],
+    graphRevision: 4,
+    observedProjectSeq: 9,
+  },
   board: {
     columns: [
       {
@@ -406,5 +471,41 @@ test('左栏全局库五栏：两种数据下都能渲染，且不带会话也�
     await clickThrough(filled.panel, { ctx: {} }, GLOBAL_TABS_FILLED, '所有文件都读得懂')
   } finally {
     filled.restore()
+  }
+})
+
+test('任务栏「新任务」：填标题提交 → 只发一次 taskCreate，且带 confirm: true', async () => {
+  const harness = loadClient(FILLED)
+  try {
+    let tree = await mount(harness.view, { sessionId: 'ses_1' })
+
+    const tasksTab = findTab(tree, '任务')
+    assert.ok(tasksTab !== null, '缺「任务」栏')
+    ;(tasksTab!.props.onClick as () => void)()
+    tree = await mount(harness.view, { sessionId: 'ses_1' })
+
+    const openForm = findButton(tree, '新任务')
+    assert.ok(openForm !== null, '任务栏缺「新任务」按钮')
+    ;(openForm!.props.onClick as () => void)()
+    tree = await mount(harness.view, { sessionId: 'ses_1' })
+
+    const titleInput = findByPlaceholder(tree, '任务标题')
+    assert.ok(titleInput !== null, '表单缺标题输入框')
+    ;(titleInput!.props.onChange as (event: unknown) => void)({ target: { value: '面板建的任务' } })
+    tree = await mount(harness.view, { sessionId: 'ses_1' })
+
+    const create = findButton(tree, '创建')
+    assert.ok(create !== null, '表单缺「创建」按钮')
+    ;(create!.props.onClick as () => void)()
+    tree = await mount(harness.view, { sessionId: 'ses_1' })
+
+    assert.deepEqual(harness.writes, ['taskCreate'], '一次点击只能发一次写请求')
+    assert.equal(harness.writeBody?.confirm, true, 'direct 类写动作必须带 confirm: true')
+    const params = harness.writeBody?.params as Record<string, unknown>
+    assert.equal(params.title, '面板建的任务')
+    assert.equal(params.teamId, 'team_1', '默认选第一个团队')
+    assert.ok(textOf(tree).includes('共 1 个任务'), '提交成功后表单收起、看板回到列表')
+  } finally {
+    harness.restore()
   }
 })

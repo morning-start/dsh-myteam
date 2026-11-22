@@ -87,6 +87,27 @@ window.__ModuleLoader__.load({
       return unwrap(payload)
     }
 
+    /** 调一个写通道方法。`direct` 类一次提交（带 `confirm: true`）。 */
+    async function callWrite(method, sessionId, body) {
+      const url = new URL(`__myteam/write/${method}`, document.baseURI)
+      const response = await fetch(url, {
+        method: 'POST',
+        credentials: 'same-origin',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ sessionId, ...body }),
+      })
+      const text = await response.text()
+      let payload
+      try {
+        payload = text === '' ? {} : JSON.parse(text)
+      } catch {
+        throw new Error(`myteam/write/${method} 返回了非 JSON（HTTP ${response.status}）`)
+      }
+      if (response.status === 401) throw new Error('会话未认证，请刷新页面后重试')
+      if (response.status === 403) throw new Error(payload?.error?.message ?? '这个 Host 不在信任栅栏里')
+      return unwrap(payload)
+    }
+
     /**
      * 读一份面板数据。
      * @param sessionId - 当前会话；root scope 的面板没有它时不发请求（不编造身份）。
@@ -394,13 +415,141 @@ window.__ModuleLoader__.load({
       )
     }
 
+    /**
+     * 新建任务表单（`taskCreate`，直接确认类写动作）。
+     *
+     * 为什么不弹模态：宿主没给我们弹窗层，塞一个自造遮罩会盖住会话。
+     * 就地展开一块表单，失败原因留在表单里，比 toast 更容易看清。
+     */
+    function NewTaskForm(props) {
+      const { sessionId, teams, onDone, onCancel } = props
+      const [title, setTitle] = useState('')
+      const [acceptance, setAcceptance] = useState('')
+      const [teamId, setTeamId] = useState(teams.length > 0 ? teams[0].id : '')
+      const [busy, setBusy] = useState(false)
+      const [problem, setProblem] = useState(null)
+
+      const submit = async () => {
+        if (busy) return
+        if (title.trim().length === 0) {
+          setProblem('标题不能为空')
+          return
+        }
+        if (teamId.length === 0) {
+          setProblem('先选一个团队：任务必须有主责团队')
+          return
+        }
+        setBusy(true)
+        setProblem(null)
+        try {
+          await callWrite('taskCreate', sessionId, {
+            confirm: true,
+            params: {
+              teamId,
+              title: title.trim(),
+              acceptance: acceptance
+                .split('\n')
+                .map((line) => line.trim())
+                .filter((line) => line.length > 0),
+            },
+          })
+          onDone()
+        } catch (error) {
+          setProblem(error instanceof Error ? error.message : String(error))
+        } finally {
+          setBusy(false)
+        }
+      }
+
+      return h(
+        'div',
+        { className: 'box', style: { padding: '14px 16px', margin: '0 16px 12px' } },
+        h(
+          'div',
+          { className: 'kws' },
+          teams.map((team) =>
+            h(
+              'button',
+              {
+                key: team.id,
+                type: 'button',
+                className: joinClass('btn', team.id === teamId ? 'primary' : ''),
+                style: { marginRight: 6 },
+                onClick: () => setTeamId(team.id),
+              },
+              team.name,
+            ),
+          ),
+        ),
+        teams.length === 0
+          ? h(
+              'p',
+              { className: 'muted', style: { fontSize: 12, margin: '6px 0 0' } },
+              '这个项目还没有团队：任务必须属于一个团队，先在会话里让队长建队。',
+            )
+          : null,
+        h('input', {
+          type: 'text',
+          className: 'box',
+          placeholder: '任务标题',
+          value: title,
+          style: { display: 'block', width: '100%', marginTop: 10, padding: '8px 10px', fontSize: 13 },
+          onChange: (event) => setTitle(event.target.value),
+        }),
+        h('textarea', {
+          className: 'box mono',
+          placeholder: '一行一条验收标准',
+          value: acceptance,
+          rows: 3,
+          style: { display: 'block', width: '100%', marginTop: 8, padding: '8px 10px', fontSize: 12 },
+          onChange: (event) => setAcceptance(event.target.value),
+        }),
+        problem === null
+          ? null
+          : h('p', { className: 'muted', style: { fontSize: 12, margin: '8px 0 0' } }, `没建成：${problem}`),
+        h(
+          'div',
+          { className: 'acts', style: { marginTop: 10 } },
+          h(
+            'button',
+            { type: 'button', className: 'btn primary', disabled: busy === true, onClick: () => void submit() },
+            busy === true ? '创建中…' : '创建',
+          ),
+          h('button', { type: 'button', className: 'btn', style: { marginLeft: 8 }, onClick: onCancel }, '取消'),
+        ),
+      )
+    }
+
     function TasksScreen(props) {
-      const { data, onOpenTask } = props
+      const { data, teams, sessionId, onOpenTask, onCreated } = props
+      const [creating, setCreating] = useState(false)
       const columns = Array.isArray(data.columns) ? data.columns : []
       const byStatus = new Map(columns.map((column) => [column.status, column]))
       return h(
         'div',
         { className: 'body flat' },
+        h(
+          'div',
+          { className: 'bar', style: { padding: '0 16px' } },
+          h(
+            'button',
+            { type: 'button', className: joinClass('btn', creating === true ? 'primary' : ''), onClick: () => setCreating(creating !== true) },
+            creating === true ? '收起' : '新任务',
+          ),
+          h('span', { className: 'grow' }),
+          h('span', { className: 'muted', style: { fontSize: 12 } }, `共 ${data.totals?.all ?? 0} 个任务`),
+        ),
+        creating === true
+          ? h(NewTaskForm, {
+              sessionId,
+              teams: teams ?? [],
+              onDone: () => {
+                setCreating(false)
+                if (onCreated !== undefined) onCreated()
+              },
+              onCancel: () => setCreating(false),
+            })
+          : null,
         h(
           'div',
           { className: 'board' },
@@ -852,7 +1001,14 @@ window.__ModuleLoader__.load({
       } else if (tab === 'overview') {
         body = h(Data, { data: overview, what: '项目概览' }, (data) => h(OverviewScreen, { data }))
       } else if (tab === 'tasks') {
-        body = h(Data, { data: board, what: '任务看板' }, (data) => h(TasksScreen, { data, onOpenTask: (task) => setTaskId(task.id) }))
+        body = h(Data, { data: board, what: '任务看板' }, (data) =>
+          h(TasksScreen, {
+            data,
+            teams: overview.data?.teams ?? [],
+            sessionId,
+            onOpenTask: (task) => setTaskId(task.id),
+            onCreated: () => void board.reload(),
+          }))
       } else if (tab === 'teams') {
         body = h(Data, { data: overview, what: '团队' }, () => h(TeamsScreen, { overview, sessionId }))
       } else if (tab === 'definitions') {
