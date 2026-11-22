@@ -58,4 +58,6 @@ echo [iso] DSH_HOME=%ISO%
 echo [iso] profile=iso-myteam port=%PORT%
 echo [iso] open the printed ?token= URL in a browser; Ctrl+C stops only this instance.
 echo.
-"%DSH%" --profile iso-myteam --host 127.0.0.1 --port %PORT% --no-open
+rem Optional extra CLI flags, e.g. for a cookie-injecting preview proxy:
+rem   set ISO_EXTRA_ARGS=--trusted-host 127.0.0.1:3098
+"%DSH%" --profile iso-myteam --host 127.0.0.1 --port %PORT% --no-open %ISO_EXTRA_ARGS%

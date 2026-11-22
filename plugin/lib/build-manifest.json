@@ -1,12 +1,12 @@
 {
   "schema": 1,
-  "builtAt": "2026-11-22T15:32:19.068Z",
+  "builtAt": "2026-11-22T15:43:13.638Z",
   "node": "v24.21.0",
   "entry": "./lib/composition/host.mjs",
   "modules": 62,
   "sourceHash": "3dfde8869694eab1b595f094af76de2607a9fbd8111911478e623b59d9be4888",
   "clientFile": "client/client.js",
-  "clientHash": "bb4792dd16cca149144825ec716ba4dcd1e49ffcdb7ae48b16017dc555eb3074",
+  "clientHash": "679197c5452822bc406fe81601fd71b622e6eb8e1b05db56f49449b97f11ecbf",
   "files": [
     "application/actor-resolution.ts",
     "application/bootstrap.ts",

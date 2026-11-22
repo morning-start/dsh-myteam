@@ -74,6 +74,9 @@
 [data-slot="main"] .ir .line { width: 24px; height: 1px; background: var(--dsh-line); margin: 2px 0 6px; }
 [data-slot="main"] .ir-nav { display: flex; flex-direction: column; gap: 4px; align-items: center; width: 100%; }
 [data-slot="main"] .ri { position: relative; width: 56px; height: 50px; border-radius: 10px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 3px; font-size: 12px; color: var(--mt-muted); text-decoration: none; }
+/* 宿主会给原生 button 一套底色/边框；导航轨是"透明项，只在高亮时上底色"。
+   不显式清掉的话，深色下会变成灰底浅字（实测 3.54:1，低于 4.5）。 */
+[data-slot="main"] .ri { background: transparent; border: 0; padding: 0; font: 400 12px/1.3 var(--dsh-font); cursor: pointer; }
 [data-slot="main"] .ri:hover { background: var(--dsh-hover); color: var(--dsh-fg); }
 [data-slot="main"] .ri.on { background: var(--dsh-hover); color: var(--dsh-fg); font-weight: 500; }
 [data-slot="main"] .ri .ic { width: 18px; height: 18px; }
@@ -470,3 +473,20 @@
 [data-slot="main"] .dchip { flex: none; height: 18px; padding: 0 5px; border-radius: 4px; background: var(--dsh-hover); color: var(--mt-muted); font-family: var(--dsh-font-code); font-size: 12px; display: inline-flex; align-items: center; }
 [data-slot="main"] .dchip.max { color: color-mix(in srgb, var(--mt-gate) 70%, var(--dsh-fg)); background: color-mix(in srgb, var(--mt-gate) 10%, transparent); }
 [data-slot="main"] .bar > .muted { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+/* ── 页脚动作（回到对话）：单一按钮，贴底不悬空 ───────────────────── */
+[data-slot="main"] .pane > .ft { flex: none; padding: 10px 14px; border-top: 1px solid var(--mt-line-soft); display: flex; justify-content: flex-end; }
+[data-slot="main"] .pane > .ft .btn { height: 26px; }
+
+/* ── 窄宽（宿主右栏 / 小窗 / 手机宽度）：摘要与状态条换行，禁止横向溢出 ── */
+@media (max-width: 760px) {
+  [data-slot="main"] .hd { padding: 12px 14px 0; flex-wrap: wrap; row-gap: 6px; }
+  [data-slot="main"] .hd h2 { flex-wrap: wrap; row-gap: 4px; }
+  [data-slot="main"] .hd .sub { flex-wrap: wrap; row-gap: 2px; }
+  [data-slot="main"] .hd .sub .l { white-space: normal; overflow-wrap: anywhere; }
+  [data-slot="main"] .bar { height: auto; min-height: 34px; padding: 6px 14px; flex-wrap: wrap; row-gap: 4px; align-items: flex-start; }
+  /* inline-flex 里的文本是匿名 flex 项，text-overflow 不生效 → 窄宽下改成 inline-block 才能出省略号 */
+  [data-slot="main"] .bar .st-chip { display: inline-block; line-height: 18px; max-width: 100%; min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+  [data-slot="main"] .bar > .muted { flex: 1 1 100%; white-space: normal; overflow: visible; }
+  [data-slot="main"] .body { padding-left: 14px; padding-right: 14px; }
+}

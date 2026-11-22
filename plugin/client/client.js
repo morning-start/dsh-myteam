@@ -1531,8 +1531,7 @@ window.__ModuleLoader__.load({
             note: '全局资产与团队运行态分开',
           }),
           body,
-          h('div', { className: 'layer' }, h('b', null, '回到对话'), h('i', { className: 'rule' })),
-          h('button', { type: 'button', className: 'btn', onClick: back }, '回到对话'),
+          h('div', { className: 'ft' }, h('button', { type: 'button', className: 'btn', onClick: back }, '回到对话')),
         ],
       })
     }
