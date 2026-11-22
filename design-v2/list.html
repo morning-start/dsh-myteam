@@ -1,0 +1,255 @@
+﻿<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=1280">
+<meta name="dsh-design" content="dshplugin 1280x800">
+<title>列表 · myteam</title>
+<link rel="stylesheet" href="dsh-shell.css">
+<link rel="stylesheet" href="myteam.css">
+<!-- 外框（DSH 插件 · 左侧栏入口）：只改 data-slot 里面，别动外框的结构、文字和 dsh-shell.css -->
+</head>
+<body>
+<div class="dsh-app" data-frame="dsh/sidebar">
+  <aside class="dsh-side">
+    <div class="dsh-brand"><div class="dsh-logo">deepseek<span class="dsh-logo-tag">HARNESS</span></div><div class="dsh-iconbtn"><svg class="dsh-i" viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M9 3v18"/></svg></div></div>
+    <div class="dsh-new"><svg class="dsh-i" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 8v8M8 12h8"/></svg>新会话</div>
+    <nav class="dsh-nav">
+      <div class="dsh-row"><svg class="dsh-i" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2.5l3 3-3 3-3-3zM18.5 9l3 3-3 3-3-3zM5.5 9l3 3-3 3-3-3zM12 15.5l3 3-3 3-3-3z"/></svg>插件</div>
+      <div class="dsh-row"><svg class="dsh-i" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>自动化任务</div>
+      <div class="dsh-row on"><span data-slot="entry-icon"><svg class="dsh-i" viewBox="0 0 24 24" aria-hidden="true"><circle cx="9" cy="8" r="3"/><path d="M3.5 19a5.5 5.5 0 0 1 11 0"/><path d="M15.5 5.8a3 3 0 0 1 0 5.4"/><path d="M17 14a4.5 4.5 0 0 1 3.5 5"/></svg></span><span data-slot="entry-label">团队</span></div>
+      <div class="dsh-row"><svg class="dsh-i" viewBox="0 0 24 24" aria-hidden="true"><rect x="4" y="4" width="6" height="6" rx="1.5"/><rect x="14" y="4" width="6" height="6" rx="3"/><rect x="4" y="14" width="6" height="6" rx="1.5"/><rect x="14" y="14" width="6" height="6" rx="1.5"/></svg>更多</div>
+    </nav>
+    <div class="dsh-sec">工作区<div class="dsh-sec-acts"><div class="dsh-iconbtn"><svg class="dsh-i" viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="M20 20l-4-4"/></svg></div><div class="dsh-iconbtn"><svg class="dsh-i" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 8h10M18 8h2M4 16h2M10 16h10"/><circle cx="16" cy="8" r="2"/><circle cx="8" cy="16" r="2"/></svg></div><div class="dsh-iconbtn"><svg class="dsh-i" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><path d="M12 11v5M9.5 13.5h5"/></svg></div></div></div>
+    <div class="dsh-row"><span class="dsh-folder"><svg class="dsh-i" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></svg></span>我的项目</div>
+    <div class="dsh-sess">整理会议记录<span class="dsh-time">2 小时</span></div>
+    <div class="dsh-sess">新会话</div>
+    <div class="dsh-acct"><div class="dsh-avatar">我</div>我的账号</div>
+  </aside>
+  <main class="dsh-main">
+    <div class="dsh-bar"><div class="dsh-iconbtn dsh-corner"><svg class="dsh-i" viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M15 3v18"/></svg></div></div>
+    <div data-slot="main">
+      <div class="wt">
+        <aside class="ir">
+          <a class="team" href="teams.html" title="结算页模块化 · 切换团队">结</a>
+          <div class="line"></div>
+          <nav class="ir-nav">
+            <a class="ri on" href="board.html" title="任务"><svg class="ic" viewBox="0 0 24 24"><rect x="3" y="4" width="5" height="16" rx="1.5"/><rect x="10" y="4" width="5" height="11" rx="1.5"/><rect x="17" y="4" width="4" height="7" rx="1.5"/></svg><span>任务</span><i class="bdg"></i></a>
+            <a class="ri" href="roles.html" title="角色与成员"><svg class="ic" viewBox="0 0 24 24"><circle cx="9" cy="8" r="3"/><path d="M3 20a6 6 0 0 1 12 0"/><path d="M16 5.5a3 3 0 0 1 0 5M17 14a6 6 0 0 1 4 6"/></svg><span>角色</span></a>
+            <a class="ri" href="knowledge.html" title="知识库"><svg class="ic" viewBox="0 0 24 24"><path d="M4 5.5A2.5 2.5 0 0 1 6.5 3H19v16H6.5A2.5 2.5 0 0 0 4 21.5z"/><path d="M8 7h7M8 11h5"/></svg><span>知识</span></a>
+            <a class="ri" href="audit.html" title="审计"><svg class="ic" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg><span>审计</span></a>
+            <a class="ri" href="settings.html" title="设置"><svg class="ic" viewBox="0 0 24 24"><path d="M4 8h10M18 8h2M4 16h2M10 16h10"/><circle cx="16" cy="8" r="2"/><circle cx="8" cy="16" r="2"/></svg><span>设置</span></a>
+          </nav>
+        </aside>
+
+        <div class="pane">
+          <div class="hd">
+            <div class="hd-l">
+              <h2>结算页模块化<span class="tag"><span class="dot run"></span>进行中</span><button class="btn"><svg class="ic s" viewBox="0 0 24 24"><path d="M4 7h9M4 17h9M15 7h5M18 4v6M15 14h5M12 11v6"/></svg>切换团队</button></h2>
+              <p class="sub">
+                <span class="l">17 个任务</span><i class="sep"></i>
+                <span class="l">3 个在跑</span><i class="sep"></i>
+                <span class="l">3 条待你裁决</span><i class="sep"></i>
+                <span class="l">累计 1.86M token</span>
+                <span class="tr">把结算页拆成独立模块包，迁出旧目录并锁定 v0.2 对外契约</span>
+              </p>
+            </div>
+            <div class="hd-r">
+              <div class="presence" aria-label="在册成员">
+                <span class="av sm" title="何 · 队长 · 规划中">何</span>
+                <span class="av sm" title="林 · 实现者 · 正在跑 t7">林</span>
+                <span class="av sm" title="周 · 实现者 · 正在跑 t6">周</span>
+                <span class="av sm" title="陈 · 审查者 · 2 条待裁决">陈</span>
+                <span class="av sm" title="苏 · 需求验证">苏</span>
+                <span class="av sm" title="赵 · api-reviewer · 正在跑 v2">赵</span>
+                <span class="lbl">3 在跑</span>
+              </div>
+              <button class="ibtn" title="刷新"><svg class="ic" viewBox="0 0 24 24"><path d="M20 11a8 8 0 1 0-2 5.5"/><path d="M20 5v6h-6"/></svg></button>
+              <button class="ibtn" title="更多"><svg class="ic" viewBox="0 0 24 24"><circle cx="5" cy="12" r="1"/><circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/></svg></button>
+            </div>
+          </div>
+
+          <div class="bar">
+            <div class="seg">
+              <a href="board.html">看板</a>
+              <a href="list.html" class="on">列表</a>
+              <a href="lanes.html">流程</a>
+              <a href="dag.html">依赖图</a>
+            </div>
+            <span class="grow"></span>
+            <label class="field w"><svg class="ic s" viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="M20 20l-4-4"/></svg><input placeholder="搜索任务号、标题" aria-label="搜索任务"></label>
+            <button class="btn"><svg class="ic s" viewBox="0 0 24 24"><path d="M4 6h16M7 12h10M10 18h4"/></svg>筛选</button>
+            <button class="btn primary"><svg class="ic s" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg>新任务</button>
+          </div>
+
+          <div class="body">
+            <div class="grp-h"><span class="dot run"></span><span class="nm">进行中</span><span class="n">3</span><span class="hint">2 个成员在跑 · 最近活动 3 分钟前</span></div>
+            <a class="row" href="detail.html">
+              <span class="id">t7</span>
+              <div class="ti"><div class="t1"><span class="pri p0">P0</span>抽结算服务边界与接口草案</div><div class="t2">解锁后置 t6 · 3 分钟前有进展</div></div>
+              <span class="muted">实现者</span>
+              <span class="who"><span class="av">林</span><span class="nm">impl-a</span></span>
+              <span class="gates"><i class="gd p"></i><i class="gd p"></i><i class="gd"></i></span>
+              <span class="tok">128k</span>
+              <span class="more">⋯</span>
+            </a>
+            <a class="row" href="detail.html">
+              <span class="id">t6</span>
+              <div class="ti"><div class="t1"><span class="pri">P1</span>结算页 UI 迁移到模块包</div><div class="t2">依赖 t7 · 已改 14 个文件</div></div>
+              <span class="muted">实现者</span>
+              <span class="who"><span class="av">周</span><span class="nm">impl-b</span></span>
+              <span class="gates"><i class="gd p"></i><i class="gd"></i><i class="gd"></i></span>
+              <span class="tok">96k</span>
+              <span class="more">⋯</span>
+            </a>
+            <a class="row" href="detail.html">
+              <span class="id">v2</span>
+              <div class="ti"><div class="t1"><span class="pri">P1</span>锁定 v0.2 对外契约基线</div><div class="t2">与 t1 契约对齐 · 待补兼容矩阵</div></div>
+              <span class="muted">api-reviewer</span>
+              <span class="who"><span class="av">赵</span><span class="nm">reviewer-c</span></span>
+              <span class="gates"><i class="gd"></i><i class="gd"></i></span>
+              <span class="tok">41k</span>
+              <span class="more">⋯</span>
+            </a>
+
+            <div class="grp-h"><span class="dot gate"></span><span class="nm">门禁</span><span class="n">3</span><span class="hint">3 条等你裁决</span></div>
+            <a class="row" href="detail.html">
+              <span class="id">t4</span>
+              <div class="ti"><div class="t1"><span class="pri">P1</span>替换调用点跑通冒烟</div><div class="t2">命令门禁 1 次重跑 · 证据 2 条</div></div>
+              <span class="muted">审查者</span>
+              <span class="who"><span class="av">陈</span><span class="nm">reviewer-a</span></span>
+              <span class="gates"><i class="gd p"></i><i class="gd p"></i><i class="gd p"></i><i class="gd w"></i></span>
+              <span class="tok">74k</span>
+              <span class="more">⋯</span>
+            </a>
+            <a class="row" href="detail.html">
+              <span class="id">t3</span>
+              <div class="ti"><div class="t1"><span class="pri">P2</span>移除旧结算组件目录</div><div class="t2">引用 0 处残留 · 等你确认删除范围</div></div>
+              <span class="muted">需求验证</span>
+              <span class="who"><span class="av">苏</span><span class="nm">verifier-a</span></span>
+              <span class="gates"><i class="gd p"></i><i class="gd p"></i></span>
+              <span class="tok">38k</span>
+              <span class="more">⋯</span>
+            </a>
+            <a class="row" href="detail.html">
+              <span class="id">v6</span>
+              <div class="ti"><div class="t1"><span class="pri">P1</span>v0.2 changelog 复核</div><div class="t2">改动 14 个文件 · 缺 breaking 标注</div></div>
+              <span class="muted">审查者</span>
+              <span class="who"><span class="av">陈</span><span class="nm">reviewer-a</span></span>
+              <span class="gates"><i class="gd p"></i><i class="gd p"></i><i class="gd"></i></span>
+              <span class="tok">12k</span>
+              <span class="more">⋯</span>
+            </a>
+
+            <div class="grp-h"><span class="dot"></span><span class="nm">就绪</span><span class="n">3</span><span class="hint">依赖已解锁，可分配</span></div>
+            <a class="row" href="detail.html">
+              <span class="id">t5</span>
+              <div class="ti"><div class="t1"><span class="pri">P1</span>旧调用点替换与灰度开关</div><div class="t2">前置 t4 未过 · 暂不分配</div></div>
+              <span class="muted">审查者</span>
+              <span class="who"><span class="av">陈</span><span class="nm">reviewer-a</span></span>
+              <span class="gates"><i class="gd"></i><i class="gd"></i><i class="gd"></i></span>
+              <span class="tok">—</span>
+              <span class="more">⋯</span>
+            </a>
+            <a class="row" href="detail.html">
+              <span class="id">t8</span>
+              <div class="ti"><div class="t1"><span class="pri">P2</span>补 12 条结算回归用例</div><div class="t2">t9 已解锁 · 用例清单待补</div></div>
+              <span class="muted">需求验证</span>
+              <span class="who"><span class="av">苏</span><span class="nm">verifier-a</span></span>
+              <span class="gates"><i class="gd"></i><i class="gd"></i></span>
+              <span class="tok">—</span>
+              <span class="more">⋯</span>
+            </a>
+            <a class="row" href="detail.html">
+              <span class="id">v3</span>
+              <div class="ti"><div class="t1"><span class="pri">P2</span>兼容性矩阵比对</div><div class="t2">需先锁定 v2 契约基线</div></div>
+              <span class="muted">api-reviewer</span>
+              <span class="who"><span class="av">赵</span><span class="nm">reviewer-c</span></span>
+              <span class="gates"><i class="gd"></i><i class="gd"></i></span>
+              <span class="tok">—</span>
+              <span class="more">⋯</span>
+            </a>
+
+            <div class="grp-h"><span class="dot idle"></span><span class="nm">待规划</span><span class="n">3</span><span class="hint">等队长拆解或补验收标准</span></div>
+            <a class="row" href="detail.html">
+              <span class="id">v1</span>
+              <div class="ti"><div class="t1"><span class="pri">P2</span>评审口径对齐</div><div class="t2">缺验收标准（AC 必须可检验）</div></div>
+              <span class="muted">需求验证</span>
+              <span class="who"><span class="nm muted">未指派</span></span>
+              <span class="gates"><i class="gd"></i></span>
+              <span class="tok">—</span>
+              <span class="more">⋯</span>
+            </a>
+            <a class="row" href="detail.html">
+              <span class="id">v4</span>
+              <div class="ti"><div class="t1"><span class="pri">P2</span>评审范围与分组口径</div><div class="t2">等队长拆解</div></div>
+              <span class="muted">api-reviewer</span>
+              <span class="who"><span class="nm muted">未指派</span></span>
+              <span class="gates"><i class="gd"></i></span>
+              <span class="tok">—</span>
+              <span class="more">⋯</span>
+            </a>
+            <a class="row" href="detail.html">
+              <span class="id">v5</span>
+              <div class="ti"><div class="t1"><span class="pri p0">P0</span>破坏性变更清单</div><div class="t2">需人工补范围后提交计划</div></div>
+              <span class="muted">—</span>
+              <span class="who"><span class="nm muted">未指派</span></span>
+              <span class="gates"><i class="gd"></i></span>
+              <span class="tok">—</span>
+              <span class="more">⋯</span>
+            </a>
+
+            <div class="grp-h"><span class="dot run"></span><span class="nm">已完成</span><span class="n">5</span><span class="hint">证据与产物已归档</span></div>
+            <a class="row" href="detail.html">
+              <span class="id">t0</span>
+              <div class="ti"><div class="t1"><span class="pri">P1</span>摸清结算页现状与依赖</div><div class="t2">4 条证据 · 产物 docs/结算页现状.md</div></div>
+              <span class="muted">需求验证</span>
+              <span class="who"><span class="av">苏</span><span class="nm">verifier-a</span></span>
+              <span class="gates"><i class="gd p"></i><i class="gd p"></i></span>
+              <span class="tok">212k</span>
+              <span class="more">⋯</span>
+            </a>
+            <a class="row" href="detail.html">
+              <span class="id">t1</span>
+              <div class="ti"><div class="t1"><span class="pri p0">P0</span>确定模块包对外 API 契约</div><div class="t2">3 条证据 · 产物 docs/契约.md</div></div>
+              <span class="muted">实现者</span>
+              <span class="who"><span class="av">林</span><span class="nm">impl-a</span></span>
+              <span class="gates"><i class="gd p"></i><i class="gd p"></i><i class="gd p"></i></span>
+              <span class="tok">186k</span>
+              <span class="more">⋯</span>
+            </a>
+            <a class="row" href="detail.html">
+              <span class="id">t2</span>
+              <div class="ti"><div class="t1"><span class="pri">P1</span>梳理现有调用点清单</div><div class="t2">2 条证据 · 28 处调用点</div></div>
+              <span class="muted">实现者</span>
+              <span class="who"><span class="av">周</span><span class="nm">impl-b</span></span>
+              <span class="gates"><i class="gd p"></i><i class="gd p"></i></span>
+              <span class="tok">97k</span>
+              <span class="more">⋯</span>
+            </a>
+            <a class="row" href="detail.html">
+              <span class="id">t9</span>
+              <div class="ti"><div class="t1"><span class="pri">P2</span>CI 增加构建产物校验</div><div class="t2">2 条证据 · 流水线已绿</div></div>
+              <span class="muted">实现者</span>
+              <span class="who"><span class="av">周</span><span class="nm">impl-b</span></span>
+              <span class="gates"><i class="gd p"></i><i class="gd p"></i></span>
+              <span class="tok">83k</span>
+              <span class="more">⋯</span>
+            </a>
+            <a class="row" href="detail.html">
+              <span class="id">t11</span>
+              <div class="ti"><div class="t1"><span class="pri">P2</span>补 README 与迁移说明</div><div class="t2">1 条证据 · 产物 README.md</div></div>
+              <span class="muted">审查者</span>
+              <span class="who"><span class="av">陈</span><span class="nm">reviewer-a</span></span>
+              <span class="gates"><i class="gd p"></i></span>
+              <span class="tok">64k</span>
+              <span class="more">⋯</span>
+            </a>
+          </div>
+        </div>
+      </div>
+    </div>
+  </main>
+</div>
+</body>
+</html>

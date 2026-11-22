@@ -1,0 +1,129 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=1280">
+<meta name="dsh-design" content="dshplugin 1280x800">
+<title>团队 · myteam</title>
+<link rel="stylesheet" href="dsh-shell.css">
+<link rel="stylesheet" href="myteam.css">
+<!-- 外框（DSH 插件 · 左侧栏入口）：只改 data-slot 里面，别动外框的结构、文字和 dsh-shell.css -->
+</head>
+<body>
+<div class="dsh-app" data-frame="dsh/sidebar">
+  <aside class="dsh-side">
+    <div class="dsh-brand"><div class="dsh-logo">deepseek<span class="dsh-logo-tag">HARNESS</span></div><div class="dsh-iconbtn"><svg class="dsh-i" viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M9 3v18"/></svg></div></div>
+    <div class="dsh-new"><svg class="dsh-i" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 8v8M8 12h8"/></svg>新会话</div>
+    <nav class="dsh-nav">
+      <div class="dsh-row"><svg class="dsh-i" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2.5l3 3-3 3-3-3zM18.5 9l3 3-3 3-3-3zM5.5 9l3 3-3 3-3-3zM12 15.5l3 3-3 3-3-3z"/></svg>插件</div>
+      <div class="dsh-row"><svg class="dsh-i" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>自动化任务</div>
+      <div class="dsh-row on"><span data-slot="entry-icon"><svg class="dsh-i" viewBox="0 0 24 24" aria-hidden="true"><circle cx="9" cy="8" r="3"/><path d="M3.5 19a5.5 5.5 0 0 1 11 0"/><path d="M15.5 5.8a3 3 0 0 1 0 5.4"/><path d="M17 14a4.5 4.5 0 0 1 3.5 5"/></svg></span><span data-slot="entry-label">团队</span></div>
+      <div class="dsh-row"><svg class="dsh-i" viewBox="0 0 24 24" aria-hidden="true"><rect x="4" y="4" width="6" height="6" rx="1.5"/><rect x="14" y="4" width="6" height="6" rx="3"/><rect x="4" y="14" width="6" height="6" rx="1.5"/><rect x="14" y="14" width="6" height="6" rx="1.5"/></svg>更多</div>
+    </nav>
+    <div class="dsh-sec">工作区<div class="dsh-sec-acts"><div class="dsh-iconbtn"><svg class="dsh-i" viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="M20 20l-4-4"/></svg></div><div class="dsh-iconbtn"><svg class="dsh-i" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 8h10M18 8h2M4 16h2M10 16h10"/><circle cx="16" cy="8" r="2"/><circle cx="8" cy="16" r="2"/></svg></div><div class="dsh-iconbtn"><svg class="dsh-i" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><path d="M12 11v5M9.5 13.5h5"/></svg></div></div></div>
+    <div class="dsh-row"><span class="dsh-folder"><svg class="dsh-i" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></svg></span>我的项目</div>
+    <div class="dsh-sess">整理会议记录<span class="dsh-time">2 小时</span></div>
+    <div class="dsh-sess">新会话</div>
+    <div class="dsh-acct"><div class="dsh-avatar">我</div>我的账号</div>
+  </aside>
+  <main class="dsh-main">
+    <div class="dsh-bar"><div class="dsh-iconbtn dsh-corner"><svg class="dsh-i" viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M15 3v18"/></svg></div></div>
+    <div data-slot="main">
+      <div class="wt">
+        <div class="pane">
+          <div class="hd">
+            <div class="hd-l">
+              <h2>团队<span class="n">2 个活跃</span></h2>
+              <p class="sub">
+                <span class="l">1 个草稿待裁决</span><i class="sep"></i>
+                <span class="l">1 个归档</span><i class="sep"></i>
+                <span class="l">累计 3.1M token</span>
+                <span class="tr">切换团队只换视图，后台成员继续跑；解散是唯一真删数据的动作</span>
+              </p>
+            </div>
+            <div class="hd-r">
+              <button class="ibtn" title="刷新"><svg class="ic" viewBox="0 0 24 24"><path d="M20 11a8 8 0 1 0-2 5.5"/><path d="M20 5v6h-6"/></svg></button>
+              <button class="ibtn" title="更多"><svg class="ic" viewBox="0 0 24 24"><circle cx="5" cy="12" r="1"/><circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/></svg></button>
+            </div>
+          </div>
+
+          <div class="bar">
+            <div class="seg">
+              <a href="teams.html" class="on">全部 3</a>
+              <a href="teams.html">进行中 1</a>
+              <a href="teams.html">草稿 1</a>
+              <a href="teams.html">归档 1</a>
+            </div>
+            <span class="grow"></span>
+            <label class="field w"><svg class="ic s" viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="M20 20l-4-4"/></svg><input placeholder="搜索团队、角色" aria-label="搜索团队"></label>
+            <button class="btn"><svg class="ic s" viewBox="0 0 24 24"><path d="M12 3v12M8 11l4 4 4-4"/><path d="M4 17v2a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-2"/></svg>导入</button>
+            <a class="btn primary" href="new-team.html" style="text-decoration:none"><svg class="ic s" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg>新建团队</a>
+          </div>
+
+          <div class="body pad">
+            <div class="layer"><b>活跃</b><span>2</span><i class="rule"></i></div>
+            <div class="tgrid">
+              <a class="tcard" href="board.html">
+                <div class="tcard-h">
+                  <span class="dot run"></span>
+                  <span class="nm">结算页模块化</span>
+                  <span class="tag">进行中</span>
+                  <svg class="ic go" viewBox="0 0 24 24"><path d="M9 6l6 6-6 6"/></svg>
+                </div>
+                <div class="goal">把结算页拆成独立模块包，迁出旧目录并锁定 v0.2 对外契约</div>
+                <div class="stats"><b>17</b> 任务<i class="sep"></i><b>6</b> 成员<i class="sep"></i>3 个在跑<i class="sep"></i><b>1.86M</b> token</div>
+                <div class="foot">
+                  <span class="av sm">何</span><span class="av sm">林</span><span class="av sm">周</span><span class="av sm">陈</span><span class="av sm">苏</span><span class="av sm">赵</span>
+                  <span class="n">3 条待你裁决</span>
+                </div>
+              </a>
+
+              <a class="tcard" href="board.html">
+                <div class="tcard-h">
+                  <span class="dot gate"></span>
+                  <span class="nm">上线检查清单</span>
+                  <span class="tag">草稿</span>
+                  <svg class="ic go" viewBox="0 0 24 24"><path d="M9 6l6 6-6 6"/></svg>
+                </div>
+                <div class="goal">把发版前 9 项检查拆给角色跑一遍，逐项留证据</div>
+                <div class="stats"><b>9</b> 任务<i class="sep"></i><b>4</b> 成员<i class="sep"></i>尚未开跑<i class="sep"></i><b>240k</b> token</div>
+                <div class="foot">
+                  <span class="av sm">何</span><span class="av sm">许</span><span class="av sm">方</span><span class="av sm">魏</span>
+                  <span class="n">计划已暂存 · 等你裁决</span>
+                </div>
+              </a>
+            </div>
+
+            <div class="layer"><b>归档</b><span>1</span><i class="rule"></i></div>
+            <div class="list">
+              <a class="arch" href="audit.html">
+                <svg class="ic s" viewBox="0 0 24 24"><path d="M4 7a2 2 0 0 1 2-2h12a2 2 0 0 1 2 2v12H6a2 2 0 0 1-2-2z"/><path d="M8 3v4M16 3v4"/></svg>
+                <span class="nm">支付页重构</span>
+                <span>08-14 归档 · 12 任务 · 5 个完成 · 42 个门禁事件</span>
+                <span class="go">回放 →</span>
+              </a>
+            </div>
+
+            <div class="layer"><b>库</b><span>项目层 + 全局层</span><i class="rule"></i></div>
+            <div class="grid c3">
+              <a class="rc" href="roles.html">
+                <div class="rc-h"><svg class="ic" viewBox="0 0 24 24"><circle cx="9" cy="8" r="3"/><path d="M3 20a6 6 0 0 1 12 0"/></svg><span class="nm">角色库</span><span class="cnt">13</span></div>
+                <div class="desc">内置 6 · 全局 3 · 项目 4，角色决定工具面与门禁链</div>
+              </a>
+              <a class="rc" href="roles.html">
+                <div class="rc-h"><svg class="ic" viewBox="0 0 24 24"><path d="M4 5h16M4 12h16M4 19h10"/></svg><span class="nm">预设</span><span class="cnt">4</span></div>
+                <div class="desc">一套名册 + 看板列 + 门禁链，建团队时直接套用</div>
+              </a>
+              <a class="rc" href="roles.html">
+                <div class="rc-h"><svg class="ic" viewBox="0 0 24 24"><path d="M12 3l2.5 5.5L20 9l-4 4 1 6-5-3-5 3 1-6-4-4 5.5-.5z"/></svg><span class="nm">技能与 MCP</span><span class="cnt">9 · 3</span></div>
+                <div class="desc">技能 9 个、已连接 MCP 3 个；可见性按角色收窄</div>
+              </a>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </main>
+</div>
+</body>
+</html>

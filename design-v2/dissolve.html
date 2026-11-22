@@ -1,0 +1,145 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=1280">
+<meta name="dsh-design" content="dshplugin 1280x800">
+<title>解散确认 · myteam</title>
+<link rel="stylesheet" href="dsh-shell.css">
+<link rel="stylesheet" href="myteam.css">
+<!-- 外框（DSH 插件 · 左侧栏入口）：只改 data-slot 里面，别动外框的结构、文字和 dsh-shell.css -->
+</head>
+<body>
+<div class="dsh-app" data-frame="dsh/sidebar">
+  <aside class="dsh-side">
+    <div class="dsh-brand"><div class="dsh-logo">deepseek<span class="dsh-logo-tag">HARNESS</span></div><div class="dsh-iconbtn"><svg class="dsh-i" viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M9 3v18"/></svg></div></div>
+    <div class="dsh-new"><svg class="dsh-i" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 8v8M8 12h8"/></svg>新会话</div>
+    <nav class="dsh-nav">
+      <div class="dsh-row"><svg class="dsh-i" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2.5l3 3-3 3-3-3zM18.5 9l3 3-3 3-3-3zM5.5 9l3 3-3 3-3-3zM12 15.5l3 3-3 3-3-3z"/></svg>插件</div>
+      <div class="dsh-row"><svg class="dsh-i" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>自动化任务</div>
+      <div class="dsh-row on"><span data-slot="entry-icon"><svg class="dsh-i" viewBox="0 0 24 24" aria-hidden="true"><circle cx="9" cy="8" r="3"/><path d="M3.5 19a5.5 5.5 0 0 1 11 0"/><path d="M15.5 5.8a3 3 0 0 1 0 5.4"/><path d="M17 14a4.5 4.5 0 0 1 3.5 5"/></svg></span><span data-slot="entry-label">团队</span></div>
+      <div class="dsh-row"><svg class="dsh-i" viewBox="0 0 24 24" aria-hidden="true"><rect x="4" y="4" width="6" height="6" rx="1.5"/><rect x="14" y="4" width="6" height="6" rx="3"/><rect x="4" y="14" width="6" height="6" rx="1.5"/><rect x="14" y="14" width="6" height="6" rx="1.5"/></svg>更多</div>
+    </nav>
+    <div class="dsh-sec">工作区<div class="dsh-sec-acts"><div class="dsh-iconbtn"><svg class="dsh-i" viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="M20 20l-4-4"/></svg></div><div class="dsh-iconbtn"><svg class="dsh-i" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 8h10M18 8h2M4 16h2M10 16h10"/><circle cx="16" cy="8" r="2"/><circle cx="8" cy="16" r="2"/></svg></div><div class="dsh-iconbtn"><svg class="dsh-i" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><path d="M12 11v5M9.5 13.5h5"/></svg></div></div></div>
+    <div class="dsh-row"><span class="dsh-folder"><svg class="dsh-i" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></svg></span>我的项目</div>
+    <div class="dsh-sess">整理会议记录<span class="dsh-time">2 小时</span></div>
+    <div class="dsh-sess">新会话</div>
+    <div class="dsh-acct"><div class="dsh-avatar">我</div>我的账号</div>
+  </aside>
+  <main class="dsh-main">
+    <div class="dsh-bar"><div class="dsh-iconbtn dsh-corner"><svg class="dsh-i" viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M15 3v18"/></svg></div></div>
+    <div data-slot="main">
+      <div class="scrim">
+        <div class="modal" role="dialog" aria-modal="true" aria-labelledby="dlg-t">
+          <div class="modal-h" id="dlg-t">解散「结算页模块化」？</div>
+          <div class="modal-b">
+            这是唯一真删数据的动作，删除后无法恢复。
+            <ul class="imp">
+              <li><svg class="ic s" viewBox="0 0 24 24"><path d="M12 3l9 16H3z"/><path d="M12 9v4M12 16v.5"/></svg>5 名成员全部释放，8 个未完成任务转为 blocked</li>
+              <li><svg class="ic s" viewBox="0 0 24 24"><path d="M12 3l9 16H3z"/><path d="M12 9v4M12 16v.5"/></svg>17 条任务历史从看板移除，只剩归档里的回放</li>
+              <li><svg class="ic s" viewBox="0 0 24 24"><path d="M12 3l9 16H3z"/><path d="M12 9v4M12 16v.5"/></svg>账本 ledger.jsonl 与产物目录一并删除</li>
+              <li><svg class="ic s" viewBox="0 0 24 24"><path d="M12 3l9 16H3z"/><path d="M12 9v4M12 16v.5"/></svg>在跑的 2 个成员会先排空再释放（不会立刻中断）</li>
+            </ul>
+            <div style="margin-top:14px; font-size:12px">输入团队名才能继续：<b class="mono" style="color:var(--dsh-fg)">结算页模块化</b></div>
+            <input class="input" placeholder="输入团队名" aria-label="输入团队名确认" style="margin-top:6px">
+          </div>
+          <div class="modal-f">
+            <span class="l">只想停下就用归档</span>
+            <a class="btn" href="settings.html" style="text-decoration:none">取消</a>
+            <a class="btn" href="settings.html" style="text-decoration:none">归档团队</a>
+            <button class="btn danger" aria-disabled="true" disabled>解散</button>
+          </div>
+        </div>
+      </div>
+      <div class="wt">
+        <aside class="ir">
+          <a class="team" href="teams.html" title="结算页模块化 · 切换团队">结</a>
+          <div class="line"></div>
+          <nav class="ir-nav">
+            <a class="ri" href="board.html" title="任务"><svg class="ic" viewBox="0 0 24 24"><rect x="3" y="4" width="5" height="16" rx="1.5"/><rect x="10" y="4" width="5" height="11" rx="1.5"/><rect x="17" y="4" width="4" height="7" rx="1.5"/></svg><span>任务</span><i class="bdg"></i></a>
+            <a class="ri" href="roles.html" title="角色与成员"><svg class="ic" viewBox="0 0 24 24"><circle cx="9" cy="8" r="3"/><path d="M3 20a6 6 0 0 1 12 0"/><path d="M16 5.5a3 3 0 0 1 0 5M17 14a6 6 0 0 1 4 6"/></svg><span>角色</span></a>
+            <a class="ri" href="knowledge.html" title="知识库"><svg class="ic" viewBox="0 0 24 24"><path d="M4 5.5A2.5 2.5 0 0 1 6.5 3H19v16H6.5A2.5 2.5 0 0 0 4 21.5z"/><path d="M8 7h7M8 11h5"/></svg><span>知识</span></a>
+            <a class="ri" href="audit.html" title="审计"><svg class="ic" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg><span>审计</span></a>
+            <a class="ri on" href="settings.html" title="设置"><svg class="ic" viewBox="0 0 24 24"><path d="M4 8h10M18 8h2M4 16h2M10 16h10"/><circle cx="16" cy="8" r="2"/><circle cx="8" cy="16" r="2"/></svg><span>设置</span></a>
+          </nav>
+        </aside>
+
+        <div class="pane">
+          <div class="hd">
+            <div class="hd-l">
+              <h2>结算页模块化<span class="tag"><span class="dot run"></span>进行中</span></h2>
+              <p class="sub">
+                <span class="l">配置来源 3 层</span><i class="sep"></i>
+                <span class="l">状态目录 1 个</span><i class="sep"></i>
+                <span class="l">账本 128 条</span>
+                <span class="tr">这里的值只影响这个团队；改动落进项目配置层，不会改插件默认</span>
+              </p>
+            </div>
+            <div class="hd-r">
+              <button class="btn">保存</button>
+              <button class="ibtn" title="更多"><svg class="ic" viewBox="0 0 24 24"><circle cx="5" cy="12" r="1"/><circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/></svg></button>
+            </div>
+          </div>
+
+          <div class="bar">
+            <div class="seg">
+              <a href="settings.html" class="on">团队</a>
+              <a href="settings.html">成员上限</a>
+              <a href="settings.html">存储</a>
+            </div>
+            <span class="grow"></span>
+            <span class="muted" style="font-size:12px">最近一次改动：12 分钟前 · 由 林 触发</span>
+          </div>
+
+          <div class="body pad">
+            <div class="sec" style="margin-top:0">
+              <div class="sec-h">配置来源<span class="r">生效层：项目配置</span></div>
+              <div class="box">
+                <div class="chain">
+                  <span class="c">插件默认</span><span class="muted">›</span>
+                  <span class="c on">项目配置</span><span class="muted">›</span>
+                  <span class="c">临时参数</span>
+                  <span class="muted" style="margin-left:8px">同名项按右侧覆盖左侧</span>
+                </div>
+              </div>
+            </div>
+
+            <div class="sec">
+              <div class="sec-h">编排</div>
+              <div class="box">
+                <div class="frow"><div class="k">看板列</div><div class="v">待规划 › 就绪 › 进行中 › 门禁 › 已完成<span class="hint">门禁列不可删；拖动卡片改阶段时按这里校验</span></div></div>
+                <div class="frow"><div class="k">泳道维度</div><div class="v">按成员<span class="hint">另一个选项是按角色（同一角色的实例合一）</span></div></div>
+                <div class="frow"><div class="k">门禁链</div><div class="v">命令验证 › 审查 › 存档<span class="hint">命令门禁必须给出 exit code，否则不算通过</span></div></div>
+                <div class="frow"><div class="k">并发成员上限</div><div class="v">3 <span class="tag line">硬上限 4</span><span class="hint">超过上限的认领会排队，不会抢占</span></div></div>
+                <div class="frow"><div class="k">每任务最大尝试</div><div class="v">2 <span class="tag line">硬上限 3</span><span class="hint">超过后任务转 blocked，等你裁决</span></div></div>
+                <div class="frow" style="border-bottom:0"><div class="k">自动归档</div><div class="v">开 · 全部任务完成后 7 天<span class="hint">归档只读，可回放</span></div></div>
+              </div>
+            </div>
+
+            <div class="sec">
+              <div class="sec-h">存储与账本</div>
+              <div class="box">
+                <div class="frow"><div class="k">状态目录</div><div class="v mono">.team-workplace/结算页模块化/</div></div>
+                <div class="frow"><div class="k">gitignore</div><div class="v">由插件托管 1 段，不要手改<span class="hint">删掉这段会让账本与产物进 git</span></div></div>
+                <div class="frow" style="border-bottom:0"><div class="k">账本</div><div class="v mono">ledger.jsonl · 128 条 · 只追加</div></div>
+              </div>
+            </div>
+
+            <div class="sec">
+              <div class="sec-h">生命周期</div>
+              <div class="box">
+                <div class="frow"><div class="k">归档团队</div><div class="v">只读保留名册、任务与账本<span class="hint">随时可以回放，不产生 token</span></div></div>
+                <div class="frow" style="border-bottom:0">
+                  <div class="k">解散团队</div>
+                  <div class="v">删除状态目录与账本，不可撤销 <button class="btn danger" style="margin-left:8px">解散团队</button><span class="hint">真正要删数据才用；只想停下就用归档</span></div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </main>
+</div>
+</body>
+</html>

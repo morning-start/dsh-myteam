@@ -1,0 +1,191 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=1280">
+<meta name="dsh-design" content="dshplugin 1280x800">
+<title>依赖图 · myteam</title>
+<link rel="stylesheet" href="dsh-shell.css">
+<link rel="stylesheet" href="myteam.css">
+<!-- 外框（DSH 插件 · 左侧栏入口）：只改 data-slot 里面，别动外框的结构、文字和 dsh-shell.css -->
+</head>
+<body>
+<div class="dsh-app" data-frame="dsh/sidebar">
+  <aside class="dsh-side">
+    <div class="dsh-brand"><div class="dsh-logo">deepseek<span class="dsh-logo-tag">HARNESS</span></div><div class="dsh-iconbtn"><svg class="dsh-i" viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M9 3v18"/></svg></div></div>
+    <div class="dsh-new"><svg class="dsh-i" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 8v8M8 12h8"/></svg>新会话</div>
+    <nav class="dsh-nav">
+      <div class="dsh-row"><svg class="dsh-i" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2.5l3 3-3 3-3-3zM18.5 9l3 3-3 3-3-3zM5.5 9l3 3-3 3-3-3zM12 15.5l3 3-3 3-3-3z"/></svg>插件</div>
+      <div class="dsh-row"><svg class="dsh-i" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>自动化任务</div>
+      <div class="dsh-row on"><span data-slot="entry-icon"><svg class="dsh-i" viewBox="0 0 24 24" aria-hidden="true"><circle cx="9" cy="8" r="3"/><path d="M3.5 19a5.5 5.5 0 0 1 11 0"/><path d="M15.5 5.8a3 3 0 0 1 0 5.4"/><path d="M17 14a4.5 4.5 0 0 1 3.5 5"/></svg></span><span data-slot="entry-label">团队</span></div>
+      <div class="dsh-row"><svg class="dsh-i" viewBox="0 0 24 24" aria-hidden="true"><rect x="4" y="4" width="6" height="6" rx="1.5"/><rect x="14" y="4" width="6" height="6" rx="3"/><rect x="4" y="14" width="6" height="6" rx="1.5"/><rect x="14" y="14" width="6" height="6" rx="1.5"/></svg>更多</div>
+    </nav>
+    <div class="dsh-sec">工作区<div class="dsh-sec-acts"><div class="dsh-iconbtn"><svg class="dsh-i" viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="M20 20l-4-4"/></svg></div><div class="dsh-iconbtn"><svg class="dsh-i" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 8h10M18 8h2M4 16h2M10 16h10"/><circle cx="16" cy="8" r="2"/><circle cx="8" cy="16" r="2"/></svg></div><div class="dsh-iconbtn"><svg class="dsh-i" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><path d="M12 11v5M9.5 13.5h5"/></svg></div></div></div>
+    <div class="dsh-row"><span class="dsh-folder"><svg class="dsh-i" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></svg></span>我的项目</div>
+    <div class="dsh-sess">整理会议记录<span class="dsh-time">2 小时</span></div>
+    <div class="dsh-sess">新会话</div>
+    <div class="dsh-acct"><div class="dsh-avatar">我</div>我的账号</div>
+  </aside>
+  <main class="dsh-main">
+    <div class="dsh-bar"><div class="dsh-iconbtn dsh-corner"><svg class="dsh-i" viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M15 3v18"/></svg></div></div>
+    <div data-slot="main">
+      <div class="wt">
+        <aside class="ir">
+          <a class="team" href="teams.html" title="结算页模块化 · 切换团队">结</a>
+          <div class="line"></div>
+          <nav class="ir-nav">
+            <a class="ri on" href="board.html" title="任务"><svg class="ic" viewBox="0 0 24 24"><rect x="3" y="4" width="5" height="16" rx="1.5"/><rect x="10" y="4" width="5" height="11" rx="1.5"/><rect x="17" y="4" width="4" height="7" rx="1.5"/></svg><span>任务</span><i class="bdg"></i></a>
+            <a class="ri" href="roles.html" title="角色与成员"><svg class="ic" viewBox="0 0 24 24"><circle cx="9" cy="8" r="3"/><path d="M3 20a6 6 0 0 1 12 0"/><path d="M16 5.5a3 3 0 0 1 0 5M17 14a6 6 0 0 1 4 6"/></svg><span>角色</span></a>
+            <a class="ri" href="knowledge.html" title="知识库"><svg class="ic" viewBox="0 0 24 24"><path d="M4 5.5A2.5 2.5 0 0 1 6.5 3H19v16H6.5A2.5 2.5 0 0 0 4 21.5z"/><path d="M8 7h7M8 11h5"/></svg><span>知识</span></a>
+            <a class="ri" href="audit.html" title="审计"><svg class="ic" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg><span>审计</span></a>
+            <a class="ri" href="settings.html" title="设置"><svg class="ic" viewBox="0 0 24 24"><path d="M4 8h10M18 8h2M4 16h2M10 16h10"/><circle cx="16" cy="8" r="2"/><circle cx="8" cy="16" r="2"/></svg><span>设置</span></a>
+          </nav>
+        </aside>
+
+        <div class="pane">
+          <div class="hd">
+            <div class="hd-l">
+              <h2>结算页模块化<span class="tag"><span class="dot run"></span>进行中</span><button class="btn"><svg class="ic s" viewBox="0 0 24 24"><path d="M4 7h9M4 17h9M15 7h5M18 4v6M15 14h5M12 11v6"/></svg>切换团队</button></h2>
+              <p class="sub">
+                <span class="l">17 个任务</span><i class="sep"></i>
+                <span class="l">9 条依赖</span><i class="sep"></i>
+                <span class="l">1 条被阻塞</span><i class="sep"></i>
+                <span class="l">累计 1.86M token</span>
+                <span class="tr">按依赖层级分列；箭头自上游戏务指向下游，点节点看同一张任务详情</span>
+              </p>
+            </div>
+            <div class="hd-r">
+              <div class="presence" aria-label="在册成员">
+                <span class="av sm" title="何 · 队长 · 规划中">何</span>
+                <span class="av sm" title="林 · 实现者 · 正在跑 t7">林</span>
+                <span class="av sm" title="周 · 实现者 · 正在跑 t6">周</span>
+                <span class="av sm" title="陈 · 审查者 · 2 条待裁决">陈</span>
+                <span class="av sm" title="苏 · 需求验证">苏</span>
+                <span class="av sm" title="赵 · api-reviewer · 正在跑 v2">赵</span>
+                <span class="lbl">3 在跑</span>
+              </div>
+              <button class="ibtn" title="刷新"><svg class="ic" viewBox="0 0 24 24"><path d="M20 11a8 8 0 1 0-2 5.5"/><path d="M20 5v6h-6"/></svg></button>
+              <button class="ibtn" title="更多"><svg class="ic" viewBox="0 0 24 24"><circle cx="5" cy="12" r="1"/><circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/></svg></button>
+            </div>
+          </div>
+
+          <div class="bar">
+            <div class="seg">
+              <a href="board.html">看板</a>
+              <a href="list.html">列表</a>
+              <a href="lanes.html">流程</a>
+              <a href="dag.html" class="on">依赖图</a>
+            </div>
+            <span class="grow"></span>
+            <label class="field w"><svg class="ic s" viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="M20 20l-4-4"/></svg><input placeholder="搜索任务号、标题" aria-label="搜索任务"></label>
+            <button class="btn"><svg class="ic s" viewBox="0 0 24 24"><path d="M4 6h16M7 12h10M10 18h4"/></svg>筛选</button>
+          </div>
+
+          <div class="body">
+            <div class="dag" data-dag>
+              <svg class="edges" aria-hidden="true" style="color:var(--mt-muted);opacity:.45">
+                <defs>
+                  <marker id="arw" viewBox="0 0 8 8" refX="7" refY="4" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+                    <path d="M0 0.8 L7 4 L0 7.2 z" fill="currentColor"></path>
+                  </marker>
+                </defs>
+              </svg>
+              <div class="dag-cols">
+                <div class="dag-col">
+                  <div class="ch"><b>起点</b><span>2</span></div>
+                  <a class="dnode done" data-n="t0" href="detail.html">
+                    <div class="l1"><span>t0</span><span class="pri">P1</span><span class="grow"></span><span>已完成</span></div>
+                    <div class="l2">摸清结算页现状与依赖</div>
+                  </a>
+                  <a class="dnode done" data-n="t1" href="detail.html">
+                    <div class="l1"><span>t1</span><span class="pri p0">P0</span><span class="grow"></span><span>已完成</span></div>
+                    <div class="l2">确定模块包对外 API 契约</div>
+                  </a>
+                </div>
+
+                <div class="dag-col">
+                  <div class="ch"><b>依赖 1</b><span>3</span></div>
+                  <a class="dnode" data-n="t2" data-dep="t0,t1" href="detail.html">
+                    <div class="l1"><span>t2</span><span class="pri">P1</span><span class="grow"></span><span>已完成</span></div>
+                    <div class="l2">梳理现有调用点清单</div>
+                  </a>
+                  <a class="dnode run" data-n="v2" data-dep="t1" href="detail.html">
+                    <div class="l1"><span>v2</span><span class="pri">P1</span><span class="grow"></span><span>进行中</span></div>
+                    <div class="l2">锁定 v0.2 对外契约基线</div>
+                  </a>
+                  <a class="dnode" data-n="t8" data-dep="t1" href="detail.html">
+                    <div class="l1"><span>t8</span><span class="pri">P2</span><span class="grow"></span><span>就绪</span></div>
+                    <div class="l2">补 12 条结算回归用例</div>
+                  </a>
+                </div>
+
+                <div class="dag-col">
+                  <div class="ch"><b>依赖 2</b><span>3</span></div>
+                  <a class="dnode run" data-n="t7" data-dep="t2" href="detail.html">
+                    <div class="l1"><span>t7</span><span class="pri p0">P0</span><span class="grow"></span><span>进行中</span></div>
+                    <div class="l2">抽结算服务边界与接口草案</div>
+                  </a>
+                  <a class="dnode gate" data-n="t4" data-dep="t2" href="detail.html">
+                    <div class="l1"><span>t4</span><span class="pri">P1</span><span class="grow"></span><span>门禁</span></div>
+                    <div class="l2">替换调用点跑通冒烟</div>
+                  </a>
+                  <a class="dnode" data-n="v3" data-dep="v2" href="detail.html">
+                    <div class="l1"><span>v3</span><span class="pri">P2</span><span class="grow"></span><span>就绪</span></div>
+                    <div class="l2">兼容性矩阵比对</div>
+                  </a>
+                </div>
+
+                <div class="dag-col">
+                  <div class="ch"><b>收口</b><span>4</span></div>
+                  <a class="dnode run" data-n="t6" data-dep="t7" href="detail.html">
+                    <div class="l1"><span>t6</span><span class="pri">P1</span><span class="grow"></span><span>进行中</span></div>
+                    <div class="l2">结算页 UI 迁移到模块包</div>
+                  </a>
+                  <a class="dnode gate" data-n="t3" data-dep="t4" href="detail.html">
+                    <div class="l1"><span>t3</span><span class="pri">P2</span><span class="grow"></span><span>门禁</span></div>
+                    <div class="l2">移除旧结算组件目录</div>
+                  </a>
+                  <a class="dnode" data-n="t5" data-dep="t4,t3" href="detail.html">
+                    <div class="l1"><span>t5</span><span class="pri">P1</span><span class="grow"></span><span>就绪</span></div>
+                    <div class="l2">旧调用点替换与灰度开关</div>
+                  </a>
+                  <a class="dnode" data-n="v6" data-dep="v2" href="detail.html">
+                    <div class="l1"><span>v6</span><span class="pri">P1</span><span class="grow"></span><span>门禁</span></div>
+                    <div class="l2">v0.2 changelog 复核</div>
+                  </a>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </main>
+</div>
+<script>
+(function () {
+  var dag = document.querySelector('[data-dag]');
+  if (!dag) return;
+  var svg = dag.querySelector('.edges');
+  function pt(el, side) {
+    var r = el.getBoundingClientRect(), b = dag.getBoundingClientRect();
+    return { x: (side === 'r' ? r.right : r.left) - b.left, y: r.top - b.top + r.height / 2 };
+  }
+  dag.querySelectorAll('[data-dep]').forEach(function (t) {
+    t.getAttribute('data-dep').split(',').forEach(function (id) {
+      var s = dag.querySelector('[data-n="' + id + '"]');
+      if (!s) return;
+      var a = pt(s, 'r'), c = pt(t, 'l'), dx = Math.max(18, (c.x - a.x) / 2);
+      var p = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+      p.setAttribute('d', 'M' + a.x + ' ' + a.y + ' C' + (a.x + dx) + ' ' + a.y + ',' + (c.x - dx) + ' ' + c.y + ',' + (c.x - 2) + ' ' + c.y);
+      p.setAttribute('fill', 'none');
+      p.setAttribute('stroke', 'currentColor');
+      p.setAttribute('stroke-width', '1.2');
+      p.setAttribute('marker-end', 'url(#arw)');
+      svg.appendChild(p);
+    });
+  });
+})();
+</script>
+</body>
+</html>

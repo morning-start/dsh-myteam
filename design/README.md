@@ -1,5 +1,7 @@
 # design — 面板 UI 设计稿
 
+> **已被 [`../design-v2/`](../design-v2/README.md) 取代**（重写版：DSH 原生外壳，只留左侧栏入口与会话标签页）。本目录保留作上一版对照；`design-notes.md` 里的实体、状态机与裁决口径仍然有效。
+
 > 面板（`main` 插槽里的 myteam 工作台）的 **28 屏 HTML 终稿** + 共用资产。谁要照着实现、对齐或复检面板 UI，先读这里再读屏。
 > 这是**设计参照**，不是可执行代码：`plugin/` 源码不 `import`、不构建本目录任何文件；实现真相在 `plugin/client/client.js`。
 

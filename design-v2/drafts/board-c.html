@@ -1,0 +1,235 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=1280">
+<meta name="dsh-design" content="dshplugin 1280x800">
+<title>方向 C · 团队导航 + 泳道 · 团队</title>
+<link rel="stylesheet" href="dsh-shell.css">
+<!-- 外框（DSH 插件 · 会话标签页）：只改 data-slot 里面，别动外框的结构、文字和 dsh-shell.css -->
+<style>
+  /* ── 方向 C：左导航轨 + 角色泳道 ─────────────────────────── */
+  .dsh-app [data-slot="main"] { display: flex; overflow: hidden; }
+  [data-slot="main"] { --mt-run: #15803d; --mt-gate: #b45309; --mt-idle: #9aa0a6; --mt-muted: #5c6167; }
+  [data-theme="dark"] [data-slot="main"] { --mt-run: #4ade80; --mt-gate: #fbbf24; --mt-idle: #6b7280; --mt-muted: #b9bec5; }
+
+  [data-slot="main"] .ic { width: 16px; height: 16px; fill: none; stroke: currentColor; stroke-width: 1.6; stroke-linecap: round; stroke-linejoin: round; flex: none; }
+  [data-slot="main"] .dot { width: 6px; height: 6px; border-radius: 50%; flex: none; background: var(--mt-muted); }
+  [data-slot="main"] .dot.run { background: var(--mt-run); }
+  [data-slot="main"] .dot.gate { background: var(--mt-gate); }
+  [data-slot="main"] .dot.idle { background: var(--mt-idle); }
+  [data-slot="main"] .av { width: 22px; height: 22px; border-radius: 50%; flex: none; background: var(--dsh-hover); color: var(--dsh-fg); font-size: 12px; display: inline-flex; align-items: center; justify-content: center; }
+
+  /* 左轨 */
+  [data-slot="main"] .rail { flex: none; width: 220px; box-sizing: border-box; border-right: 1px solid var(--dsh-line); display: flex; flex-direction: column; padding: 14px 8px 8px; }
+  [data-slot="main"] .rail .tm { padding: 0 8px 12px; }
+  [data-slot="main"] .rail .tm h1 { margin: 0; font: 600 14px/1.35 var(--dsh-font); display: flex; align-items: center; gap: 6px; }
+  [data-slot="main"] .rail .tm .chev { width: 14px; height: 14px; color: var(--mt-muted); }
+  [data-slot="main"] .rail .tm .meta { margin-top: 5px; font-size: 12px; color: var(--mt-muted); display: flex; align-items: center; gap: 6px; }
+  [data-slot="main"] .nav { display: flex; flex-direction: column; gap: 1px; }
+  [data-slot="main"] .nav a { height: 32px; padding: 0 8px; border-radius: 8px; display: flex; align-items: center; gap: 9px; font-size: 13px; color: var(--dsh-fg); text-decoration: none; }
+  [data-slot="main"] .nav a:hover { background: var(--dsh-hover); }
+  [data-slot="main"] .nav a.on { background: var(--dsh-hover); font-weight: 500; }
+  [data-slot="main"] .nav a .n { margin-left: auto; font-family: var(--dsh-font-code); font-size: 12px; color: var(--mt-muted); }
+  [data-slot="main"] .rl-sec { margin: 14px 8px 6px; display: flex; align-items: center; font-size: 12px; color: var(--mt-muted); letter-spacing: .02em; }
+  [data-slot="main"] .rl-sec .n { margin-left: auto; font-family: var(--dsh-font-code); }
+  [data-slot="main"] .mq { display: flex; flex-direction: column; gap: 1px; }
+  [data-slot="main"] .mq .r { height: 30px; padding: 0 8px; border-radius: 8px; display: flex; align-items: center; gap: 8px; font-size: 12px; }
+  [data-slot="main"] .mq .r:hover { background: var(--dsh-hover); }
+  [data-slot="main"] .mq .r .nm { min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  [data-slot="main"] .mq .r .tk { margin-left: auto; font-family: var(--dsh-font-code); font-size: 12px; color: var(--mt-muted); }
+  [data-slot="main"] .rail .bot { margin-top: auto; padding: 8px; border-top: 1px solid var(--dsh-line); font-size: 12px; color: var(--mt-muted); line-height: 1.7; }
+  [data-slot="main"] .rail .bot b { color: var(--dsh-fg); font-weight: 500; font-family: var(--dsh-font-code); font-size: 12px; }
+
+  /* 右侧 */
+  [data-slot="main"] .pane { flex: 1 1 auto; min-width: 0; display: flex; flex-direction: column; }
+  [data-slot="main"] .hd { flex: none; padding: 14px 20px 0; display: flex; align-items: center; gap: 10px; }
+  [data-slot="main"] .hd h2 { margin: 0; font: 600 14px/1.2 var(--dsh-font); }
+  [data-slot="main"] .hd .sub { font-size: 12px; color: var(--mt-muted); white-space: nowrap; }
+  [data-slot="main"] .hd .grow { flex: 1 1 auto; }
+  [data-slot="main"] .ibtn { width: 28px; height: 28px; flex: none; border: 0; border-radius: var(--dsh-radius-sm); background: transparent; color: var(--mt-muted); display: flex; align-items: center; justify-content: center; }
+  [data-slot="main"] .ibtn:hover { background: var(--dsh-hover); color: var(--dsh-fg); }
+  [data-slot="main"] .btn { height: 28px; padding: 0 10px; box-sizing: border-box; border: 1px solid var(--dsh-line); border-radius: var(--dsh-radius-sm); background: transparent; color: var(--dsh-fg); font: 400 13px/1 var(--dsh-font); display: inline-flex; align-items: center; gap: 6px; white-space: nowrap; }
+  [data-slot="main"] .btn:hover { background: var(--dsh-hover); }
+  [data-slot="main"] .btn.primary { background: var(--dsh-btn); color: var(--dsh-btn-fg); border-color: transparent; font-weight: 500; }
+  [data-slot="main"] .btn .ic { width: 14px; height: 14px; }
+
+  [data-slot="main"] .bar { flex: none; height: 46px; padding: 0 20px; display: flex; align-items: center; gap: 8px; }
+  [data-slot="main"] .seg { display: flex; gap: 2px; padding: 2px; border-radius: 9px; background: var(--dsh-hover); }
+  [data-slot="main"] .seg b { height: 24px; padding: 0 10px; border-radius: 7px; display: inline-flex; align-items: center; font: 500 13px/1 var(--dsh-font); color: var(--mt-muted); }
+  [data-slot="main"] .seg b.on { background: var(--dsh-card); color: var(--dsh-fg); box-shadow: 0 1px 2px rgba(0, 0, 0, .06); }
+  [data-slot="main"] .field { height: 28px; width: 168px; box-sizing: border-box; border: 1px solid var(--dsh-line); border-radius: var(--dsh-radius-sm); background: var(--dsh-bg); display: flex; align-items: center; gap: 6px; padding: 0 8px; color: var(--mt-muted); font-size: 12px; }
+  [data-slot="main"] .field .ic { width: 14px; height: 14px; }
+
+  /* 泳道 */
+  [data-slot="main"] .lanes { flex: 1 1 auto; min-height: 0; overflow: auto; padding: 0 20px 10px; }
+  [data-slot="main"] .lane-head { display: grid; grid-template-columns: 122px repeat(5, minmax(0, 1fr)); gap: 0; position: sticky; top: 0; z-index: 2; background: var(--dsh-bg); border-bottom: 1px solid var(--dsh-line); }
+  [data-slot="main"] .lane-head > div { height: 30px; display: flex; align-items: center; gap: 5px; font-size: 12px; color: var(--mt-muted); padding-left: 8px; }
+  [data-slot="main"] .lane-head .nm { font-weight: 500; color: var(--dsh-fg); font-size: 12px; }
+  [data-slot="main"] .lane-head .n { font-family: var(--dsh-font-code); font-size: 12px; }
+  [data-slot="main"] .lane { display: grid; grid-template-columns: 122px repeat(5, minmax(0, 1fr)); border-bottom: 1px solid color-mix(in srgb, var(--dsh-line) 55%, transparent); }
+  [data-slot="main"] .lane .who { padding: 10px 8px 10px 0; display: flex; align-items: flex-start; gap: 8px; min-width: 0; }
+  [data-slot="main"] .lane .who .nm { font-size: 12px; line-height: 18px; }
+  [data-slot="main"] .lane .who .rl { font-size: 12px; color: var(--mt-muted); line-height: 15px; display: flex; align-items: center; gap: 4px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  [data-slot="main"] .cell { padding: 8px 8px 8px 0; min-width: 0; display: flex; flex-direction: column; gap: 4px; }
+  [data-slot="main"] .chip { min-width: 0; display: flex; align-items: center; gap: 5px; height: 24px; padding: 0 6px; border: 1px solid var(--dsh-line); border-radius: 6px; background: var(--dsh-card); font-size: 12px; }
+  [data-slot="main"] .chip:hover { border-color: color-mix(in srgb, var(--dsh-fg) 26%, transparent); }
+  [data-slot="main"] .chip .id { font-family: var(--dsh-font-code); font-size: 12px; color: var(--mt-muted); flex: none; }
+  [data-slot="main"] .chip .tt { min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  [data-slot="main"] .chip.run { border-left: 2px solid var(--mt-run); }
+  [data-slot="main"] .chip.gate { border-left: 2px solid var(--mt-gate); }
+  [data-slot="main"] .chip.done { color: var(--mt-muted); border-style: dashed; background: transparent; }
+  [data-slot="main"] .chip.more { border: 0; background: transparent; color: var(--mt-muted); font-size: 12px; height: 18px; padding-left: 2px; }
+  [data-slot="main"] .cell .none { height: 24px; display: flex; align-items: center; font-size: 12px; color: var(--mt-muted); padding-left: 2px; }
+
+  /* 页脚 */
+  [data-slot="main"] .ft { flex: none; height: 28px; padding: 0 20px; display: flex; align-items: center; gap: 10px; border-top: 1px solid var(--dsh-line); font-size: 12px; color: var(--mt-muted); }
+  [data-slot="main"] .ft .sep { width: 1px; height: 10px; background: var(--dsh-line); }
+  [data-slot="main"] .ft .r { margin-left: auto; }
+</style>
+</head>
+<body>
+<div class="dsh-app" data-frame="dsh/view">
+  <aside class="dsh-side">
+    <div class="dsh-brand"><div class="dsh-logo">deepseek<span class="dsh-logo-tag">HARNESS</span></div><div class="dsh-iconbtn"><svg class="dsh-i" viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M9 3v18"/></svg></div></div>
+    <div class="dsh-new"><svg class="dsh-i" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 8v8M8 12h8"/></svg>新会话</div>
+    <nav class="dsh-nav">
+      <div class="dsh-row"><svg class="dsh-i" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2.5l3 3-3 3-3-3zM18.5 9l3 3-3 3-3-3zM5.5 9l3 3-3 3-3-3zM12 15.5l3 3-3 3-3-3z"/></svg>插件</div>
+      <div class="dsh-row"><svg class="dsh-i" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>自动化任务</div>
+      <div class="dsh-row"><svg class="dsh-i" viewBox="0 0 24 24" aria-hidden="true"><rect x="4" y="4" width="6" height="6" rx="1.5"/><rect x="14" y="4" width="6" height="6" rx="3"/><rect x="4" y="14" width="6" height="6" rx="1.5"/><rect x="14" y="14" width="6" height="6" rx="1.5"/></svg>更多</div>
+    </nav>
+    <div class="dsh-sec">工作区<div class="dsh-sec-acts"><div class="dsh-iconbtn"><svg class="dsh-i" viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="M20 20l-4-4"/></svg></div><div class="dsh-iconbtn"><svg class="dsh-i" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 8h10M18 8h2M4 16h2M10 16h10"/><circle cx="16" cy="8" r="2"/><circle cx="8" cy="16" r="2"/></svg></div><div class="dsh-iconbtn"><svg class="dsh-i" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><path d="M12 11v5M9.5 13.5h5"/></svg></div></div></div>
+    <div class="dsh-row"><span class="dsh-folder"><svg class="dsh-i" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></svg></span>我的项目</div>
+    <div class="dsh-sess on">整理会议记录<span class="dsh-time">2 小时</span></div>
+    <div class="dsh-sess">新会话</div>
+    <div class="dsh-acct"><div class="dsh-avatar">我</div>我的账号</div>
+  </aside>
+  <main class="dsh-main">
+    <header class="dsh-head">
+      <div class="dsh-crumbs">整理会议记录<span class="dsh-mode">标准模式<svg class="dsh-i" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg></span></div>
+      <div class="dsh-utils"><div class="dsh-split"><svg class="dsh-i" viewBox="0 0 24 24" aria-hidden="true"><path d="M9 8l-4 4 4 4M15 8l4 4-4 4"/></svg><svg class="dsh-i" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg></div><div class="dsh-iconbtn"><svg class="dsh-i" viewBox="0 0 24 24" aria-hidden="true"><circle cx="5" cy="12" r="1"/><circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/></svg></div></div>
+      <div class="dsh-iconbtn dsh-corner"><svg class="dsh-i" viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M15 3v18"/></svg></div>
+      <div class="dsh-tabs" role="tablist"><div class="dsh-tab">对话</div><div class="dsh-tab">轨迹</div><div class="dsh-tab on"><span data-slot="tab-label">团队</span></div></div>
+    </header>
+    <div data-slot="main">
+      <div class="rail">
+        <div class="tm">
+          <h1>结算页模块化<svg class="ic chev" viewBox="0 0 24 24"><path d="M6 9l6 6 6-6"/></svg></h1>
+          <div class="meta"><span class="dot run"></span>进行中 · 3 个在跑</div>
+        </div>
+        <nav class="nav">
+          <a href="#"><svg class="ic" viewBox="0 0 24 24"><rect x="3" y="4" width="5" height="16" rx="1.5"/><rect x="10" y="4" width="5" height="11" rx="1.5"/><rect x="17" y="4" width="4" height="7" rx="1.5"/></svg>看板<span class="n">17</span></a>
+          <a href="#" class="on"><svg class="ic" viewBox="0 0 24 24"><path d="M4 6h16M4 12h16M4 18h10"/></svg>任务<span class="n">17</span></a>
+          <a href="#"><svg class="ic" viewBox="0 0 24 24"><circle cx="9" cy="8" r="3"/><path d="M3 20a6 6 0 0 1 12 0"/><path d="M16 5.5a3 3 0 0 1 0 5M17 14a6 6 0 0 1 4 6"/></svg>角色与成员<span class="n">5</span></a>
+          <a href="#"><svg class="ic" viewBox="0 0 24 24"><path d="M4 5.5A2.5 2.5 0 0 1 6.5 3H19v16H6.5A2.5 2.5 0 0 0 4 21.5z"/><path d="M8 7h7M8 11h5"/></svg>知识库<span class="n">23</span></a>
+          <a href="#"><svg class="ic" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>审计</a>
+          <a href="#"><svg class="ic" viewBox="0 0 24 24"><path d="M4 8h10M18 8h2M4 16h2M10 16h10"/><circle cx="16" cy="8" r="2"/><circle cx="8" cy="16" r="2"/></svg>设置</a>
+        </nav>
+        <div class="rl-sec">成员<span class="n">5</span></div>
+        <div class="mq">
+          <div class="r"><span class="av">何</span><span class="nm">队长</span><span class="tk">规划</span><span class="dot idle"></span></div>
+          <div class="r"><span class="av">林</span><span class="nm">林 · 实现者</span><span class="tk">t7</span><span class="dot run"></span></div>
+          <div class="r"><span class="av">周</span><span class="nm">周 · 实现者</span><span class="tk">t6</span><span class="dot run"></span></div>
+          <div class="r"><span class="av">陈</span><span class="nm">陈 · 审查者</span><span class="tk">t4</span><span class="dot gate"></span></div>
+          <div class="r"><span class="av">苏</span><span class="nm">苏 · 需求验证</span><span class="tk">t3</span><span class="dot gate"></span></div>
+          <div class="r"><span class="av">赵</span><span class="nm">赵 · api-reviewer</span><span class="tk">v2</span><span class="dot run"></span></div>
+        </div>
+        <div class="bot">累计 <b>1.86M</b> token · 命中 <b>71.8%</b><br>上下文 <b>174k</b> / 256k · 估算</div>
+      </div>
+
+      <div class="pane">
+        <div class="hd">
+          <h2>任务</h2>
+          <span class="sub">17 个 · 6 名成员 · 3 个在跑</span>
+          <span class="grow"></span>
+          <button class="ibtn" title="刷新"><svg class="ic" viewBox="0 0 24 24"><path d="M20 11a8 8 0 1 0-2 5.5"/><path d="M20 5v6h-6"/></svg></button>
+          <button class="btn"><svg class="ic" viewBox="0 0 24 24"><path d="M4 6h16M7 12h10M10 18h4"/></svg>筛选</button>
+          <button class="btn primary"><svg class="ic" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg>新任务</button>
+        </div>
+        <div class="bar">
+          <div class="seg"><b>列表</b><b>看板</b><b class="on">流程</b><b>依赖图</b></div>
+          <span class="grow" style="flex:1 1 auto"></span>
+          <div class="field"><svg class="ic" viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="M20 20l-4-4"/></svg>搜索任务号、标题</div>
+        </div>
+
+        <div class="lanes">
+          <div class="lane-head">
+            <div>成员</div>
+            <div><span class="dot idle"></span><span class="nm">待规划</span><span class="n">3</span></div>
+            <div><span class="dot"></span><span class="nm">就绪</span><span class="n">3</span></div>
+            <div><span class="dot run"></span><span class="nm">进行中</span><span class="n">3</span></div>
+            <div><span class="dot gate"></span><span class="nm">门禁</span><span class="n">3</span></div>
+            <div><span class="dot"></span><span class="nm">已完成</span><span class="n">5</span></div>
+          </div>
+
+          <div class="lane">
+            <div class="who"><span class="av">何</span><div><div class="nm">队长</div><div class="rl">只做协调</div></div></div>
+            <div class="cell">
+              <div class="chip"><span class="id">v5</span><span class="tt">破坏性变更清单</span></div>
+              <div class="chip"><span class="id">v1</span><span class="tt">评审口径对齐</span></div>
+              <div class="chip"><span class="id">v4</span><span class="tt">评审范围与分组口径</span></div>
+            </div>
+            <div class="cell"><span class="none">—</span></div>
+            <div class="cell"><span class="none">—</span></div>
+            <div class="cell"><span class="none">—</span></div>
+            <div class="cell"><span class="none">—</span></div>
+          </div>
+
+          <div class="lane">
+            <div class="who"><span class="av">林</span><div><div class="nm">林</div><div class="rl"><span class="dot run"></span>实现者</div></div></div>
+            <div class="cell"><span class="none">—</span></div>
+            <div class="cell"><span class="none">—</span></div>
+            <div class="cell"><div class="chip run"><span class="id">t7</span><span class="tt">抽结算服务边界</span></div></div>
+            <div class="cell"><span class="none">—</span></div>
+            <div class="cell"><div class="chip done"><span class="id">t1</span><span class="tt">确定 API 契约</span></div></div>
+          </div>
+
+          <div class="lane">
+            <div class="who"><span class="av">周</span><div><div class="nm">周</div><div class="rl"><span class="dot run"></span>实现者</div></div></div>
+            <div class="cell"><span class="none">—</span></div>
+            <div class="cell"><span class="none">—</span></div>
+            <div class="cell"><div class="chip run"><span class="id">t6</span><span class="tt">结算页 UI 迁移</span></div></div>
+            <div class="cell"><span class="none">—</span></div>
+            <div class="cell"><div class="chip done"><span class="id">t2</span><span class="tt">调用点清单</span></div><div class="chip done"><span class="id">t9</span><span class="tt">CI 产物校验</span></div></div>
+          </div>
+
+          <div class="lane">
+            <div class="who"><span class="av">陈</span><div><div class="nm">陈</div><div class="rl"><span class="dot gate"></span>审查者 · 2 待裁决</div></div></div>
+            <div class="cell"><span class="none">—</span></div>
+            <div class="cell"><div class="chip"><span class="id">t5</span><span class="tt">灰度开关</span></div></div>
+            <div class="cell"><span class="none">—</span></div>
+            <div class="cell"><div class="chip gate"><span class="id">t4</span><span class="tt">4 条冒烟</span></div><div class="chip gate"><span class="id">v6</span><span class="tt">changelog 复核</span></div></div>
+            <div class="cell"><div class="chip done"><span class="id">t11</span><span class="tt">README 迁移说明</span></div></div>
+          </div>
+
+          <div class="lane">
+            <div class="who"><span class="av">苏</span><div><div class="nm">苏</div><div class="rl"><span class="dot gate"></span>需求验证</div></div></div>
+            <div class="cell"><span class="none">—</span></div>
+            <div class="cell"><div class="chip"><span class="id">t8</span><span class="tt">12 条回归用例</span></div></div>
+            <div class="cell"><span class="none">—</span></div>
+            <div class="cell"><div class="chip gate"><span class="id">t3</span><span class="tt">移除旧目录</span></div></div>
+            <div class="cell"><div class="chip done"><span class="id">t0</span><span class="tt">现状与依赖</span></div></div>
+          </div>
+
+          <div class="lane">
+            <div class="who"><span class="av">赵</span><div><div class="nm">赵</div><div class="rl"><span class="dot run"></span>api-reviewer</div></div></div>
+            <div class="cell"><span class="none">—</span></div>
+            <div class="cell"><div class="chip"><span class="id">v3</span><span class="tt">兼容性矩阵</span></div></div>
+            <div class="cell"><div class="chip run"><span class="id">v2</span><span class="tt">v0.2 契约基线</span></div></div>
+            <div class="cell"><span class="none">—</span></div>
+            <div class="cell"><span class="none">—</span></div>
+          </div>
+        </div>
+
+        <div class="ft">
+          <span>拖动卡片改阶段 · 门禁未过会被驳回</span>
+          <span class="sep"></span>
+          <span>门禁重跑 4 次</span>
+          <span class="r">成本归因为估算</span>
+        </div>
+      </div>
+    </div>
+  </main>
+</div>
+</body>
+</html>

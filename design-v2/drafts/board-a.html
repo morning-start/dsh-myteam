@@ -1,0 +1,323 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=1280">
+<meta name="dsh-design" content="dshplugin 1280x800">
+<title>方向 A · 分组任务列表 · 团队</title>
+<link rel="stylesheet" href="dsh-shell.css">
+<!-- 外框（DSH 插件 · 会话标签页）：只改 data-slot 里面，别动外框的结构、文字和 dsh-shell.css -->
+<style>
+  /* ── 方向 A：分组任务列表（DSH 原生克制风）────────────────── */
+  .dsh-app [data-slot="main"] { display: flex; overflow: hidden; }
+  [data-slot="main"] { --mt-run: #15803d; --mt-gate: #b45309; --mt-fail: #b91c1c; --mt-idle: #9aa0a6; --mt-muted: #5c6167; }
+  [data-theme="dark"] [data-slot="main"] { --mt-run: #4ade80; --mt-gate: #fbbf24; --mt-fail: #f87171; --mt-idle: #6b7280; --mt-muted: #b9bec5; }
+
+  [data-slot="main"] .pg { flex: 1 1 auto; min-width: 0; display: flex; flex-direction: column; }
+  [data-slot="main"] .mono { font-family: var(--dsh-font-code); font-size: 12px; }
+
+  /* 页头 */
+  [data-slot="main"] .hd { flex: none; padding: 18px 24px 0; display: flex; align-items: flex-start; gap: 12px; }
+  [data-slot="main"] .hd-l { min-width: 0; flex: 1 1 auto; }
+  [data-slot="main"] .ttl { display: flex; align-items: center; gap: 8px; }
+  [data-slot="main"] .ttl h1 { margin: 0; font: 600 16px/1.3 var(--dsh-font); letter-spacing: -.01em; }
+  [data-slot="main"] .st { display: inline-flex; align-items: center; gap: 5px; height: 20px; padding: 0 7px; border-radius: 6px; background: var(--dsh-hover); font-size: 12px; color: var(--dsh-fg); }
+  [data-slot="main"] .dot { width: 6px; height: 6px; border-radius: 50%; flex: none; background: var(--mt-muted); }
+  [data-slot="main"] .dot.run { background: var(--mt-run); }
+  [data-slot="main"] .dot.gate { background: var(--mt-gate); }
+  [data-slot="main"] .dot.done { background: var(--mt-run); }
+  [data-slot="main"] .dot.idle { background: var(--mt-idle); }
+  [data-slot="main"] .goal { margin: 6px 0 0; font-size: 12px; color: var(--mt-muted); }
+  [data-slot="main"] .hd-r { flex: none; display: flex; align-items: center; gap: 4px; padding-top: 1px; }
+
+  [data-slot="main"] .ibtn { width: 28px; height: 28px; border: 0; border-radius: var(--dsh-radius-sm); background: transparent; color: var(--mt-muted); display: flex; align-items: center; justify-content: center; }
+  [data-slot="main"] .ibtn:hover { background: var(--dsh-hover); color: var(--dsh-fg); }
+  [data-slot="main"] .ibtn .dsh-i { width: 16px; height: 16px; fill: none; stroke: currentColor; stroke-width: 1.6; stroke-linecap: round; stroke-linejoin: round; }
+
+  /* 摘要 + 工具条 */
+  [data-slot="main"] .sum { flex: none; padding: 10px 24px 0; display: flex; align-items: center; gap: 14px; font-size: 12px; color: var(--mt-muted); flex-wrap: wrap; }
+  [data-slot="main"] .sum b { font-weight: 500; color: var(--dsh-fg); }
+  [data-slot="main"] .sum .sep { width: 1px; height: 10px; background: var(--dsh-line); }
+  [data-slot="main"] .bar { flex: none; height: 44px; margin-top: 10px; padding: 0 24px; display: flex; align-items: center; gap: 8px; border-bottom: 1px solid var(--dsh-line); }
+  [data-slot="main"] .seg { display: flex; gap: 2px; padding: 2px; border-radius: 9px; background: var(--dsh-hover); }
+  [data-slot="main"] .seg b { height: 24px; padding: 0 11px; border-radius: 7px; display: inline-flex; align-items: center; gap: 5px; font: 500 13px/1 var(--dsh-font); color: var(--mt-muted); }
+  [data-slot="main"] .seg b.on { background: var(--dsh-card); color: var(--dsh-fg); box-shadow: 0 1px 2px rgba(0, 0, 0, .06); }
+  [data-slot="main"] .grow { flex: 1 1 auto; }
+  [data-slot="main"] .field { height: 28px; box-sizing: border-box; border: 1px solid var(--dsh-line); border-radius: var(--dsh-radius-sm); background: var(--dsh-bg); display: flex; align-items: center; gap: 6px; padding: 0 8px; color: var(--mt-muted); font-size: 12px; }
+  [data-slot="main"] .field.w { width: 196px; }
+  [data-slot="main"] .field .dsh-i { width: 14px; height: 14px; fill: none; stroke: currentColor; stroke-width: 1.6; stroke-linecap: round; stroke-linejoin: round; }
+  [data-slot="main"] .btn { height: 28px; padding: 0 10px; box-sizing: border-box; border: 1px solid var(--dsh-line); border-radius: var(--dsh-radius-sm); background: transparent; color: var(--dsh-fg); font: 400 13px/1 var(--dsh-font); display: inline-flex; align-items: center; gap: 6px; }
+  [data-slot="main"] .btn:hover { background: var(--dsh-hover); }
+  [data-slot="main"] .btn.primary { background: var(--dsh-btn); color: var(--dsh-btn-fg); border-color: transparent; font-weight: 500; }
+  [data-slot="main"] .btn .dsh-i { width: 14px; height: 14px; fill: none; stroke: currentColor; stroke-width: 1.7; stroke-linecap: round; stroke-linejoin: round; }
+
+  /* 列表 */
+  [data-slot="main"] .list { flex: 1 1 auto; min-height: 0; overflow: auto; }
+  [data-slot="main"] .grp-h { position: sticky; top: 0; z-index: 2; height: 34px; box-sizing: border-box; padding: 0 24px; display: flex; align-items: center; gap: 8px; background: color-mix(in srgb, var(--dsh-bg) 92%, var(--dsh-fg)); font-size: 12px; color: var(--mt-muted); border-bottom: 1px solid var(--dsh-line); }
+  [data-slot="main"] .grp-h .nm { font-weight: 500; color: var(--dsh-fg); }
+  [data-slot="main"] .grp-h .n { font-family: var(--dsh-font-code); font-size: 12px; }
+  [data-slot="main"] .grp-h .hint { margin-left: auto; font-size: 12px; }
+  [data-slot="main"] .grp-h .caret { width: 12px; height: 12px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+
+  [data-slot="main"] .row { display: grid; grid-template-columns: 40px minmax(0, 1fr) 106px 132px 84px 62px 24px; gap: 12px; align-items: center; height: 54px; box-sizing: border-box; padding: 0 24px; border-bottom: 1px solid color-mix(in srgb, var(--dsh-line) 55%, transparent); cursor: default; }
+  [data-slot="main"] .row:hover { background: var(--dsh-hover); }
+  [data-slot="main"] .row .id { font-family: var(--dsh-font-code); font-size: 12px; color: var(--mt-muted); }
+  [data-slot="main"] .row .ti { min-width: 0; }
+  [data-slot="main"] .row .ti .t1 { font-size: 13px; line-height: 1.35; display: flex; align-items: center; gap: 6px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  [data-slot="main"] .row .ti .t2 { margin-top: 2px; font-size: 12px; color: var(--mt-muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  [data-slot="main"] .pri { flex: none; font-family: var(--dsh-font-code); font-size: 12px; line-height: 16px; padding: 0 4px; border-radius: 4px; color: var(--mt-muted); border: 1px solid var(--dsh-line); }
+  [data-slot="main"] .pri.p0 { color: var(--dsh-fg); border-color: color-mix(in srgb, var(--dsh-fg) 34%, transparent); }
+  [data-slot="main"] .role { font-size: 12px; color: var(--mt-muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  [data-slot="main"] .who { display: flex; align-items: center; gap: 7px; min-width: 0; font-size: 13px; }
+  [data-slot="main"] .who .nm { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  [data-slot="main"] .who .nm.muted { color: var(--mt-muted); }
+  [data-slot="main"] .av { width: 20px; height: 20px; border-radius: 50%; flex: none; background: var(--dsh-hover); color: var(--dsh-fg); font-size: 12px; display: inline-flex; align-items: center; justify-content: center; }
+  [data-slot="main"] .av.more { color: var(--mt-muted); }
+  [data-slot="main"] .gates { display: flex; align-items: center; gap: 4px; }
+  [data-slot="main"] .gd { width: 7px; height: 7px; border-radius: 2px; background: color-mix(in srgb, var(--dsh-fg) 14%, transparent); }
+  [data-slot="main"] .gd.p { background: var(--mt-run); }
+  [data-slot="main"] .gd.w { background: var(--mt-gate); }
+  [data-slot="main"] .tok { font-family: var(--dsh-font-code); font-size: 12px; color: var(--mt-muted); text-align: right; }
+  [data-slot="main"] .row .more { opacity: 0; color: var(--mt-muted); }
+  [data-slot="main"] .row:hover .more { opacity: 1; }
+  [data-slot="main"] .empty { padding: 14px 24px; font-size: 12px; color: var(--mt-muted); }
+
+  /* 页脚状态 */
+  [data-slot="main"] .ft { flex: none; height: 30px; padding: 0 24px; display: flex; align-items: center; gap: 12px; border-top: 1px solid var(--dsh-line); font-size: 12px; color: var(--mt-muted); }
+  [data-slot="main"] .ft .sep { width: 1px; height: 10px; background: var(--dsh-line); }
+  [data-slot="main"] .ft .r { margin-left: auto; display: flex; align-items: center; gap: 6px; }
+</style>
+</head>
+<body>
+<div class="dsh-app" data-frame="dsh/view">
+  <aside class="dsh-side">
+    <div class="dsh-brand"><div class="dsh-logo">deepseek<span class="dsh-logo-tag">HARNESS</span></div><div class="dsh-iconbtn"><svg class="dsh-i" viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M9 3v18"/></svg></div></div>
+    <div class="dsh-new"><svg class="dsh-i" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 8v8M8 12h8"/></svg>新会话</div>
+    <nav class="dsh-nav">
+      <div class="dsh-row"><svg class="dsh-i" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2.5l3 3-3 3-3-3zM18.5 9l3 3-3 3-3-3zM5.5 9l3 3-3 3-3-3zM12 15.5l3 3-3 3-3-3z"/></svg>插件</div>
+      <div class="dsh-row"><svg class="dsh-i" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>自动化任务</div>
+      <div class="dsh-row"><svg class="dsh-i" viewBox="0 0 24 24" aria-hidden="true"><rect x="4" y="4" width="6" height="6" rx="1.5"/><rect x="14" y="4" width="6" height="6" rx="3"/><rect x="4" y="14" width="6" height="6" rx="1.5"/><rect x="14" y="14" width="6" height="6" rx="1.5"/></svg>更多</div>
+    </nav>
+    <div class="dsh-sec">工作区<div class="dsh-sec-acts"><div class="dsh-iconbtn"><svg class="dsh-i" viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="M20 20l-4-4"/></svg></div><div class="dsh-iconbtn"><svg class="dsh-i" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 8h10M18 8h2M4 16h2M10 16h10"/><circle cx="16" cy="8" r="2"/><circle cx="8" cy="16" r="2"/></svg></div><div class="dsh-iconbtn"><svg class="dsh-i" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><path d="M12 11v5M9.5 13.5h5"/></svg></div></div></div>
+    <div class="dsh-row"><span class="dsh-folder"><svg class="dsh-i" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></svg></span>我的项目</div>
+    <div class="dsh-sess on">整理会议记录<span class="dsh-time">2 小时</span></div>
+    <div class="dsh-sess">新会话</div>
+    <div class="dsh-acct"><div class="dsh-avatar">我</div>我的账号</div>
+  </aside>
+  <main class="dsh-main">
+    <header class="dsh-head">
+      <div class="dsh-crumbs">整理会议记录<span class="dsh-mode">标准模式<svg class="dsh-i" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg></span></div>
+      <div class="dsh-utils"><div class="dsh-split"><svg class="dsh-i" viewBox="0 0 24 24" aria-hidden="true"><path d="M9 8l-4 4 4 4M15 8l4 4-4 4"/></svg><svg class="dsh-i" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg></div><div class="dsh-iconbtn"><svg class="dsh-i" viewBox="0 0 24 24" aria-hidden="true"><circle cx="5" cy="12" r="1"/><circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/></svg></div></div>
+      <div class="dsh-iconbtn dsh-corner"><svg class="dsh-i" viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M15 3v18"/></svg></div>
+      <div class="dsh-tabs" role="tablist"><div class="dsh-tab">对话</div><div class="dsh-tab">轨迹</div><div class="dsh-tab on"><span data-slot="tab-label">团队</span></div></div>
+    </header>
+    <div data-slot="main">
+      <div class="pg">
+        <div class="hd">
+          <div class="hd-l">
+            <div class="ttl">
+              <h1>结算页模块化</h1>
+              <span class="st"><span class="dot run"></span>进行中</span>
+              <button class="btn"><svg class="dsh-i" viewBox="0 0 24 24"><path d="M4 7h9M4 17h9M15 7h5M18 4v6M15 14h5M12 11v6"/></svg>切换团队</button>
+            </div>
+            <p class="goal">把结算页拆成独立模块包，迁出旧目录并锁定 v0.2 对外契约</p>
+          </div>
+          <div class="hd-r">
+            <button class="ibtn" title="刷新"><svg class="dsh-i" viewBox="0 0 24 24"><path d="M20 11a8 8 0 1 0-2 5.5"/><path d="M20 5v6h-6"/></svg></button>
+            <button class="ibtn" title="更多"><svg class="dsh-i" viewBox="0 0 24 24"><circle cx="5" cy="12" r="1"/><circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/></svg></button>
+          </div>
+        </div>
+
+        <div class="sum">
+          <span><b>17</b> 个任务</span><i class="sep"></i>
+          <span><b>3</b> 个在跑</span><i class="sep"></i>
+          <span><b>3</b> 条待你裁决</span><i class="sep"></i>
+          <span><b>5</b> 名成员</span><i class="sep"></i>
+          <span>累计 <b>1.86M</b> token</span>
+        </div>
+
+        <div class="bar">
+          <div class="seg"><b class="on">列表</b><b>看板</b><b>流程</b><b>依赖图</b></div>
+          <div class="grow"></div>
+          <div class="field w"><svg class="dsh-i" viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="M20 20l-4-4"/></svg>搜索任务号、标题</div>
+          <button class="btn"><svg class="dsh-i" viewBox="0 0 24 24"><path d="M4 6h16M7 12h10M10 18h4"/></svg>筛选</button>
+          <button class="btn"><svg class="dsh-i" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg>新任务</button>
+        </div>
+
+        <div class="list">
+          <div class="grp-h"><span class="dot run"></span><span class="nm">进行中</span><span class="n">3</span><span class="hint">2 个成员在跑 · 最近活动 3 分钟前</span><svg class="caret" viewBox="0 0 24 24"><path d="M6 9l6 6 6-6"/></svg></div>
+          <div class="row">
+            <span class="id">t7</span>
+            <div class="ti"><div class="t1"><span class="pri p0">P0</span>抽结算服务边界与接口草案</div><div class="t2">解锁后置 t6 · 会话 结算页模块化 · 3 分钟前有进展</div></div>
+            <span class="role">实现者</span>
+            <span class="who"><span class="av">林</span><span class="nm">林 · impl-a</span></span>
+            <span class="gates" title="门禁 2/3"><i class="gd p"></i><i class="gd p"></i><i class="gd"></i></span>
+            <span class="tok">128k</span>
+            <span class="more">⋯</span>
+          </div>
+          <div class="row">
+            <span class="id">t6</span>
+            <div class="ti"><div class="t1"><span class="pri">P1</span>结算页 UI 迁移到模块包</div><div class="t2">依赖 t7 · 已改 14 个文件 · 6 分钟前</div></div>
+            <span class="role">实现者</span>
+            <span class="who"><span class="av">周</span><span class="nm">周 · impl-b</span></span>
+            <span class="gates" title="门禁 1/3"><i class="gd p"></i><i class="gd"></i><i class="gd"></i></span>
+            <span class="tok">96k</span>
+            <span class="more">⋯</span>
+          </div>
+          <div class="row">
+            <span class="id">v2</span>
+            <div class="ti"><div class="t1"><span class="pri">P1</span>锁定 v0.2 对外契约基线</div><div class="t2">与 t1 契约对齐 · 待补兼容矩阵</div></div>
+            <span class="role">api-reviewer</span>
+            <span class="who"><span class="av">赵</span><span class="nm">赵 · reviewer-c</span></span>
+            <span class="gates" title="门禁 0/2"><i class="gd"></i><i class="gd"></i></span>
+            <span class="tok">41k</span>
+            <span class="more">⋯</span>
+          </div>
+
+          <div class="grp-h"><span class="dot gate"></span><span class="nm">门禁</span><span class="n">3</span><span class="hint">3 条等你裁决</span><svg class="caret" viewBox="0 0 24 24"><path d="M6 9l6 6 6-6"/></svg></div>
+          <div class="row">
+            <span class="id">t4</span>
+            <div class="ti"><div class="t1"><span class="pri">P1</span>替换调用点并跑通 4 条冒烟</div><div class="t2">命令门禁 1 次重跑 · 证据 2 条</div></div>
+            <span class="role">审查者</span>
+            <span class="who"><span class="av">陈</span><span class="nm">陈 · reviewer-a</span></span>
+            <span class="gates" title="门禁 3/4"><i class="gd p"></i><i class="gd p"></i><i class="gd p"></i><i class="gd w"></i></span>
+            <span class="tok">74k</span>
+            <span class="more">⋯</span>
+          </div>
+          <div class="row">
+            <span class="id">t3</span>
+            <div class="ti"><div class="t1"><span class="pri">P2</span>移除旧结算组件目录</div><div class="t2">引用 0 处残留 · 等你确认删除范围</div></div>
+            <span class="role">需求验证</span>
+            <span class="who"><span class="av">苏</span><span class="nm">苏 · verifier-a</span></span>
+            <span class="gates" title="门禁 2/2"><i class="gd p"></i><i class="gd p"></i></span>
+            <span class="tok">38k</span>
+            <span class="more">⋯</span>
+          </div>
+          <div class="row">
+            <span class="id">v6</span>
+            <div class="ti"><div class="t1"><span class="pri">P1</span>v0.2 changelog 复核</div><div class="t2">改动 14 个文件 · 缺 breaking 标注</div></div>
+            <span class="role">审查者</span>
+            <span class="who"><span class="av">陈</span><span class="nm">陈 · reviewer-a</span></span>
+            <span class="gates" title="门禁 2/3"><i class="gd p"></i><i class="gd p"></i><i class="gd"></i></span>
+            <span class="tok">12k</span>
+            <span class="more">⋯</span>
+          </div>
+
+          <div class="grp-h"><span class="dot"></span><span class="nm">就绪</span><span class="n">3</span><span class="hint">依赖已解锁，可分配</span><svg class="caret" viewBox="0 0 24 24"><path d="M6 9l6 6 6-6"/></svg></div>
+          <div class="row">
+            <span class="id">t5</span>
+            <div class="ti"><div class="t1"><span class="pri">P1</span>旧调用点替换与灰度开关</div><div class="t2">前置 t4 未过 · 暂不分配</div></div>
+            <span class="role">审查者</span>
+            <span class="who"><span class="av">陈</span><span class="nm">陈 · reviewer-a</span></span>
+            <span class="gates" title="门禁 0/3"><i class="gd"></i><i class="gd"></i><i class="gd"></i></span>
+            <span class="tok">—</span>
+            <span class="more">⋯</span>
+          </div>
+          <div class="row">
+            <span class="id">t8</span>
+            <div class="ti"><div class="t1"><span class="pri">P2</span>补 12 条结算回归用例</div><div class="t2">t9 已解锁 · 用例清单待补</div></div>
+            <span class="role">需求验证</span>
+            <span class="who"><span class="av">苏</span><span class="nm">苏 · verifier-a</span></span>
+            <span class="gates" title="门禁 0/2"><i class="gd"></i><i class="gd"></i></span>
+            <span class="tok">—</span>
+            <span class="more">⋯</span>
+          </div>
+          <div class="row">
+            <span class="id">v3</span>
+            <div class="ti"><div class="t1"><span class="pri">P2</span>兼容性矩阵比对</div><div class="t2">需先锁定 v2 契约基线</div></div>
+            <span class="role">api-reviewer</span>
+            <span class="who"><span class="av">赵</span><span class="nm">赵 · reviewer-c</span></span>
+            <span class="gates" title="门禁 0/2"><i class="gd"></i><i class="gd"></i></span>
+            <span class="tok">—</span>
+            <span class="more">⋯</span>
+          </div>
+
+          <div class="grp-h"><span class="dot idle"></span><span class="nm">待规划</span><span class="n">3</span><span class="hint">等队长拆解或补验收标准</span><svg class="caret" viewBox="0 0 24 24"><path d="M6 9l6 6 6-6"/></svg></div>
+          <div class="row">
+            <span class="id">v1</span>
+            <div class="ti"><div class="t1"><span class="pri">P2</span>评审口径对齐</div><div class="t2">缺验收标准（AC 必须可检验）</div></div>
+            <span class="role">需求验证</span>
+            <span class="who"><span class="nm muted">未指派</span></span>
+            <span class="gates" title="门禁 0/0"><i class="gd"></i></span>
+            <span class="tok">—</span>
+            <span class="more">⋯</span>
+          </div>
+          <div class="row">
+            <span class="id">v4</span>
+            <div class="ti"><div class="t1"><span class="pri">P2</span>评审范围与分组口径</div><div class="t2">等队长拆解</div></div>
+            <span class="role">api-reviewer</span>
+            <span class="who"><span class="nm muted">未指派</span></span>
+            <span class="gates" title="门禁 0/0"><i class="gd"></i></span>
+            <span class="tok">—</span>
+            <span class="more">⋯</span>
+          </div>
+          <div class="row">
+            <span class="id">v5</span>
+            <div class="ti"><div class="t1"><span class="pri">P1</span>破坏性变更清单</div><div class="t2">需人工补范围后提交计划</div></div>
+            <span class="role">—</span>
+            <span class="who"><span class="nm muted">未指派</span></span>
+            <span class="gates" title="门禁 0/0"><i class="gd"></i></span>
+            <span class="tok">—</span>
+            <span class="more">⋯</span>
+          </div>
+
+          <div class="grp-h"><span class="dot done"></span><span class="nm">已完成</span><span class="n">5</span><span class="hint">证据与产物已归档</span><svg class="caret" viewBox="0 0 24 24"><path d="M6 9l6 6 6-6"/></svg></div>
+          <div class="row">
+            <span class="id">t0</span>
+            <div class="ti"><div class="t1"><span class="pri">P1</span>摸清结算页现状与依赖</div><div class="t2">4 条证据 · 产物 docs/结算页现状.md</div></div>
+            <span class="role">需求验证</span>
+            <span class="who"><span class="av">苏</span><span class="nm">苏 · verifier-a</span></span>
+            <span class="gates" title="门禁 2/2"><i class="gd p"></i><i class="gd p"></i></span>
+            <span class="tok">212k</span>
+            <span class="more">⋯</span>
+          </div>
+          <div class="row">
+            <span class="id">t1</span>
+            <div class="ti"><div class="t1"><span class="pri">P0</span>确定模块包对外 API 契约</div><div class="t2">3 条证据 · 产物 docs/契约.md</div></div>
+            <span class="role">实现者</span>
+            <span class="who"><span class="av">林</span><span class="nm">林 · impl-a</span></span>
+            <span class="gates" title="门禁 3/3"><i class="gd p"></i><i class="gd p"></i><i class="gd p"></i></span>
+            <span class="tok">186k</span>
+            <span class="more">⋯</span>
+          </div>
+          <div class="row">
+            <span class="id">t2</span>
+            <div class="ti"><div class="t1"><span class="pri">P1</span>梳理结算页现有调用点清单</div><div class="t2">2 条证据 · 28 处调用点</div></div>
+            <span class="role">实现者</span>
+            <span class="who"><span class="av">周</span><span class="nm">周 · impl-b</span></span>
+            <span class="gates" title="门禁 2/2"><i class="gd p"></i><i class="gd p"></i></span>
+            <span class="tok">97k</span>
+            <span class="more">⋯</span>
+          </div>
+          <div class="row">
+            <span class="id">t9</span>
+            <div class="ti"><div class="t1"><span class="pri">P2</span>CI 增加构建产物校验</div><div class="t2">2 条证据 · 流水线已绿</div></div>
+            <span class="role">实现者</span>
+            <span class="who"><span class="av">周</span><span class="nm">周 · impl-b</span></span>
+            <span class="gates" title="门禁 2/2"><i class="gd p"></i><i class="gd p"></i></span>
+            <span class="tok">83k</span>
+            <span class="more">⋯</span>
+          </div>
+          <div class="row">
+            <span class="id">t11</span>
+            <div class="ti"><div class="t1"><span class="pri">P2</span>补 README 与迁移说明</div><div class="t2">1 条证据 · 产物 README.md</div></div>
+            <span class="role">审查者</span>
+            <span class="who"><span class="av">陈</span><span class="nm">陈 · reviewer-a</span></span>
+            <span class="gates" title="门禁 1/1"><i class="gd p"></i></span>
+            <span class="tok">64k</span>
+            <span class="more">⋯</span>
+          </div>
+        </div>
+
+        <div class="ft">
+          <span>缓存命中 71.8%</span><span class="sep"></span>
+          <span>今日 264k 未命中 / 58k 输出</span><span class="sep"></span>
+          <span>门禁重跑 4 次</span>
+          <span class="r">上下文 174k / 256k<span class="dot gate"></span><span style="color:var(--mt-muted)">估算</span></span>
+        </div>
+      </div>
+    </div>
+  </main>
+</div>
+</body>
+</html>
