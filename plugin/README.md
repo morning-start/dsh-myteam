@@ -98,6 +98,8 @@ node scripts/build-lib.mjs        # 49 个模块 → lib/（入口 lib/compositi
 node ../tools/gen-panel-contract.mjs --check   # 面板契约文档与代码一致
 node ../tools/gen-tool-contract.mjs --check    # 工具面契约文档与代码一致
 node ../tools/gen-config-contract.mjs --check  # 配置字段契约文档与代码一致
+# 真实 cutover 演练（只读；候选写临时目录，不动工作区）
+node ../tools/myteam-cutover.mjs --root "E:\Workplace\extension\dsh-myteam"
 
 # v1 数据只读分析（不写旧文件、不迁移）
 node ../tools/myteam-migrate.mjs analyze --root "E:\Workplace\extension\dsh-myteam"
