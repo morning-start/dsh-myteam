@@ -92,14 +92,16 @@ window.__ModuleLoader__.load({
      * @param sessionId - 当前会话；root scope 的面板没有它时不发请求（不编造身份）。
      * @param method - 门面方法名。
      * @param query - 方法参数。
+     * @param options - `allowNoSession`：全局库方法不属任何项目，不带会话也要读。
      */
-    function usePanelData(sessionId, method, query) {
+    function usePanelData(sessionId, method, query, options) {
+      const allowNoSession = options !== undefined && options.allowNoSession === true
       const [state, setState] = useState({ status: 'loading' })
       const generation = useRef(0)
 
       const load = useCallback(async () => {
         const mine = (generation.current += 1)
-        if (!sessionId) {
+        if (!sessionId && !allowNoSession) {
           setState({ status: 'no-session' })
           return
         }
@@ -387,7 +389,7 @@ window.__ModuleLoader__.load({
           'div',
           { className: 'box', style: { padding: '12px 14px' } },
           h('p', { className: 'muted', style: { margin: 0, fontSize: 12 } },
-            `看板与概览来自同一份项目投影（graphRevision ${data.graphRevision ?? '—'}）。事件流、跨团队依赖与最近事件的读取端点尚未接入，本页只画已投影的部分。`),
+            `看板、审计、设置读的是同一份项目投影（graphRevision ${data.graphRevision ?? '—'}）；跨团队依赖还没有单独成图，这一页只画已投影的团队与计数。`),
         ),
       )
     }
@@ -576,33 +578,223 @@ window.__ModuleLoader__.load({
       )
     }
 
-    const PROJECT_MISSING = {
-      runs: {
-        title: '工作流运行',
-        reason: 'v2 还只有 status / overview / board / task / team / definitions / migration 七个只读端点，没有 Run 列表与 Run 详情。',
-        hints: ['Run 的事件已经写进账本', '端点接上后这一页直接读同一份投影'],
-      },
-      knowledge: {
-        title: '项目知识',
-        reason: '知识条目已经在投影里（counts.knowledge 能读到数量），但还没有把条目、证据与修订读出来的端点。',
-        hints: ['counts.knowledge 来自 status'],
-      },
-      memory: {
-        title: '长期记忆',
-        reason: '记忆 bank 属于 SQLite 侧，面板端点还没接。',
-        hints: ['memory 不进全局库'],
-      },
-      audit: {
-        title: '审计',
-        reason: '审计要按批次读事件流与 Effect 三态，v2 还没有这个端点。',
-        hints: ['看板与概览都标了 projectSeq', '事件流端点接上后按批次翻页'],
-      },
-      settings: {
-        title: '项目设置',
-        reason: '配置链（四层合并、硬上限、写者路径）目前在 host 内部，没有只读端点。',
-        hints: ['teamView.config 能读到单个团队的生效配置'],
-      },
+    // ───────────────────── 运行 / 知识 / 记忆 / 审计 / 设置 ─────────────────────
+    //
+    // 这五屏都只读同一份投影或同一个记忆库；没有数据时给一句「为什么空」，
+    // 而不是画占位卡片冒充有数据。
+
+    const RUN_STATUS = { active: '进行中', completed: '已完成', cancelled: '已取消' }
+
+    function ListPane(props) {
+      return h(
+        'div',
+        { className: 'body pad' },
+        props.items.length === 0
+          ? h('p', { className: 'muted', style: { fontSize: 12, margin: 0 } }, props.empty)
+          : h('div', { className: 'list' }, props.children),
+        props.footer ?? null,
+      )
     }
+
+    function RunsScreen(props) {
+      const items = Array.isArray(props.data.items) ? props.data.items : []
+      return h(
+        ListPane,
+        { items, empty: '还没有工作流运行。实例化一个工作流后，Run 与它的任务图会一起写进账本。' },
+        items.map((run) =>
+          h(
+            'div',
+            { key: run.id, className: 'item' },
+            h(
+              'div',
+              { className: 'l' },
+              h('div', { className: 't' }, run.workflowId, ' ', h('span', { className: 'muted' }, run.id)),
+              h(
+                'div',
+                { className: 's' },
+                h('span', { className: 'mono' }, `rev ${run.revision}`),
+                h('span', { className: 'mono' }, `定义 rev ${run.workflowRevision}`),
+                h('span', { className: 'mono' }, `完成规则 rev ${run.completionRevision}`),
+                h('span', { className: 'mono' }, `${run.taskCount} 个任务`),
+              ),
+            ),
+            h('div', { className: 'r' }, h('span', { className: 'st-chip' }, RUN_STATUS[run.status] ?? run.status)),
+          ),
+        ),
+      )
+    }
+
+    function KnowledgeScreen(props) {
+      const items = Array.isArray(props.data.items) ? props.data.items : []
+      return h(
+        ListPane,
+        { items, empty: '这个项目还没有知识条目。成员提出、队长采纳后会写进账本。' },
+        items.map((entry) =>
+          h(
+            'div',
+            { key: entry.id, className: 'item' },
+            h(
+              'div',
+              { className: 'l' },
+              h('div', { className: 't' }, entry.title),
+              h(
+                'div',
+                { className: 's' },
+                h('span', { className: 'mono' }, `rev ${entry.revision}`),
+                h('span', { className: 'mono' }, `证据 ${Array.isArray(entry.evidence) ? entry.evidence.length : 0} 条`),
+                entry.supersedes === null || entry.supersedes === undefined
+                  ? null
+                  : h('span', { className: 'mono' }, `取代 ${entry.supersedes}`),
+              ),
+              h('div', { className: 's' }, String(entry.body ?? '').slice(0, 160)),
+            ),
+            h('div', { className: 'r' }, h('span', { className: 'st-chip' }, String(entry.status))),
+          ),
+        ),
+      )
+    }
+
+    function MemoryScreen(props) {
+      const data = props.data
+      const banks = Array.isArray(data.banks) ? data.banks : []
+      const entries = Array.isArray(data.entries) ? data.entries : []
+      const warnings = Array.isArray(data.warnings) ? data.warnings : []
+      if (data.exists !== true) {
+        return h(
+          'div',
+          { className: 'body pad' },
+          h(
+            'p',
+            { className: 'muted', style: { fontSize: 12, margin: 0 } },
+            `这个工作区还没有记忆库（${data.file ?? 'myteam.db'} 未创建）。记忆只在成员真正写入后才出现。`,
+          ),
+        )
+      }
+      return h(
+        ListPane,
+        {
+          items: entries,
+          empty: '记忆库是空的。',
+          footer:
+            warnings.length === 0
+              ? null
+              : h('p', { className: 'muted', style: { margin: '10px 0 0', fontSize: 12 } }, `读取告警：${warnings.join(' · ')}`),
+        },
+        [
+          h(
+            'div',
+            { key: 'banks', className: 'kws', style: { marginBottom: 10 } },
+            banks.length === 0
+              ? h('span', { className: 'kw' }, '没有 bank')
+              : banks.map((bank) =>
+                  h('span', { key: bank.bankId, className: 'kw' }, `${bank.bankId} · ${bank.live}/${bank.total}`),
+                ),
+          ),
+          ...entries.map((entry) =>
+            h(
+              'div',
+              { key: entry.id, className: 'item' },
+              h(
+                'div',
+                { className: 'l' },
+                h('div', { className: 't' }, String(entry.text ?? '').slice(0, 120)),
+                h(
+                  'div',
+                  { className: 's' },
+                  h('span', { className: 'mono' }, entry.bankId),
+                  h('span', { className: 'mono' }, `rev ${entry.revision}`),
+                  (Array.isArray(entry.tags) ? entry.tags : []).map((tag) => h('span', { key: tag, className: 'mono' }, `#${tag}`)),
+                ),
+              ),
+              h('div', { className: 'r' }, entry.forgotten === true ? h('span', { className: 'st-chip' }, '已遗忘') : null),
+            ),
+          ),
+        ],
+      )
+    }
+
+    function AuditScreen(props) {
+      const data = props.data
+      const items = Array.isArray(data.items) ? data.items : []
+      const done = data.nextBeforeSeq === null || data.nextBeforeSeq === undefined
+      return h(
+        ListPane,
+        {
+          items,
+          empty: '这个项目还没有事件。',
+          footer: h(
+            'p',
+            { className: 'muted', style: { margin: '10px 0 0', fontSize: 12 } },
+            done ? `已到最早一条（本页 ${items.length} 条）` : `本页 ${items.length} 条，更早的用 beforeSeq=${data.nextBeforeSeq} 继续翻`,
+          ),
+        },
+        items.map((event) =>
+          h(
+            'div',
+            { key: event.seq, className: 'item' },
+            h(
+              'div',
+              { className: 'l' },
+              h('div', { className: 't' }, h('span', { className: 'mono' }, `#${event.seq}`), ' ', String(event.type)),
+              h(
+                'div',
+                { className: 's' },
+                h('span', { className: 'mono' }, String(event.at ?? '')),
+                h('span', { className: 'mono' }, `${event.actor.kind}${event.actor.id === null ? '' : `:${event.actor.id}`}`),
+                h('span', { className: 'mono' }, `${event.entity.kind}${event.entity.id === '' ? '' : `:${event.entity.id}`}`),
+              ),
+            ),
+          ),
+        ),
+      )
+    }
+
+    function SettingsScreen(props) {
+      const data = props.data
+      const teams = Array.isArray(data.teams) ? data.teams : []
+      return h(
+        'div',
+        { className: 'body pad' },
+        h('p', { className: 'muted', style: { margin: '0 0 6px', fontSize: 12 } }, `configRevision ${data.configRevision ?? '—'} · 项目默认值`),
+        h(
+          'pre',
+          { className: 'box mono', style: { padding: '12px 14px', margin: 0, whiteSpace: 'pre-wrap', fontSize: 12 } },
+          JSON.stringify(data.defaults ?? {}, null, 2),
+        ),
+        h(
+          'p',
+          { className: 'muted', style: { margin: '12px 0 6px', fontSize: 12 } },
+          teams.length === 0 ? '还没有团队的生效配置落盘。' : '各团队生效配置：',
+        ),
+        h(
+          'div',
+          { className: 'list' },
+          teams.map((team) =>
+            h(
+              'div',
+              { key: team.teamId, className: 'item' },
+              h(
+                'div',
+                { className: 'l' },
+                h('div', { className: 't' }, team.teamId),
+                h(
+                  'div',
+                  { className: 's' },
+                  h('span', { className: 'mono' }, `rev ${team.configRevision}`),
+                  h('span', { className: 'mono' }, `hash ${String(team.contentHash ?? '').slice(0, 8)}`),
+                  h('span', { className: 'mono' }, `merge ${team.mergeAlgorithmVersion ?? '—'}`),
+                  h('span', { className: 'mono' }, `limits ${team.safetyLimitsVersion ?? '—'}`),
+                ),
+              ),
+              h('div', { className: 'r' }, team.clamped === true ? h('span', { className: 'st-chip' }, '被上限夹住') : null),
+            ),
+          ),
+        ),
+      )
+    }
+
+    // 导航里的九栏现在都有端点；留这个兜底是为了将来加栏时的默认文案。
+    const PROJECT_FALLBACK = { title: '未接入', reason: '这一栏还没有端点。' }
 
     function ProjectView(props) {
       const { sessionId } = props
@@ -618,6 +810,12 @@ window.__ModuleLoader__.load({
       const board = usePanelData(sessionId, METHOD_BOARD)
       const definitions = usePanelData(sessionId, METHOD_DEFINITIONS)
       const migration = usePanelData(tab === 'migration' ? sessionId : undefined, METHOD_MIGRATION)
+      // 五个后接的只读面：只在切到那一栏时才请求，避免每次开面板打七枪。
+      const runs = usePanelData(tab === 'runs' ? sessionId : undefined, 'runs')
+      const knowledge = usePanelData(tab === 'knowledge' ? sessionId : undefined, 'knowledge')
+      const memory = usePanelData(tab === 'memory' ? sessionId : undefined, 'memory')
+      const audit = usePanelData(tab === 'audit' ? sessionId : undefined, 'audit', { limit: 200 })
+      const settings = usePanelData(tab === 'settings' ? sessionId : undefined, 'settings')
 
       const projectName = status.data?.name ?? overview.data?.name ?? '未命名'
       const counts = status.data?.counts ?? {}
@@ -641,6 +839,11 @@ window.__ModuleLoader__.load({
         void board.reload()
         void definitions.reload()
         if (tab === 'migration') void migration.reload()
+        if (tab === 'runs') void runs.reload()
+        if (tab === 'knowledge') void knowledge.reload()
+        if (tab === 'memory') void memory.reload()
+        if (tab === 'audit') void audit.reload()
+        if (tab === 'settings') void settings.reload()
       }
 
       let body
@@ -656,9 +859,19 @@ window.__ModuleLoader__.load({
         body = h(Data, { data: definitions, what: '项目定义副本' }, (data) => h(DefinitionsScreen, { data }))
       } else if (tab === 'migration') {
         body = h(Data, { data: migration, what: '迁移' }, (data) => h(MigrationScreen, { data }))
+      } else if (tab === 'runs') {
+        body = h(Data, { data: runs, what: '工作流运行' }, (data) => h(RunsScreen, { data }))
+      } else if (tab === 'knowledge') {
+        body = h(Data, { data: knowledge, what: '项目知识' }, (data) => h(KnowledgeScreen, { data }))
+      } else if (tab === 'memory') {
+        body = h(Data, { data: memory, what: '长期记忆' }, (data) => h(MemoryScreen, { data }))
+      } else if (tab === 'audit') {
+        body = h(Data, { data: audit, what: '审计' }, (data) => h(AuditScreen, { data }))
+      } else if (tab === 'settings') {
+        body = h(Data, { data: settings, what: '项目设置' }, (data) => h(SettingsScreen, { data }))
       } else {
-        const missing = PROJECT_MISSING[tab] ?? { title: tab, reason: '这个页面还没有端点。' }
-        body = h(Unavailable, missing)
+        const missing = PROJECT_FALLBACK
+        body = h(Unavailable, { ...missing, title: tab })
       }
 
       return h(Shell, {
@@ -688,12 +901,106 @@ window.__ModuleLoader__.load({
       { id: 'publish', label: '发布', icon: 'book', hint: '发布与全局审计' },
     ]
 
-    const GLOBAL_MISSING = {
-      overview: '全局库要读 $DSH_HOME/myteam 下的角色 / 工作流 / 蓝图文件与 global-operations.jsonl；v2 的面板端点只读项目，没有全局库读取面。',
-      roles: 'RoleDefinition 的全局库读取端点还没接；项目里的定义副本可以在「定义」里看到。',
-      workflows: 'WorkflowDefinition 的全局库读取端点还没接；项目里的定义副本可以在「定义」里看到。',
-      blueprints: 'TeamBlueprint 的全局库读取端点还没接。',
-      publish: '发布确认与 global-operations.jsonl 审计端点是人类专属写路径，还没接。',
+    // ───────────────────────── 全局库五栏（不属任何项目） ─────────────────────────
+
+    const GLOBAL_KIND_LABEL = { role: '角色', workflow: '工作流', blueprint: '蓝图', team: 'v1 团队（只读兼容）' }
+
+    function globalEntryRows(entries) {
+      return entries.map((entry) =>
+        h(
+          'div',
+          { key: `${entry.kind}:${entry.id}`, className: 'item' },
+          h(
+            'div',
+            { className: 'l' },
+            h('div', { className: 't' }, entry.name, ' ', h('span', { className: 'muted' }, entry.id)),
+            h(
+              'div',
+              { className: 's' },
+              h('span', { className: 'mono' }, entry.file),
+              h('span', { className: 'mono' }, entry.revision === null ? '未标 revision' : `rev ${entry.revision}`),
+              h('span', { className: 'mono' }, GLOBAL_KIND_LABEL[entry.kind] ?? entry.kind),
+            ),
+          ),
+          h('div', { className: 'r' }, entry.legacy === true ? h('span', { className: 'st-chip' }, 'v1 兼容') : null),
+        ),
+      )
+    }
+
+    function GlobalOverviewScreen(props) {
+      const data = props.data
+      const counts = data.counts ?? {}
+      const warnings = Array.isArray(data.warnings) ? data.warnings : []
+      return h(
+        'div',
+        { className: 'body pad' },
+        h(
+          'p',
+          { className: 'muted', style: { margin: '0 0 10px', fontSize: 12 } },
+          `根目录 ${data.root ?? '—'}${data.exists === true ? '' : '（还不存在，第一次发布会创建）'}`,
+        ),
+        h(
+          'div',
+          { className: 'kws' },
+          ['role', 'workflow', 'blueprint', 'team'].map((kind) =>
+            h('span', { key: kind, className: 'kw' }, `${GLOBAL_KIND_LABEL[kind]} ${counts[kind] ?? 0}`),
+          ),
+        ),
+        warnings.length === 0
+          ? h('p', { className: 'muted', style: { margin: '12px 0 0', fontSize: 12 } }, '所有文件都读得懂。')
+          : h(
+              'div',
+              { className: 'box', style: { padding: '12px 14px', marginTop: 12 } },
+              h('b', null, `有 ${warnings.length} 个文件读不懂（已跳过，不影响其它条目）`),
+              warnings.map((warning) =>
+                h(
+                  'p',
+                  { key: `${warning.file}:${warning.reason}`, className: 'mono', style: { margin: '6px 0 0', fontSize: 12 } },
+                  `${warning.file} · ${warning.reason}`,
+                ),
+              ),
+            ),
+      )
+    }
+
+    function GlobalAuditScreen(props) {
+      const data = props.data
+      const items = Array.isArray(data.items) ? data.items : []
+      return h(
+        ListPane,
+        {
+          items,
+          empty: '还没有全局操作记录。发布、下架等人类确认动作会写进 global-operations.jsonl。',
+          footer:
+            data.truncated === true
+              ? h('p', { className: 'muted', style: { margin: '10px 0 0', fontSize: 12 } }, '文件比本页更多：提高 limit 或直接看 jsonl。')
+              : null,
+        },
+        items.map((item) =>
+          h(
+            'div',
+            { key: `${item.at ?? ''}:${item.operationId ?? ''}`, className: 'item' },
+            h(
+              'div',
+              { className: 'l' },
+              h(
+                'div',
+                { className: 't' },
+                String(item.action ?? '未知操作'),
+                ' ',
+                h('span', { className: 'muted' }, String(item.target ?? '')),
+              ),
+              h(
+                'div',
+                { className: 's' },
+                h('span', { className: 'mono' }, String(item.at ?? '')),
+                h('span', { className: 'mono' }, String(item.operationId ?? '')),
+              ),
+            ),
+            h('div', { className: 'r' }, h('span', { className: 'st-chip' }, String(item.status ?? '—'))),
+          ),
+        ),
+      )
     }
 
     function GlobalPanel(props) {
@@ -713,6 +1020,29 @@ window.__ModuleLoader__.load({
       }, [ctx])
 
       const navItem = GLOBAL_NAV.find((item) => item.id === tab) ?? GLOBAL_NAV[0]
+      // 全局库不属任何项目：请求不带会话，路由对这两个方法也不要求 sessionId。
+      const library = usePanelData(undefined, 'globalLibrary', undefined, { allowNoSession: true })
+      const globalAudit = usePanelData(undefined, 'globalAudit', { limit: 100 }, { allowNoSession: true })
+
+      const kindForTab = tab === 'roles' ? 'role' : tab === 'workflows' ? 'workflow' : tab === 'blueprints' ? 'blueprint' : null
+      const entries = Array.isArray(library.data?.entries) ? library.data.entries : []
+      const ofKind = kindForTab === null ? [] : entries.filter((entry) => entry.kind === kindForTab)
+
+      let body
+      if (tab === 'publish') {
+        body = h(Data, { data: globalAudit, what: '全局操作审计' }, (data) => h(GlobalAuditScreen, { data }))
+      } else if (kindForTab === null) {
+        body = h(Data, { data: library, what: '全局库概览' }, (data) => h(GlobalOverviewScreen, { data }))
+      } else {
+        body = h(Data, { data: library, what: navItem.label }, () =>
+          h(ListPane, { items: ofKind, empty: `${navItem.label}里还没有全局条目。` }, globalEntryRows(ofKind)),
+        )
+      }
+
+      const onRefresh = () => {
+        void library.reload()
+        void globalAudit.reload()
+      }
 
       return h(Shell, {
         initials: 'mt',
@@ -724,24 +1054,21 @@ window.__ModuleLoader__.load({
           h(PaneHeader, {
             title: '全局库',
             scope: { kind: '全局', detail: navItem.label },
-            summary: ['$DSH_HOME/myteam', '只有人类确认后写', '项目侧在会话「团队视图」标签'],
-            onRefresh: undefined,
+            summary: ['$DSH_HOME/myteam', '只有人类确认后写', '团队视图在会话标签上'],
+            onRefresh,
+            busy: library.status === 'loading',
           }),
           h(StatusBar, {
-            chips: [{ text: '只读', tone: undefined }, { text: '作用域 全局' }, { text: '设计 design-v2' }],
-            note: '全局资产与项目运行态分开',
+            chips: [
+              { text: '只读', tone: undefined },
+              { text: `条目 ${entries.length}` },
+              { text: library.data?.root ?? '$DSH_HOME/myteam' },
+            ],
+            note: '全局资产与团队运行态分开',
           }),
-          h(
-            'div',
-            { className: 'body pad' },
-            h(Unavailable, {
-              title: navItem.label,
-              reason: GLOBAL_MISSING[tab] ?? GLOBAL_MISSING.overview,
-              hints: ['左侧入口 = 全局库', '会话「团队视图」标签 = 当前团队视图'],
-            }),
-            h('div', { className: 'layer' }, h('b', null, '回到对话'), h('i', { className: 'rule' })),
-            h('button', { type: 'button', className: 'btn', onClick: back }, '回到对话'),
-          ),
+          body,
+          h('div', { className: 'layer' }, h('b', null, '回到对话'), h('i', { className: 'rule' })),
+          h('button', { type: 'button', className: 'btn', onClick: back }, '回到对话'),
         ],
       })
     }
