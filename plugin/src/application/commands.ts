@@ -407,6 +407,58 @@ export function appointMemberCommand(
   return runtime.commit([draft])
 }
 
+export function rebaseTeamConfigCommand(
+  runtime: ProjectRuntime,
+  input: {
+    actor: ActorRef
+    teamId: string
+    overrides: ConfigOverrides
+    expectedConfigRevision: number
+  },
+): CommitResult {
+  const state = runtime.state
+  const team = state.teams.get(input.teamId)
+  if (team === undefined) {
+    fail(ERROR_CODES.NOT_FOUND, '团队不存在', { details: { teamId: input.teamId } })
+  }
+  authorize('config.rebase', input.actor, { teamId: input.teamId })
+  assertTeamActive(team)
+
+  if (team.configRevision !== input.expectedConfigRevision) {
+    fail(ERROR_CODES.PRECONDITION_FAILED, '团队配置已被修改，请重读差异后重试', {
+      details: { expectedConfigRevision: input.expectedConfigRevision, currentConfigRevision: team.configRevision },
+    })
+  }
+
+  const blueprint =
+    team.blueprint === null ? undefined : state.blueprints.get(team.blueprint.id)
+  const configRevision = team.configRevision + 1
+  const snapshot = computeEffectiveConfig({
+    projectDefaults: state.configDefaults as ConfigOverrides,
+    blueprintDefaults: blueprint?.defaults ?? null,
+    teamOverrides: input.overrides,
+    configRevision,
+    sources: {
+      projectDefaultsRevision: state.configRevision,
+      blueprintRevision: team.blueprint?.revision ?? null,
+      teamOverridesRevision: configRevision,
+    },
+  })
+
+  const draft: DraftEvent = {
+    type: 'config.rebased',
+    actor: input.actor,
+    entity: { kind: 'config', id: input.teamId, teamId: input.teamId },
+    payload: {
+      teamId: input.teamId,
+      configRevision,
+      previousRevision: team.configRevision,
+      snapshot,
+    },
+  }
+  return runtime.commit([draft])
+}
+
 export function changeTeamStatusCommand(
   runtime: ProjectRuntime,
   input: { actor: ActorRef; teamId: string; status: 'active' | 'archived' | 'disbanded'; reason?: string },

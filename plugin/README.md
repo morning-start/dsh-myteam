@@ -3,8 +3,8 @@
 项目级多智能体团队运行时。v2 是**重写**，不是给 v1 打补丁：v1 的完整实现保存在
 Git 标签 `v1-backup`，本分支从新的分层骨架开始重新实现。
 
-> 状态：`2.0.0-alpha.1`。R0～R2（契约、领域内核、事件库与投影）已落地并有测试；
-> R3～R7（应用用例、DSH 适配器、面板、迁移、验收清理）尚未完成。
+> 状态：`2.0.0-alpha.1`。R0～R3（契约、领域内核、事件库与投影、项目用例）已落地并有测试；
+> R4～R7（DSH 适配器、面板、实际迁移、验收清理）尚未完成。
 > **R4 之前本分支不可安装**：`main` 指向的 `lib/composition/host.mjs` 还不存在，
 > `cordis.patch.yml` 里的 preset 入口按 R4 设计尚未接上。
 
@@ -59,13 +59,19 @@ composition → infrastructure → application → domain → contracts
 | 人类专属动作对任何 agent 返回 `HUMAN_ONLY` | `domain/permissions/policy.ts` | `t04` |
 | 项目重开后的投影与关闭前逐字段一致 | `application/project-runtime.ts` | `t06` |
 | 每个事件类型都有投影处理（目录与 switch 不漂移） | `application/projections/project-state.ts` | `t07` |
+| Run 实例化 = 一个原子批次；完成条件满足时同批次关 Run | `application/run-commands.ts`、`task-commands.ts` | `t08` |
+| 完成一个任务时同批次放开已满足依赖的下游任务 | `application/task-commands.ts` | `t08` |
+| 知识提案必须有证据；提案与采纳分离 | `application/knowledge-commands.ts` | `t09` |
+| 配置 rebase 必须带 `expectedConfigRevision` | `application/commands.ts` | `t09` |
+| Effect 只能 `requested→accepted→completed`；未知结果不重放 | `application/effect-commands.ts` | `t10` |
+| v1 分析：未知事件/序号断裂阻断，索引孤儿只告警 | `infrastructure/migration/v1/analyze.ts` | `t11` |
 
 ## 运行
 
 ```bash
 cd plugin
-node --test test/*.test.ts        # 51 个测试
-node ../tools/check-architecture.mjs   # ARCH_OK files=23 violations=0
+node --test test/*.test.ts        # 69 个测试
+node ../tools/check-architecture.mjs   # ARCH_OK files=30 violations=0
 ```
 
 不需要 `npm install`：Node ≥ 22.18 直接擦除类型运行 `.ts`，仓库保持零运行时依赖。

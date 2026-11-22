@@ -48,6 +48,7 @@ export type Action =
   | 'memory.write'
   | 'memory.forget'
   | 'message.post'
+  | 'effect.settle'
   | 'plan.approve'
   | 'migration.cutover'
 
@@ -90,7 +91,11 @@ const CAPTAIN_ACTIONS: ReadonlySet<Action> = new Set<Action>([
   'memory.write',
   'memory.forget',
   'message.post',
+  'effect.settle',
 ])
+
+/** 系统身份（Effect Runner）只能结算 Effect，不能发起任何业务动作。 */
+const SYSTEM_ACTIONS: ReadonlySet<Action> = new Set<Action>(['effect.settle'])
 
 /**
  * 成员可发起的动作。
@@ -137,6 +142,7 @@ export function authorize(action: Action, actor: ActorRef, context: PermissionCo
     case 'human':
       return
     case 'system':
+      if (SYSTEM_ACTIONS.has(action)) return
       fail(ERROR_CODES.FORBIDDEN, `系统身份不能发起业务动作 ${action}`, { details: { action } })
       break
     case 'captain': {

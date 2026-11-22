@@ -12,6 +12,7 @@ import {
   createTaskCommand,
   createTeamCommand,
   initializeProject,
+  rebaseTeamConfigCommand,
 } from '../src/application/commands.ts'
 import {
   adoptKnowledgeCommand,
@@ -151,6 +152,44 @@ test('任务：改依赖成环被拒，取消与重开可用', () => {
       assert.equal(runtime.state.tasks.get(bId)!.status, 'cancelled')
       reopenTaskCommand(runtime, { actor: HUMAN, taskId: bId, reason: '又需要了' })
       assert.equal(runtime.state.tasks.get(bId)!.status, 'ready')
+    } finally {
+      runtime.close()
+    }
+  } finally {
+    rmSync(dir, { recursive: true, force: true })
+  }
+})
+
+test('配置：团队 rebase 必须带正确的 configRevision', () => {
+  const dir = mkdtempSync(join(tmpdir(), 'myteam-config-'))
+  try {
+    const runtime = openRuntime(dir)
+    try {
+      const { teamId } = bootstrap(runtime)
+      const before = runtime.state.teams.get(teamId)!.configRevision
+      assert.equal(before, 1)
+
+      rebaseTeamConfigCommand(runtime, {
+        actor: HUMAN,
+        teamId,
+        overrides: { limits: { maxMembers: 3 } },
+        expectedConfigRevision: before,
+      })
+      const after = runtime.state.teams.get(teamId)!.configRevision
+      assert.equal(after, 2)
+      assert.equal(runtime.state.teamConfigs.get(teamId)!.values.limits.maxMembers, 3)
+      assert.equal(runtime.state.teamConfigs.get(teamId)!.values.gates.requireEvidence, true, '未覆盖项保持默认')
+
+      assert.throws(
+        () =>
+          rebaseTeamConfigCommand(runtime, {
+            actor: HUMAN,
+            teamId,
+            overrides: { limits: { maxMembers: 2 } },
+            expectedConfigRevision: before,
+          }),
+        (error: unknown) => error instanceof MyTeamError && error.code === 'PRECONDITION_FAILED',
+      )
     } finally {
       runtime.close()
     }
