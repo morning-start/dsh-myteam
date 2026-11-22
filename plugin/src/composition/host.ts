@@ -14,7 +14,7 @@ import { leadToolSpecs, memberToolSpecs } from '../application/tool-specs.ts'
 import { ProjectHosts } from '../infrastructure/dsh/project-hosts.ts'
 import { toDshTool } from '../infrastructure/dsh/tool-adapter.ts'
 
-export const inject = ['tools', 'agents', 'workingDirectory']
+export const inject = ['tools', 'agents', 'workingDirectory', 'subagents']
 
 export interface CaptainHostConfig {
   /** 明确固定项目根；不填时用进程工作目录。 */
@@ -26,8 +26,16 @@ interface HostContext {
   tools: { register(definition: unknown, options?: unknown): () => void }
   effect?: (execute: () => () => string | void) => unknown
   agents?: {
-    get(id: string): { id: string } | undefined
+    get(id: string): { id: string; followup?: (message: unknown) => unknown } | undefined
     create(options: unknown): Promise<unknown>
+  }
+  subagents?: {
+    sendMessage(
+      sender: { id: string },
+      target: string,
+      content: unknown[],
+      options: { signal: AbortSignal },
+    ): Promise<unknown>
   }
   workingDirectory?: { ensure(agent: { id: string }): Promise<string> }
 }
@@ -69,6 +77,39 @@ export function apply(ctx: HostContext, config: CaptainHostConfig = {}): (() => 
   }
 
   /**
+   * 把任务说明投递给成员会话。
+   *
+   * 两条通道，按可信度排序：
+   *   ① `subagents.sendMessage` —— 成员在队长的子代理树里时可用（会唤醒空闲成员）；
+   *   ② `agent.followup` —— 老路径（`agents.create` 建的根会话成员）。
+   * 都不行就返回 false，让工具如实告诉模型「没派出去」，而不是假装成功。
+   */
+  const makeDispatcher =
+    (captainSessionId: string) =>
+    async (target: string, text: string): Promise<boolean> => {
+      const content = [{ type: 'text', text }]
+      const sender = ctx.agents?.get(captainSessionId)
+      if (sender !== undefined && ctx.subagents !== undefined) {
+        try {
+          await ctx.subagents.sendMessage(sender, target, content, { signal: AbortSignal.timeout(60_000) })
+          return true
+        } catch {
+          // 落到 ②
+        }
+      }
+      const targetAgent = ctx.agents?.get(target)
+      if (typeof targetAgent?.followup === 'function') {
+        try {
+          targetAgent.followup({ role: 'user', content })
+          return true
+        } catch {
+          return false
+        }
+      }
+      return false
+    }
+
+  /**
    * 项目根 = **会话**的工作目录，不是进程 cwd。
    *
    * DSH Web 里多个会话共享一个进程；用 process.cwd() 会把所有工作区接到启动
@@ -87,7 +128,7 @@ export function apply(ctx: HostContext, config: CaptainHostConfig = {}): (() => 
     ctx.tools.register(
       toDshTool(spec, async (sessionId) => {
         const runtime = await hosts.open(await rootFor(sessionId))
-        return { runtime, sessionId, spawnMember }
+        return { runtime, sessionId, spawnMember, dispatchMember: makeDispatcher(sessionId) }
       }),
     ),
   )

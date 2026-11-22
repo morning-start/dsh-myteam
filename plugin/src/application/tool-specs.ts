@@ -34,6 +34,11 @@ export interface ToolRuntimeContext {
    * 返回成员会话 id；宿主不支持（或本地脚本）时返回 null，成员保持「待绑定」。
    */
   spawnMember?: (input: { teamId: string; roleId: string; parentMemberId: string | null }) => Promise<string | null>
+  /**
+   * 宿主能力：把一段任务说明投递给成员会话（唤醒它开始一轮）。
+   * 返回是否已投递；宿主没有该通道时返回 false，调用方如实回报「未派发」。
+   */
+  dispatchMember?: (memberSessionId: string, text: string) => Promise<boolean>
 }
 
 export interface MyTeamToolSpec {
@@ -402,16 +407,37 @@ export function leadToolSpecs(): MyTeamToolSpec[] {
         additionalProperties: false,
       },
       outputSchema: OUTPUT_SCHEMA,
-      execute(args, context) {
+      async execute(args, context) {
         const record = asRecord(args)
         const actor = actorOf(context)
-        const result = claimTaskCommand(context.runtime, {
-          actor,
-          taskId: requireString(record, 'taskId'),
-          memberId: requireString(record, 'memberId'),
-        })
+        const taskId = requireString(record, 'taskId')
+        const memberId = requireString(record, 'memberId')
+        const result = claimTaskCommand(context.runtime, { actor, taskId, memberId })
         const attempt = (result.events[0]!.payload as { attempt: { id: string; generation: number } }).attempt
-        return jsonSafe({ ok: true, data: { attemptId: attempt.id, generation: attempt.generation } })
+
+        // 认领后把任务派给成员：没有这一步，成员会话永远不知道自己要做什么。
+        const task = context.runtime.state.tasks.get(taskId)!
+        const member = context.runtime.state.members.get(memberId)!
+        let dispatched = false
+        if (context.dispatchMember !== undefined && member.sessionId !== null) {
+          const acceptance = task.acceptance.map((item) => `- ${item}`).join('\n')
+          const text = [
+            `你被指派了任务「${task.title}」（taskId=${taskId}，attemptId=${attempt.id}）。`,
+            task.description.length > 0 ? `任务说明：${task.description}` : '',
+            `验收标准：\n${acceptance.length > 0 ? acceptance : '- （未填写）'}`,
+            '请按顺序调用：myteam_progress 报告进度、myteam_evidence 附证据、myteam_submit_review 提交评审。',
+            '不要调用队长工具，也不要自己裁决。',
+          ]
+            .filter((line) => line.length > 0)
+            .join('\n')
+          try {
+            dispatched = await context.dispatchMember(member.sessionId, text)
+          } catch {
+            dispatched = false
+          }
+        }
+
+        return jsonSafe({ ok: true, data: { attemptId: attempt.id, generation: attempt.generation, dispatched } })
       },
     },
     {

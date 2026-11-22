@@ -90,7 +90,7 @@ composition → infrastructure → application → domain → contracts
 
 ```bash
 cd plugin
-node --test test/*.test.ts        # 127 个测试
+node --test test/*.test.ts        # 128 个测试
 node ../tools/check-architecture.mjs   # ARCH_OK files=49 violations=0
 node scripts/build-lib.mjs        # 49 个模块 → lib/（入口 lib/composition/host.mjs）
 node ../tools/gen-panel-contract.mjs --check   # 面板契约文档与代码一致
