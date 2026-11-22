@@ -10,7 +10,7 @@
  */
 import { randomUUID } from 'node:crypto'
 import { resolve } from 'node:path'
-import { leadToolSpecs, memberToolSpecs } from '../application/tool-specs.ts'
+import { leadToolSpecs } from '../application/tool-specs.ts'
 import { ProjectHosts } from '../infrastructure/dsh/project-hosts.ts'
 import { toDshTool } from '../infrastructure/dsh/tool-adapter.ts'
 
@@ -36,6 +36,7 @@ interface HostContext {
       content: unknown[],
       options: { signal: AbortSignal },
     ): Promise<unknown>
+    startActivation?(spec: unknown): Promise<{ childId: string }>
   }
   workingDirectory?: { ensure(agent: { id: string }): Promise<string> }
 }
@@ -55,26 +56,47 @@ export function apply(ctx: HostContext, config: CaptainHostConfig = {}): (() => 
    * 顺序很关键：先有会话，才能把 sessionId 写进成员记录；先记成员再开会话，
    * 成员就永远是「待绑定」，成员工具也没人用得上。
    */
-  const spawnMember = async (input: { teamId: string; roleId: string; parentMemberId: string | null }): Promise<string | null> => {
-    if (ctx.agents?.create === undefined) return null
-    const sessionId = `mt-member-${randomUUID()}`
-    const created = (await ctx.agents.create({
-      sessionId,
-      setup(agentCtx: { tools: { register(definition: unknown, options?: unknown): unknown } }) {
-        for (const spec of memberToolSpecs()) {
-          agentCtx.tools.register(
-            toDshTool(spec, async () => ({
-              runtime: await hosts.open(await rootFor(sessionId)),
-              sessionId,
-            })),
-            {},
-          )
+  const makeSpawner =
+    (captainSessionId: string) =>
+    async (input: { teamId: string; roleId: string; parentMemberId: string | null }): Promise<string | null> => {
+      const cwd = await rootFor(captainSessionId)
+
+      // 首选：真正的子代理（有树、有初始 prompt、消息能唤醒它）。
+      // 成员工具面由 myteam-member preset 提供，不在 setup 里重复注册。
+      const captain = ctx.agents?.get(captainSessionId)
+      if (ctx.subagents?.startActivation !== undefined && captain !== undefined) {
+        try {
+          const activation = await ctx.subagents.startActivation({
+            provider: 'spawn',
+            label: `myteam-${input.roleId}`,
+            agentPreset: 'myteam-member',
+            cwd,
+            parent: captain,
+            delivery: 'caller',
+            signal: AbortSignal.timeout(120_000),
+            prompt: [
+              {
+                type: 'text',
+                text: [
+                  '你是 myteam 团队的成员，已被队长聘任。',
+                  '现在还没有任务；收到任务说明后，按指示调用 myteam_progress / myteam_evidence / myteam_submit_review。',
+                  '不要调用队长工具，也不要自己裁决。',
+                ].join('\n'),
+              },
+            ],
+          })
+          return activation.childId
+        } catch {
+          // 落到下面的老路径
         }
-      },
-    })) as MemberSpawnResult
-    void input
-    return created.agent?.session?.id ?? created.session?.id ?? sessionId
-  }
+      }
+
+      // 回落：老路径（agents.create）。它不会被 sendMessage 唤醒，仅作兼容。
+      if (ctx.agents?.create === undefined) return null
+      const sessionId = `mt-member-${randomUUID()}`
+      const created = (await ctx.agents.create({ sessionId, setup() {} })) as MemberSpawnResult
+      return created.agent?.session?.id ?? created.session?.id ?? sessionId
+    }
 
   /**
    * 把任务说明投递给成员会话。
@@ -128,7 +150,7 @@ export function apply(ctx: HostContext, config: CaptainHostConfig = {}): (() => 
     ctx.tools.register(
       toDshTool(spec, async (sessionId) => {
         const runtime = await hosts.open(await rootFor(sessionId))
-        return { runtime, sessionId, spawnMember, dispatchMember: makeDispatcher(sessionId) }
+        return { runtime, sessionId, spawnMember: makeSpawner(sessionId), dispatchMember: makeDispatcher(sessionId) }
       }),
     ),
   )

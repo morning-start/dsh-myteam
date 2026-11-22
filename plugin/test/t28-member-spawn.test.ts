@@ -10,9 +10,12 @@ interface FakeTool {
   execute(args: unknown, exec: { agent: { id: string } }): Promise<unknown>
 }
 
-function fakeContext(spawned: Map<string, FakeTool>) {
+test('聘人优先用 subagents.startActivation 建真正的子代理（成员 preset + 队长 cwd）', async () => {
+  const dir = mkdtempSync(join(tmpdir(), 'myteam-activation-'))
   const tools = new Map<string, FakeTool>()
+  const activations: Record<string, unknown>[] = []
   const cleanups: (() => void)[] = []
+
   const ctx = {
     tools: {
       register(definition: unknown) {
@@ -28,34 +31,27 @@ function fakeContext(spawned: Map<string, FakeTool>) {
       if (typeof dispose === 'function') cleanups.push(dispose)
     },
     agents: {
-      get: () => undefined,
-      async create(options: { sessionId: string; setup?: (agentCtx: unknown) => void }) {
-        options.setup?.({
-          tools: {
-            register(definition: unknown) {
-              const tool = definition as FakeTool
-              spawned.set(tool.name, tool)
-              return () => spawned.delete(tool.name)
-            },
-          },
-        })
-        return { agent: { session: { id: options.sessionId } } }
+      get: (id: string) => ({ id }),
+      async create() {
+        throw new Error('不应回落到 agents.create')
+      },
+    },
+    subagents: {
+      async sendMessage() {
+        return 'msg_1'
+      },
+      async startActivation(spec: Record<string, unknown>) {
+        activations.push(spec)
+        return { childId: 'mt-child-1' }
       },
     },
   }
-  return { ctx: ctx as never, tools, cleanups }
-}
 
-test('聘人时宿主现场创建成员会话并在其作用域内注册三个成员工具', async () => {
-  const dir = mkdtempSync(join(tmpdir(), 'myteam-spawn-'))
-  const spawned = new Map<string, FakeTool>()
-  const { ctx, tools, cleanups } = fakeContext(spawned)
   const captainExec = { agent: { id: 'ses_captain' } }
-
   try {
-    applyCaptainHost(ctx, { projectRoot: dir })
+    applyCaptainHost(ctx as never, { projectRoot: dir })
     const created = (await tools.get('myteam_create_team')!.execute(
-      { name: '甲队', goal: '测试聘人' },
+      { name: '甲队', goal: '激活测试' },
       captainExec,
     )) as { ok: boolean; data: { roles: { id: string }[] } }
     assert.equal(created.ok, true, JSON.stringify(created))
@@ -63,19 +59,18 @@ test('聘人时宿主现场创建成员会话并在其作用域内注册三个�
     const member = (await tools.get('myteam_appoint_member')!.execute(
       { roleId: created.data.roles[0]!.id },
       captainExec,
-    )) as { ok: boolean; data: { memberId: string; sessionId: string | null; bound: boolean } }
+    )) as { ok: boolean; data: { sessionId: string | null; bound: boolean } }
     assert.equal(member.ok, true, JSON.stringify(member))
-    assert.equal(member.data.bound, true, '成员会话应已创建并绑定')
-    assert.match(member.data.sessionId!, /^mt-member-/)
+    assert.equal(member.data.bound, true)
+    assert.equal(member.data.sessionId, 'mt-child-1')
 
-    // 成员工具只注册了三个，且能真的提交进度（说明身份解析到新成员）。
-    assert.deepEqual([...spawned.keys()].sort(), ['myteam_evidence', 'myteam_progress', 'myteam_submit_review'])
-    const progress = (await spawned.get('myteam_progress')!.execute(
-      { taskId: 'task_x', attemptId: 'att_x', note: 'hi', percent: 50 },
-      { agent: { id: member.data.sessionId! } },
-    )) as { ok: boolean; error?: { code: string } }
-    assert.equal(progress.ok, false, '任务不存在时应报错，而不是成功')
-    assert.equal(progress.error!.code, 'NOT_FOUND')
+    assert.equal(activations.length, 1)
+    const spec = activations[0]!
+    assert.equal(spec.provider, 'spawn')
+    assert.equal(spec.agentPreset, 'myteam-member')
+    assert.equal(spec.cwd, dir)
+    assert.equal((spec.parent as { id: string }).id, 'ses_captain')
+    assert.ok(Array.isArray(spec.prompt) && spec.prompt.length > 0)
   } finally {
     for (const cleanup of cleanups) cleanup()
     rmSync(dir, { recursive: true, force: true })

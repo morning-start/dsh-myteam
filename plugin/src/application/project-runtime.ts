@@ -58,9 +58,18 @@ export class ProjectRuntime {
   private readonly ids: IdPort
   private readonly logger: LoggerPort
   private lease: WriteToken | null = null
+  /**
+   * 续租定时器：租约 TTL 默认 60s，而一个打开的项目可能长时间没有写入。
+   * 只在 commit 时续租会让空闲项目「静默丢租」，之后第一次写入报
+   * WRITER_LEASE_LOST——这属于正常使用路径，不是异常。
+   */
+  private renewTimer: ReturnType<typeof setInterval> | null = null
   private current: ProjectState
   /** 追加成功但内存投影应用失败时为 true：之后拒绝写入，重启后可重建。 */
   private poisoned = false
+
+  /** 续租间隔：TTL 的 1/3（默认 20s），留足两次失败的机会。 */
+  private static readonly RENEW_INTERVAL_MS = 20_000
 
   private constructor(options: ProjectRuntimeOptions, lease: WriteToken, state: ProjectState) {
     this.projectId = options.projectId
@@ -71,6 +80,22 @@ export class ProjectRuntime {
     this.logger = options.logger ?? silentLogger
     this.lease = lease
     this.current = state
+    this.renewTimer = setInterval(() => this.renewLease(), ProjectRuntime.RENEW_INTERVAL_MS)
+    // 定时器不应阻止宿主退出。
+    if (typeof this.renewTimer === 'object' && this.renewTimer !== null && 'unref' in this.renewTimer) {
+      this.renewTimer.unref()
+    }
+  }
+
+  /** 续租；失败只记日志，真正写入时会再次 assert 并报 WRITER_LEASE_LOST。 */
+  private renewLease(): void {
+    if (this.lease === null) return
+    try {
+      this.writerLock.assert(this.lease)
+      this.lease = this.writerLock.renew(this.lease)
+    } catch (error) {
+      this.logger.warn('writer.lease.renew.failed', { error: error instanceof Error ? error.message : String(error) })
+    }
   }
 
   static open(options: ProjectRuntimeOptions): ProjectRuntime {
@@ -120,6 +145,8 @@ export class ProjectRuntime {
     }
 
     this.writerLock.assert(this.lease)
+    // 写前续租：把「刚好在 TTL 边界」的竞争窗口压到一次 assert 内。
+    this.lease = this.writerLock.renew(this.lease)
 
     const batchId = this.ids('batch')
     const occurredAt = this.clock.now()
@@ -168,6 +195,10 @@ export class ProjectRuntime {
 
   /** 释放写者租约。不自动重放任何 Effect。 */
   close(): void {
+    if (this.renewTimer !== null) {
+      clearInterval(this.renewTimer)
+      this.renewTimer = null
+    }
     if (this.lease === null) return
     this.writerLock.release(this.lease)
     this.lease = null
