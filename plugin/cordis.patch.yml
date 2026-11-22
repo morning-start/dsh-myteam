@@ -26,10 +26,10 @@
     # 树之外），扫描也看不到。故顶层必须挂一行裸包名；config.carrier=true 让
     # apply 直接返回（宿主职责全部留在 preset 作用域，NFR-7.4；也避免 root 侧
     # 再 provide 'myteam' 与门面造成网关端点歧义）。
-    # v2 暂不挂客户端载体行：本包还没有 client bundle（R5 面板 RPC 未接）。
-    # 留着裸包名行会让 dsh-client-modules 去解析一个不存在的客户端入口，
-    # 表现是整个 Web 前端起不来（「前端资源不可用 / 无法读取前端 index.html」）。
-    # 恢复条件：client 入口与 bundle 落地后，再把 myteam-carrier 加回来。
+    - id: myteam-carrier
+      name: 'dsh-plugin-myteam'
+      config:
+        carrier: true
     # M2 门面行（官方 SessionController 模式，dsh-api-session-controller/lib/index.js:2952）：
     # 根级 typert remote 服务，namespace 仍 'myteam' → 客户端端点 myteam/<method> 不变。
     # 为什么必需：preset 挂载审计要求队长内的 MyTeamRemote isolate（entry-local realm），
@@ -38,11 +38,7 @@
     # agentPresets.serviceFor(agent,'myteam') 读隔离服务；方法首参 `agent` 命中
     # dsh-agent 的 typert lookup（wire=agentId），网关把客户端传的 sessionId 解析成
     # Agent 实例。inject：门面读 agents（listTeams 会话发现）与 agentPresets（serviceFor）。
-    # v2 R4 未完成：面板 RPC 入口（原 `dsh-plugin-myteam/panel`）尚未实现，
-    # 该行已从 patch 移除；否则安装时 import 失败会让整条 patch 静默跳过。
-    # 恢复条件：panel 适配器落地并重新导出 "./panel"。
     # 面板 RPC 门面：必须挂在 **root**（preset 内会被 isolate，网关看不到）。
-    # 暂不加 carrier（裸包名）行：v2 还没有 client bundle，加行会让前端整体起不来。
     - id: myteam-panel
       name: 'dsh-plugin-myteam/panel'
       inject: ['agents', 'workingDirectory']
