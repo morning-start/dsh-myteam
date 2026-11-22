@@ -88,6 +88,7 @@ export type EventType =
   | 'task.updated'
   | 'task.participation.changed'
   | 'task.dependencies.changed'
+  | 'task.ready'
   | 'task.claimed'
   | 'task.progress'
   | 'task.evidence'
@@ -281,7 +282,7 @@ export interface EventPayloads {
   }
   'member.released': { teamId: TeamId; memberId: MemberId; revision: number }
 
-  'run.created': { run: WorkflowRun; completion: CompletionRule }
+  'run.created': { run: WorkflowRun; completion: CompletionRule; graphRevision: number }
   'run.revised': {
     runId: WorkflowRunId
     revision: number
@@ -292,7 +293,7 @@ export interface EventPayloads {
   }
   'run.closed': { runId: WorkflowRunId; status: WorkflowRunStatus; reason: string }
 
-  'task.created': { task: Task }
+  'task.created': { task: Task; graphRevision: number }
   'task.updated': {
     taskId: TaskId
     revision: number
@@ -315,6 +316,8 @@ export interface EventPayloads {
     dependencies: TaskId[]
     graphRevision: number
   }
+  /** 上游完成后由系统放开：planned → ready。 */
+  'task.ready': { taskId: TaskId; revision: number }
   'task.claimed': { taskId: TaskId; attempt: Attempt; graphRevision: number }
   'task.progress': { taskId: TaskId; attemptId: string; note: string; percent: number | null }
   'task.evidence': { taskId: TaskId; attemptId: string; evidence: EvidenceRef[] }
@@ -426,6 +429,7 @@ export const EVENT_TYPES: readonly EventType[] = [
   'task.updated',
   'task.participation.changed',
   'task.dependencies.changed',
+  'task.ready',
   'task.claimed',
   'task.progress',
   'task.evidence',

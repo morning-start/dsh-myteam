@@ -29,7 +29,6 @@ export function createTeam(input: {
     status: 'active',
     blueprint: input.blueprint,
     configRevision: input.configRevision,
-    graphRevision: 1,
     revision: 1,
     createdAt: input.now,
     updatedAt: input.now,

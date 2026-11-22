@@ -195,7 +195,6 @@ export interface Team {
   status: TeamStatus
   blueprint: DefinitionRef | null
   configRevision: number
-  graphRevision: number
   revision: number
   createdAt: string
   updatedAt: string

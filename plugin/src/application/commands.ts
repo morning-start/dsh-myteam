@@ -4,17 +4,26 @@
  * 这里没有文件、没有 DSH、没有面板协议；同一个函数被队长工具、面板 RPC 和
  * 测试调用，因此三者不可能出现「面板能建、工具不能建」这种分叉。
  */
-import type { Attempt, CapabilitySet, ConfigOverrides, RoleDefinition, Task } from '../contracts/entities.ts'
+import type {
+  Attempt,
+  CapabilitySet,
+  CompletionRule,
+  ConfigOverrides,
+  RoleDefinition,
+  Task,
+  TaskTemplate,
+  WorkflowDefinition,
+} from '../contracts/entities.ts'
 import { ERROR_CODES, fail } from '../contracts/errors.ts'
 import type { ActorRef } from '../contracts/events.ts'
-import { computeEffectiveConfig } from '../domain/config/merge.ts'
+import { computeEffectiveConfig, DEFAULT_TEAM_CONFIG } from '../domain/config/merge.ts'
 import { normalizeRole, validateRole } from '../domain/definitions/role.ts'
+import { normalizeWorkflow, validateWorkflow } from '../domain/definitions/workflow.ts'
 import { assertBlueprintResolvable } from '../domain/definitions/blueprint.ts'
 import { authorize } from '../domain/permissions/policy.ts'
 import { cycleIfEdgesChanged, graphOf } from '../domain/tasks/dag.ts'
 import { assertCurrentAttempt, createPlannedTask, isClaimable } from '../domain/tasks/task.ts'
 import { appointMember, assertMemberActive, assertMemberLimits, memberDepth } from '../domain/teams/member.ts'
-import { DEFAULT_TEAM_CONFIG } from '../domain/config/merge.ts'
 import { assertGraphRevision, assertTeamActive, assertTeamStatusChange, createTeam } from '../domain/teams/team.ts'
 import type { CommitResult, DraftEvent, ProjectRuntime } from './project-runtime.ts'
 
@@ -67,6 +76,43 @@ export function createProjectRole(
     entity: { kind: 'role-definition', id },
     entityRevision: 1,
     payload: { role, origin: null },
+  }
+  return runtime.commit([draft])
+}
+
+export function createProjectWorkflowCommand(
+  runtime: ProjectRuntime,
+  input: {
+    actor: ActorRef
+    name: string
+    description: string
+    templates: TaskTemplate[]
+    completion?: CompletionRule
+  },
+): CommitResult {
+  authorize('definition.write', input.actor)
+  const now = runtime.now()
+  const workflow: WorkflowDefinition = normalizeWorkflow({
+    id: runtime.nextId('workflow'),
+    revision: 1,
+    name: input.name,
+    description: input.description,
+    templates: input.templates,
+    completion: input.completion ?? { mode: 'all-tasks', requiredKeys: [] },
+    createdAt: now,
+    updatedAt: now,
+  })
+  const problems = validateWorkflow(workflow)
+  if (problems.length > 0) {
+    fail(ERROR_CODES.INVALID_PAYLOAD, '工作流定义不合法', { details: { problems } })
+  }
+
+  const draft: DraftEvent = {
+    type: 'definition.workflow.created',
+    actor: input.actor,
+    entity: { kind: 'workflow-definition', id: workflow.id },
+    entityRevision: 1,
+    payload: { workflow, origin: null },
   }
   return runtime.commit([draft])
 }
@@ -207,7 +253,7 @@ export function createTaskCommand(
     entity: { kind: 'task', id: taskId, teamId: input.ownerTeamId },
     entityRevision: 1,
     configRevision: team.configRevision,
-    payload: { task },
+    payload: { task, graphRevision: state.graphRevision + 1 },
   }
   return runtime.commit([draft])
 }
@@ -233,8 +279,8 @@ export function claimTaskCommand(
   })
 
   const team = task.ownerTeamId === null ? undefined : state.teams.get(task.ownerTeamId)
-  if (input.expectedGraphRevision !== undefined && team !== undefined) {
-    assertGraphRevision(team.graphRevision, input.expectedGraphRevision)
+  if (input.expectedGraphRevision !== undefined) {
+    assertGraphRevision(state.graphRevision, input.expectedGraphRevision)
   }
   if (!isClaimable(task.status)) {
     fail(ERROR_CODES.TASK_NOT_READY, `任务状态为 ${task.status}，当前不能认领`, {
@@ -287,7 +333,7 @@ export function claimTaskCommand(
     entity: { kind: 'attempt', id: attempt.id, teamId: member.teamId },
     entityRevision: task.revision + 1,
     configRevision: attempt.configRevision,
-    payload: { taskId: task.id, attempt, graphRevision: team?.graphRevision ?? 1 },
+    payload: { taskId: task.id, attempt, graphRevision: state.graphRevision },
   }
   return runtime.commit([draft])
 }

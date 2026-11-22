@@ -12,6 +12,7 @@
 import type {
   Attempt,
   CaptainAssignment,
+  CompletionRule,
   EffectiveConfigSnapshot,
   Effect,
   EvidenceRef,
@@ -59,6 +60,8 @@ export interface ProjectState {
   members: Map<string, Member>
 
   runs: Map<string, WorkflowRun>
+  /** 每个 Run 实例化时固化的完成条件（定义后改不影响既有 Run）。 */
+  runCompletions: Map<string, CompletionRule>
   tasks: Map<string, Task>
   attempts: Map<string, Attempt>
   verdicts: Map<string, GateVerdict>
@@ -70,6 +73,8 @@ export interface ProjectState {
 
   configDefaults: Record<string, unknown>
   configRevision: number
+  /** 项目级 DAG 版本：只随图结构（建任务、改依赖、实例化 Run）变化。 */
+  graphRevision: number
   teamConfigs: Map<string, EffectiveConfigSnapshot>
 }
 
@@ -87,6 +92,7 @@ export function emptyProjectState(projectId: string): ProjectState {
     captains: new Map(),
     members: new Map(),
     runs: new Map(),
+    runCompletions: new Map(),
     tasks: new Map(),
     attempts: new Map(),
     verdicts: new Map(),
@@ -96,6 +102,7 @@ export function emptyProjectState(projectId: string): ProjectState {
     messages: [],
     configDefaults: {},
     configRevision: 0,
+    graphRevision: 1,
     teamConfigs: new Map(),
   }
 }
@@ -134,6 +141,7 @@ export const HANDLED_EVENT_TYPES: readonly EventType[] = [
   'task.updated',
   'task.participation.changed',
   'task.dependencies.changed',
+  'task.ready',
   'task.claimed',
   'task.progress',
   'task.evidence',
@@ -418,8 +426,10 @@ export function applyEvent(state: ProjectState, event: EventEnvelope): void {
     }
 
     case 'run.created': {
-      const payload = event.payload as { run: WorkflowRun }
+      const payload = event.payload as { run: WorkflowRun; completion: CompletionRule; graphRevision: number }
       state.runs.set(payload.run.id, payload.run)
+      state.runCompletions.set(payload.run.id, payload.completion)
+      state.graphRevision = Math.max(state.graphRevision, payload.graphRevision)
       return
     }
     case 'run.revised': {
@@ -451,8 +461,9 @@ export function applyEvent(state: ProjectState, event: EventEnvelope): void {
     }
 
     case 'task.created': {
-      const payload = event.payload as { task: Task }
+      const payload = event.payload as { task: Task; graphRevision: number }
       state.tasks.set(payload.task.id, payload.task)
+      state.graphRevision = Math.max(state.graphRevision, payload.graphRevision)
       return
     }
     case 'task.updated': {
@@ -498,11 +509,23 @@ export function applyEvent(state: ProjectState, event: EventEnvelope): void {
       return
     }
     case 'task.dependencies.changed': {
-      const payload = event.payload as { taskId: string; revision: number; dependencies: string[] }
+      const payload = event.payload as { taskId: string; revision: number; dependencies: string[]; graphRevision: number }
       const task = requireTask(state, payload.taskId)
       state.tasks.set(payload.taskId, {
         ...task,
         dependencies: [...payload.dependencies],
+        revision: payload.revision,
+        updatedAt: event.occurredAt,
+      })
+      state.graphRevision = Math.max(state.graphRevision, payload.graphRevision)
+      return
+    }
+    case 'task.ready': {
+      const payload = event.payload as { taskId: string; revision: number }
+      const task = requireTask(state, payload.taskId)
+      state.tasks.set(payload.taskId, {
+        ...task,
+        status: 'ready',
         revision: payload.revision,
         updatedAt: event.occurredAt,
       })
