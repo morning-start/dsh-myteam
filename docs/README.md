@@ -38,7 +38,7 @@
 
 因此：
 
-- [contracts/04](contracts/04-API与数据契约.md)、[contracts/16](contracts/16-插件团队贡献契约.md)、[contracts/18](./contracts/config-schema.md)是 **as-is v1**，用于当前实现和迁移表征；
+- [contracts/04](./contracts/tool-surface.md)、[contracts/16](./contracts/contribution.md)、[contracts/18](./contracts/config-schema.md)是 **as-is v1**，用于当前实现和迁移表征；
 - [audits/22](audits/22-架构梳理.md)是代码快照，不是目标模块图；
 - [audits/27](audits/27-成员子代理化与SQLite记忆.md)是子代理/SQLite 真机证据，不恢复旧 ADR 编号；
 - `historical/` 中“唯一权威”“定稿草案”等字样只代表历史原文，不覆盖当前导航。
@@ -59,7 +59,7 @@
 
 ### 我要执行计划、登记变更或验收
 
-从 [delivery/README](delivery/README.md) 进入。旧 [05-任务板](historical/05-任务板.md)不再作为当前重写计划；真实测试与真机结果归 `audits/`。
+从 [delivery/README](delivery/README.md) 进入。旧 [05-任务板](./delivery/README.md)不再作为当前重写计划；真实测试与真机结果归 `audits/`。
 
 ### 我要追溯旧需求、旧架构或旧存储
 

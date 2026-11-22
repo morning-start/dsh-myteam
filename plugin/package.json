@@ -10,7 +10,6 @@
     "./member": "./lib/composition/member.mjs",
     "./panel": "./lib/composition/panel.mjs",
     "./commands": "./lib/composition/human-command.mjs",
-    "./client": "./client/client.js",
     "./icon": "./icon.svg",
     "./icon.svg": "./icon.svg",
     "./package.json": "./package.json"
@@ -23,10 +22,6 @@
   "dsh": {
     "bundle": {
       "patch": "./cordis.patch.yml"
-    },
-    "client": {
-      "platform": "web",
-      "inject": []
     }
   },
   "files": [

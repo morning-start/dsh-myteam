@@ -26,7 +26,7 @@ const apply = process.argv.includes('--apply')
 const confirm = process.argv.includes('--confirm')
 const includePartial = process.argv.includes('--include-partial')
 
-const STATUSES = ['已替代', '部分替代', '待补写', '待确认']
+const STATUSES = ['已替代', '部分替代', '待补写', '待确认', '已删除']
 
 function statusOf(cells) {
   for (const status of STATUSES) if (cells.some((cell) => cell.includes(status))) return status

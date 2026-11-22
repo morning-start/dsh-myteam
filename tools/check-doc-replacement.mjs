@@ -15,7 +15,7 @@ import { join } from 'node:path'
 const ROOT = fileURLToPath(new URL('..', import.meta.url))
 const INVENTORY = join(ROOT, 'docs', 'delivery', '11-文档替换清单.md')
 
-const STATUSES = ['已替代', '部分替代', '待补写', '待确认']
+const STATUSES = ['已替代', '部分替代', '待补写', '待确认', '已删除']
 
 function statusOf(cells) {
   for (const status of STATUSES) {
@@ -71,7 +71,7 @@ for (const row of rows) {
   const candidates = [join(ROOT, 'docs', 'historical', base), join(ROOT, 'docs', 'contracts', base)]
   if (!candidates.some((candidate) => existsSync(candidate))) {
     // 「已替代」的文件在删除执行后本就不存在：那是完成态，不是清单错误。
-    if (row.status !== '已替代' && !fileExists(row)) missing.push(row.file)
+    if (row.status !== '已替代' && row.status !== '已删除' && !fileExists(row)) missing.push(row.file)
   }
 }
 if (missing.length > 0) {

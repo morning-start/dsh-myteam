@@ -84,7 +84,7 @@ FR 编号来源：`design-notes.md` §四（21 屏）+ `docs/00-需求池.md` FR
 | [design-notes.md](design-notes.md) | 设计口径正本：实体模型、作用域分层、插槽落点、视觉映射、已知误报 |
 | [../docs/delivery/13-UI对齐分工.md](../docs/delivery/13-UI对齐分工.md) | 28 屏 → 6 组的分工、并发写协议、验收线 |
 | [../docs/audits/14-UI复检清单.md](../docs/audits/14-UI复检清单.md) | 五轮复检方法（逐屏对照 / 越界探测 / 跨切面 / 真装实测）与遗留项 |
-| [../docs/historical/00-需求池.md](../docs/historical/00-需求池.md) | FR-19~24 的原始口径（作用域分层 / 聘任记录 / 参与关系 / 依赖图 / 骨架 / 角色详情） |
+| [../docs/historical/00-需求池.md](../docs/product/README.md) | FR-19~24 的原始口径（作用域分层 / 聘任记录 / 参与关系 / 依赖图 / 骨架 / 角色详情） |
 | [../docs/delivery/09-变更记录.md](../docs/delivery/09-变更记录.md) | CHG 编号与每轮改动的裁决记录 |
 | [../plugin/README.md](../plugin/README.md) | 实现侧入口：`src/` 真身、`lib/` 产物、构建与测试 |
 

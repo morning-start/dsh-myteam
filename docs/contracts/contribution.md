@@ -43,6 +43,6 @@ node skills/myteam-plugin-team/tools/check-contribution.mjs <plugins 根> --root
 
 ## 与旧契约的关系
 
-旧的 [`16-插件团队贡献契约.md`](../contracts/16-插件团队贡献契约.md) 描述的是 v1 加载器行为
+旧的 [`16-插件团队贡献契约.md`](./contribution.md) 描述的是 v1 加载器行为
 （`config/plugins` 下的目录约定）。现行实现以 checker 为准；**字段级 schema 待 v2
 manifest 定稿后补齐**，在此之前不要按旧文档写新贡献。
