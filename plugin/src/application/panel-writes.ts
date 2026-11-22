@@ -21,13 +21,23 @@ import type { GlobalPublicationPort, PublicationKind } from '../contracts/public
 import { HumanAuthorizer } from '../domain/permissions/human-authorizer.ts'
 import type { HumanConfirmation } from '../domain/permissions/human-authorizer.ts'
 import { createTaskCommand } from './commands.ts'
+import { forgetMemory, rememberMemory } from './memory-commands.ts'
+import type { MemoryPort } from './ports.ts'
 import { confirmDefinitionPublication, requestDefinitionPublication } from './publication.ts'
 import { confirmCaptainTakeover, confirmTeamDisband, previewCaptainTakeover, previewTeamDisband } from './human-actions.ts'
 import type { ProjectRuntime } from './project-runtime.ts'
 import { recordVerdictCommand } from './task-commands.ts'
 
 /** 面板写方法白名单。新增写能力必须同时在这里登记并补测试。 */
-export const PANEL_WRITE_METHODS = ['teamDisband', 'captainTakeover', 'gateVerdict', 'taskCreate', 'definitionPublish'] as const
+export const PANEL_WRITE_METHODS = [
+  'teamDisband',
+  'captainTakeover',
+  'gateVerdict',
+  'taskCreate',
+  'definitionPublish',
+  'memoryRemember',
+  'memoryForget',
+] as const
 
 export type PanelWriteMethod = (typeof PANEL_WRITE_METHODS)[number]
 
@@ -48,6 +58,8 @@ export const PANEL_WRITE_KINDS: Readonly<Record<PanelWriteMethod, PanelWriteKind
   gateVerdict: 'direct',
   taskCreate: 'direct',
   definitionPublish: 'token',
+  memoryRemember: 'direct',
+  memoryForget: 'direct',
 }
 
 /** 判断一个名字是否为已登记的面板写方法。 */
@@ -67,6 +79,8 @@ export const PANEL_WRITE_DOCS: Readonly<Record<PanelWriteMethod, string>> = {
   gateVerdict: '门禁裁决：对评审中的任务写入 pass / fail / blocked 与检查结果，需 `confirm: true`。',
   taskCreate: '新建任务：标题、验收标准、依赖与所需角色，建在指定团队下，需 `confirm: true`。',
   definitionPublish: '发布定义到全局库：预览引用与覆盖影响面，凭一次性令牌执行。动作 `definition.publish.confirm`（人类专属）。',
+  memoryRemember: '写一条长期记忆到团队 bank 或某个成员 bank，需 `confirm: true`。',
+  memoryForget: '遗忘一条记忆（默认软删留痕，`hard` 才真删），需 `confirm: true`。',
 }
 
 /** 面板动作的 actor：单属主部署下的人类入口。 */
@@ -193,9 +207,13 @@ export interface PanelWriteApplied {
   committed: unknown
 }
 
-/** 写通道的外部依赖：只有全局发布需要额外装配（端口注入，不 import infrastructure）。 */
+/** 写通道的外部依赖：全局发布要写入器，记忆要存储实现与项目根（都是端口注入）。 */
 export interface PanelWriteDeps {
   publisher?: GlobalPublicationPort
+  /** 项目根：记忆库按项目落盘（`memory/myteam.db`）。 */
+  rootDir?: string
+  /** 打开记忆存储；由装配层注入，application 不 import infrastructure。 */
+  openMemory?: (rootDir: string) => MemoryPort
 }
 
 function requirePublisher(deps: PanelWriteDeps): GlobalPublicationPort {
@@ -203,6 +221,13 @@ function requirePublisher(deps: PanelWriteDeps): GlobalPublicationPort {
     fail(ERROR_CODES.INTERNAL, '全局发布器未装配')
   }
   return deps.publisher
+}
+
+function requireMemory(deps: PanelWriteDeps): { memory: MemoryPort; rootDir: string } {
+  if (deps.rootDir === undefined || deps.openMemory === undefined) {
+    fail(ERROR_CODES.INTERNAL, '记忆存储未装配')
+  }
+  return { memory: deps.openMemory(deps.rootDir), rootDir: deps.rootDir }
 }
 
 const PUBLICATION_KINDS = ['role', 'workflow', 'blueprint'] as const
@@ -263,6 +288,9 @@ export function previewPanelWrite(
       fail(ERROR_CODES.INVALID_COMMAND, 'gateVerdict 不走确认令牌：直接带 confirm: true 提交（见 applyDirectPanelWrite）')
     case 'taskCreate':
       fail(ERROR_CODES.INVALID_COMMAND, 'taskCreate 不走确认令牌：直接带 confirm: true 提交（见 applyDirectPanelWrite）')
+    case 'memoryRemember':
+    case 'memoryForget':
+      fail(ERROR_CODES.INVALID_COMMAND, `${method} 不走确认令牌：直接带 confirm: true 提交（见 applyDirectPanelWrite）`)
     case 'definitionPublish': {
       const preview = requestDefinitionPublication(runtime, { publisher: requirePublisher(deps) }, {
         actor: PANEL_HUMAN,
@@ -330,6 +358,9 @@ export function applyPanelWrite(
       fail(ERROR_CODES.INVALID_COMMAND, 'gateVerdict 不使用确认令牌，请走 applyDirectPanelWrite')
     case 'taskCreate':
       fail(ERROR_CODES.INVALID_COMMAND, 'taskCreate 不使用确认令牌，请走 applyDirectPanelWrite')
+    case 'memoryRemember':
+    case 'memoryForget':
+      fail(ERROR_CODES.INVALID_COMMAND, `${method} 不使用确认令牌，请走 applyDirectPanelWrite`)
     case 'definitionPublish': {
       const result = confirmDefinitionPublication(runtime, { authorizer, publisher: requirePublisher(deps) }, {
         actor: PANEL_HUMAN,
@@ -369,11 +400,13 @@ export interface PanelDirectWriteInput {
  * @param runtime - 项目运行时（已刷新到最新账本）。
  * @param method - 白名单方法名，且其 `PanelWriteKind` 必须是 `direct`。
  * @param input - 参数与确认位。
+ * @param deps - 额外端口（写记忆需要存储实现与项目根）。
  */
 export function applyDirectPanelWrite(
   runtime: ProjectRuntime,
   method: PanelWriteMethod,
   input: PanelDirectWriteInput,
+  deps: PanelWriteDeps = {},
 ): PanelWriteApplied {
   switch (method) {
     case 'gateVerdict': {
@@ -409,6 +442,61 @@ export function applyDirectPanelWrite(
     case 'captainTakeover':
     case 'definitionPublish':
       fail(ERROR_CODES.INVALID_COMMAND, `${method} 走确认令牌通道（先预览再确认），不能直接执行`)
+    case 'memoryRemember': {
+      if (input.confirm !== true) {
+        fail(ERROR_CODES.INVALID_PAYLOAD, '写记忆需要 confirm: true')
+      }
+      // 先把参数验完再开库：参数错误不该在磁盘上留下一个空记忆库。
+      const teamId = requireTeamId(input.params)
+      const memberId = optionalString(input.params, 'memberId')
+      const text = requireString(input.params, 'text')
+      const tags = optionalStringArray(input.params, 'tags')
+      const evidence = optionalStringArray(input.params, 'evidence')
+      const { memory } = requireMemory(deps)
+      try {
+        const record = rememberMemory(
+          { memory, ids: (kind) => runtime.nextId(kind), now: runtime.now() },
+          {
+            actor: PANEL_HUMAN,
+            teamId,
+            ...(memberId === undefined ? {} : { memberId }),
+            text,
+            ...(tags === undefined ? {} : { tags }),
+            ...(evidence === undefined ? {} : { evidence }),
+          },
+        )
+        return { method, operationId: record.id, committed: record }
+      } finally {
+        memory.close()
+      }
+    }
+    case 'memoryForget': {
+      if (input.confirm !== true) {
+        fail(ERROR_CODES.INVALID_PAYLOAD, '遗忘记忆需要 confirm: true')
+      }
+      // 同样先验参数：缺 id 时不该动到库。
+      const teamId = requireTeamId(input.params)
+      const memberId = optionalString(input.params, 'memberId')
+      const id = requireString(input.params, 'id')
+      const hard = input.params.hard === true
+      const { memory } = requireMemory(deps)
+      try {
+        forgetMemory(
+          { memory, ids: (kind) => runtime.nextId(kind), now: runtime.now() },
+          {
+            actor: PANEL_HUMAN,
+            teamId,
+            ...(memberId === undefined ? {} : { memberId }),
+            id,
+            reason: optionalString(input.params, 'reason') ?? '面板遗忘',
+            hard,
+          },
+        )
+        return { method, operationId: id, committed: { id, hard } }
+      } finally {
+        memory.close()
+      }
+    }
     case 'taskCreate': {
       if (input.confirm !== true) {
         fail(ERROR_CODES.INVALID_PAYLOAD, '新建任务需要 confirm: true')

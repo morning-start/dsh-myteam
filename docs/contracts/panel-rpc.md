@@ -43,6 +43,8 @@
 | `gateVerdict` | `direct` | 门禁裁决：对评审中的任务写入 pass / fail / blocked 与检查结果，需 `confirm: true`。 |
 | `taskCreate` | `direct` | 新建任务：标题、验收标准、依赖与所需角色，建在指定团队下，需 `confirm: true`。 |
 | `definitionPublish` | `token` | 发布定义到全局库：预览引用与覆盖影响面，凭一次性令牌执行。动作 `definition.publish.confirm`（人类专属）。 |
+| `memoryRemember` | `direct` | 写一条长期记忆到团队 bank 或某个成员 bank，需 `confirm: true`。 |
+| `memoryForget` | `direct` | 遗忘一条记忆（默认软删留痕，`hard` 才真删），需 `confirm: true`。 |
 
 ## 参数
 

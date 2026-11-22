@@ -15,7 +15,8 @@ import { PanelService } from '../application/panel-service.ts'
 import { migrationSummaryFor } from '../infrastructure/migration/v1/panel-summary.ts'
 import { globalLibraryRoot, readGlobalAudit, readGlobalLibrary } from '../infrastructure/global-library/library.ts'
 import { createGlobalPublisher } from '../infrastructure/global-library/write.ts'
-import { readMemoryStore } from '../infrastructure/memory-store/read.ts'
+import { memoryDbPath, readMemoryStore } from '../infrastructure/memory-store/read.ts'
+import { SqliteMemoryStore } from '../infrastructure/memory-store/sqlite-memory.ts'
 import { PANEL_METHODS, isGlobalPanelMethod } from '../application/panel-contract.ts'
 import {
   applyDirectPanelWrite,
@@ -143,7 +144,12 @@ export function createPanelFacade(ctx: PanelHostContext): PanelFacade {
       // 预览与确认都基于最新账本：陈旧投影会让 hash 校验假失败。
       runtime.refresh()
       if (panelWriteKind(name) === 'direct') {
-        const applied = applyDirectPanelWrite(runtime, name, { params, confirm: record.confirm === true })
+        const applied = applyDirectPanelWrite(
+          runtime,
+          name,
+          { params, confirm: record.confirm === true },
+          { rootDir, openMemory: (dir) => new SqliteMemoryStore(join(dir, memoryDbPath(dir))) },
+        )
         return { ok: true, data: JSON.parse(JSON.stringify(applied)) }
       }
       if (record.action === 'confirm') {
