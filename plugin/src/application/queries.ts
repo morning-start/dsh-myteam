@@ -133,6 +133,8 @@ export interface TeamView {
   captain: { sessionId: string; generation: number } | null
   members: { id: string; roleId: string; status: string; parentMemberId: string | null }[]
   tasks: { id: string; title: string; status: TaskStatus }[]
+  /** 项目级可用角色，供队长挑 roleId 聘人。 */
+  roles: { id: string; name: string }[]
   config: EffectiveConfigSnapshot | null
 }
 
@@ -156,6 +158,7 @@ export function teamView(state: ProjectState, teamId: string): TeamView {
     tasks: [...state.tasks.values()]
       .filter((task) => task.ownerTeamId === teamId)
       .map((task) => ({ id: task.id, title: task.title, status: task.status })),
+    roles: [...state.roles.values()].map((role) => ({ id: role.id, name: role.profile.name })),
     config: state.teamConfigs.get(teamId) ?? null,
   }
 }

@@ -244,7 +244,8 @@ export function leadToolSpecs(): MyTeamToolSpec[] {
           fail(ERROR_CODES.INTERNAL, '建队没有产生 team.created 事件')
         }
         const teamId = (created.payload as { team: { id: string } }).team.id
-        return jsonSafe({ ok: true, data: { teamId, captainSessionId: context.sessionId } })
+        const roles = [...state.roles.values()].map((role) => ({ id: role.id, name: role.profile.name }))
+        return jsonSafe({ ok: true, data: { teamId, captainSessionId: context.sessionId, roles } })
       },
     },
     {

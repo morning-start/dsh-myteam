@@ -8,6 +8,7 @@
  */
 import { join, resolve } from 'node:path'
 import { ProjectRuntime } from '../../application/project-runtime.ts'
+import { bootstrapProject } from '../../application/bootstrap.ts'
 import type { Clock, IdPort, LoggerPort } from '../../application/ports.ts'
 import { systemClock } from '../../application/ports.ts'
 import { newId } from '../../contracts/ids.ts'
@@ -64,7 +65,7 @@ export class ProjectHosts {
         projectId: ids('project'),
         createdAt: clock.now(),
       })
-      return ProjectRuntime.open({
+      const runtime = await ProjectRuntime.open({
         projectId: manifest.projectId,
         eventStore: new FileEventStore(join(key, EVENTS_FILE)),
         writerLock: new WriterLeaseManager(join(key, WRITER_LOCK_FILE), {
@@ -74,6 +75,9 @@ export class ProjectHosts {
         ids,
         ...(this.options.logger === undefined ? {} : { logger: this.options.logger }),
       })
+      // 首次打开空项目时补齐「项目初始化 + 内置角色」，否则队长连成员都聘不了。
+      bootstrapProject(runtime, key)
+      return runtime
     })()
 
     const entry: SharedEntry = { promise: opening, refs: 1 }

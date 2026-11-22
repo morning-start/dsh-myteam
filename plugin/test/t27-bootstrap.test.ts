@@ -53,6 +53,16 @@ test('引导建队：空项目里当前会话可自建团队并立刻建任务�
     )) as { ok: boolean; data?: { teamId: string }; error?: { code: string } }
     assert.equal(created.ok, true, JSON.stringify(created))
     assert.match(created.data!.teamId, /^team_/)
+    const roles = (created.data as { roles?: { id: string }[] }).roles ?? []
+    assert.ok(roles.length >= 1, '引导后应带有内置角色，否则队长聘不了人')
+
+    // 队长用内置角色聘人（成员会话留空 = 待绑定）。
+    const member = (await tools.get('myteam_appoint_member')!.execute(
+      { roleId: roles[0]!.id },
+      exec,
+    )) as { ok: boolean; data?: { memberId: string }; error?: { code: string } }
+    assert.equal(member.ok, true, JSON.stringify(member))
+    assert.match(member.data!.memberId, /^mem_/)
 
     // 建队后：同一个会话就是队长，可以建任务。
     const task = (await tools.get('myteam_create_task')!.execute(
