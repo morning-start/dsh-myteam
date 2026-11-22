@@ -41,6 +41,11 @@
     # v2 R4 未完成：面板 RPC 入口（原 `dsh-plugin-myteam/panel`）尚未实现，
     # 该行已从 patch 移除；否则安装时 import 失败会让整条 patch 静默跳过。
     # 恢复条件：panel 适配器落地并重新导出 "./panel"。
+    # 面板 RPC 门面：必须挂在 **root**（preset 内会被 isolate，网关看不到）。
+    # 暂不加 carrier（裸包名）行：v2 还没有 client bundle，加行会让前端整体起不来。
+    - id: myteam-panel
+      name: 'dsh-plugin-myteam/panel'
+      inject: ['agents', 'workingDirectory']
     - id: myteam-preset-captain
       name: '@deepseek-ai/dsh-agent-preset'
       config:

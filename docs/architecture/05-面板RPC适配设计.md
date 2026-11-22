@@ -1,6 +1,6 @@
 # 面板 RPC 适配（待实现）
 
-> 状态：**设计已定，代码未写**。目标是把已完成的 `PanelService` 挂到 DSH 的
+> 状态：**门面已实现并在 Web profile 启动通过**（src/composition/panel.ts，	30）；客户端 bundle 未接。目标是把已完成的 `PanelService` 挂到 DSH 的
 > Remote 上，让 Web 客户端能 `ctx.remote.myteam.*` 调用。
 
 ## 已具备
