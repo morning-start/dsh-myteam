@@ -1,0 +1,153 @@
+﻿<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=1280">
+<meta name="dsh-design" content="dshplugin 1280x800">
+<title>迁移 · myteam</title>
+<link rel="stylesheet" href="dsh-shell.css">
+<link rel="stylesheet" href="myteam.css">
+<!-- 外框（DSH 插件 · 会话标签页）：只改 data-slot 里面，别动外框的结构、文字和 dsh-shell.css -->
+</head>
+<body>
+<div class="dsh-app" data-frame="dsh/view">
+  <aside class="dsh-side">
+    <div class="dsh-brand"><div class="dsh-logo">deepseek<span class="dsh-logo-tag">HARNESS</span></div><div class="dsh-iconbtn"><svg class="dsh-i" viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M9 3v18"/></svg></div></div>
+    <div class="dsh-new"><svg class="dsh-i" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 8v8M8 12h8"/></svg>新会话</div>
+    <nav class="dsh-nav">
+      <div class="dsh-row"><svg class="dsh-i" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2.5l3 3-3 3-3-3zM18.5 9l3 3-3 3-3-3zM5.5 9l3 3-3 3-3-3zM12 15.5l3 3-3 3-3-3z"/></svg>插件</div>
+      <div class="dsh-row"><svg class="dsh-i" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>自动化任务</div>
+      <div class="dsh-row"><svg class="dsh-i" viewBox="0 0 24 24" aria-hidden="true"><rect x="4" y="4" width="6" height="6" rx="1.5"/><rect x="14" y="4" width="6" height="6" rx="3"/><rect x="4" y="14" width="6" height="6" rx="1.5"/><rect x="14" y="14" width="6" height="6" rx="1.5"/></svg>更多</div>
+    </nav>
+    <div class="dsh-sec">工作区<div class="dsh-sec-acts"><div class="dsh-iconbtn"><svg class="dsh-i" viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="M20 20l-4-4"/></svg></div><div class="dsh-iconbtn"><svg class="dsh-i" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 8h10M18 8h2M4 16h2M10 16h10"/><circle cx="16" cy="8" r="2"/><circle cx="8" cy="16" r="2"/></svg></div><div class="dsh-iconbtn"><svg class="dsh-i" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><path d="M12 11v5M9.5 13.5h5"/></svg></div></div></div>
+    <div class="dsh-row"><span class="dsh-folder"><svg class="dsh-i" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></svg></span>我的项目</div>
+    <div class="dsh-sess on">整理会议记录<span class="dsh-time">2 小时</span></div>
+    <div class="dsh-sess">新会话</div>
+    <div class="dsh-acct"><div class="dsh-avatar">我</div>我的账号</div>
+  </aside>
+  <main class="dsh-main">
+    <header class="dsh-head">
+      <div class="dsh-crumbs">整理会议记录<span class="dsh-mode">标准模式<svg class="dsh-i" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg></span></div>
+      <div class="dsh-utils"><div class="dsh-split"><svg class="dsh-i" viewBox="0 0 24 24" aria-hidden="true"><path d="M9 8l-4 4 4 4M15 8l4 4-4 4"/></svg><svg class="dsh-i" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg></div><div class="dsh-iconbtn"><svg class="dsh-i" viewBox="0 0 24 24" aria-hidden="true"><circle cx="5" cy="12" r="1"/><circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/></svg></div></div>
+      <div class="dsh-iconbtn dsh-corner"><svg class="dsh-i" viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M15 3v18"/></svg></div>
+      <div class="dsh-tabs" role="tablist"><div class="dsh-tab">对话</div><div class="dsh-tab">轨迹</div><div class="dsh-tab on"><span data-slot="tab-label">项目</span></div></div>
+    </header>
+    <div data-slot="main">
+      <div class="wt">
+        <aside class="ir">
+          <a class="team" href="p-overview.html" title="项目 storefront · 切换项目" style="font-family:var(--dsh-font-code);font-size:12px">st</a>
+          <div class="line"></div>
+          <nav class="ir-nav">
+            <a class="ri " href="p-overview.html" title="概览"><svg class="ic" viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/></svg><span>概览</span></a>
+            <a class="ri " href="p-tasks.html" title="任务与看板"><svg class="ic" viewBox="0 0 24 24"><rect x="3" y="4" width="5" height="16" rx="1.5"/><rect x="10" y="4" width="5" height="11" rx="1.5"/><rect x="17" y="4" width="4" height="7" rx="1.5"/></svg><span>任务</span><i class="bdg"></i></a>
+            <a class="ri " href="p-teams.html" title="团队与成员"><svg class="ic" viewBox="0 0 24 24"><circle cx="9" cy="8" r="3"/><path d="M3 20a6 6 0 0 1 12 0"/><path d="M16 5.5a3 3 0 0 1 0 5M17 14a6 6 0 0 1 4 6"/></svg><span>团队</span></a>
+            <a class="ri " href="p-runs.html" title="工作流运行"><svg class="ic" viewBox="0 0 24 24"><circle cx="6" cy="6" r="2.5"/><circle cx="18" cy="6" r="2.5"/><circle cx="12" cy="18" r="2.5"/><path d="M8.5 6h7M7 8.4l4 7.2M17 8.4l-4 7.2"/></svg><span>流程</span></a>
+            <a class="ri " href="p-defs.html" title="项目定义"><svg class="ic" viewBox="0 0 24 24"><path d="M12 3l8 4-8 4-8-4z"/><path d="M4 12l8 4 8-4"/><path d="M4 17l8 4 8-4"/></svg><span>定义</span></a>
+            <a class="ri " href="p-knowledge.html" title="项目知识"><svg class="ic" viewBox="0 0 24 24"><path d="M4 5.5A2.5 2.5 0 0 1 6.5 3H19v16H6.5A2.5 2.5 0 0 0 4 21.5z"/><path d="M8 7h7M8 11h5"/></svg><span>知识</span></a>
+            <a class="ri " href="p-memory.html" title="长期记忆"><svg class="ic" viewBox="0 0 24 24"><ellipse cx="12" cy="6" rx="7" ry="3"/><path d="M5 6v6c0 1.7 3.1 3 7 3s7-1.3 7-3V6"/><path d="M5 12v6c0 1.7 3.1 3 7 3s7-1.3 7-3v-6"/></svg><span>记忆</span></a>
+            <a class="ri " href="p-audit.html" title="审计"><svg class="ic" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg><span>审计</span></a>
+            <a class="ri on" href="p-settings.html" title="项目设置"><svg class="ic" viewBox="0 0 24 24"><path d="M4 8h10M18 8h2M4 16h2M10 16h10"/><circle cx="16" cy="8" r="2"/><circle cx="8" cy="16" r="2"/></svg><span>设置</span></a>
+          </nav>
+        </aside>
+
+        <div class="pane">
+<div class="hd">
+            <div class="hd-l">
+              <h2>迁移<span class="scope"><b>项目</b> · v1 → v2</span></h2>
+              <p class="sub">
+                <span class="l">只读分析完成</span><i class="sep"></i>
+                <span class="l">2 类旧布局</span><i class="sep"></i>
+                <span class="l">2 个索引孤儿</span><i class="sep"></i>
+                <span class="l">尚未切换</span>
+                <span class="tr">一次性迁移：旧数据只读分析 → 候选事件 → 对账 → 你确认 → v2 单写</span>
+              </p>
+            </div>
+            <div class="hd-r">
+              <button class="btn">重新分析</button>
+              <button class="ibtn" title="更多"><svg class="ic" viewBox="0 0 24 24"><circle cx="5" cy="12" r="1"/><circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/></svg></button>
+            </div>
+          </div>
+
+          <div class="bar">
+            <div class="seg">
+              <a href="p-migrate.html" class="on">分析</a>
+              <a href="p-migrate.html">对账</a>
+              <a href="p-migrate.html">切换</a>
+            </div>
+            <span class="grow"></span>
+            <span class="st-chip">只读 · 不写任何文件</span>
+          </div>
+
+          <div class="body pad">
+            <div class="sec" style="margin-top:0">
+              <div class="sec-h">旧数据源<span class="n">2 类布局·只读</span></div>
+              <div class="box">
+                <div class="frow"><div class="k">state/teams</div><div class="v mono-sm">.dsh-myteam/state/teams/&lt;teamId&gt;/ledger.jsonl<span class="hint">本项目实际布局：2 个团队账本</span></div></div>
+                <div class="frow"><div class="k">tasks</div><div class="v mono-sm">.dsh-myteam/tasks/&lt;teamId&gt;/ledger.jsonl<span class="hint">当前代码写入的布局：本项目中为 0 个</span></div></div>
+                <div class="frow" style="border-bottom:0"><div class="k">辅证据</div><div class="v">state/teams.json · state/index/tasks.json · 成员卡 · identity.json<span class="hint">只用于对账，不覆盖账本事实</span></div></div>
+              </div>
+            </div>
+
+            <div class="sec">
+              <div class="sec-h">发现<span class="r">1 项需要你决定</span></div>
+              <div class="act-card warn">
+                <div class="act-h">
+                  <svg class="ic" viewBox="0 0 24 24" style="color:var(--mt-gate)"><path d="M12 3l9 16H3z"/><path d="M12 9v4M12 16v.5"/></svg>
+                  索引孤儿 · b5 / b5-dogfood
+                  <span class="st-chip upd">待你决定</span>
+                </div>
+                <ul class="imp">
+                  <li><svg class="ic s" viewBox="0 0 24 24"><path d="M12 3l9 16H3z"/><path d="M12 9v4M12 16v.5"/></svg>索引标为 active 且各有 1 个任务，但磁盘上没有对应账本</li>
+                  <li><svg class="ic s" viewBox="0 0 24 24"><path d="M12 3l9 16H3z"/><path d="M12 9v4M12 16v.5"/></svg>不会伪造成完整团队或任务；要么确认忽略，要么日后提供可验证证据</li>
+                  <li><svg class="ic s" viewBox="0 0 24 24"><path d="M12 3l9 16H3z"/><path d="M12 9v4M12 16v.5"/></svg>原始索引记录与名称会保留在迁移报告里</li>
+                </ul>
+                <div class="acts">
+                  <button class="btn">确认忽略并继续</button>
+                  <button class="btn">稍后提供证据</button>
+                </div>
+              </div>
+            </div>
+
+            <div class="sec">
+              <div class="sec-h">对账<span class="r">候选事件 1,284 · 引用缺失 0 · hash 冲突 0</span></div>
+              <div class="box">
+                <div class="frow"><div class="k">事件</div><div class="v">旧账本可还原 1,284 条事件；<span class="mono-sm">default</span> 账本的 2 条 rules.version.adopted 保留原样<span class="hint">多团队旧账本按 (ts, teamId, seq) 形成迁移排序，并明确标记</span></div></div>
+                <div class="frow"><div class="k">引用</div><div class="v">taskId / attemptId / sessionId 全部重映射并可追溯 legacyId<span class="hint">旧 Attempt 一律失效，恢复后必须新 claim</span></div></div>
+                <div class="frow"><div class="k">知识</div><div class="v">正文从 Markdown 导入，账本里的提案事件建立关联<span class="hint">避免重复入库</span></div></div>
+                <div class="frow" style="border-bottom:0"><div class="k">记忆</div><div class="v">SQLite 独立备份迁移；旧 memory.md 只在无对应条目时一次性导入</div></div>
+              </div>
+            </div>
+
+            <div class="sec">
+              <div class="sec-h">切换步骤<span class="n">只有你能发起</span></div>
+              <div class="box">
+                <ol class="ol">
+                  <li><span class="n">1</span><span><b>只读分析</b>：已完成，不写任何文件。</span></li>
+                  <li><span class="n">2</span><span><b>生成候选</b>：写入 <span class="mono-sm">state/migration-candidate/</span>，不动权威事件。</span></li>
+                  <li><span class="n">3</span><span><b>全量校验</b>：投影、引用、hash 对账全部通过才可继续。</span></li>
+                  <li><span class="n">4</span><span><b>你确认 cutover</b>：输入项目名 + nonce；旧运行时立即停止接受写入。</span></li>
+                  <li><span class="n">5</span><span><b>v2 单写</b>：旧布局保留为只读备份，不提供自动反向回滚。</span></li>
+                </ol>
+              </div>
+            </div>
+
+            <div class="dz" style="margin-top:14px">
+              <svg class="ic" viewBox="0 0 24 24" style="color:var(--mt-fail);margin-top:2px"><path d="M12 3l9 16H3z"/><path d="M12 9v4M12 16v.5"/></svg>
+              <div class="l">
+                <b>切换是不可逆的</b>
+                cutover 后新写数据只能向前导出，不提供自动回滚；旧数据备份独立保留，不会因为删除历史文档而被删掉。
+                <div style="margin-top:8px;display:flex;gap:8px;flex-wrap:wrap">
+                  <input class="input" style="width:180px" placeholder="输入项目名 storefront" aria-label="输入项目名确认">
+                  <input class="input" style="width:150px" placeholder="6 位 nonce" aria-label="输入 nonce">
+                  <button class="btn primary" aria-disabled="true" disabled>确认切换</button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </main>
+</div>
+</body>
+</html>

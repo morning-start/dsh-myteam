@@ -1,0 +1,140 @@
+﻿<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=1280">
+<meta name="dsh-design" content="dshplugin 1280x800">
+<title>发布与审计 · myteam</title>
+<link rel="stylesheet" href="dsh-shell.css">
+<link rel="stylesheet" href="myteam.css">
+<!-- 外框（DSH 插件 · 左侧栏入口）：只改 data-slot 里面，别动外框的结构、文字和 dsh-shell.css -->
+</head>
+<body>
+<div class="dsh-app" data-frame="dsh/sidebar">
+  <aside class="dsh-side">
+    <div class="dsh-brand"><div class="dsh-logo">deepseek<span class="dsh-logo-tag">HARNESS</span></div><div class="dsh-iconbtn"><svg class="dsh-i" viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M9 3v18"/></svg></div></div>
+    <div class="dsh-new"><svg class="dsh-i" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 8v8M8 12h8"/></svg>新会话</div>
+    <nav class="dsh-nav">
+      <div class="dsh-row"><svg class="dsh-i" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2.5l3 3-3 3-3-3zM18.5 9l3 3-3 3-3-3zM5.5 9l3 3-3 3-3-3zM12 15.5l3 3-3 3-3-3z"/></svg>插件</div>
+      <div class="dsh-row"><svg class="dsh-i" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>自动化任务</div>
+      <div class="dsh-row on"><span data-slot="entry-icon"><svg class="dsh-i" viewBox="0 0 24 24" aria-hidden="true"><circle cx="9" cy="8" r="3"/><path d="M3.5 19a5.5 5.5 0 0 1 11 0"/><path d="M15.5 5.8a3 3 0 0 1 0 5.4"/><path d="M17 14a4.5 4.5 0 0 1 3.5 5"/></svg></span><span data-slot="entry-label">myteam</span></div>
+      <div class="dsh-row"><svg class="dsh-i" viewBox="0 0 24 24" aria-hidden="true"><rect x="4" y="4" width="6" height="6" rx="1.5"/><rect x="14" y="4" width="6" height="6" rx="3"/><rect x="4" y="14" width="6" height="6" rx="1.5"/><rect x="14" y="14" width="6" height="6" rx="1.5"/></svg>更多</div>
+    </nav>
+    <div class="dsh-sec">工作区<div class="dsh-sec-acts"><div class="dsh-iconbtn"><svg class="dsh-i" viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="M20 20l-4-4"/></svg></div><div class="dsh-iconbtn"><svg class="dsh-i" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 8h10M18 8h2M4 16h2M10 16h10"/><circle cx="16" cy="8" r="2"/><circle cx="8" cy="16" r="2"/></svg></div><div class="dsh-iconbtn"><svg class="dsh-i" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><path d="M12 11v5M9.5 13.5h5"/></svg></div></div></div>
+    <div class="dsh-row"><span class="dsh-folder"><svg class="dsh-i" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></svg></span>我的项目</div>
+    <div class="dsh-sess">整理会议记录<span class="dsh-time">2 小时</span></div>
+    <div class="dsh-sess">新会话</div>
+    <div class="dsh-acct"><div class="dsh-avatar">我</div>我的账号</div>
+  </aside>
+  <main class="dsh-main">
+    <div class="dsh-bar"><div class="dsh-iconbtn dsh-corner"><svg class="dsh-i" viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M15 3v18"/></svg></div></div>
+    <div data-slot="main">
+      <div class="wt">
+        <aside class="ir">
+          <a class="team" href="g-overview.html" title="全局库 · $DSH_HOME/myteam" style="font-family:var(--dsh-font-code);font-size:12px">my</a>
+          <div class="line"></div>
+          <nav class="ir-nav">
+            <a class="ri " href="g-overview.html" title="概览"><svg class="ic" viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/></svg><span>概览</span></a>
+            <a class="ri " href="g-roles.html" title="全局角色"><svg class="ic" viewBox="0 0 24 24"><circle cx="9" cy="8" r="3"/><path d="M3 20a6 6 0 0 1 12 0"/><path d="M16 5.5a3 3 0 0 1 0 5M17 14a6 6 0 0 1 4 6"/></svg><span>角色</span></a>
+            <a class="ri " href="g-workflows.html" title="全局工作流"><svg class="ic" viewBox="0 0 24 24"><circle cx="6" cy="6" r="2.5"/><circle cx="18" cy="6" r="2.5"/><circle cx="12" cy="18" r="2.5"/><path d="M8.5 6h7M7 8.4l4 7.2M17 8.4l-4 7.2"/></svg><span>工作流</span></a>
+            <a class="ri " href="g-blueprints.html" title="团队蓝图"><svg class="ic" viewBox="0 0 24 24"><path d="M12 3l8 4-8 4-8-4z"/><path d="M4 12l8 4 8-4"/><path d="M4 17l8 4 8-4"/></svg><span>蓝图</span></a>
+            <a class="ri on" href="g-publish.html" title="发布与全局审计"><svg class="ic" viewBox="0 0 24 24"><path d="M12 16V4M8 8l4-4 4 4"/><path d="M4 16v3a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-3"/></svg><span>发布</span><i class="bdg"></i></a>
+          </nav>
+        </aside>
+
+        <div class="pane">
+<div class="hd">
+            <div class="hd-l">
+              <h2>发布与全局审计<span class="scope"><b>全局</b> · 人类专属</span></h2>
+              <p class="sub">
+                <span class="l">1 条待确认</span><i class="sep"></i>
+                <span class="l">全局操作 38 条</span><i class="sep"></i>
+                <span class="l">确认只在用户入口发生</span>
+                <span class="tr">队长只能提出发布请求；写入全局必须由你预览影响面并确认</span>
+              </p>
+            </div>
+            <div class="hd-r">
+              <button class="ibtn" title="刷新"><svg class="ic" viewBox="0 0 24 24"><path d="M20 11a8 8 0 1 0-2 5.5"/><path d="M20 5v6h-6"/></svg></button>
+              <button class="ibtn" title="更多"><svg class="ic" viewBox="0 0 24 24"><circle cx="5" cy="12" r="1"/><circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/></svg></button>
+            </div>
+          </div>
+
+          <div class="bar">
+            <div class="seg">
+              <a href="g-publish.html" class="on">待确认 1</a>
+              <a href="g-publish.html">已写入 37</a>
+              <a href="g-publish.html">被拒绝 2</a>
+            </div>
+            <span class="grow"></span>
+            <span class="muted" style="font-size:12px">审计只保存确认摘要，不保存确认令牌本体</span>
+          </div>
+
+          <div class="body pad">
+            <div class="pub-box">
+              <div class="act-h">
+                <svg class="ic" viewBox="0 0 24 24" style="color:var(--mt-gate)"><path d="M12 16V4M8 8l4-4 4 4"/><path d="M4 16v3a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-3"/></svg>
+                发布请求 · 角色 实现者
+                <span class="st-chip upd">待你确认</span>
+                <span class="grow"></span>
+                <span class="confirm-note">来自项目 storefront · 提出人 队长 · 09-20 10:12</span>
+              </div>
+
+              <div class="target" style="margin-top:10px">
+                <span class="mono-sm">roles/实现者.json</span>
+                <span class="muted" style="font-family:var(--dsh-font)">当前 hash <span class="mono-sm">9f3c1a…8b2e</span></span>
+              </div>
+
+              <div class="meta-grid" style="margin-top:10px">
+                <span class="k">项目定义</span><span class="v">revision 3 · 基准全局 v5 · 内容 hash <span class="mono-sm">41be07…c9d4</span></span>
+                <span class="k">影响面</span><span class="v">3 个项目有副本；2 个工作流、2 个蓝图引用此角色</span>
+                <span class="k">不可逆</span><span class="v">覆盖全局当前内容；只在 global-operations.jsonl 留摘要</span>
+                <span class="k">确认令牌</span><span class="v">绑定本操作 + 目标 hash + 影响面 · 5 分钟过期 · 一次性</span>
+              </div>
+
+              <div class="box" style="margin-top:10px;background:transparent">
+                <div class="side-h">差异（项目副本 → 全局 v5）</div>
+                <div class="kv"><span class="mono-sm" style="color:var(--mt-run-ink)">+</span><span class="v">工具策略：增加 pwsh</span></div>
+                <div class="kv"><span class="mono-sm" style="color:var(--mt-run-ink)">+</span><span class="v">长期设定：先读证据再动手</span></div>
+                <div class="kv"><span class="mono-sm" style="color:var(--mt-fail)">−</span><span class="v">组织授权：可派生层数 2 → 1</span></div>
+              </div>
+
+              <div class="confirm-note" style="margin-top:10px">若你预览后全局又发生变化，原令牌立即失效，需要重新生成差异预览；不会自动合并或覆盖。</div>
+
+              <div style="display:flex;align-items:center;gap:8px;margin-top:12px;flex-wrap:wrap">
+                <span class="muted" style="font-size:12px">输入 <span class="mono-sm" style="color:var(--dsh-fg)">实现者</span> 确认：</span>
+                <input class="input" style="width:180px" placeholder="角色 id" aria-label="输入角色 id">
+                <input class="input" style="width:150px;font-family:var(--dsh-font-code)" placeholder="6 位 nonce" aria-label="输入 nonce">
+                <span class="grow"></span>
+                <button class="btn">拒绝</button>
+                <button class="btn">重新生成预览</button>
+                <button class="btn primary" aria-disabled="true" disabled>确认发布到全局</button>
+              </div>
+            </div>
+
+            <div class="layer"><b>全局操作审计</b><span>global-operations.jsonl · 38 条</span><i class="rule"></i><a class="link" href="g-overview.html">存储位置</a></div>
+            <div class="list">
+              <div class="item">
+                <div class="l"><div class="t">发布 角色 实现者 · v4 → v5</div><div class="s"><span>操作 publish-role · 目标 hash 9f3c1a…</span><span class="mono-sm">09-18 14:22</span><span>确认耗时 38s</span></div></div>
+                <div class="r"><span class="st-chip ok">已写入</span></div>
+              </div>
+              <div class="item">
+                <div class="l"><div class="t">修改 工作流 发版检查 · v2 → v3</div><div class="s"><span>新增 2 个 TaskTemplate · 重接 1 条依赖</span><span class="mono-sm">09-16 10:05</span></div></div>
+                <div class="r"><span class="st-chip ok">已写入</span></div>
+              </div>
+              <div class="item">
+                <div class="l"><div class="t">拒绝 发布 角色 api-reviewer</div><div class="s"><span>原因：影响面包含 4 个项目的本地修改</span><span class="mono-sm">09-15 16:30</span></div></div>
+                <div class="r"><span class="st-chip">已拒绝</span></div>
+              </div>
+              <div class="item">
+                <div class="l"><div class="t">删除 蓝图 旧的四人组</div><div class="s"><span>未被任何项目引用</span><span class="mono-sm">09-12 17:40</span></div></div>
+                <div class="r"><span class="st-chip ok">已写入</span></div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </main>
+</div>
+</body>
+</html>

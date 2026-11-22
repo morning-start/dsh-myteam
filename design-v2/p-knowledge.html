@@ -1,0 +1,153 @@
+﻿<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=1280">
+<meta name="dsh-design" content="dshplugin 1280x800">
+<title>项目知识 · myteam</title>
+<link rel="stylesheet" href="dsh-shell.css">
+<link rel="stylesheet" href="myteam.css">
+<!-- 外框（DSH 插件 · 会话标签页）：只改 data-slot 里面，别动外框的结构、文字和 dsh-shell.css -->
+</head>
+<body>
+<div class="dsh-app" data-frame="dsh/view">
+  <aside class="dsh-side">
+    <div class="dsh-brand"><div class="dsh-logo">deepseek<span class="dsh-logo-tag">HARNESS</span></div><div class="dsh-iconbtn"><svg class="dsh-i" viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M9 3v18"/></svg></div></div>
+    <div class="dsh-new"><svg class="dsh-i" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 8v8M8 12h8"/></svg>新会话</div>
+    <nav class="dsh-nav">
+      <div class="dsh-row"><svg class="dsh-i" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2.5l3 3-3 3-3-3zM18.5 9l3 3-3 3-3-3zM5.5 9l3 3-3 3-3-3zM12 15.5l3 3-3 3-3-3z"/></svg>插件</div>
+      <div class="dsh-row"><svg class="dsh-i" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>自动化任务</div>
+      <div class="dsh-row"><svg class="dsh-i" viewBox="0 0 24 24" aria-hidden="true"><rect x="4" y="4" width="6" height="6" rx="1.5"/><rect x="14" y="4" width="6" height="6" rx="3"/><rect x="4" y="14" width="6" height="6" rx="1.5"/><rect x="14" y="14" width="6" height="6" rx="1.5"/></svg>更多</div>
+    </nav>
+    <div class="dsh-sec">工作区<div class="dsh-sec-acts"><div class="dsh-iconbtn"><svg class="dsh-i" viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="M20 20l-4-4"/></svg></div><div class="dsh-iconbtn"><svg class="dsh-i" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 8h10M18 8h2M4 16h2M10 16h10"/><circle cx="16" cy="8" r="2"/><circle cx="8" cy="16" r="2"/></svg></div><div class="dsh-iconbtn"><svg class="dsh-i" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><path d="M12 11v5M9.5 13.5h5"/></svg></div></div></div>
+    <div class="dsh-row"><span class="dsh-folder"><svg class="dsh-i" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></svg></span>我的项目</div>
+    <div class="dsh-sess on">整理会议记录<span class="dsh-time">2 小时</span></div>
+    <div class="dsh-sess">新会话</div>
+    <div class="dsh-acct"><div class="dsh-avatar">我</div>我的账号</div>
+  </aside>
+  <main class="dsh-main">
+    <header class="dsh-head">
+      <div class="dsh-crumbs">整理会议记录<span class="dsh-mode">标准模式<svg class="dsh-i" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg></span></div>
+      <div class="dsh-utils"><div class="dsh-split"><svg class="dsh-i" viewBox="0 0 24 24" aria-hidden="true"><path d="M9 8l-4 4 4 4M15 8l4 4-4 4"/></svg><svg class="dsh-i" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg></div><div class="dsh-iconbtn"><svg class="dsh-i" viewBox="0 0 24 24" aria-hidden="true"><circle cx="5" cy="12" r="1"/><circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/></svg></div></div>
+      <div class="dsh-iconbtn dsh-corner"><svg class="dsh-i" viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M15 3v18"/></svg></div>
+      <div class="dsh-tabs" role="tablist"><div class="dsh-tab">对话</div><div class="dsh-tab">轨迹</div><div class="dsh-tab on"><span data-slot="tab-label">项目</span></div></div>
+    </header>
+    <div data-slot="main">
+      <div class="wt">
+        <aside class="ir">
+          <a class="team" href="p-overview.html" title="项目 storefront · 切换项目" style="font-family:var(--dsh-font-code);font-size:12px">st</a>
+          <div class="line"></div>
+          <nav class="ir-nav">
+            <a class="ri " href="p-overview.html" title="概览"><svg class="ic" viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/></svg><span>概览</span></a>
+            <a class="ri " href="p-tasks.html" title="任务与看板"><svg class="ic" viewBox="0 0 24 24"><rect x="3" y="4" width="5" height="16" rx="1.5"/><rect x="10" y="4" width="5" height="11" rx="1.5"/><rect x="17" y="4" width="4" height="7" rx="1.5"/></svg><span>任务</span><i class="bdg"></i></a>
+            <a class="ri " href="p-teams.html" title="团队与成员"><svg class="ic" viewBox="0 0 24 24"><circle cx="9" cy="8" r="3"/><path d="M3 20a6 6 0 0 1 12 0"/><path d="M16 5.5a3 3 0 0 1 0 5M17 14a6 6 0 0 1 4 6"/></svg><span>团队</span></a>
+            <a class="ri " href="p-runs.html" title="工作流运行"><svg class="ic" viewBox="0 0 24 24"><circle cx="6" cy="6" r="2.5"/><circle cx="18" cy="6" r="2.5"/><circle cx="12" cy="18" r="2.5"/><path d="M8.5 6h7M7 8.4l4 7.2M17 8.4l-4 7.2"/></svg><span>流程</span></a>
+            <a class="ri " href="p-defs.html" title="项目定义"><svg class="ic" viewBox="0 0 24 24"><path d="M12 3l8 4-8 4-8-4z"/><path d="M4 12l8 4 8-4"/><path d="M4 17l8 4 8-4"/></svg><span>定义</span></a>
+            <a class="ri on" href="p-knowledge.html" title="项目知识"><svg class="ic" viewBox="0 0 24 24"><path d="M4 5.5A2.5 2.5 0 0 1 6.5 3H19v16H6.5A2.5 2.5 0 0 0 4 21.5z"/><path d="M8 7h7M8 11h5"/></svg><span>知识</span></a>
+            <a class="ri " href="p-memory.html" title="长期记忆"><svg class="ic" viewBox="0 0 24 24"><ellipse cx="12" cy="6" rx="7" ry="3"/><path d="M5 6v6c0 1.7 3.1 3 7 3s7-1.3 7-3V6"/><path d="M5 12v6c0 1.7 3.1 3 7 3s7-1.3 7-3v-6"/></svg><span>记忆</span></a>
+            <a class="ri " href="p-audit.html" title="审计"><svg class="ic" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg><span>审计</span></a>
+            <a class="ri " href="p-settings.html" title="项目设置"><svg class="ic" viewBox="0 0 24 24"><path d="M4 8h10M18 8h2M4 16h2M10 16h10"/><circle cx="16" cy="8" r="2"/><circle cx="8" cy="16" r="2"/></svg><span>设置</span></a>
+          </nav>
+        </aside>
+
+        <div class="pane">
+<div class="hd">
+            <div class="hd-l">
+              <h2>项目知识<span class="scope"><b>项目</b> · Knowledge</span></h2>
+              <p class="sub">
+                <span class="l">21 条已采纳</span><i class="sep"></i>
+                <span class="l">2 条提案待确认</span><i class="sep"></i>
+                <span class="l">3 条可能过期</span>
+                <span class="tr">正文、证据与修订都在项目事件里；<span class="mono-sm">config/knowledge/*.md</span> 是可重建的生成视图</span>
+              </p>
+            </div>
+            <div class="hd-r">
+              <button class="btn"><svg class="ic s" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg>新增条目</button>
+              <button class="ibtn" title="更多"><svg class="ic" viewBox="0 0 24 24"><circle cx="5" cy="12" r="1"/><circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/></svg></button>
+            </div>
+          </div>
+
+          <div class="bar">
+            <div class="seg">
+              <a href="p-knowledge.html" class="on">已采纳 21</a>
+              <a href="p-knowledge.html">提案 2</a>
+              <a href="p-knowledge.html">可能过期 3</a>
+            </div>
+            <span class="grow"></span>
+            <label class="field w"><svg class="ic s" viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="M20 20l-4-4"/></svg><input placeholder="搜索条目、证据" aria-label="搜索知识"></label>
+            <button class="btn"><svg class="ic s" viewBox="0 0 24 24"><path d="M4 6h16M7 12h10M10 18h4"/></svg>筛选</button>
+          </div>
+
+          <div class="body pad">
+            <div class="banner plan" style="margin:0 0 4px">
+              <svg class="ic" viewBox="0 0 24 24"><path d="M12 3l9 16H3z"/><path d="M12 9v4M12 16v.5"/></svg>
+              <div class="b-t"><b>2 条知识提案待确认</b><span>来自 队长 与 陈：「结算模块以服务层为界」「发版前必须跑兼容矩阵」。采纳后才进入已采纳条目。</span></div>
+              <div class="acts"><button class="btn">看证据</button><button class="btn">逐条确认</button></div>
+            </div>
+
+            <div class="layer"><b>已采纳</b><span>21 条 · 修订与证据可回放</span><i class="rule"></i></div>
+            <div class="list">
+              <a class="item" href="p-task.html">
+                <div class="l">
+                  <div class="t">结算页改造期间不触碰支付回调</div>
+                  <div class="s"><span>4 条证据</span><span>rev 2 · 队长采纳</span><span>被 6 个任务引用</span><span class="mono-sm">config/knowledge/k-01.md</span></div>
+                </div>
+                <div class="r">有效</div>
+              </a>
+              <a class="item" href="p-task.html">
+                <div class="l">
+                  <div class="t">门禁命令统一用 <span class="mono-sm">pnpm -w test --filter &lt;pkg&gt;</span></div>
+                  <div class="s"><span>6 条证据</span><span>rev 1 · 队长采纳</span><span>被 11 个任务引用</span></div>
+                </div>
+                <div class="r">有效</div>
+              </a>
+              <a class="item" href="p-task.html">
+                <div class="l">
+                  <div class="t">模块包对外只暴露 6 个方法与错误码</div>
+                  <div class="s"><span>3 条证据</span><span>rev 3 · 队长采纳</span><span>被 v2 引用</span><span class="st-chip upd">可能过期：契约仍在改</span></div>
+                </div>
+                <div class="r">待复核</div>
+              </a>
+              <a class="item" href="p-task.html">
+                <div class="l">
+                  <div class="t">旧调用点 28 处，其中 3 处是动态调用</div>
+                  <div class="s"><span>2 条证据</span><span>rev 1 · 成员提案后采纳</span><span>被 t6、t7 引用</span></div>
+                </div>
+                <div class="r">有效</div>
+              </a>
+              <a class="item" href="p-task.html">
+                <div class="l">
+                  <div class="t">灰度开关默认关闭，按租户白名单开</div>
+                  <div class="s"><span>1 条证据</span><span>rev 1 · 队长采纳</span><span>被 t5 引用</span></div>
+                </div>
+                <div class="r">有效</div>
+              </a>
+            </div>
+
+            <div class="layer"><b>提案</b><span>2 条 · 成员与队长都能提</span><i class="rule"></i></div>
+            <div class="list">
+              <div class="item">
+                <div class="l">
+                  <div class="t">结算模块以服务层为界</div>
+                  <div class="s"><span>提案人 队长</span><span>2 条证据</span><span class="mono-sm">09-20 10:02</span></div>
+                </div>
+                <div class="r"><button class="btn">采纳</button></div>
+              </div>
+              <div class="item">
+                <div class="l">
+                  <div class="t">发版前必须跑一遍兼容矩阵</div>
+                  <div class="s"><span>提案人 陈</span><span>1 条证据</span><span class="mono-sm">09-20 10:04</span></div>
+                </div>
+                <div class="r"><button class="btn">采纳</button></div>
+              </div>
+            </div>
+
+            <div class="confirm-note" style="margin-top:12px">成员私有记忆不在这里：它属于项目 SQLite 的成员 bank，只有本人可读写。</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </main>
+</div>
+</body>
+</html>

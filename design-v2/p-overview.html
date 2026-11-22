@@ -1,0 +1,160 @@
+﻿<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=1280">
+<meta name="dsh-design" content="dshplugin 1280x800">
+<title>项目概览 · myteam</title>
+<link rel="stylesheet" href="dsh-shell.css">
+<link rel="stylesheet" href="myteam.css">
+<!-- 外框（DSH 插件 · 会话标签页）：只改 data-slot 里面，别动外框的结构、文字和 dsh-shell.css -->
+</head>
+<body>
+<div class="dsh-app" data-frame="dsh/view">
+  <aside class="dsh-side">
+    <div class="dsh-brand"><div class="dsh-logo">deepseek<span class="dsh-logo-tag">HARNESS</span></div><div class="dsh-iconbtn"><svg class="dsh-i" viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M9 3v18"/></svg></div></div>
+    <div class="dsh-new"><svg class="dsh-i" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 8v8M8 12h8"/></svg>新会话</div>
+    <nav class="dsh-nav">
+      <div class="dsh-row"><svg class="dsh-i" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2.5l3 3-3 3-3-3zM18.5 9l3 3-3 3-3-3zM5.5 9l3 3-3 3-3-3zM12 15.5l3 3-3 3-3-3z"/></svg>插件</div>
+      <div class="dsh-row"><svg class="dsh-i" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>自动化任务</div>
+      <div class="dsh-row"><svg class="dsh-i" viewBox="0 0 24 24" aria-hidden="true"><rect x="4" y="4" width="6" height="6" rx="1.5"/><rect x="14" y="4" width="6" height="6" rx="3"/><rect x="4" y="14" width="6" height="6" rx="1.5"/><rect x="14" y="14" width="6" height="6" rx="1.5"/></svg>更多</div>
+    </nav>
+    <div class="dsh-sec">工作区<div class="dsh-sec-acts"><div class="dsh-iconbtn"><svg class="dsh-i" viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="M20 20l-4-4"/></svg></div><div class="dsh-iconbtn"><svg class="dsh-i" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 8h10M18 8h2M4 16h2M10 16h10"/><circle cx="16" cy="8" r="2"/><circle cx="8" cy="16" r="2"/></svg></div><div class="dsh-iconbtn"><svg class="dsh-i" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><path d="M12 11v5M9.5 13.5h5"/></svg></div></div></div>
+    <div class="dsh-row"><span class="dsh-folder"><svg class="dsh-i" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></svg></span>我的项目</div>
+    <div class="dsh-sess on">整理会议记录<span class="dsh-time">2 小时</span></div>
+    <div class="dsh-sess">新会话</div>
+    <div class="dsh-acct"><div class="dsh-avatar">我</div>我的账号</div>
+  </aside>
+  <main class="dsh-main">
+    <header class="dsh-head">
+      <div class="dsh-crumbs">整理会议记录<span class="dsh-mode">标准模式<svg class="dsh-i" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg></span></div>
+      <div class="dsh-utils"><div class="dsh-split"><svg class="dsh-i" viewBox="0 0 24 24" aria-hidden="true"><path d="M9 8l-4 4 4 4M15 8l4 4-4 4"/></svg><svg class="dsh-i" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg></div><div class="dsh-iconbtn"><svg class="dsh-i" viewBox="0 0 24 24" aria-hidden="true"><circle cx="5" cy="12" r="1"/><circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/></svg></div></div>
+      <div class="dsh-iconbtn dsh-corner"><svg class="dsh-i" viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M15 3v18"/></svg></div>
+      <div class="dsh-tabs" role="tablist"><div class="dsh-tab">对话</div><div class="dsh-tab">轨迹</div><div class="dsh-tab on"><span data-slot="tab-label">项目</span></div></div>
+    </header>
+    <div data-slot="main">
+      <div class="wt">
+        <aside class="ir">
+          <a class="team" href="p-overview.html" title="项目 storefront · 切换项目" style="font-family:var(--dsh-font-code);font-size:12px">st</a>
+          <div class="line"></div>
+          <nav class="ir-nav">
+            <a class="ri on" href="p-overview.html" title="概览"><svg class="ic" viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/></svg><span>概览</span></a>
+            <a class="ri " href="p-tasks.html" title="任务与看板"><svg class="ic" viewBox="0 0 24 24"><rect x="3" y="4" width="5" height="16" rx="1.5"/><rect x="10" y="4" width="5" height="11" rx="1.5"/><rect x="17" y="4" width="4" height="7" rx="1.5"/></svg><span>任务</span><i class="bdg"></i></a>
+            <a class="ri " href="p-teams.html" title="团队与成员"><svg class="ic" viewBox="0 0 24 24"><circle cx="9" cy="8" r="3"/><path d="M3 20a6 6 0 0 1 12 0"/><path d="M16 5.5a3 3 0 0 1 0 5M17 14a6 6 0 0 1 4 6"/></svg><span>团队</span></a>
+            <a class="ri " href="p-runs.html" title="工作流运行"><svg class="ic" viewBox="0 0 24 24"><circle cx="6" cy="6" r="2.5"/><circle cx="18" cy="6" r="2.5"/><circle cx="12" cy="18" r="2.5"/><path d="M8.5 6h7M7 8.4l4 7.2M17 8.4l-4 7.2"/></svg><span>流程</span></a>
+            <a class="ri " href="p-defs.html" title="项目定义"><svg class="ic" viewBox="0 0 24 24"><path d="M12 3l8 4-8 4-8-4z"/><path d="M4 12l8 4 8-4"/><path d="M4 17l8 4 8-4"/></svg><span>定义</span></a>
+            <a class="ri " href="p-knowledge.html" title="项目知识"><svg class="ic" viewBox="0 0 24 24"><path d="M4 5.5A2.5 2.5 0 0 1 6.5 3H19v16H6.5A2.5 2.5 0 0 0 4 21.5z"/><path d="M8 7h7M8 11h5"/></svg><span>知识</span></a>
+            <a class="ri " href="p-memory.html" title="长期记忆"><svg class="ic" viewBox="0 0 24 24"><ellipse cx="12" cy="6" rx="7" ry="3"/><path d="M5 6v6c0 1.7 3.1 3 7 3s7-1.3 7-3V6"/><path d="M5 12v6c0 1.7 3.1 3 7 3s7-1.3 7-3v-6"/></svg><span>记忆</span></a>
+            <a class="ri " href="p-audit.html" title="审计"><svg class="ic" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg><span>审计</span></a>
+            <a class="ri " href="p-settings.html" title="项目设置"><svg class="ic" viewBox="0 0 24 24"><path d="M4 8h10M18 8h2M4 16h2M10 16h10"/><circle cx="16" cy="8" r="2"/><circle cx="8" cy="16" r="2"/></svg><span>设置</span></a>
+          </nav>
+        </aside>
+
+        <div class="pane">
+<div class="hd">
+            <div class="hd-l">
+              <h2>storefront<span class="scope"><b>项目</b> · storefront</span></h2>
+              <p class="sub">
+                <span class="l">2 个团队</span><i class="sep"></i>
+                <span class="l">17 个任务</span><i class="sep"></i>
+                <span class="l">2 个 Run</span><i class="sep"></i>
+                <span class="l">3 件待你确认</span>
+                <span class="tr">项目里的定义、配置、知识、任务与 Run 都写进同一个事件日志</span>
+              </p>
+            </div>
+            <div class="hd-r">
+              <button class="ibtn" title="刷新"><svg class="ic" viewBox="0 0 24 24"><path d="M20 11a8 8 0 1 0-2 5.5"/><path d="M20 5v6h-6"/></svg></button>
+              <button class="ibtn" title="更多"><svg class="ic" viewBox="0 0 24 24"><circle cx="5" cy="12" r="1"/><circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/></svg></button>
+            </div>
+          </div>
+
+          <div class="bar">
+            <span class="st-chip ok"><span class="dot run"></span>写者就绪</span>
+            <span class="st-chip">lease 12s · fencing 7</span>
+            <span class="st-chip">schema v2</span>
+            <span class="st-chip">projectSeq 1,284</span>
+            <span class="grow"></span>
+            <span class="muted" style="font-size:12px">最近同步 2 分钟前</span>
+          </div>
+
+          <div class="body pad">
+            <div class="grid" style="grid-template-columns:repeat(4,minmax(0,1fr))">
+              <a class="rc" href="p-teams.html" style="gap:4px">
+                <div class="desc">团队</div>
+                <div style="font:600 16px/1.2 var(--dsh-font)">2</div>
+                <div class="desc">1 个进行中 · 1 个待批准</div>
+              </a>
+              <a class="rc" href="p-tasks.html" style="gap:4px">
+                <div class="desc">任务</div>
+                <div style="font:600 16px/1.2 var(--dsh-font)">17</div>
+                <div class="desc">3 个在跑 · 3 个待裁决</div>
+              </a>
+              <a class="rc" href="p-runs.html" style="gap:4px">
+                <div class="desc">工作流运行</div>
+                <div style="font:600 16px/1.2 var(--dsh-font)">2</div>
+                <div class="desc">1 个进行中 · 1 个未开始</div>
+              </a>
+              <a class="rc" href="p-approval.html" style="gap:4px">
+                <div class="desc">等你确认</div>
+                <div style="font:600 16px/1.2 var(--dsh-font)">3</div>
+                <div class="desc">计划批准 · 队长接管 · 发布请求</div>
+              </a>
+            </div>
+
+            <div class="banner plan" style="margin:12px 0 0">
+              <svg class="ic" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>
+              <div class="b-t"><b>3 件事等你确认</b><span>上线检查清单的计划待批准 · 结算页模块化的队长接管请求 · 角色 实现者 的全局发布请求</span></div>
+              <div class="acts"><a class="btn primary" href="p-approval.html" style="text-decoration:none">逐项确认</a></div>
+            </div>
+
+            <div class="layer"><b>团队</b><span>2 个</span><i class="rule"></i><a class="link" href="p-teams.html">全部团队</a></div>
+            <div class="grid c2">
+              <a class="rc" href="p-teams.html">
+                <div class="rc-h"><span class="dot run"></span><span class="nm">结算页模块化</span><span class="tag">进行中</span><span class="cnt">configRev 3</span></div>
+                <div class="inst">
+                  <div class="i"><span class="nm muted">队长 何 · generation 1 · 在线</span></div>
+                  <div class="i"><span class="dot run"></span><span class="nm">3 个在跑 · 12 个任务</span><span class="tk">1.86M</span></div>
+                </div>
+                <div class="kws"><span class="kw">队长</span><span class="kw">实现者 ×2</span><span class="kw">审查者</span><span class="kw">需求验证</span><span class="kw">api-reviewer</span></div>
+              </a>
+              <a class="rc" href="p-teams.html">
+                <div class="rc-h"><span class="dot gate"></span><span class="nm">上线检查清单</span><span class="tag">草稿</span><span class="cnt">configRev 1</span></div>
+                <div class="inst">
+                  <div class="i"><span class="nm muted">队长 何 · generation 1 · 在线</span></div>
+                  <div class="i"><span class="dot"></span><span class="nm">5 个任务已规划 · 等你批准</span><span class="tk">0</span></div>
+                </div>
+                <div class="kws"><span class="kw">队长</span><span class="kw">检查员</span><span class="kw">审查者</span><span class="kw">需求验证</span></div>
+              </a>
+            </div>
+
+            <div class="layer"><b>跨团队依赖</b><span>3 条 · 都归下游任务</span><i class="rule"></i><a class="link" href="p-dag.html">打开依赖图</a></div>
+            <div class="list">
+              <a class="item" href="p-task.html">
+                <div class="l"><div class="t">c5 发版检查报告 <span class="muted">依赖</span> t6 结算页 UI 迁移</div><div class="s"><span>结算页模块化 → 上线检查清单</span><span>主责 苏</span></div></div>
+                <div class="r">已就绪</div>
+              </a>
+              <a class="item" href="p-task.html">
+                <div class="l"><div class="t">c3 灰度窗口确认 <span class="muted">依赖</span> t4 替换调用点跑通冒烟</div><div class="s"><span>结算页模块化 → 上线检查清单</span><span>主责 方</span></div></div>
+                <div class="r"><span class="st-chip upd">等上游</span></div>
+              </a>
+              <a class="item" href="p-task.html">
+                <div class="l"><div class="t">t4 替换调用点 <span class="muted">协作</span> 上线检查清单 · 检查员</div><div class="s"><span>协作团队只处理获授权的执行子集</span></div></div>
+                <div class="r">1 人参与</div>
+              </a>
+            </div>
+
+            <div class="layer"><b>最近事件</b><span>projectSeq 1,284</span><i class="rule"></i><a class="link" href="p-audit.html">打开审计</a></div>
+            <div class="box" style="padding:2px 14px">
+              <div class="ev"><span class="tm">1,284</span><div class="tx"><b>gate.result</b><span class="m"> · t4 · 命令验证通过（exit 0）· 林</span></div></div>
+              <div class="ev"><span class="tm">1,283</span><div class="tx"><b>attempt.progress</b><span class="m"> · t6 · 迁移 14 个文件 · 周</span></div></div>
+              <div class="ev"><span class="tm">1,282</span><div class="tx"><b>effect.completed</b><span class="m"> · spawn 陈 · 会话已就绪</span></div></div>
+              <div class="ev" style="border-bottom:0"><span class="tm">1,281</span><div class="tx"><b>run.updated</b><span class="m"> · 结算改造 Run 1 · 新增 1 个任务</span></div></div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </main>
+</div>
+</body>
+</html>

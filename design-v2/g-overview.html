@@ -1,0 +1,139 @@
+﻿<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=1280">
+<meta name="dsh-design" content="dshplugin 1280x800">
+<title>全局库 · myteam</title>
+<link rel="stylesheet" href="dsh-shell.css">
+<link rel="stylesheet" href="myteam.css">
+<!-- 外框（DSH 插件 · 左侧栏入口）：只改 data-slot 里面，别动外框的结构、文字和 dsh-shell.css -->
+</head>
+<body>
+<div class="dsh-app" data-frame="dsh/sidebar">
+  <aside class="dsh-side">
+    <div class="dsh-brand"><div class="dsh-logo">deepseek<span class="dsh-logo-tag">HARNESS</span></div><div class="dsh-iconbtn"><svg class="dsh-i" viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M9 3v18"/></svg></div></div>
+    <div class="dsh-new"><svg class="dsh-i" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 8v8M8 12h8"/></svg>新会话</div>
+    <nav class="dsh-nav">
+      <div class="dsh-row"><svg class="dsh-i" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2.5l3 3-3 3-3-3zM18.5 9l3 3-3 3-3-3zM5.5 9l3 3-3 3-3-3zM12 15.5l3 3-3 3-3-3z"/></svg>插件</div>
+      <div class="dsh-row"><svg class="dsh-i" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>自动化任务</div>
+      <div class="dsh-row on"><span data-slot="entry-icon"><svg class="dsh-i" viewBox="0 0 24 24" aria-hidden="true"><circle cx="9" cy="8" r="3"/><path d="M3.5 19a5.5 5.5 0 0 1 11 0"/><path d="M15.5 5.8a3 3 0 0 1 0 5.4"/><path d="M17 14a4.5 4.5 0 0 1 3.5 5"/></svg></span><span data-slot="entry-label">myteam</span></div>
+      <div class="dsh-row"><svg class="dsh-i" viewBox="0 0 24 24" aria-hidden="true"><rect x="4" y="4" width="6" height="6" rx="1.5"/><rect x="14" y="4" width="6" height="6" rx="3"/><rect x="4" y="14" width="6" height="6" rx="1.5"/><rect x="14" y="14" width="6" height="6" rx="1.5"/></svg>更多</div>
+    </nav>
+    <div class="dsh-sec">工作区<div class="dsh-sec-acts"><div class="dsh-iconbtn"><svg class="dsh-i" viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="M20 20l-4-4"/></svg></div><div class="dsh-iconbtn"><svg class="dsh-i" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 8h10M18 8h2M4 16h2M10 16h10"/><circle cx="16" cy="8" r="2"/><circle cx="8" cy="16" r="2"/></svg></div><div class="dsh-iconbtn"><svg class="dsh-i" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><path d="M12 11v5M9.5 13.5h5"/></svg></div></div></div>
+    <div class="dsh-row"><span class="dsh-folder"><svg class="dsh-i" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></svg></span>我的项目</div>
+    <div class="dsh-sess">整理会议记录<span class="dsh-time">2 小时</span></div>
+    <div class="dsh-sess">新会话</div>
+    <div class="dsh-acct"><div class="dsh-avatar">我</div>我的账号</div>
+  </aside>
+  <main class="dsh-main">
+    <div class="dsh-bar"><div class="dsh-iconbtn dsh-corner"><svg class="dsh-i" viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M15 3v18"/></svg></div></div>
+    <div data-slot="main">
+      <div class="wt">
+        <aside class="ir">
+          <a class="team" href="g-overview.html" title="全局库 · $DSH_HOME/myteam" style="font-family:var(--dsh-font-code);font-size:12px">my</a>
+          <div class="line"></div>
+          <nav class="ir-nav">
+            <a class="ri on" href="g-overview.html" title="概览"><svg class="ic" viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/></svg><span>概览</span></a>
+            <a class="ri " href="g-roles.html" title="全局角色"><svg class="ic" viewBox="0 0 24 24"><circle cx="9" cy="8" r="3"/><path d="M3 20a6 6 0 0 1 12 0"/><path d="M16 5.5a3 3 0 0 1 0 5M17 14a6 6 0 0 1 4 6"/></svg><span>角色</span></a>
+            <a class="ri " href="g-workflows.html" title="全局工作流"><svg class="ic" viewBox="0 0 24 24"><circle cx="6" cy="6" r="2.5"/><circle cx="18" cy="6" r="2.5"/><circle cx="12" cy="18" r="2.5"/><path d="M8.5 6h7M7 8.4l4 7.2M17 8.4l-4 7.2"/></svg><span>工作流</span></a>
+            <a class="ri " href="g-blueprints.html" title="团队蓝图"><svg class="ic" viewBox="0 0 24 24"><path d="M12 3l8 4-8 4-8-4z"/><path d="M4 12l8 4 8-4"/><path d="M4 17l8 4 8-4"/></svg><span>蓝图</span></a>
+            <a class="ri " href="g-publish.html" title="发布与全局审计"><svg class="ic" viewBox="0 0 24 24"><path d="M12 16V4M8 8l4-4 4 4"/><path d="M4 16v3a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-3"/></svg><span>发布</span><i class="bdg"></i></a>
+          </nav>
+        </aside>
+
+        <div class="pane">
+          <div class="hd">
+            <div class="hd-l">
+              <h2>myteam 全局库<span class="scope"><b>全局</b> · 跨项目复用</span></h2>
+              <p class="sub">
+                <span class="l">角色 12</span><i class="sep"></i>
+                <span class="l">工作流 4</span><i class="sep"></i>
+                <span class="l">蓝图 3</span><i class="sep"></i>
+                <span class="l">1 条发布待确认</span>
+                <span class="tr">这里只有可复用定义；团队、任务、Run、知识与记忆都只存在于各自项目</span>
+              </p>
+            </div>
+            <div class="hd-r">
+              <button class="ibtn" title="刷新"><svg class="ic" viewBox="0 0 24 24"><path d="M20 11a8 8 0 1 0-2 5.5"/><path d="M20 5v6h-6"/></svg></button>
+              <button class="ibtn" title="更多"><svg class="ic" viewBox="0 0 24 24"><circle cx="5" cy="12" r="1"/><circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/></svg></button>
+            </div>
+          </div>
+
+          <div class="bar">
+            <div class="seg">
+              <a href="g-roles.html">角色 12</a>
+              <a href="g-workflows.html">工作流 4</a>
+              <a href="g-blueprints.html">蓝图 3</a>
+              <a href="g-publish.html">发布 1</a>
+            </div>
+            <span class="grow"></span>
+            <label class="field w"><svg class="ic s" viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="M20 20l-4-4"/></svg><input placeholder="搜索定义、hash" aria-label="搜索全局定义"></label>
+            <button class="btn"><svg class="ic s" viewBox="0 0 24 24"><path d="M4 6h16M7 12h10M10 18h4"/></svg>筛选</button>
+          </div>
+
+          <div class="body pad">
+            <div class="grid" style="grid-template-columns:repeat(4,minmax(0,1fr))">
+              <a class="rc" href="g-roles.html" style="gap:4px">
+                <div class="desc">角色 RoleDefinition</div>
+                <div style="font:600 16px/1.2 var(--dsh-font)">12</div>
+                <div class="desc">内置 6 · 插件 2 · 用户 4</div>
+              </a>
+              <a class="rc" href="g-workflows.html" style="gap:4px">
+                <div class="desc">工作流 WorkflowDefinition</div>
+                <div style="font:600 16px/1.2 var(--dsh-font)">4</div>
+                <div class="desc">被 3 个蓝图引用</div>
+              </a>
+              <a class="rc" href="g-blueprints.html" style="gap:4px">
+                <div class="desc">团队蓝图 TeamBlueprint</div>
+                <div style="font:600 16px/1.2 var(--dsh-font)">3</div>
+                <div class="desc">只存引用，不拥有定义</div>
+              </a>
+              <a class="rc" href="g-publish.html" style="gap:4px">
+                <div class="desc">发布请求待确认</div>
+                <div style="font:600 16px/1.2 var(--dsh-font)">1</div>
+                <div class="desc">来自项目 storefront · 角色 实现者</div>
+              </a>
+            </div>
+
+            <div class="layer"><b>存储与来源</b><span class="mono-sm">$DSH_HOME/myteam</span><i class="rule"></i></div>
+            <div class="grid c2">
+              <div class="box">
+                <div class="side-h">目录（用户可写，全部对外只读，写需确认）</div>
+                <div class="kv"><span class="v mono-sm">roles/</span><span class="muted" style="margin-left:auto;font-size:12px">7 个文件 · 16 KB</span></div>
+                <div class="kv"><span class="v mono-sm">workflows/</span><span class="muted" style="margin-left:auto;font-size:12px">4 个文件 · 9 KB</span></div>
+                <div class="kv"><span class="v mono-sm">team-blueprints/</span><span class="muted" style="margin-left:auto;font-size:12px">3 个文件 · 6 KB</span></div>
+                <div class="kv"><span class="v mono-sm">audit/global-operations.jsonl</span><span class="muted" style="margin-left:auto;font-size:12px">38 条</span></div>
+              </div>
+              <div class="box">
+                <div class="side-h">来源</div>
+                <div class="kv"><span class="tag line">内置</span><span class="v">6 个角色 · 只读 origin，不落在这个目录</span></div>
+                <div class="kv"><span class="tag line">插件贡献</span><span class="v">2 个角色 · 随插件升级，用户不可改</span></div>
+                <div class="kv"><span class="tag line">用户</span><span class="v">4 个角色 · 4 个工作流 · 3 个蓝图</span></div>
+                <div class="muted" style="font-size:12px;margin-top:6px">Skill / MCP / 工具连接由 DSH 自己的管理面持有，myteam 只存引用。</div>
+              </div>
+            </div>
+
+            <div class="layer"><b>最近全局操作</b><span>global-operations.jsonl</span><i class="rule"></i><a class="link" href="g-publish.html">看全部</a></div>
+            <div class="list">
+              <div class="item">
+                <div class="l"><div class="t">发布 角色 实现者 · v4 → v5</div><div class="s"><span>由用户在确认令牌内执行</span><span class="mono-sm">09-18 14:22</span></div></div>
+                <div class="r"><span class="st-chip ok">已写入</span></div>
+              </div>
+              <div class="item">
+                <div class="l"><div class="t">修改 工作流 发版检查</div><div class="s"><span>新增 2 个 TaskTemplate · 重接 1 条依赖</span><span class="mono-sm">09-16 10:05</span></div></div>
+                <div class="r"><span class="st-chip">已写入</span></div>
+              </div>
+              <div class="item">
+                <div class="l"><div class="t">删除 蓝图 旧的四人组</div><div class="s"><span>未被任何项目引用</span><span class="mono-sm">09-12 17:40</span></div></div>
+                <div class="r"><span class="st-chip">已写入</span></div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </main>
+</div>
+</body>
+</html>
