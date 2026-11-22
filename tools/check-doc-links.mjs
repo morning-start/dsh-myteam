@@ -28,14 +28,10 @@ const NON_REPO_PATTERNS = [
 const files = []
 function walk(dir) {
   for (const name of readdirSync(dir)) {
-<<<<<<< HEAD
-    // `.agents/` 里是 linked worktree（各自的仓库根），相对链接只在那个根里成立；
+// `.agents/` 里是 linked worktree（各自的仓库根），相对链接只在那个根里成立；
     // `.tmp/` / `tmp/` 是抓取与调试草稿，都不属于本文档树。
     if (name === 'node_modules' || name === '.git' || name === '.debug' || name === 'lib'
       || name === 'refs' || name === '.agents' || name === '.tmp' || name === 'tmp') continue
-=======
-    if (SKIP_DIRS.has(name)) continue
->>>>>>> v2-rewrite
     const full = join(dir, name)
     if (statSync(full).isDirectory()) walk(full)
     else if (name.endsWith('.md')) files.push(full)
