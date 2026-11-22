@@ -75,12 +75,13 @@ composition → infrastructure → application → domain → contracts
 | 候选导入只支持已确认的事件形状；其他事件阻断而非跳过 | `infrastructure/migration/v1/convert.ts` | `t18` |
 | 候选写入后从磁盘重放对账，数量不符即失败 | `infrastructure/migration/v1/convert.ts` | `t18` |
 | 任务按终态折叠迁移；在途执行回落 ready，旧 Attempt 不迁移 | `infrastructure/migration/v1/convert.ts` | `t18` |
+| 知识保留「提案→采纳」链；被驳回的提案不迁移 | `infrastructure/migration/v1/convert.ts` | `t18` |
 
 ## 运行
 
 ```bash
 cd plugin
-node --test test/*.test.ts        # 97 个测试
+node --test test/*.test.ts        # 98 个测试
 node ../tools/check-architecture.mjs   # ARCH_OK files=43 violations=0
 node scripts/build-lib.mjs        # 43 个模块 → lib/（入口 lib/composition/host.mjs）
 node ../tools/gen-panel-contract.mjs --check   # 面板契约文档与代码一致

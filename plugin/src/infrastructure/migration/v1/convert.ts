@@ -15,7 +15,7 @@
  * 写入后立即做对账：重放候选事件，与转换时声明的计数逐项比较。
  */
 import { join } from 'node:path'
-import type { Member, RoleDefinition, Task, TaskStatus, Team } from '../../../contracts/entities.ts'
+import type { EvidenceRef, KnowledgeEntry, Member, RoleDefinition, Task, TaskStatus, Team } from '../../../contracts/entities.ts'
 import { ERROR_CODES, fail, toErrorShape } from '../../../contracts/errors.ts'
 import type { ActorRef, EntityRef, EventType } from '../../../contracts/events.ts'
 import type { IdFactory } from '../../../contracts/ids.ts'
@@ -52,7 +52,7 @@ export interface ConversionResult {
   records: ConvertedRecord[]
   skipped: { type: string; count: number; reason: string }[]
   mappings: { teams: Record<string, string>; members: Record<string, string> }
-  counts: { teams: number; members: number; tasks: number }
+  counts: { teams: number; members: number; tasks: number; knowledge: number }
   /** 每条来源事件的下场：converted / skipped / blocked。 */
   disposition: { teamId: string; seq: number; type: string; outcome: 'converted' | 'skipped' | 'blocked' }[]
 }
@@ -114,6 +114,42 @@ export function convertV1Analysis(options: ConvertOptions): ConversionResult {
   const members = new Map<string, Member>()
   const disposition: ConversionResult['disposition'] = []
   let convertedTasks = 0
+  let convertedKnowledge = 0
+
+  /*
+   * 知识：v1 的提案/采纳是两个事件（`knowledge.proposed` + `knowledge.adopted`）。
+   * 迁移保留这条链：pending 只写 proposed；adopted 写 proposed + adopted；
+   * 被驳回（decision=rejected）不迁移（v2 没有「已驳回条目」，硬造会复活被否掉的知识）。
+   */
+  const knowledgeSeen = new Map<
+    string,
+    { order: number; event: V1LedgerEvent; legacy: NonNullable<DraftEvent['legacy']>; adoptedEvent: V1LedgerEvent | null; rejected: boolean }
+  >()
+  for (const planned of options.plan.events) {
+    const event = planned.event
+    if (event.type !== 'knowledge.proposed' && event.type !== 'knowledge.adopted') continue
+    const draftId = asString(event.payload.draftId)
+    if (draftId === null) continue
+    if (event.type === 'knowledge.proposed') {
+      if (!knowledgeSeen.has(draftId)) {
+        knowledgeSeen.set(draftId, { order: planned.order, event, legacy: planned.legacyOrigin, adoptedEvent: null, rejected: false })
+      }
+      continue
+    }
+    const current = knowledgeSeen.get(draftId)
+    if (current === undefined) continue
+    if (event.payload.decision === 'rejected') current.rejected = true
+    else current.adoptedEvent = event
+  }
+
+  const mapEvidencePointer = (pointer: string): EvidenceRef => {
+    if (pointer.startsWith('session:')) return { kind: 'session', ref: pointer }
+    if (pointer.startsWith('file:')) return { kind: 'file', ref: pointer.slice('file:'.length) }
+    if (pointer.includes('/') || pointer.includes('\\') || /\.[a-z0-9]+$/i.test(pointer)) {
+      return { kind: 'file', ref: pointer }
+    }
+    return { kind: 'artifact', ref: pointer }
+  }
 
   /*
    * 任务状态折叠：旧账本里一个任务的状态散在 created/claimed/progress/completed…
@@ -339,8 +375,66 @@ export function convertV1Analysis(options: ConvertOptions): ConversionResult {
       continue
     }
 
-    if (event.type.startsWith('knowledge.')) {
-      block('UNSUPPORTED_FOR_IMPORT', '知识条目的 payload 语义尚未确认，先阻断（避免丢正文与证据）')
+    if (event.type === 'knowledge.proposed') {
+      const draftId = asString(event.payload.draftId)
+      const seen = draftId === null ? undefined : knowledgeSeen.get(draftId)
+      if (draftId === null || seen === undefined) {
+        block('MISSING_FIELD', 'knowledge.proposed 缺少 draftId')
+        continue
+      }
+      if (seen.order !== planned.order) {
+        skip(teamLabel, event, '知识状态已折叠进首次提案')
+        continue
+      }
+      if (seen.rejected) {
+        skip(teamLabel, event, '旧提案已被驳回，v2 不保留驳回条目')
+        continue
+      }
+      const draft = event.payload.draft
+      const draftRecord = typeof draft === 'object' && draft !== null ? (draft as Record<string, unknown>) : null
+      const title = draftRecord === null ? null : asString(draftRecord.title)
+      const body = draftRecord === null ? null : asString(draftRecord.body)
+      const evidencePointer = draftRecord === null ? null : asString(draftRecord.evidence)
+      if (title === null || body === null || evidencePointer === null) {
+        block('MISSING_FIELD', `知识提案 ${draftId} 缺少 title/body/evidence`)
+        continue
+      }
+
+      const entryId = options.ids('knowledge')
+      const entry: KnowledgeEntry = {
+        id: entryId,
+        title,
+        body,
+        evidence: [mapEvidencePointer(evidencePointer)],
+        status: 'proposed',
+        supersedes: null,
+        revision: 1,
+        createdAt: new Date(event.ts).toISOString(),
+        updatedAt: options.now,
+      }
+      records.push({
+        order: planned.order,
+        type: 'knowledge.proposed',
+        entity: { kind: 'knowledge-entry', id: entryId },
+        payload: { entry },
+        legacy: planned.legacyOrigin,
+      })
+      if (seen.adoptedEvent !== null) {
+        records.push({
+          order: planned.order,
+          type: 'knowledge.adopted',
+          entity: { kind: 'knowledge-entry', id: entryId },
+          payload: { entryId, revision: 2, adoptedBy: 'migration' },
+          legacy: planned.legacyOrigin,
+        })
+      }
+      convertedKnowledge += 1
+      disposition.push({ teamId: teamLabel, seq: event.seq, type: event.type, outcome: 'converted' })
+      continue
+    }
+
+    if (event.type === 'knowledge.adopted') {
+      skip(teamLabel, event, '采纳已折叠进 knowledge.proposed 记录')
       continue
     }
 
@@ -427,7 +521,7 @@ export function convertV1Analysis(options: ConvertOptions): ConversionResult {
     records,
     skipped: [...skipped.entries()].map(([type, value]) => ({ type, count: value.count, reason: value.reason })),
     mappings: { teams: teamMapping, members: memberMapping },
-    counts: { teams: teams.size, members: members.size, tasks: convertedTasks },
+    counts: { teams: teams.size, members: members.size, tasks: convertedTasks, knowledge: convertedKnowledge },
     disposition,
   }
 }
@@ -451,9 +545,11 @@ export interface CandidateWriteResult {
     teams: number
     members: number
     tasks: number
+    knowledge: number
     expectedTeams: number
     expectedMembers: number
     expectedTasks: number
+    expectedKnowledge: number
     problems: string[]
   }
 }
@@ -525,6 +621,9 @@ export function writeCandidateProject(conversion: ConversionResult, options: Can
   if (rebuilt.tasks.size !== conversion.counts.tasks) {
     problems.push(`任务数量不符：投影 ${rebuilt.tasks.size}，转换 ${conversion.counts.tasks}`)
   }
+  if (rebuilt.knowledge.size !== conversion.counts.knowledge) {
+    problems.push(`知识数量不符：投影 ${rebuilt.knowledge.size}，转换 ${conversion.counts.knowledge}`)
+  }
   for (const record of conversion.records) {
     if (record.type === 'team.created' && !rebuilt.teams.has((record.payload as { team: Team }).team.id)) {
       problems.push(`投影缺少团队 ${(record.payload as { team: Team }).team.id}`)
@@ -541,9 +640,11 @@ export function writeCandidateProject(conversion: ConversionResult, options: Can
       teams: rebuilt.teams.size,
       members: rebuilt.members.size,
       tasks: rebuilt.tasks.size,
+      knowledge: rebuilt.knowledge.size,
       expectedTeams: conversion.counts.teams,
       expectedMembers: conversion.counts.members,
       expectedTasks: conversion.counts.tasks,
+      expectedKnowledge: conversion.counts.knowledge,
       problems,
     },
   }

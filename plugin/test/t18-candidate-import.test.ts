@@ -91,17 +91,17 @@ test('候选导入：团队 + 成员写进候选目录并对账通过', () => {
   }
 })
 
-test('候选导入：不支持的事件阻断而不是跳过', () => {
+test('候选导入：缺正文的知识提案阻断而不是猜测', () => {
   const source = mkdtempSync(join(tmpdir(), 'myteam-convert-'))
   try {
     buildSource(
       source,
       line(0, 1000, 'team.created', { teamId: 'A', name: '甲队', goal: 'g' }) +
-        line(1, 2000, 'knowledge.proposed', { teamId: 'A', draftId: 'd1', draft: { title: 'k', body: 'b' } }),
+        line(1, 2000, 'knowledge.proposed', { teamId: 'A', draftId: 'd1', draft: { title: 'k', evidence: 'task:t1' } }),
     )
     const { conversion } = convert(source)
     assert.equal(conversion.ok, false)
-    assert.ok(conversion.issues.some((issue) => issue.code === 'UNSUPPORTED_FOR_IMPORT' && issue.severity === 'blocking'))
+    assert.ok(conversion.issues.some((issue) => issue.code === 'MISSING_FIELD' && issue.severity === 'blocking'))
     assert.ok(conversion.disposition.some((item) => item.type === 'knowledge.proposed' && item.outcome === 'blocked'))
 
     const candidate = mkdtempSync(join(tmpdir(), 'myteam-candidate-'))
@@ -196,6 +196,57 @@ test('候选导入：任务按终态折叠，依赖重映射，在途执行回�
 
     // claimed/progress/completed 里的执行细节没有逐条重放，但被明确计数。
     assert.ok(conversion.skipped.some((item) => item.type === 'task.claimed' && item.count === 1))
+  } finally {
+    rmSync(source, { recursive: true, force: true })
+    rmSync(candidate, { recursive: true, force: true })
+  }
+})
+
+test('候选导入：知识保留提案→采纳链，驳回的不迁移', () => {
+  const source = mkdtempSync(join(tmpdir(), 'myteam-convert-'))
+  const candidate = mkdtempSync(join(tmpdir(), 'myteam-candidate-'))
+  try {
+    buildSource(
+      source,
+      line(0, 1000, 'team.created', { teamId: 'A', name: '甲队', goal: 'g' }) +
+        line(1, 2000, 'knowledge.proposed', {
+          teamId: 'A',
+          draftId: 'd1',
+          draft: { id: 'd1', title: '限流', tags: [], body: '要限流', evidence: 'task:t1' },
+        }) +
+        line(2, 3000, 'knowledge.adopted', { teamId: 'A', draftId: 'd1', decision: 'adopted' }) +
+        line(3, 4000, 'knowledge.proposed', {
+          teamId: 'A',
+          draftId: 'd2',
+          draft: { id: 'd2', title: '旧结论', tags: [], body: '过时', evidence: 'file:docs/x.md' },
+        }) +
+        line(4, 5000, 'knowledge.adopted', { teamId: 'A', draftId: 'd2', decision: 'rejected' }),
+    )
+
+    const { conversion } = convert(source)
+    assert.equal(conversion.ok, true, JSON.stringify(conversion.issues))
+    assert.equal(conversion.counts.knowledge, 1, '被驳回的提案不迁移')
+    assert.equal(conversion.records.filter((record) => record.type === 'knowledge.proposed').length, 1)
+    assert.equal(conversion.records.filter((record) => record.type === 'knowledge.adopted').length, 1)
+
+    const written = writeCandidateProject(conversion, {
+      candidateRoot: candidate,
+      projectId: newId('project'),
+      projectName: 'kb',
+      now: NOW,
+      ids: newId,
+      clock: { now: () => NOW },
+    })
+    assert.equal(written.verification.ok, true, written.verification.problems.join('; '))
+    assert.equal(written.verification.knowledge, 1)
+
+    const events = new FileEventStore(join(candidate, EVENTS_FILE)).readCommitted().events
+    const entries = events.filter((event) => event.type === 'knowledge.proposed')
+    const entry = (entries[0]!.payload as { entry: { title: string; status: string; evidence: { kind: string; ref: string }[] } }).entry
+    assert.equal(entry.title, '限流')
+    assert.equal(entry.status, 'proposed')
+    assert.deepEqual(entry.evidence, [{ kind: 'artifact', ref: 'task:t1' }])
+    assert.ok(events.some((event) => event.type === 'knowledge.adopted'))
   } finally {
     rmSync(source, { recursive: true, force: true })
     rmSync(candidate, { recursive: true, force: true })
