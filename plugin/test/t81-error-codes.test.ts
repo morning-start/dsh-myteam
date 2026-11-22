@@ -24,7 +24,7 @@ import { MT_CODES, MT_CODE_DOCS, isMtCode } from '../src/core/errors.ts'
 const root = new URL('..', import.meta.url).pathname.replace(/^\/([A-Za-z]:)/, '$1')
 const srcDir = join(root, 'src')
 const errorsFile = join(root, 'src', 'core', 'errors.ts')
-const docsPath = join(root, '..', 'docs', '04-API与数据契约.md')
+const docsPath = join(root, '..', 'docs', 'contracts', '04-API与数据契约.md')
 
 const MT_RE = /MT_[A-Z][A-Z_]*/g
 

@@ -4,7 +4,7 @@
  * 运行方式：在启用了本插件的 DSH 会话内由 Lead 执行（宿主 API 仅在 host 进程可用），
  * 或作为插件 dev profile 的 bootstrap 脚本。本文件是「冒烟脚本本体」，不进 CI。
  *
- * 验证清单（docs/02-技术可行性.md POC-T0 的动态兜底，六项对应）：
+ * 验证清单（docs/audits/02-技术可行性.md POC-T0 的动态兜底，六项对应）：
  *   ① agents.create 直连 + setup 作用域（restrict/section 注册）
  *   ② followup 唤醒 + whenIdle 静默（零请求语义）
  *   ③ tools.restrict 掩码语法（名单 vs glob——T0-④ 遗留确认项）
@@ -13,7 +13,7 @@
  *   ⑥ dispose 拆卸（会话与会话日志留存）
  *
  * 预期输出：每个探针一行 [PASS]/[FAIL]，退出码 0 = 全绿。
- * 结果回填 docs/02-技术可行性.md POC-T0S 记录。
+ * 结果回填 docs/audits/02-技术可行性.md POC-T0S 记录。
  */
 
 interface ProbeResult {

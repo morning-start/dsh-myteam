@@ -1,5 +1,5 @@
 /**
- * 从 `plugin/src/core/errors.ts` 生成 `docs/04-API与数据契约.md` 的「错误码」一节。
+ * 从 `plugin/src/core/errors.ts` 生成 `docs/contracts/04-API与数据契约.md` 的「错误码」一节。
  *
  * 为什么要有这个脚本（CHG-98，审计 A7）：
  *   改名前 `MT_*` 是散落在 250 余处调用点的字符串字面量，文档只覆盖了 32 个，
@@ -7,7 +7,7 @@
  *   文档由本脚本生成 —— **手改文档会被下一次生成覆盖，也会被 t78 判红**。
  *
  * 用法：
- *   node tools/gen-error-docs.mjs           # 写回 docs/04
+ *   node tools/gen-error-docs.mjs           # 写回 docs/contracts/04
  *   node tools/gen-error-docs.mjs --check   # 只校验是否已同步（CI / 测试用，不写文件）
  */
 import { readFileSync, writeFileSync } from 'node:fs'
@@ -17,7 +17,7 @@ import { join } from 'node:path'
 
 const repoRoot = fileURLToPath(new URL('..', import.meta.url))
 const errorsPath = join(repoRoot, 'plugin', 'src', 'core', 'errors.ts')
-const docsPath = join(repoRoot, 'docs', '04-API与数据契约.md')
+const docsPath = join(repoRoot, 'docs', 'contracts', '04-API与数据契约.md')
 
 const BEGIN = '<!-- BEGIN:MT_CODES（由 tools/gen-error-docs.mjs 生成，勿手改）-->'
 const END = '<!-- END:MT_CODES -->'
@@ -119,11 +119,11 @@ const next = hasBlock
 
 if (checkOnly) {
   if (!hasBlock) {
-    console.error('[gen-error-docs] docs/04 里没有错误码标记块 —— 先跑一次不带 --check 的生成。')
+    console.error('[gen-error-docs] docs/contracts/04 里没有错误码标记块 —— 先跑一次不带 --check 的生成。')
     process.exit(1)
   }
   if (next !== original) {
-    console.error('[gen-error-docs] docs/04 与 errors.ts 不同步 —— 请跑 `node tools/gen-error-docs.mjs`。')
+    console.error('[gen-error-docs] docs/contracts/04 与 errors.ts 不同步 —— 请跑 `node tools/gen-error-docs.mjs`。')
     process.exit(1)
   }
   console.log(`[gen-error-docs] 已同步（${table.codes.length} 个码）。`)
@@ -131,4 +131,4 @@ if (checkOnly) {
 }
 
 writeFileSync(docsPath, next, 'utf8')
-console.log(`[gen-error-docs] 写入 ${table.codes.length} 个码 → docs/04-API与数据契约.md`)
+console.log(`[gen-error-docs] 写入 ${table.codes.length} 个码 → docs/contracts/04-API与数据契约.md`)

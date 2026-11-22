@@ -48,7 +48,7 @@ FR 编号来源：`design-notes.md` §四（21 屏）+ `docs/00-需求池.md` FR
 | `guest.html` | 单角色调用（普通会话）：角色 chips + 「不进团队账本」横幅 + `myteam_apply_roles` 注入卡 + `/myteam+` 前缀候选弹层 | FR-15.1、FR-15.2、FR-16.1 |
 | `roster-tree.html` | **名册树（FR-32 支柱一）**：成员派生父子树（深度 0 队长 → 深度 1 一级成员 → 深度 2 子成员）、深度 chip（含「硬上限」态）、委派授权四行（canSpawn / allowedRoles / maxDepth / maxChildren）、释放影响面（MT_HAS_CHILDREN + 级联释放）、树的对账 | FR-32 |
 
-> 对齐状态见 [../docs/13-UI对齐分工.md](../docs/13-UI对齐分工.md)：**26 屏已对齐 + 1 屏撤屏**（`overview.html`，CHG-83 判定与「角色库三层」+「团队」tab 重复，归档团队改从「团队」tab 进入）。文件保留作历史参照，**不要照着它重做入口**。
+> 对齐状态见 [../docs/delivery/13-UI对齐分工.md](../docs/delivery/13-UI对齐分工.md)：**26 屏已对齐 + 1 屏撤屏**（`overview.html`，CHG-83 判定与「角色库三层」+「团队」tab 重复，归档团队改从「团队」tab 进入）。文件保留作历史参照，**不要照着它重做入口**。
 
 ## 共用资产
 
@@ -73,7 +73,7 @@ FR 编号来源：`design-notes.md` §四（21 屏）+ `docs/00-需求池.md` FR
 
 1. **设计是参照，实现不引用**：`plugin/` 源码（`client/client.js`，单文件、不经 build-lib）不 `import` 本目录、不读这些 CSS；它只消费宿主的 `--dsw-alias-*`。所以改设计稿**不会**自动改实现，改完要人对着改。
 2. **改 token 要同时看宿主 alias 回退**：改那 16 个带 `var(--dsw-alias-*, …)` 的角色时，宿主名写错在**独立打开时看不出来**（走 fallback），只有嵌进宿主才变色——改完必须两种打开方式各验一遍。防回归断言是 `plugin/test/t82-design-tokens.test.ts`。
-3. **27 屏是终稿**：任何屏幕级改动先登 CHG（[../docs/09-变更记录.md](../docs/09-变更记录.md)），再改 HTML。不要顺手「统一重排」——CHG-84/85 已逐屏复检过（79 处差异 + 7 处真实裁切），重排会把这些结论作废。
+3. **27 屏是终稿**：任何屏幕级改动先登 CHG（[../docs/delivery/09-变更记录.md](../docs/delivery/09-变更记录.md)），再改 HTML。不要顺手「统一重排」——CHG-84/85 已逐屏复检过（79 处差异 + 7 处真实裁切），重排会把这些结论作废。
 4. **颜色只从 `tokens.css` 取**：屏里不写十六进制、不写 `font-family`（宿主统一字体栈）。深色模式是 `prefers-color-scheme` + `[data-theme]` 双通道，改色两处都要看。
 5. **已知误报不要为消警改样式**：固定底栏 `.costbar`、滚动容器内元素（含未滚到可视区的盒子）、`.scrim` 弹层与其下方看板、`dragging.html` 的悬浮卡与其覆盖内容，会被自动检查报成「文字叠在一起」。已逐屏目视确认无问题，改动前先看 [design-notes.md](design-notes.md) §九「已知检测误报」。
 
@@ -82,10 +82,10 @@ FR 编号来源：`design-notes.md` §四（21 屏）+ `docs/00-需求池.md` FR
 | 文档 | 什么时候读 |
 |---|---|
 | [design-notes.md](design-notes.md) | 设计口径正本：实体模型、作用域分层、插槽落点、视觉映射、已知误报 |
-| [../docs/13-UI对齐分工.md](../docs/13-UI对齐分工.md) | 28 屏 → 6 组的分工、并发写协议、验收线 |
-| [../docs/14-UI复检清单.md](../docs/14-UI复检清单.md) | 五轮复检方法（逐屏对照 / 越界探测 / 跨切面 / 真装实测）与遗留项 |
-| [../docs/00-需求池.md](../docs/00-需求池.md) | FR-19~24 的原始口径（作用域分层 / 聘任记录 / 参与关系 / 依赖图 / 骨架 / 角色详情） |
-| [../docs/09-变更记录.md](../docs/09-变更记录.md) | CHG 编号与每轮改动的裁决记录 |
+| [../docs/delivery/13-UI对齐分工.md](../docs/delivery/13-UI对齐分工.md) | 28 屏 → 6 组的分工、并发写协议、验收线 |
+| [../docs/audits/14-UI复检清单.md](../docs/audits/14-UI复检清单.md) | 五轮复检方法（逐屏对照 / 越界探测 / 跨切面 / 真装实测）与遗留项 |
+| [../docs/historical/00-需求池.md](../docs/historical/00-需求池.md) | FR-19~24 的原始口径（作用域分层 / 聘任记录 / 参与关系 / 依赖图 / 骨架 / 角色详情） |
+| [../docs/delivery/09-变更记录.md](../docs/delivery/09-变更记录.md) | CHG 编号与每轮改动的裁决记录 |
 | [../plugin/README.md](../plugin/README.md) | 实现侧入口：`src/` 真身、`lib/` 产物、构建与测试 |
 
 ---

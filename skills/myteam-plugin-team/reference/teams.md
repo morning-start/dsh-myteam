@@ -1,6 +1,6 @@
 # 团队模板字段速查（`teams/<templateId>.json`）
 
-> 权威：`docs/16-插件团队贡献契约.md` §6。Schema 复用 myteam 的 `PresetDefinition`（`plugin/src/core/presets/preset-store.ts`），新增 `namespace` / `charter` 两个可选字段。
+> 权威：`docs/contracts/16-插件团队贡献契约.md` §6。Schema 复用 myteam 的 `PresetDefinition`（`plugin/src/core/presets/preset-store.ts`），新增 `namespace` / `charter` 两个可选字段。
 >
 > **注意**：CHG-52 定过「全局只保留角色，不存团队模板」。本契约**修订**了它——插件模板是**插件资产**（跨项目可见），不是用户资产（用户自建模板仍只在项目层）。理由见契约 §6.4。
 
@@ -104,7 +104,7 @@ builtin 角色（captain / implementer / req-validator / developer / acceptor / 
 
 团队章程 = 这个团队的**结构约定**（谁沟通、谁存档、文件放哪、做到什么程度）。
 
-- 它会被存进团队的结构文件（`structure.md`），> **v1 只登记，尚未自动注入队长 system prompt**（`docs/16` §14 未决 / `docs/08` §8 未验项）。
+- 它会被存进团队的结构文件（`structure.md`），> **v1 只登记，尚未自动注入队长 system prompt**（`docs/contracts/16` §14 未决 / `docs/audits/08` §8 未验项）。
 - 想现在就生效：把章程内容**写进每个角色的 `systemPrompt`**（重复但立刻有效）。
 
 ## 一个模板 vs 多个模板

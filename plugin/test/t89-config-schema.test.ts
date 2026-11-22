@@ -4,7 +4,7 @@
  * 定稿交付物有三份（docs/18 §0）：
  *  ①`plugin/schema/team-config.schema.json`（机器可读）
  *  ②`plugin/src/core/config/team-config.ts` 的 `DEFAULT_CONFIG` / `PATCH_CEILINGS`（代码真相）
- *  ③`docs/18-配置Schema定稿.md`（字段语义）
+ *  ③`docs/contracts/18-配置Schema定稿.md`（字段语义）
  *
  * 只要它们任一漂移，本用例就红——这是「定稿」和「写了一半的文档」的区别。
  *
@@ -26,7 +26,7 @@ import { DEFAULT_CONFIG, PATCH_CEILINGS } from '../src/core/config/team-config.t
 
 const here = dirname(fileURLToPath(import.meta.url))
 const schemaPath = join(here, '..', 'schema', 'team-config.schema.json')
-const docPath = join(here, '..', '..', 'docs', '18-配置Schema定稿.md')
+const docPath = join(here, '..', '..', 'docs', 'contracts', '18-配置Schema定稿.md')
 
 const schema = JSON.parse(readFileSync(schemaPath, 'utf8'))
 const doc = readFileSync(docPath, 'utf8')

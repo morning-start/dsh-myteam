@@ -7,7 +7,7 @@
  *   systemPrompt · tokenMeter（FR-8.2 计量）· subprocess（M2 command 门禁）·
  *   storage/fs · sessionProjections（tokenUsage 投影）
  *
- * 域划分（docs/03-架构与ADR.md）：D1 账本 / D2 调度 / D3 成员 / D4 角色库 / D5 接口。
+ * 旧实现域划分（docs/historical/03-架构与ADR.md）：D1 账本 / D2 调度 / D3 成员 / D4 角色库 / D5 接口。
  *
  * CHG-102：**路径不再在这里定义**。项目级存储的唯一事实源是
  * `core/workspace/layout.ts`（`.dsh-myteam/` 目录契约 + 项目根解析）。本文件只剩

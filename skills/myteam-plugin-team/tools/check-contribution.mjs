@@ -2,7 +2,7 @@
 /**
  * myteam 插件团队贡献 —— 契约校验器（contractVersion = 1）
  *
- * 权威：仓库内 `docs/16-插件团队贡献契约.md`。本文件的每个错误码都直接对应契约 §9。
+ * 当前 v1 权威：仓库内 `docs/contracts/16-插件团队贡献契约.md`。本文件的每个错误码都直接对应契约 §9。
  * 目的：让插件作者在**自己的仓库里**就能验证贡献目录，而不是装进 DSH 之后才发现角色被静默跳过。
  *
  * 用法：
@@ -17,7 +17,7 @@
 import { existsSync, readFileSync, readdirSync, statSync } from 'node:fs'
 import { dirname, isAbsolute, join, normalize, relative, resolve, sep } from 'node:path'
 
-/* ── 契约常量（改这里 = 改契约，必须同步 docs/16）────────────────── */
+/* ── 契约常量（改这里 = 改契约，必须同步 docs/contracts/16）────────────────── */
 
 const SUPPORTED_CONTRACT_VERSIONS = new Set([1])
 const PLUGIN_ID_RE = /^[a-z][a-z0-9-]{1,63}$/

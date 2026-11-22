@@ -14,9 +14,11 @@
 
 | 顺序 | 文档 | 内容 |
 |---|---|---|
-| 1 | [docs/architecture/00-现状与决策基线](docs/architecture/00-现状与决策基线.md) | 代码事实、旧文档冲突、已确认决策与兼容约束 |
-| 2 | [docs/architecture/01-系统架构](docs/architecture/01-系统架构.md) | 资源模型、项目事件真源、Root Runtime、权限、配置与恢复 |
-| 3 | [docs/architecture/02-文档重构与迁移蓝图](docs/architecture/02-文档重构与迁移蓝图.md) | 旧文档处置、旧数据迁移、实施批次与验证矩阵 |
+| 1 | [docs/product/README](docs/product/README.md) | 产品目标、当前需求、用户场景与非目标 |
+| 2 | [docs/architecture/00-现状与决策基线](docs/architecture/00-现状与决策基线.md) | 代码事实、旧文档冲突、已确认决策与兼容约束 |
+| 3 | [docs/architecture/01-系统架构](docs/architecture/01-系统架构.md) | 资源模型、项目事件真源、Root Runtime、权限、配置与恢复 |
+| 4 | [docs/architecture/03-角色能力与工作流](docs/architecture/03-角色能力与工作流.md) | RoleProfile + CapabilitySet、SkillRef、WorkflowDefinition/Run 与 Task DAG |
+| 5 | [docs/architecture/02-文档重构与迁移蓝图](docs/architecture/02-文档重构与迁移蓝图.md) | 文档目录、旧数据迁移、实施批次与验证矩阵 |
 
 完整阅读路径见 [docs/README.md](docs/README.md)。旧编号文档继续保留用于追溯，但涉及作用域、真源、权限、成员、记忆和目录时，不能再各自宣称唯一权威。
 
@@ -26,12 +28,14 @@ myteam 将系统分为三层：
 
 | 层 | 负责什么 | 核心规则 |
 |---|---|---|
-| **全局复用层** | RoleDefinition、TeamBlueprint | 跨项目复用；任何进入或修改全局的动作必须经用户确认 |
-| **项目定义与运行层** | 项目角色/蓝图、多个团队、项目任务 DAG、配置、知识、记忆 | agent 主操作；项目内跨会话、跨时间持久化 |
+| **全局复用层** | RoleDefinition、WorkflowDefinition、TeamBlueprint | 跨项目复用；任何进入或修改全局的动作必须经用户确认 |
+| **项目定义与运行层** | 项目定义、多个团队、WorkflowRun、项目任务 DAG、配置、知识、记忆 | agent 主操作；项目内跨会话、跨时间持久化 |
 | **DSH 执行层** | 队长/成员会话、子代理、模型与工具执行、Session Log | DSH 持有执行事实，myteam 只保存明确引用 |
 
 目标模型的关键变化：
 
+- **Role 只保留两部分**：RoleProfile + CapabilitySet，Skill 由 DSH 持有并通过 SkillRef 引用；
+- **Workflow 独立**：Definition 可复用，Run 仅属项目并复用统一项目 Task DAG，不建立第二套任务引擎；
 - **任务直接属于项目**：允许一个项目多个团队并行，允许跨团队依赖；
 - **项目统一事件真源**：项目定义、配置、知识和运行事实进入同一项目事件日志；
 - **配置文件是生成视图**：不再与账本形成双真源；
@@ -54,9 +58,13 @@ myteam 将系统分为三层：
 
 | 位置 | 内容 |
 |---|---|
-| [`docs/architecture/`](docs/architecture/00-现状与决策基线.md) | 当前架构评审稿与迁移蓝图 |
-| [`docs/`](docs/README.md) | 文档导航、旧设计、调研、审计与历史记录 |
-| [`dsh-myteam-requirements.md`](dsh-myteam-requirements.md) | 旧 PRD 与需求演化记录；后续按新文档蓝图拆分 |
+| [`docs/product/`](docs/product/README.md) | 当前产品目标与需求基线 |
+| [`docs/architecture/`](docs/architecture/README.md) | 系统架构、Role/Workflow 与迁移蓝图 |
+| [`docs/features/`](docs/features/README.md) | 后续六组功能实现设计 |
+| [`docs/contracts/`](docs/contracts/README.md) | as-is v1 与未来目标契约 |
+| [`docs/delivery/`](docs/delivery/README.md) | 执行、风险、验收方法与变更记录 |
+| [`docs/research/`](docs/research/README.md) · [`docs/audits/`](docs/audits/README.md) · [`docs/historical/`](docs/historical/README.md) | 研究、时点证据与历史文档 |
+| [`docs/historical/dsh-myteam-requirements.md`](docs/historical/dsh-myteam-requirements.md) | 原根目录 PRD，已历史化 |
 | [`plugin/`](plugin/README.md) | 插件实现：`src/`、`lib/`、`client/`、`test/`、装载 patch 与 locale |
 | [`design/`](design/README.md) | UI 设计资产 |
 | [`skills/`](skills/README.md) | 对外 skill 包与第三方贡献辅助资产 |
@@ -109,7 +117,7 @@ Web 测试不会替代单元测试、权限负面对抗或多进程写者测试�
 
 ## 7. 下一阶段
 
-架构书面评审通过后，先完成六组功能实现设计：定义与发布、建队与成员、任务 DAG 与门禁、消息与恢复、配置/知识/记忆、面板与迁移。每组明确场景、状态、接口、权限、持久化、故障和验收后，才进入整体代码重写。
+架构书面评审通过后，先完成六组功能实现设计：定义与发布、建队与成员、Workflow/任务 DAG 与门禁、消息与恢复、配置/知识/记忆、面板与迁移。每组明确场景、状态、接口、权限、持久化、故障和验收后，才进入整体代码重写。
 
 ---
 

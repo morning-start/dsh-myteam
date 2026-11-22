@@ -1,7 +1,7 @@
 /**
  * T61 · G1 设计稿对齐（CHG-82）—— design/detail.html · confirm.html · discard.html
  *
- * 覆盖口径（docs/13-UI对齐分工.md §四）：
+ * 覆盖口径（docs/delivery/13-UI对齐分工.md §四）：
  *  1) mock loader 能加载 client.js（window.__ModuleLoader__ + react / react/jsx-runtime 模块表），
  *     apply 后注入样式、注册三插槽；
  *  2) 任务详情从「右侧抽屉」改为主区整页：mt-detail-page + 面包屑 + 主列/侧列双栏；

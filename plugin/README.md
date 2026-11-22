@@ -1,7 +1,7 @@
 # plugin — 插件实现（可装载单元）
 
 > `dsh-plugin-myteam` 的可装载单元：`src/` 是唯一实现，`lib/` 是构建产物，`cordis.patch.yml` 是装载声明。
-> 读者：要构建、调试、扩展插件源码的开发者。面板怎么用见[根 README](../README.md)，对外契约见 [docs/04](../docs/04-API与数据契约.md)。
+> 读者：要构建、调试、扩展插件源码的开发者。面板怎么用见[根 README](../README.md)，当前旧 Runtime 契约见 [docs/04](../docs/contracts/04-API与数据契约.md)，目标架构见 [docs/architecture](../docs/architecture/README.md)。
 
 ## 一句话定位
 
@@ -31,17 +31,17 @@ npx tsc -p tsconfig.json --noEmit
 | `lib/` | 构建产物：56 个 `.mjs` + `build-manifest.json`；`main` 指向 `lib/host.mjs`，随包分发 |
 | `client/` | `client.js` 面板浏览器产物——**不经 src 编译**，由 `exports["./client"]` 直载，指纹单独记 |
 | `test/` | 单测 124 个文件（`node --test`） |
-| `schema/` | `team-config.schema.json`：配置的机器可读定稿（与 [docs/18](../docs/18-配置Schema定稿.md)、`src/core/config/team-config.ts` 三方同步，`t89` 守门） |
+| `schema/` | `team-config.schema.json`：当前 v1 配置的机器可读定稿（与 [docs/18](../docs/contracts/18-配置Schema定稿.md)、`src/core/config/team-config.ts` 三方同步，`t89` 守门） |
 | `scripts/` | `build-lib.mjs`：构建脚本（代码生成器，不是运行时） |
 | `locale/` | 面板文案 `zh.json` / `en.json` |
 | `cordis.patch.yml` | 装载声明（preset EntryGroup 三行，见下文「装载形态」） |
 | `icon.svg` | 插件图标（`exports["./icon"]`） |
 
-项目级数据落在 `<project>/.dsh-myteam/`（`config/` 角色与团队配置、`tasks/<teamId>/ledger.jsonl` 任务账本**入库**；`history/`、`state/`、`export/` 不入库）。目录契约的唯一事实源是 `src/core/workspace/layout.ts` 的 `storeLayout()`，口径见 [docs/17](../docs/17-项目级存储架构.md)。
+当前旧 Runtime 的项目级数据落在 `<project>/.dsh-myteam/`（`config/` 角色与团队配置、`tasks/<teamId>/ledger.jsonl` 任务账本**入库**；`history/`、`state/`、`export/` 不入库）。当前目录的事实源是 `src/core/workspace/layout.ts` 的 `storeLayout()`，旧口径见 [docs/17](../docs/historical/17-项目级存储架构.md)；目标布局以 [docs/architecture/01](../docs/architecture/01-系统架构.md) 为准。
 
 ## 源码结构（五域）
 
-依赖方向单向：**D1 ← D2 ← D3**，D4 / D5 依赖 D1（口径见 [docs/03 §模块划分](../docs/03-架构与ADR.md)）。纪律：判定逻辑做成无 IO 的纯函数，宿主接线留在 `host.ts` —— 于是「能不能领任务」「门禁判什么」都能在无 `ctx` 环境下单测。
+旧实现依赖方向单向：**D1 ← D2 ← D3**，D4 / D5 依赖 D1（历史口径见 [docs/03 §模块划分](../docs/historical/03-架构与ADR.md)）。目标代码边界以 [docs/architecture/01](../docs/architecture/01-系统架构.md) 为准，不把旧五域直接当成新架构。
 
 | 域 | 文件 | 职责 |
 |---|---|---|
@@ -197,12 +197,13 @@ cd plugin && npm test
 | 文档 | 什么时候读 |
 |---|---|
 | [../README.md](../README.md) | 项目定位、仓库规范、当前状态 |
-| [../docs/03-架构与ADR.md](../docs/03-架构与ADR.md) | 五域划分、核心数据流、ADR-001~016 |
-| [../docs/23-项目目标重梳理.md](../docs/23-项目目标重梳理.md) | **v4.0 目标体系**：角色 / 任务两类资源、FR-32 子 Agent 编队、FR-33 项目共享看板、M3 任务分解 |
-| [../docs/04-API与数据契约.md](../docs/04-API与数据契约.md) | 工具 / 端点 / 错误码契约（错误码表由 `tools/gen-error-docs.mjs` 生成，不要手改） |
-| [../docs/11-数据模型与存储设计.md](../docs/11-数据模型与存储设计.md) | 账本事件与投影字段 |
-| [../docs/18-配置Schema定稿.md](../docs/18-配置Schema定稿.md) | **配置字段的唯一权威定义**（`team.config.json` / 角色 schema / 模板组合面 / 设置页写契约） |
-| [../docs/16-插件团队贡献契约.md](../docs/16-插件团队贡献契约.md) | 第三方插件怎么贡献角色与团队模板 |
+| [../docs/architecture/README.md](../docs/architecture/README.md) | 目标系统架构、迁移蓝图与决策基线 |
+| [../docs/architecture/03-角色能力与工作流.md](../docs/architecture/03-角色能力与工作流.md) | Role、Skill、Workflow、TeamBlueprint 与 Task 的目标边界 |
+| [../docs/03-架构与ADR.md](../docs/historical/03-架构与ADR.md) | 旧五域划分与 ADR-001~016，仅作历史追溯 |
+| [../docs/04-API与数据契约.md](../docs/contracts/04-API与数据契约.md) | 当前 v1 工具 / 端点 / 错误码契约（错误码表由 `tools/gen-error-docs.mjs` 生成，不要手改） |
+| [../docs/11-数据模型与存储设计.md](../docs/historical/11-数据模型与存储设计.md) | 旧账本事件与投影字段 |
+| [../docs/18-配置Schema定稿.md](../docs/contracts/18-配置Schema定稿.md) | 当前 v1 配置字段定义（`team.config.json` / 角色 schema / 模板组合面 / 设置页写契约） |
+| [../docs/16-插件团队贡献契约.md](../docs/contracts/16-插件团队贡献契约.md) | 当前 v1 第三方 Role 与团队模板贡献契约 |
 | [../skills/myteam-plugin-team/README.md](../skills/myteam-plugin-team/README.md) | 贡献方视角的 skill 包与可执行校验器 |
 
 ---

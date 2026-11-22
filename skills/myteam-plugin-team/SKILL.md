@@ -1,6 +1,6 @@
 ---
 name: myteam-plugin-team
-description: 让一个 DSH 插件把「一套已经配好的团队」（角色 + 名册 + 门禁链 + 看板列 + 团队章程）贡献给 myteam 的全局团队库，装插件即得团队。用户说「我的插件要带团队 / 装插件后 myteam 里就有这套角色 / 做一个带团队的插件 / 插件怎么接 myteam / contribution / 贡献点」时使用。核心纪律：契约先行——先产出符合 docs/16 契约的贡献文件并通过校验器，再谈插件实现。
+description: 让一个 DSH 插件把「一套已经配好的团队」（角色 + 名册 + 门禁链 + 看板列 + 团队章程）贡献给 myteam 的全局团队库，装插件即得团队。用户说「我的插件要带团队 / 装插件后 myteam 里就有这套角色 / 做一个带团队的插件 / 插件怎么接 myteam / contribution / 贡献点」时使用。核心纪律：契约先行——先产出符合 docs/contracts/16 契约的贡献文件并通过校验器，再谈插件实现。
 ---
 
 # 给插件带一套团队（myteam 贡献点）
@@ -20,7 +20,7 @@ description: 让一个 DSH 插件把「一套已经配好的团队」（角色 +
 所以工作流是：
 
 ```
-① 读契约（docs/16）→ ② 写贡献数据 → ③ 跑校验器全绿 → ④ 才写插件代码
+① 读契约（docs/contracts/16）→ ② 写贡献数据 → ③ 跑校验器全绿 → ④ 才写插件代码
 ```
 
 **跳过 ③ 直接写代码 = 返工。** 贡献数据过不了校验，插件装上去角色就是被静默跳过。
@@ -29,7 +29,7 @@ description: 让一个 DSH 插件把「一套已经配好的团队」（角色 +
 
 | 文档 | 作用 |
 |---|---|
-| **`docs/16-插件团队贡献契约.md`** | **唯一权威**。字段、优先级、错误码、安全边界都在这里 |
+| **`docs/contracts/16-插件团队贡献契约.md`** | **唯一权威**。字段、优先级、错误码、安全边界都在这里 |
 | `reference/manifest.md` | `plugin.json` 字段速查 |
 | `reference/roles.md` | 角色文件字段速查 + 约束 |
 | `reference/teams.md` | 团队模板字段速查 + 约束 |
@@ -179,7 +179,7 @@ teams/acme-trio.json → {"members": [{"roleId": "acme-reviewer"}, {"roleId": "a
 | 索引 / scratch / 日志 | `.dsh-myteam/state/**` | ❌ |
 
 **不要**把项目内容写进 `$DSH_HOME`、用户家目录或 DSH profile —— 宿主会用
-`rejectProjectRoot()` 硬拒 `$DSH_HOME` 内的项目根（`docs/17-项目级存储架构.md`）。
+`rejectProjectRoot()` 硬拒 `$DSH_HOME` 内的项目根（`docs/historical/17-项目级存储架构.md`）。
 
 ---
 

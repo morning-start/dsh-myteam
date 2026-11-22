@@ -1,6 +1,6 @@
 # 角色文件字段速查（`roles/<roleId>.json`）
 
-> 权威：`docs/16-插件团队贡献契约.md` §5。**Schema 完全复用** myteam 的 `RoleDefinition`（`plugin/src/core/roles/builtin-roles.ts`），不新造。
+> 权威：`docs/contracts/16-插件团队贡献契约.md` §5。**Schema 完全复用** myteam 的 `RoleDefinition`（`plugin/src/core/roles/builtin-roles.ts`），不新造。
 
 ## 最小可用
 
