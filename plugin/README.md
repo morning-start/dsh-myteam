@@ -83,12 +83,13 @@ composition → infrastructure → application → domain → contracts
 | 面板渲染纯字符串；所有数据文本必须转义（防 XSS） | `client/panel-render.js` | `t23` |
 | 静态演示页用同一套模型/渲染，可直接在浏览器看效果 | `client/panel-demo.html`、`panel-definitions.html`、`panel-migration.html` | 人工预览 |
 | 面板客户端与传输无关；服务端错误转 PanelError，畸形响应不算成功 | `client/panel-client.js` | `t24` |
+| 项目根取**会话工作目录**（workingDirectory.ensure），不是进程 cwd | `src/composition/host.ts` | `t12` |
 
 ## 运行
 
 ```bash
 cd plugin
-node --test test/*.test.ts        # 123 个测试
+node --test test/*.test.ts        # 124 个测试
 node ../tools/check-architecture.mjs   # ARCH_OK files=49 violations=0
 node scripts/build-lib.mjs        # 49 个模块 → lib/（入口 lib/composition/host.mjs）
 node ../tools/gen-panel-contract.mjs --check   # 面板契约文档与代码一致

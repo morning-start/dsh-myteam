@@ -10,7 +10,7 @@ import { memberToolSpecs } from '../application/tool-specs.ts'
 import { ProjectHosts } from '../infrastructure/dsh/project-hosts.ts'
 import { toDshTool } from '../infrastructure/dsh/tool-adapter.ts'
 
-export const inject = ['tools']
+export const inject = ['tools', 'agents', 'workingDirectory']
 
 export interface MemberHostConfig {
   projectRoot?: string
@@ -18,17 +18,27 @@ export interface MemberHostConfig {
 
 interface HostContext {
   tools: { register(definition: unknown, options?: unknown): () => void }
-  effect?: (execute: () => () => void) => unknown
+  effect?: (execute: () => () => string | void) => unknown
+  agents?: { get(id: string): { id: string } | undefined }
+  workingDirectory?: { ensure(agent: { id: string }): Promise<string> }
 }
 
 export function apply(ctx: HostContext, config: MemberHostConfig = {}): (() => void) | undefined {
   const hosts = new ProjectHosts()
-  const rootDir = () => resolve(config.projectRoot ?? process.cwd())
+
+  /** 与队长侧一致：项目根取会话工作目录，而不是进程 cwd。 */
+  const rootFor = async (sessionId: string): Promise<string> => {
+    const agent = ctx.agents?.get(sessionId)
+    if (agent !== undefined && ctx.workingDirectory !== undefined) {
+      return await ctx.workingDirectory.ensure(agent)
+    }
+    return resolve(config.projectRoot ?? process.cwd())
+  }
 
   const disposers = memberToolSpecs().map((spec) =>
     ctx.tools.register(
       toDshTool(spec, async (sessionId) => {
-        const runtime = await hosts.open(rootDir())
+        const runtime = await hosts.open(await rootFor(sessionId))
         return { runtime, sessionId }
       }),
     ),

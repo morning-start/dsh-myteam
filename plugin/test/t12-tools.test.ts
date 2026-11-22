@@ -1,6 +1,6 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import { mkdtempSync, rmSync } from 'node:fs'
+import { existsSync, mkdtempSync, rmSync } from 'node:fs'
 import { join } from 'node:path'
 import { tmpdir } from 'node:os'
 import { apply as applyCaptainHost } from '../src/composition/host.ts'
@@ -200,5 +200,36 @@ test('成员装配：只有三条执行工具，且能提交自己 Attempt 的�
     }
   } finally {
     rmSync(dir, { recursive: true, force: true })
+  }
+})
+
+test('队长装配：项目根取会话工作目录，而不是进程 cwd', async () => {
+  const sessionDir = mkdtempSync(join(tmpdir(), 'myteam-session-'))
+  const tools = new Map<string, FakeTool>()
+  const ctx = {
+    tools: {
+      register(definition: unknown) {
+        const tool = definition as FakeTool
+        tools.set(tool.name, tool)
+        return () => tools.delete(tool.name)
+      },
+    },
+    effect(execute: () => () => void) {
+      execute()
+    },
+    agents: { get: (id: string) => (id === 'ses_web' ? { id: 'ses_web' } : undefined) },
+    workingDirectory: { ensure: async () => sessionDir },
+  }
+
+  try {
+    applyCaptainHost(ctx as never, {})
+    const result = (await tools.get('myteam_read_board')!.execute({}, { agent: { id: 'ses_web' } })) as {
+      ok: boolean
+      error?: { code: string; details?: { path?: string } }
+    }
+    assert.equal(result.ok, true, JSON.stringify(result))
+    assert.ok(existsSync(join(sessionDir, '.dsh-myteam', 'manifest.json')), '应在会话目录建项目')
+  } finally {
+    rmSync(sessionDir, { recursive: true, force: true })
   }
 })

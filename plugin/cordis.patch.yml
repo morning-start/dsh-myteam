@@ -53,7 +53,7 @@
             name: 'dsh-plugin-myteam'
             # 行级 inject（EntryOptions.inject，loader internal/plugin 钩子并入 fiber.inject）：
             # 等价于插件 apply 函数上的 .inject 属性，双保险且在清单里显式可见。
-            inject: ['tools', 'agents']
+            inject: ['tools', 'agents', 'workingDirectory']
             # 行级 isolate（EntryOptions.isolate，Dict<true|string>）：把本行提供的服务名
             # 映射到 entry-local realm（LocalRealm，键后缀 '#<entry.id>'）。
             # 必需：preset 挂载审计 mountPreset → leakedServices 检查「preset 子树是否
@@ -113,7 +113,7 @@
           - id: myteam-member-tools
             name: 'dsh-plugin-myteam/member'
             # 行级 inject 与插件上的 .inject 双保险（同 myteam-host 行的理由）
-            inject: ['tools', 'agents', 'agentPresets', 'systemPrompt']
+            inject: ['tools', 'agents', 'agentPresets', 'workingDirectory', 'systemPrompt']
 
 # ── 根层能力（CHG-212）：队长与成员**共同继承** ─────────────────────────────
 #

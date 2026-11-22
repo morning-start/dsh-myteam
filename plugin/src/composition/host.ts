@@ -13,7 +13,7 @@ import { leadToolSpecs } from '../application/tool-specs.ts'
 import { ProjectHosts } from '../infrastructure/dsh/project-hosts.ts'
 import { toDshTool } from '../infrastructure/dsh/tool-adapter.ts'
 
-export const inject = ['tools']
+export const inject = ['tools', 'agents', 'workingDirectory']
 
 export interface CaptainHostConfig {
   /** 明确固定项目根；不填时用进程工作目录。 */
@@ -23,17 +23,33 @@ export interface CaptainHostConfig {
 /** Cordis 传入的最小 ctx；只声明用到的成员，避免耦合宿主类型。 */
 interface HostContext {
   tools: { register(definition: unknown, options?: unknown): () => void }
-  effect?: (execute: () => () => void) => unknown
+  effect?: (execute: () => () => string | void) => unknown
+  agents?: { get(id: string): { id: string } | undefined }
+  workingDirectory?: { ensure(agent: { id: string }): Promise<string> }
 }
 
 export function apply(ctx: HostContext, config: CaptainHostConfig = {}): (() => void) | undefined {
   const hosts = new ProjectHosts()
-  const rootDir = () => resolve(config.projectRoot ?? process.cwd())
+
+  /**
+   * 项目根 = **会话**的工作目录，不是进程 cwd。
+   *
+   * DSH Web 里多个会话共享一个进程；用 process.cwd() 会把所有工作区接到启动
+   * 目录。宿主提供 workingDirectory.ensure(agent) 才是每个会话各自的目录。
+   * 拿不到会话/服务时才回落到显式配置或 cwd（本地脚本与测试场景）。
+   */
+  const rootFor = async (sessionId: string): Promise<string> => {
+    const agent = ctx.agents?.get(sessionId)
+    if (agent !== undefined && ctx.workingDirectory !== undefined) {
+      return await ctx.workingDirectory.ensure(agent)
+    }
+    return resolve(config.projectRoot ?? process.cwd())
+  }
 
   const disposers = leadToolSpecs().map((spec) =>
     ctx.tools.register(
       toDshTool(spec, async (sessionId) => {
-        const runtime = await hosts.open(rootDir())
+        const runtime = await hosts.open(await rootFor(sessionId))
         return { runtime, sessionId }
       }),
     ),
