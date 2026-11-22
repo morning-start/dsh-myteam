@@ -1,4 +1,4 @@
-﻿/**
+/**
  * myteam 客户端插件：会话页「团队」视图（只读看板）。
  *
  * 形态与 v1 相同：`window.__ModuleLoader__.load({ id, factory })`，factory 返回
