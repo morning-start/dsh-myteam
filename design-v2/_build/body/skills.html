@@ -1,0 +1,77 @@
+<div class="hd">
+            <div class="hd-l">
+              <h2>结算页模块化<span class="tag"><span class="dot run"></span>进行中</span><button class="btn"><svg class="ic s" viewBox="0 0 24 24"><path d="M4 7h9M4 17h9M15 7h5M18 4v6M15 14h5M12 11v6"/></svg>切换团队</button></h2>
+              <p class="sub">
+                <span class="l">9 个技能</span><i class="sep"></i>
+                <span class="l">3 个 MCP 连接</span><i class="sep"></i>
+                <span class="l">技能四层来源</span>
+                <span class="tr">技能按角色绑定；MCP 是两段式：连接层由宿主配置，可见层按角色收窄</span>
+              </p>
+            </div>
+            <div class="hd-r">
+              <button class="btn"><svg class="ic s" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg>绑定技能</button>
+              <button class="ibtn" title="更多"><svg class="ic" viewBox="0 0 24 24"><circle cx="5" cy="12" r="1"/><circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/></svg></button>
+            </div>
+          </div>
+
+          <div class="bar">
+            <div class="seg">
+              <a href="roles.html">成员 6</a>
+              <a href="roles.html">角色库 13</a>
+              <a href="presets.html">预设 4</a>
+              <a href="skills.html" class="on">技能与 MCP 9</a>
+            </div>
+            <span class="grow"></span>
+            <label class="field w"><svg class="ic s" viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="M20 20l-4-4"/></svg><input placeholder="搜索技能、MCP" aria-label="搜索技能"></label>
+            <button class="btn"><svg class="ic s" viewBox="0 0 24 24"><path d="M4 6h16M7 12h10M10 18h4"/></svg>筛选</button>
+          </div>
+
+          <div class="body pad">
+            <div class="layer"><b>技能</b><span>9 个 · 绑定 14 次</span><i class="rule"></i></div>
+            <div class="list">
+              <div class="item">
+                <div class="l"><div class="t">结算改造<span class="tag line" style="margin-left:8px">项目层</span></div><div class="s"><span>绑给 实现者 ×2</span><span>只读知识 + 代码规范</span></div></div>
+                <div class="r">2 次绑定</div>
+              </div>
+              <div class="item">
+                <div class="l"><div class="t">迁移手册<span class="tag line" style="margin-left:8px">项目层</span></div><div class="s"><span>绑给 实现者 ×2 · 审查者</span><span>含调用点清单与回滚步骤</span></div></div>
+                <div class="r">3 次绑定</div>
+              </div>
+              <div class="item">
+                <div class="l"><div class="t">代码审查<span class="tag line" style="margin-left:8px">全局层</span></div><div class="s"><span>绑给 审查者 · 需求验证</span><span>先看证据块，再看结论</span></div></div>
+                <div class="r">2 次绑定</div>
+              </div>
+              <div class="item">
+                <div class="l"><div class="t">命令验证<span class="tag line" style="margin-left:8px">内置</span></div><div class="s"><span>绑给 审查者 · 需求验证 · api-reviewer</span><span>必须给 exit code</span></div></div>
+                <div class="r">4 次绑定</div>
+              </div>
+              <div class="item">
+                <div class="l"><div class="t">api 兼容性<span class="tag line" style="margin-left:8px">角色绑定</span></div><div class="s"><span>只给 api-reviewer</span><span>其他角色看不到这个技能</span></div></div>
+                <div class="r">1 次绑定</div>
+              </div>
+              <div class="item">
+                <div class="l"><div class="t">变更摘要<span class="tag line" style="margin-left:8px">内置</span></div><div class="s"><span>未绑定</span><span>绑进角色后才生效</span></div></div>
+                <div class="r">0 次</div>
+              </div>
+            </div>
+
+            <div class="layer"><b>MCP · 两段式</b><span>连接层 ∩ 可见层</span><i class="rule"></i></div>
+            <div class="grid c2">
+              <div class="box">
+                <div class="side-h">连接层 · 宿主配置（插件只读，不代连）</div>
+                <div class="kv"><span class="dot run"></span><span class="v mono">filesystem</span><span class="muted" style="margin-left:auto;font-size:12px">已连接</span></div>
+                <div class="kv"><span class="dot run"></span><span class="v mono">git</span><span class="muted" style="margin-left:auto;font-size:12px">已连接</span></div>
+                <div class="kv"><span class="dot run"></span><span class="v mono">sqlite</span><span class="muted" style="margin-left:auto;font-size:12px">已连接</span></div>
+                <div class="kv"><span class="dot idle"></span><span class="v mono">browser</span><span class="muted" style="margin-left:auto;font-size:12px">未连接</span></div>
+                <div class="muted" style="font-size:12px;margin-top:6px">未连接的不会出现在可见层里；要连接请到宿主设置。</div>
+              </div>
+              <div class="box">
+                <div class="side-h">可见层 · 按角色 allowlist</div>
+                <div class="kv"><span class="v">实现者</span><span class="muted" style="margin-left:auto;font-size:12px">filesystem · git</span></div>
+                <div class="kv"><span class="v">审查者</span><span class="muted" style="margin-left:auto;font-size:12px">filesystem</span></div>
+                <div class="kv"><span class="v">需求验证</span><span class="muted" style="margin-left:auto;font-size:12px">filesystem · sqlite</span></div>
+                <div class="kv"><span class="v">api-reviewer</span><span class="muted" style="margin-left:auto;font-size:12px">filesystem · browser（未连接，不生效）</span></div>
+                <div class="muted" style="font-size:12px;margin-top:6px">技能与 MCP 都是「只能收窄」：角色不会比宿主多拿到任何能力。</div>
+              </div>
+            </div>
+          </div>

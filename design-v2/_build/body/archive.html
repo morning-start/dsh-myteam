@@ -1,0 +1,109 @@
+<div class="hd">
+            <div class="hd-l">
+              <h2>支付页重构<span class="tag line">已归档</span></h2>
+              <p class="sub">
+                <span class="l">12 个任务</span><i class="sep"></i>
+                <span class="l">5 个完成</span><i class="sep"></i>
+                <span class="l">4 个 blocked</span><i class="sep"></i>
+                <span class="l">42 个门禁事件</span>
+                <span class="tr">2026-08-14 归档 · 只读 · 账本与产物都留在工作区里</span>
+              </p>
+            </div>
+            <div class="hd-r">
+              <a class="btn" href="audit.html" style="text-decoration:none">在审计视图打开</a>
+              <button class="ibtn" title="更多"><svg class="ic" viewBox="0 0 24 24"><circle cx="5" cy="12" r="1"/><circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/></svg></button>
+            </div>
+          </div>
+
+          <div class="bar">
+            <div class="seg">
+              <a href="archive.html" class="on">回放</a>
+              <a href="audit.html">事件</a>
+              <a href="archive.html">产物</a>
+            </div>
+            <span class="grow"></span>
+            <span class="muted" style="font-size:12px">归档视图只读：写操作已随团队关闭</span>
+          </div>
+
+          <div class="ribbon">
+            <svg class="ic s" viewBox="0 0 24 24"><path d="M4 7a2 2 0 0 1 2-2h12a2 2 0 0 1 2 2v12H6a2 2 0 0 1-2-2z"/><path d="M8 3v4M16 3v4"/></svg>
+            归档于 2026-08-14 · 由 林 手动归档 · 之后没有任何写入
+            <span class="grow"></span>
+            <a class="link" href="teams.html">返回团队列表</a>
+          </div>
+
+          <div class="body pad">
+            <div class="sec" style="margin-top:6px">
+              <div class="sec-h">结局<span class="r">归档不等于解散：数据都还在</span></div>
+              <div class="box">
+                <div class="frow"><div class="k">为什么结束</div><div class="v">支付页整体并入结算域，原团队目标失效<span class="hint">由你手动归档，不是因为失败</span></div></div>
+                <div class="frow"><div class="k">影响面</div><div class="v">4 名成员释放（先排空）· 7 个未完成任务转 blocked<span class="hint">blocked 不算失败，恢复团队后可重新开跑</span></div></div>
+                <div class="frow" style="border-bottom:0"><div class="k">花费</div><div class="v">1.79M token（估算）· 642 次调用 · 命中率 74.4%</div></div>
+              </div>
+            </div>
+
+            <div class="sec">
+              <div class="sec-h">进度<span class="n">12 个任务</span><span class="r">5 完成 / 4 blocked / 3 未开始</span></div>
+              <div class="box">
+                <div class="segbar" role="img" aria-label="完成 5、blocked 4、未开始 3">
+                  <i class="dn" style="width:41.7%"></i><i class="bl" style="width:33.3%"></i><i class="td" style="width:25%"></i>
+                </div>
+                <div class="legend">
+                  <span><i class="dn" style="background:var(--mt-run)"></i>完成 5</span>
+                  <span><i class="bl" style="background:var(--mt-gate)"></i>blocked 4</span>
+                  <span><i class="td" style="background:color-mix(in srgb, var(--dsh-fg) 18%, transparent)"></i>未开始 3</span>
+                </div>
+              </div>
+            </div>
+
+            <div class="sec">
+              <div class="sec-h">名册终态<span class="r">实例名固定，不复用</span></div>
+              <div class="list">
+                <div class="item">
+                  <div class="l"><div class="t">许 · 实现者</div><div class="s"><span>完成 3 · blocked 0</span><span>最后一个任务 t9 · 08-13</span></div></div>
+                  <div class="r">248k</div>
+                </div>
+                <div class="item">
+                  <div class="l"><div class="t">方 · 审查者</div><div class="s"><span>完成 2 · blocked 1</span><span>blocked：缺命令证据，等你裁决时归档</span></div></div>
+                  <div class="r">176k</div>
+                </div>
+                <div class="item">
+                  <div class="l"><div class="t">魏 · 需求验证</div><div class="s"><span>完成 0 · blocked 2</span><span>两个任务都卡在上游未交付</span></div></div>
+                  <div class="r">92k</div>
+                </div>
+                <div class="item">
+                  <div class="l"><div class="t">何 · 队长</div><div class="s"><span>只做协调 · 不接任务</span></div></div>
+                  <div class="r">31k</div>
+                </div>
+              </div>
+            </div>
+
+            <div class="sec">
+              <div class="sec-h">token 五项<span class="n">按天桶</span><span class="r">全部为估算</span></div>
+              <div class="box" style="padding:6px 10px">
+                <table class="table">
+                  <thead>
+                    <tr><th class="t">日期</th><th class="num">未命中</th><th class="num">命中</th><th class="num">写缓存</th><th class="num">输出</th><th class="num">调用</th><th class="num">命中率</th></tr>
+                  </thead>
+                  <tbody>
+                    <tr><td>08-12</td><td class="num">128k</td><td class="num">412k</td><td class="num">96k</td><td class="num">48k</td><td class="num">214</td><td class="num">76.3%</td></tr>
+                    <tr><td>08-13</td><td class="num">164k</td><td class="num">468k</td><td class="num">112k</td><td class="num">62k</td><td class="num">268</td><td class="num">74.1%</td></tr>
+                    <tr><td>08-14</td><td class="num">94k</td><td class="num">240k</td><td class="num">60k</td><td class="num">42k</td><td class="num">160</td><td class="num">71.9%</td></tr>
+                  </tbody>
+                  <tfoot>
+                    <tr><td class="t">合计</td><td class="num">386k</td><td class="num">1.12M</td><td class="num">268k</td><td class="num">152k</td><td class="num">642</td><td class="num">74.4%</td></tr>
+                  </tfoot>
+                </table>
+              </div>
+            </div>
+
+            <div class="sec">
+              <div class="sec-h">账本与产物<span class="r">都在 .team-workplace/支付页重构/</span></div>
+              <div class="list">
+                <div class="item"><div class="l"><div class="t mono">ledger.jsonl</div><div class="s"><span>642 条事件，只追加</span></div></div><div class="r">1.8 MB</div></div>
+                <div class="item"><div class="l"><div class="t mono">team.json</div><div class="s"><span>名册、看板列、门禁链的最终配置</span></div></div><div class="r">6 KB</div></div>
+                <div class="item"><div class="l"><div class="t mono">members/</div><div class="s"><span>4 个成员快照（含最后一次上下文用量）</span></div></div><div class="r">4 个文件</div></div>
+                <div class="item"><div class="l"><div class="t mono">artifacts/</div><div class="s"><span>9 个交付物与产物清单</span></div></div><div class="r">9 个文件</div></div>
+              </div>
+            </div>
+          </div>
