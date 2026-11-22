@@ -12,7 +12,8 @@
 | 2 | [architecture/00](architecture/00-现状与决策基线.md) | 代码实际是什么、旧文档冲突在哪里、哪些决策已确认 |
 | 3 | [architecture/01](architecture/01-系统架构.md) | 全局/项目边界、项目事件真源、Root Runtime、权限、配置与恢复 |
 | 4 | [architecture/03](architecture/03-角色能力与工作流.md) | Role、Skill、Workflow、TeamBlueprint 与统一 Task DAG 的关系 |
-| 5 | [architecture/02](architecture/02-文档重构与迁移蓝图.md) | 文档治理、旧数据迁移、cutover、实施批次与验收矩阵 |
+| 5 | [architecture/04](architecture/04-全量重构实施设计.md) | 全量 v2 实施路径、真实数据迁移、交付阶段与历史删除门禁 |
+| 6 | [architecture/02](architecture/02-文档重构与迁移蓝图.md) | 文档治理、旧数据迁移、cutover、实施批次与验收矩阵 |
 
 这些目标文档目前为 `proposed`，不能描述成已实现能力。架构书面评审和功能实现设计完成后，才进入整体代码重写。
 

@@ -18,7 +18,8 @@
 | 2 | [docs/architecture/00-现状与决策基线](docs/architecture/00-现状与决策基线.md) | 代码事实、旧文档冲突、已确认决策与兼容约束 |
 | 3 | [docs/architecture/01-系统架构](docs/architecture/01-系统架构.md) | 资源模型、项目事件真源、Root Runtime、权限、配置与恢复 |
 | 4 | [docs/architecture/03-角色能力与工作流](docs/architecture/03-角色能力与工作流.md) | RoleProfile + CapabilitySet、SkillRef、WorkflowDefinition/Run 与 Task DAG |
-| 5 | [docs/architecture/02-文档重构与迁移蓝图](docs/architecture/02-文档重构与迁移蓝图.md) | 文档目录、旧数据迁移、实施批次与验证矩阵 |
+| 5 | [docs/architecture/04-全量重构实施设计](docs/architecture/04-全量重构实施设计.md) | 全量 v2 实施路径、真实数据迁移与历史删除门禁 |
+| 6 | [docs/architecture/02-文档重构与迁移蓝图](docs/architecture/02-文档重构与迁移蓝图.md) | 文档目录、旧数据迁移、实施批次与验证矩阵 |
 
 完整阅读路径见 [docs/README.md](docs/README.md)。旧编号文档继续保留用于追溯，但涉及作用域、真源、权限、成员、记忆和目录时，不能再各自宣称唯一权威。
 
