@@ -1,0 +1,148 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>myteam · 面板预览（fixture）</title>
+    <style>
+      :root {
+        color-scheme: light;
+        --bg: #f6f7f9;
+        --surface: #ffffff;
+        --border: #e3e6ea;
+        --text: #1b1f24;
+        --muted: #667080;
+        --accent: #2f6fed;
+        --warn: #b25b00;
+      }
+      * { box-sizing: border-box; }
+      body {
+        margin: 0;
+        background: var(--bg);
+        color: var(--text);
+        font: 14px/1.55 "Segoe UI", "Microsoft YaHei", system-ui, sans-serif;
+      }
+      header.panel-head {
+        display: flex;
+        align-items: baseline;
+        gap: 12px;
+        padding: 16px 24px;
+        background: var(--surface);
+        border-bottom: 1px solid var(--border);
+      }
+      header.panel-head h1 { margin: 0; font-size: 16px; }
+      header.panel-head p { margin: 0; color: var(--muted); font-size: 12px; }
+      main { padding: 20px 24px 40px; display: grid; gap: 20px; }
+      .mt-attention-list { display: flex; gap: 10px; list-style: none; margin: 0 0 14px; padding: 0; }
+      .mt-attention {
+        padding: 6px 10px;
+        border-radius: 999px;
+        background: #eef1f5;
+        color: var(--muted);
+        font-size: 12px;
+      }
+      .mt-attention.is-active { background: #fdeee0; color: var(--warn); font-weight: 600; }
+      .mt-teams { width: 100%; border-collapse: collapse; background: var(--surface); border: 1px solid var(--border); }
+      .mt-teams th, .mt-teams td { text-align: left; padding: 8px 12px; border-bottom: 1px solid var(--border); font-size: 13px; }
+      .mt-teams th { background: #fafbfc; color: var(--muted); font-weight: 600; }
+      .mt-board { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; }
+      .mt-column { background: var(--surface); border: 1px solid var(--border); border-radius: 10px; padding: 10px; min-height: 120px; }
+      .mt-column-head { display: flex; justify-content: space-between; font-weight: 600; font-size: 13px; margin-bottom: 8px; }
+      .mt-count { color: var(--muted); font-weight: 400; }
+      .mt-card { border: 1px solid var(--border); border-radius: 8px; padding: 10px; margin-bottom: 8px; background: #fcfcfd; }
+      .mt-card-title { margin: 0 0 4px; font-size: 13px; }
+      .mt-card-meta { margin: 0; color: var(--muted); font-size: 12px; }
+      .mt-card-blocked { margin: 6px 0 0; color: var(--warn); font-size: 12px; }
+      .mt-empty { color: var(--muted); font-size: 12px; margin: 4px 0; }
+      .mt-task { background: var(--surface); border: 1px solid var(--border); border-radius: 10px; padding: 16px; }
+      .mt-task h2 { margin: 0 0 6px; font-size: 15px; display: flex; gap: 8px; align-items: center; }
+      .mt-meta { color: var(--muted); margin: 0 0 12px; }
+      .mt-chip { background: #e8f0fe; color: var(--accent); border-radius: 999px; padding: 2px 8px; font-size: 12px; font-weight: 500; }
+      .mt-verdict-none { color: var(--muted); }
+      .mt-task h3 { font-size: 13px; margin: 14px 0 6px; color: var(--muted); }
+      .mt-task ul { margin: 0; padding-left: 18px; }
+      .mt-dep { margin: 2px 0; }
+      .mt-dep[data-status="done"] { color: #237b3d; }
+    </style>
+  </head>
+  <body>
+    <header class="panel-head">
+      <h1>myteam 面板</h1>
+      <p>静态预览 · 数据来自 fixture，未连接 RPC</p>
+    </header>
+    <main id="root"></main>
+    <script type="module">
+      import { toBoardModel, toOverviewModel, toTaskModel } from './panel-model.js'
+      import { renderBoard, renderOverview, renderTask } from './panel-render.js'
+      import { createPanelClient } from './panel-client.js'
+
+      const overviewFixture = {
+        totals: { all: 6, done: 2, blocked: 1, review: 2 },
+        attention: { review: 2, blocked: 1, unknownEffects: 0 },
+        teams: [
+          { id: 'team_1', name: '甲队', status: 'active', members: 3, tasks: 4, captain: { generation: 2 } },
+          { id: 'team_2', name: '乙队', status: 'active', members: 2, tasks: 2, captain: null },
+        ],
+      }
+
+      const boardFixture = {
+        totals: overviewFixture.totals,
+        graphRevision: 7,
+        columns: [
+          {
+            status: 'ready',
+            count: 2,
+            tasks: [
+              { id: 'task_1', title: '把登录接口拆成独立模块', ownerTeamName: '甲队', blockedBy: [], attemptId: null },
+              { id: 'task_2', title: '补全错误码映射表', ownerTeamName: '乙队', blockedBy: [], attemptId: null },
+            ],
+          },
+          {
+            status: 'in_progress',
+            count: 1,
+            tasks: [{ id: 'task_3', title: '接入限流中间件', ownerTeamName: '甲队', blockedBy: [], attemptId: 'att_9' }],
+          },
+          {
+            status: 'blocked',
+            count: 1,
+            tasks: [{ id: 'task_4', title: '迁移旧配置快照', ownerTeamName: '甲队', blockedBy: ['task_1'], attemptId: null }],
+          },
+          { status: 'review', count: 2, tasks: [{ id: 'task_5', title: '会话过期清理', ownerTeamName: '乙队', blockedBy: [], attemptId: null }, { id: 'task_6', title: '审计日志字段', ownerTeamName: '甲队', blockedBy: [], attemptId: null }] },
+        ],
+      }
+
+      const taskFixture = {
+        task: { id: 'task_4', title: '迁移旧配置快照', status: 'blocked', acceptance: ['旧配置全部有对应字段', '回滚脚本可执行'] },
+        team: { id: 'team_1', name: '甲队' },
+        attempt: null,
+        verdict: null,
+        evidence: [],
+        dependencies: [
+          { taskId: 'task_1', title: '把登录接口拆成独立模块', status: 'done' },
+          { taskId: 'task_0', title: null, status: null },
+        ],
+        dependents: [],
+      }
+
+      // 演示用传输：与正式面板同一条客户端契约，只是数据来自 fixture。
+      const client = createPanelClient(async (method) => ({
+        ok: true,
+        data:
+          method === 'overview'
+            ? overviewFixture
+            : method === 'board'
+              ? boardFixture
+              : method === 'task'
+                ? taskFixture
+                : { items: [] },
+      }))
+
+      const [overview, board, task] = await Promise.all([client.overview(), client.board(), client.task('task_4')])
+      document.getElementById('root').innerHTML = [
+        renderOverview(toOverviewModel(overview)),
+        renderBoard(toBoardModel(board)),
+        renderTask(toTaskModel(task)),
+      ].join('')
+    </script>
+  </body>
+</html>

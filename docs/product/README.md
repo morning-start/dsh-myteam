@@ -89,4 +89,4 @@ myteam 是 DSH 内的通用多智能体团队运行时，让可复用的定义�
 
 ## 6. 历史需求资料
 
-旧 [需求池](../historical/00-需求池.md)、[项目目标重梳理](../historical/23-项目目标重梳理.md)、[用户场景与功能设计](../historical/12-用户场景与功能设计.md)和[根 PRD](../historical/dsh-myteam-requirements.md)仅用于追溯需求演化，不再作为当前产品目标的并行入口。
+旧 [需求池](./README.md)、[项目目标重梳理](./README.md)、[用户场景与功能设计](../features/README.md)和[根 PRD](./README.md)仅用于追溯需求演化，不再作为当前产品目标的并行入口。

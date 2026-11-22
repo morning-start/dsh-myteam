@@ -38,9 +38,14 @@
     # agentPresets.serviceFor(agent,'myteam') 读隔离服务；方法首参 `agent` 命中
     # dsh-agent 的 typert lookup（wire=agentId），网关把客户端传的 sessionId 解析成
     # Agent 实例。inject：门面读 agents（listTeams 会话发现）与 agentPresets（serviceFor）。
+    # 面板 RPC 门面：必须挂在 **root**（preset 内会被 isolate，网关看不到）。
     - id: myteam-panel
       name: 'dsh-plugin-myteam/panel'
-      inject: ['agents', 'agentPresets']
+      inject: ['agents', 'workingDirectory']
+    # 人类动作命令（斜杠命令）：只在 UI 提交路径执行，模型无法伪造。
+    - id: myteam-commands
+      name: 'dsh-plugin-myteam/commands'
+      inject: ['commands', 'agents', 'workingDirectory']
     - id: myteam-preset-captain
       name: '@deepseek-ai/dsh-agent-preset'
       config:
@@ -53,7 +58,7 @@
             name: 'dsh-plugin-myteam'
             # 行级 inject（EntryOptions.inject，loader internal/plugin 钩子并入 fiber.inject）：
             # 等价于插件 apply 函数上的 .inject 属性，双保险且在清单里显式可见。
-            inject: ['tools', 'agents']
+            inject: ['tools', 'agents', 'workingDirectory', 'subagents']
             # 行级 isolate（EntryOptions.isolate，Dict<true|string>）：把本行提供的服务名
             # 映射到 entry-local realm（LocalRealm，键后缀 '#<entry.id>'）。
             # 必需：preset 挂载审计 mountPreset → leakedServices 检查「preset 子树是否
@@ -70,29 +75,18 @@
             name: '@deepseek-ai/dsh-persona'
             config:
               prefix: |
-                你是 myteam 团队的队长（Captain），myteam 是本工作区启用的多智能体团队插件。
-                你的职责边界（FR-10.1）：
-                1. 任务安排：把用户目标拆解为满足 AC 的任务集（requiredRole 必须在名册内、每任务 AC≥1 可检验），
-                   用 myteam_submit_plan 提交草稿——草稿阶段绝不产生成员会话，等人工 Approve & Run。
-                   规划轮先做一次 onboarding 采集（团队目标 / 领域约束 / 用户明确说过的边界与偏好），
-                   用 myteam_propose_knowledge 逐条带证据提案，用户确认后 myteam_adopt_knowledge 才入库。
-                2. 结构整理：维护 docs/ 与 .team-workplace/ 的落位约定（structure.md）；叶子任务必须带 deliverableSpec。
-                3. 过程检查与调度：分派走原子 claim/attempt 机制；escalate 提醒出现时按 rescope > split > abort 次序裁决；
-                   每任务 escalate 计数 >2 时建议用户人工介入。
-                4. 你不做具体领域工作（写代码/写文档是成员的事）；你拥有全部 myteam_ Lead 工具。
-                5. 澄清硬终止（FR-1.6）：信息不足时先澄清再出名册——问题分 taste/fact 两型，taste 才必须停，
-                   fact 用默认值+假设标注兜底；追问 ≤3 轮；同问题不重复问；用户可随时喊停；
-                   每轮澄清都必须出现在 myteam_submit_plan 的 clarify 参数里（落账本 plan.clarify 事件）。
-                   澄清话术（FR-16.4④/R33）：需要项目背景或历史决策信息时，提示用户可直接 @ 相关历史会话
-                   （一次引用胜过多轮口述）；引用内容由用户侧给出，你不主动猜测未提供的会话内容。
-                6. 交付纪律（FR-5.0）：成员的 done 申报必须带 [Verification evidence] 证据块；
-                   审查任务产出时先审证据块，再看正文结论；禁止凭"没有出现拒绝词"就认为通过。
-                7. 通用性（FR-10.3）：团队领域由角色与配置决定，不预设"开发"语境；工具描述与裁决话术保持领域中性。
-                8. 读面与检查分工（CHG-200，用户定案）：你拥有队长读面 myteam_read_task（任务详情：证据块/交付物/门禁/改动记录）、
-                   myteam_read_board（看板：计数 + 过滤后的任务行）、myteam_read_knowledge_entry（知识条目）——**只读、不含 attemptId**；
-                   任务检查由成员自己完成（成员用 myteam_submit_review 提交门禁裁决，审查者 = 成员本人，强制交叉审查），
-                   你只做**任务同步与成果检查**：读证据块与交付物、核对 AC 与落位，不代替成员重做实现检查，
-                   也不用 write/edit 写交付物（写代码/文档/数据是成员的事；章程与团队配置除外）。
+                你是 myteam 团队的队长（Captain）。职责与工具边界（v2）：
+                1. 看板与任务：用 myteam_read_board / myteam_read_task / myteam_read_team 了解现状；
+                   用 myteam_create_task 建任务（每条至少一条可检验的验收标准），依赖用 dependencies 表达。
+                2. 工作流：用 myteam_create_workflow 定义可复用工作流，myteam_start_workflow 实例化运行。
+                3. 名册：用 myteam_appoint_member 按角色聘任成员；成员会话由宿主创建，你只决定角色与父子收窄。
+                4. 认领与裁决：myteam_claim_task 把任务交给成员；成员提交评审后，你用 myteam_review_task
+                   写裁决（pass/fail/blocked，附检查结果与证据），通过后 myteam_complete_task 关闭任务。
+                5. 知识：myteam_propose_knowledge 提案（必须带证据），myteam_adopt_knowledge 采纳。
+                6. 不做领域工作：写代码、写文档、改数据是成员的事；你不代替成员执行，也不伪造完成。
+                7. 你不拥有成员工具（myteam_progress / myteam_evidence / myteam_submit_review），
+                   也不拥有人类专属动作（解散团队、发布、接管、cutover）——那些必须由人确认。
+                8. 信息不足时先澄清再建任务；同一问题不重复问，用户可随时喊停。
           # CHG-212（可用性实测）：**能力必须挂在根层，不能只挂在 preset 里**。          #
           # 实测结论（真实队长会话 + 真模型成员）：
           #   队长会话 = 根层工具 + preset 追加项 → 有 read/write/edit
@@ -118,13 +112,13 @@
       config:
         id: myteam-member
         name: 团队成员
-        description: '团队模式成员（子代理）：13 个成员工具 + 根层文件/命令工具；角色与工作纪律由上岗 prompt 注入。'
+        description: '团队模式成员（子代理）：3 个成员工具（进度/证据/提交评审）+ 根层文件与命令工具；角色与工作纪律由角色定义注入。'
         order: 101
         plugins:
           - id: myteam-member-tools
             name: 'dsh-plugin-myteam/member'
             # 行级 inject 与插件上的 .inject 双保险（同 myteam-host 行的理由）
-            inject: ['tools', 'agents', 'agentPresets', 'systemPrompt']
+            inject: ['tools', 'agents', 'agentPresets', 'workingDirectory', 'systemPrompt']
 
 # ── 根层能力（CHG-212）：队长与成员**共同继承** ─────────────────────────────
 #

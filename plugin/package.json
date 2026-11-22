@@ -1,16 +1,15 @@
 {
   "name": "dsh-plugin-myteam",
-  "version": "0.1.0",
-  "description": "myteam — DSH 内的独立多智能体团队运行时：任务账本、状态机、质量门禁、角色库与可视化面板；零依赖内置 agentTeams（通用 Agent 团队平台）",
+  "version": "2.0.0-alpha.1",
+  "description": "myteam v2 —— DSH 内的项目级多智能体团队运行时：定义资产、项目事件真源、任务 DAG、门禁与统一投影。",
   "type": "module",
-  "main": "./lib/host.mjs",
+  "main": "./lib/composition/host.mjs",
   "exports": {
-    ".": "./lib/host.mjs",
-    "./host": "./lib/host.mjs",
-    "./member": "./lib/member.mjs",
-    "./panel": "./lib/panel.mjs",
-    "./client": "./client/client.js",
-    "./locale/*.json": "./locale/*.json",
+    ".": "./lib/composition/host.mjs",
+    "./host": "./lib/composition/host.mjs",
+    "./member": "./lib/composition/member.mjs",
+    "./panel": "./lib/composition/panel.mjs",
+    "./commands": "./lib/composition/human-command.mjs",
     "./icon": "./icon.svg",
     "./icon.svg": "./icon.svg",
     "./package.json": "./package.json"
@@ -23,17 +22,6 @@
   "dsh": {
     "bundle": {
       "patch": "./cordis.patch.yml"
-    },
-    "client": {
-      "platform": "web",
-      "inject": [
-        "@deepseek-ai/dsh-api-remotes",
-        "@deepseek-ai/dsh-client-locale",
-        "@deepseek-ai/dsh-client-ui-conversation",
-        "@deepseek-ai/dsh-client-ui-layout",
-        "@deepseek-ai/dsh-client-ui-sidebar",
-        "@deepseek-ai/dsh-client-ui-workspace"
-      ]
     }
   },
   "files": [
@@ -42,18 +30,12 @@
     "client",
     "scripts",
     "cordis.patch.yml",
-    "locale/*.json",
     "icon.svg"
   ],
   "scripts": {
-    "build:client": "node scripts/build-client.mjs",
     "build:lib": "node scripts/build-lib.mjs",
-    "bundle": "npm run build:client && npm run build:lib",
-    "check:client": "node scripts/build-client.mjs --check",
-    "test": "node --test test/*.test.ts test/*.test.js"
+    "test": "node --test test/*.test.ts",
+    "check:arch": "node ../tools/check-architecture.mjs"
   },
-  "license": "MIT",
-  "devDependencies": {
-    "@deepseek-ai/dsh-typert-protocol": "0.2.1-rc.3"
-  }
+  "license": "MIT"
 }

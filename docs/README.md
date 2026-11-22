@@ -28,7 +28,7 @@
 | [delivery/](delivery/README.md) | 当前执行、风险、验收方法、变更记录 | 第二套架构权威 |
 | [research/](research/README.md) | 竞品、官方实现、实践和源码研究 | 未经验证的宿主能力断言 |
 | [audits/](audits/README.md) | 带日期的代码、技术、UI、交互和真机证据 | 目标架构正文 |
-| [historical/](historical/README.md) | 被替代的需求、目标、架构、存储、计划与旧 PRD | 当前施工依据 |
+| [historical/](./architecture/README.md) | 被替代的需求、目标、架构、存储、计划与旧 PRD | 当前施工依据 |
 
 每个目录的 `README.md` 是该部分的唯一导航入口。新增文档先确定部分，再建立链接，不再在 docs 根目录追加散文件。
 
@@ -38,7 +38,7 @@
 
 因此：
 
-- [contracts/04](contracts/04-API与数据契约.md)、[contracts/16](contracts/16-插件团队贡献契约.md)、[contracts/18](contracts/18-配置Schema定稿.md)是 **as-is v1**，用于当前实现和迁移表征；
+- [contracts/04](./contracts/tool-surface.md)、[contracts/16](./contracts/contribution.md)、[contracts/18](./contracts/config-schema.md)是 **as-is v1**，用于当前实现和迁移表征；
 - [audits/22](audits/22-架构梳理.md)是代码快照，不是目标模块图；
 - [audits/27](audits/27-成员子代理化与SQLite记忆.md)是子代理/SQLite 真机证据，不恢复旧 ADR 编号；
 - `historical/` 中“唯一权威”“定稿草案”等字样只代表历史原文，不覆盖当前导航。
@@ -59,11 +59,11 @@
 
 ### 我要执行计划、登记变更或验收
 
-从 [delivery/README](delivery/README.md) 进入。旧 [05-任务板](historical/05-任务板.md)不再作为当前重写计划；真实测试与真机结果归 `audits/`。
+从 [delivery/README](delivery/README.md) 进入。旧 [05-任务板](./delivery/README.md)不再作为当前重写计划；真实测试与真机结果归 `audits/`。
 
 ### 我要追溯旧需求、旧架构或旧存储
 
-进入 [historical/README](historical/README.md)。历史文档不回填成最新设计；新决策在 `architecture/` 或 `features/` 中明确 `supersedes` 关系。
+进入 [historical/README](./architecture/README.md)。历史文档不回填成最新设计；新决策在 `architecture/` 或 `features/` 中明确 `supersedes` 关系。
 
 ## 5. 文档状态与轨道
 

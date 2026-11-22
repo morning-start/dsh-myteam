@@ -1,0 +1,56 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>myteam · 迁移审查（fixture）</title>
+    <style>
+      :root { --bg:#f6f7f9; --surface:#fff; --border:#e3e6ea; --text:#1b1f24; --muted:#667080; --accent:#2f6fed; --warn:#b25b00; }
+      * { box-sizing:border-box; }
+      body { margin:0; background:var(--bg); color:var(--text); font:14px/1.55 "Segoe UI","Microsoft YaHei",system-ui,sans-serif; }
+      header.panel-head { display:flex; align-items:baseline; gap:12px; padding:16px 24px; background:var(--surface); border-bottom:1px solid var(--border); }
+      header.panel-head h1 { margin:0; font-size:16px; }
+      header.panel-head p { margin:0; color:var(--muted); font-size:12px; }
+      main { padding:20px 24px 40px; }
+      .mt-migration { background:var(--surface); border:1px solid var(--border); border-radius:10px; padding:16px; }
+      .mt-migration-head { margin:0 0 4px; font-size:15px; display:flex; gap:8px; align-items:center; }
+      .mt-chip { display:inline-block; background:#e8f0fe; color:var(--accent); border-radius:999px; padding:2px 8px; font-size:12px; }
+      .mt-chip-warn { background:#fdeee0; color:var(--warn); }
+      .mt-meta { color:var(--muted); margin:0 0 12px; }
+      .mt-report { margin:0; padding:12px; background:#fafbfc; border:1px solid var(--border); border-radius:8px; overflow:auto; font:12px/1.6 Consolas,"Cascadia Mono",monospace; white-space:pre-wrap; }
+    </style>
+  </head>
+  <body>
+    <header class="panel-head">
+      <h1>迁移审查</h1>
+      <p>静态预览 · fixture 数据 · 真实命令：myteam-migrate analyze</p>
+    </header>
+    <main id="root"></main>
+    <script type="module">
+      import { toMigrationModel } from './panel-model.js'
+      import { renderMigration } from './panel-render.js'
+
+      const fixture = {
+        verdict: 'ready',
+        headline: '可导入：1 份账本、2 条事件',
+        markdown: `# myteam v1 → v2 迁移分析
+
+- 工作区：\`E:\\Workplace\\extension\\dsh-myteam\`
+- 旧 manifest：layoutVersion=1, projectName=dsh-myteam
+- 结论：**可进入候选导入**
+
+## 需要确认
+
+- \`DUPLICATE_RULES\` state-teams/default/ledger.jsonl 含 2 条规则版本事件，将保留原行并只初始化一次
+- \`INDEX_ORPHAN\` 索引里的团队 b5（B5 狗粮）没有账本，不会迁移为 active 团队
+
+## 来源
+
+| 团队 | 来源 | 事件数 | 来源 hash |
+| --- | --- | --- | --- |
+| default | state-teams | 2 | \`sha256:0b5419150…\` |`,
+      }
+      document.getElementById('root').innerHTML = renderMigration(toMigrationModel(fixture))
+    </script>
+  </body>
+</html>

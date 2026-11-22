@@ -1,0 +1,24 @@
+{
+  "schemaVersion": 1,
+  "generatedAt": "2026-11-22T10:43:46.449Z",
+  "projectId": "prj_291ab0095c77404aa4631894ab30198d",
+  "sourceHashes": [
+    {
+      "teamId": "default",
+      "sourceHash": "sha256:0b5419150a3613b73f010b6301c9f7bd844acff890d075316d6399e826d53385"
+    }
+  ],
+  "counts": {
+    "teams": 0,
+    "members": 0,
+    "tasks": 0,
+    "knowledge": 0
+  },
+  "skipped": [
+    {
+      "type": "rules.version.adopted",
+      "count": 2,
+      "reason": "规则版本只初始化一次，保留旧行作为来源证据"
+    }
+  ]
+}

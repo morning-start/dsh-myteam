@@ -6,9 +6,9 @@
 
 | 文档 | 轨道 | 用途 |
 |---|---|---|
-| [04-API与数据契约](04-API与数据契约.md) | as-is v1 | 旧工具、RPC、事件、错误码与数据形状；迁移表征和兼容分析 |
-| [16-插件团队贡献契约](16-插件团队贡献契约.md) | as-is v1 | 当前第三方 Role/Team 模板贡献方式与安全边界 |
-| [18-配置Schema定稿](18-配置Schema定稿.md) | as-is v1 | 当前团队配置字段、合并与写契约 |
+| [04-API与数据契约](./tool-surface.md) | as-is v1 | 旧工具、RPC、事件、错误码与数据形状；迁移表征和兼容分析 |
+| [16-插件团队贡献契约](./contribution.md) | as-is v1 | 当前第三方 Role/Team 模板贡献方式与安全边界 |
+| [18-配置Schema定稿](./config-schema.md) | as-is v1 | 当前团队配置字段、合并与写契约 |
 
 这些文档仍有现实价值，因为当前代码仍在使用相应模型；但它们**不是目标架构的 v2 设计**。其中涉及团队分账本、队长内 Host、角色/模板旧 schema 和旧目录的内容，应以代码与迁移表征复核。
 
@@ -47,7 +47,7 @@ architecture 评审
 
 ## 4. 生成与手工维护
 
-- 错误码由 `plugin/src/core/errors.ts` 经 `tools/gen-error-docs.mjs` 生成到 [04](04-API与数据契约.md) 的标记块；
+- 错误码由 `plugin/src/core/errors.ts` 经 `tools/gen-error-docs.mjs` 生成到 [04](./tool-surface.md) 的标记块；
 - 工具数、RPC 数、事件数、错误码和 schema 后续应从代码生成；
 - 手写部分负责语义、权限、故障和迁移，不复制容易漂移的计数；
 - 当前实现与目标设计不得共用“已冻结、适用于所有版本”的表述。

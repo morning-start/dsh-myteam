@@ -14,7 +14,7 @@ myteam 只做一件事：**把「一套配好的团队」变成可跑的多智�
 
 本目录服务第二种。它**不含运行时**，只含「怎么写对那份数据」的知识与工具：契约怎么读、字段怎么填、校验器怎么跑、错了看哪个错误码。
 
-**当前 v1 契约文档是 [../docs/contracts/16-插件团队贡献契约.md](../docs/contracts/16-插件团队贡献契约.md)**（v1，已冻结并实装）。本目录是它的使用说明，契约与本目录冲突时**契约赢**。
+**当前 v1 契约文档是 [../docs/contracts/16-插件团队贡献契约.md](../docs/contracts/contribution.md)**（v1，已冻结并实装）。本目录是它的使用说明，契约与本目录冲突时**契约赢**。
 
 ## 目录里有什么
 
@@ -50,13 +50,13 @@ $DSH_HOME/skills/myteam-plugin-team/
 
 1. **一个包一个目录**，目录名 = 包名；包内必须有 `SKILL.md`，且 frontmatter 带 `name` 与 `description`（`description` 写「什么时候该用它」，路由靠它）。
 2. **包只描述数据与流程，不实现运行时**。要写 myteam 运行时逻辑，那是 `plugin/` 的事（见 [../plugin/README.md](../plugin/README.md)）。
-3. **契约变更走 CHG**：本目录任何字段说法都必须能在 [../docs/contracts/16-插件团队贡献契约.md](../docs/contracts/16-插件团队贡献契约.md) 里找到依据；契约要改先走 [../docs/delivery/09-变更记录.md](../docs/delivery/09-变更记录.md) 的 CHG 流程，本目录跟随更新。
+3. **契约变更走 CHG**：本目录任何字段说法都必须能在 [../docs/contracts/16-插件团队贡献契约.md](../docs/contracts/contribution.md) 里找到依据；契约要改先走 [../docs/delivery/09-变更记录.md](../docs/delivery/09-变更记录.md) 的 CHG 流程，本目录跟随更新。
 
 ## 相关文档
 
 | 文档 | 什么时候读 |
 |---|---|
-| [../docs/contracts/16-插件团队贡献契约.md](../docs/contracts/16-插件团队贡献契约.md) | 当前 v1：目录布局、字段、优先级、错误码、安全边界 |
+| [../docs/contracts/16-插件团队贡献契约.md](../docs/contracts/contribution.md) | 当前 v1：目录布局、字段、优先级、错误码、安全边界 |
 | [myteam-plugin-team/README.md](myteam-plugin-team/README.md) | 5 分钟上手 + 校验器用法 + 四条硬边界 |
 | [myteam-plugin-team/reference/errors.md](myteam-plugin-team/reference/errors.md) | 校验器报错 → 怎么改 |
 | [myteam-plugin-team/templates/acme-workflow/](myteam-plugin-team/templates/acme-workflow/) | 可直接拷的骨架 |

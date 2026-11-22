@@ -1,211 +1,144 @@
-# plugin — 插件实现（可装载单元）
+﻿# dsh-plugin-myteam · v2
 
-> `dsh-plugin-myteam` 的可装载单元：`src/` 是唯一实现，`lib/` 是构建产物，`cordis.patch.yml` 是装载声明。
-> 读者：要构建、调试、扩展插件源码的开发者。面板怎么用见[根 README](../README.md)，当前旧 Runtime 契约见 [docs/04](../docs/contracts/04-API与数据契约.md)，目标架构见 [docs/architecture](../docs/architecture/README.md)。
+项目级多智能体团队运行时。v2 是**重写**，不是给 v1 打补丁：v1 的完整实现保存在
+Git 标签 `v1-backup`，本分支从新的分层骨架开始重新实现。
 
-## 一句话定位
+> 状态：`2.0.0-alpha.1`。R0～R3（契约、领域内核、事件库与投影、项目用例）已落地并有测试；
+> R4 完成队长/成员工具面与装配（尚未安装进 DSH 验证）；R5～R7 未完成。
+> **可安装性**：`lib/composition/host.mjs` 已能构建并通过冒烟（13 个队长工具注册、读看板与引导建队可用），
+> 但 `panel` RPC 与 `cordis.patch.yml` 的 preset 行尚未接上，因此 R5 前不要安装到 profile。
 
-`package.json` 的 `main` 与 `exports["."]` 都指向 `./lib/host.mjs` —— **宿主直接装载构建产物，不装载 src**。所以「改 `src/` 必须 `npm run bundle`」不是习俗而是硬约束：漏跑一次，宿主跑的就是旧代码（R38 门禁由 `t42-lib-manifest` 守着）。
+## 为什么要重写
 
-## 快速开始
+v1 的问题不是「文件太大」，而是边界错了，且错在会被持续沿用：
+
+- 业务 Host 挂在 captain preset 里，成员工具反向依赖入口 Host；
+- 配置、知识、成员卡、身份快照与索引各有多份权威与非原子写；
+- 面板在线/离线存在多条读写路径，离线视图另起一套状态机；
+- `actor:'human'` / `confirm:true` 只是普通参数，不能构成可信人类授权。
+
+继续「原地换内核」会让旧 Host 继续决定系统边界，所以 v2 在隔离 worktree 中重建，
+最终整体替换（见 [全量重构实施设计](../docs/architecture/04-全量重构实施设计.md)）。
+
+## 分层与依赖方向
+
+```text
+plugin/src/
+├── contracts/      事件、批次帧、实体形状、错误码、版本与规范化 hash
+├── domain/         纯领域规则：定义资产、任务 DAG、状态机、配置合并、权限
+├── application/    用例命令、项目运行时、内存投影（纯 reducer）
+├── infrastructure/ 文件事件库、写者租约（未来：DSH 适配器、迁移读取器）
+└── composition/    （R4）DSH 装载与依赖装配
+```
+
+依赖只能向内：
+
+```text
+composition → infrastructure → application → domain → contracts
+```
+
+由 `tools/check-architecture.mjs` 机械检查（V1～V5：目录归属、依赖方向、宿主模块、
+第三方包、打印边界）。`contracts/domain/application` 不得 import `fs` /
+`child_process` / `path`，也不得 `console.log`；需要 IO 或日志时用
+`application/ports.ts` 的端口。
+
+## 已实现的不变量
+
+| 不变量 | 落点 | 测试 |
+|---|---|---|
+| 事件内容 hash 与字段顺序无关、拒绝不可无损表达的值 | `contracts/json.ts` | `t01` |
+| 批次 = 头帧 + 事件帧 + 提交帧；hash/数量/序号三者对齐才是 durable 提交点 | `contracts/batch.ts` | `t01` |
+| 撕裂尾部与损坏严格区分：前者可显式修复，后者整个项目停写 | `infrastructure/event-store/log-scan.ts` | `t01`、`t05` |
+| 追加前核对 projectSeq 连续；跳号拒绝且不写坏日志 | `infrastructure/event-store/file-store.ts` | `t05` |
+| 写者租约独占、fencing 单调、过期可接管、释放留墓碑 | `infrastructure/event-store/writer-lease.ts` | `t05` |
+| 能力只收窄；deny 不能被下层重新打开；`*` 与空 allow 语义不同 | `domain/definitions/role.ts` | `t02` |
+| 工作流定义可实例化：key 唯一、依赖存在、无环、完成条件可解析 | `domain/definitions/workflow.ts` | `t03` |
+| 任务就绪只认上游 `done`；`cancelled` 不解除下游 | `domain/tasks/dag.ts` | `t03` |
+| 完成 = review + 门禁 pass + 证据/交付物齐 + 依赖完成，缺一不可 | `domain/tasks/task.ts` | `t04` |
+| 配置分层合并后按安全上限钳制，钳制项写进快照；未知键报错 | `domain/config/merge.ts` | `t04` |
+| 人类专属动作对任何 agent 返回 `HUMAN_ONLY` | `domain/permissions/policy.ts` | `t04` |
+| 项目重开后的投影与关闭前逐字段一致 | `application/project-runtime.ts` | `t06` |
+| 外部写入后先按 seq 重建投影再判身份（陈旧读会导致队长被误判 FORBIDDEN） | `application/project-runtime.ts` `refresh()` | 真机复现（`a144b2e`） |
+| 每个事件类型都有投影处理（目录与 switch 不漂移） | `application/projections/project-state.ts` | `t07` |
+| Run 实例化 = 一个原子批次；完成条件满足时同批次关 Run | `application/run-commands.ts`、`task-commands.ts` | `t08` |
+| 完成一个任务时同批次放开已满足依赖的下游任务 | `application/task-commands.ts` | `t08` |
+| 知识提案必须有证据；提案与采纳分离 | `application/knowledge-commands.ts` | `t09` |
+| 配置 rebase 必须带 `expectedConfigRevision` | `application/commands.ts` | `t09` |
+| Effect 只能 `requested→accepted→completed`；未知结果不重放 | `application/effect-commands.ts` | `t10` |
+| v1 分析：未知事件/序号断裂阻断，索引孤儿只告警 | `infrastructure/migration/v1/analyze.ts` | `t11` |
+| 工具身份只来自会话绑定；未知会话 = FORBIDDEN | `application/actor-resolution.ts` | `t12` |
+| 队长 13 个工具、成员 3 个工具，互不泄漏 | `composition/host.ts`、`composition/member.ts` | `t12` |
+| 同一工作区只开一个项目运行时（并发打开折叠为一个 Promise） | `infrastructure/dsh/project-hosts.ts` | `t12` |
+| 迁移影响面可复现：CLI 与报告同一结构，阻断时不给导入顺序 | `infrastructure/migration/v1/report.ts` | `t13` |
+| 面板只读服务：协议版本不匹配即拒绝，未知方法/缺参数结构化报错 | `application/panel-service.ts` | `t14` |
+| 人类确认令牌绑定 operationId/action/targetHash/impactHash/一次性 nonce | `domain/permissions/human-authorizer.ts` | `t15` |
+| 解散团队/队长接管：预览 → 确认 → 执行；影响面变化即失效 | `application/human-actions.ts` | `t16` |
+| 候选导入只支持已确认的事件形状；其他事件阻断而非跳过 | `infrastructure/migration/v1/convert.ts` | `t18` |
+| 候选写入后从磁盘重放对账，数量不符即失败 | `infrastructure/migration/v1/convert.ts` | `t18` |
+| 任务按终态折叠迁移；在途执行回落 ready，旧 Attempt 不迁移 | `infrastructure/migration/v1/convert.ts` | `t18` |
+| 知识保留「提案→采纳」链；被驳回的提案不迁移 | `infrastructure/migration/v1/convert.ts` | `t18` |
+| cutover 前必须证明候选未过期（来源 hash 对得上） | `infrastructure/migration/v1/cutover.ts` | `t19` |
+| 记忆属于 bank 不属于会话；跨 bank 读取视为不存在；硬删除仅人类 | `infrastructure/memory-store/sqlite-memory.ts` | `t20` |
+| 人类动作（解散/接管）走 CLI：预览只读、执行前重算影响面、令牌一次性 | `tools/myteam-human.mjs` | `t31` |
+| 同一动作也有斜杠命令入口（不带 `--yes` 只预览；模型无法伪造） | `src/composition/human-command.ts` | `t32` |
+| 演练在临时副本上完成切换与回滚，不触碰真实工作区 | `tools/rehearse-cutover.mjs` | `t21` |
+| 面板视图模型只做排序/分组/标签，不重算业务；未知状态显示为未知 | `client/panel-model.js` | `t22` |
+| 面板渲染纯字符串；所有数据文本必须转义（防 XSS） | `client/panel-render.js` | `t23` |
+| 静态演示页用同一套模型/渲染，可直接在浏览器看效果 | `client/panel-demo.html`、`panel-definitions.html`、`panel-migration.html` | 人工预览 |
+| 面板客户端与传输无关；服务端错误转 PanelError，畸形响应不算成功 | `client/panel-client.js` | `t24` |
+| 项目根取**会话工作目录**（workingDirectory.ensure），不是进程 cwd | `src/composition/host.ts` | `t12` |
+| 队长与成员共享同一项目运行时（按 root 引用计数，最后释放才 close） | `infrastructure/dsh/project-hosts.ts` | `t12` |
+
+## 运行
 
 ```bash
 cd plugin
+node --test test/*.test.ts        # 135 个测试
+node ../tools/check-architecture.mjs   # ARCH_OK files=49 violations=0
+node scripts/build-lib.mjs        # 49 个模块 → lib/（入口 lib/composition/host.mjs）
+node ../tools/gen-panel-contract.mjs --check   # 面板契约文档与代码一致
+node ../tools/gen-tool-contract.mjs --check    # 工具面契约文档与代码一致
+node ../tools/gen-config-contract.mjs --check  # 配置字段契约文档与代码一致
+# 真实 cutover 演练（只读；候选写临时目录，不动工作区）
+node ../tools/myteam-cutover.mjs --root "E:\Workplace\extension\dsh-myteam"
 
-npm run bundle    # src/**.ts → lib/**.mjs（暂存构建 → node --check → 原子 rename）
-npm test          # = node --test test/*.test.ts test/*.test.js
+# v1 数据只读分析（不写旧文件、不迁移）
+node ../tools/myteam-migrate.mjs analyze --root "E:\Workplace\extension\dsh-myteam"
+node ../tools/myteam-migrate.mjs plan    --root "E:\Workplace\extension\dsh-myteam" --json
+# 候选导入：写到一个独立目录，旧工作区不动；写完立即对账
+node ../tools/myteam-migrate.mjs candidate --root "E:\Workplace\extension\dsh-myteam" --candidate "<候选目录>"
+# cutover 计划：检查候选完整性、源是否变化、列出步骤与回滚边界（不执行切换）
+node ../tools/myteam-migrate.mjs cutover-plan --root "E:\Workplace\extension\dsh-myteam" --candidate "<候选目录>"
+# cutover 演练：在临时副本上跑完分析→候选→切换→首次打开→回滚，不碰真实工作区
+node ../tools/rehearse-cutover.mjs --root "E:\Workplace\extension\dsh-myteam"
 ```
 
-插件**零 devDependency**：构建与测试都靠 Node 自带的类型擦除（`stripTypeScriptTypes` + `node --test`），不需要装 TypeScript。想要类型检查就自己装一份（不写进 `package.json`）：
+不需要 `npm install`：Node ≥ 22.18 直接擦除类型运行 `.ts`，仓库保持零运行时依赖。
 
-```bash
-npm i -D --no-save typescript
-npx tsc -p tsconfig.json --noEmit
+## 数据布局（v2 目标，R6 迁移后生效）
+
+```text
+<project>/.dsh-myteam/
+├── manifest.json          # projectId、layoutVersion、schemaVersion
+├── events/project.jsonl   # 项目唯一业务事实源（原子批次）
+├── config/                # 生成视图，禁止直接写
+├── memory/memory.db       # 长期记忆唯一权威（R3）
+├── state/projections/     # 可重建缓存
+└── state/writer.lock      # 写者协调，不是业务事实
 ```
 
-## 目录地图
+## 明确不做
 
-| 路径 | 职责 |
-|---|---|
-| `src/` | TypeScript 源码真身：56 个 `.ts` + 1 个遗留转发 `host.js` |
-| `lib/` | 构建产物：56 个 `.mjs` + `build-manifest.json`；`main` 指向 `lib/host.mjs`，随包分发 |
-| `client/` | `client.js` 面板浏览器产物——**不经 src 编译**，由 `exports["./client"]` 直载，指纹单独记 |
-| `test/` | 单测 124 个文件（`node --test`） |
-| `schema/` | `team-config.schema.json`：当前 v1 配置的机器可读定稿（与 [docs/18](../docs/contracts/18-配置Schema定稿.md)、`src/core/config/team-config.ts` 三方同步，`t89` 守门） |
-| `scripts/` | `build-lib.mjs`：构建脚本（代码生成器，不是运行时） |
-| `locale/` | 面板文案 `zh.json` / `en.json` |
-| `cordis.patch.yml` | 装载声明（preset EntryGroup 三行，见下文「装载形态」） |
-| `icon.svg` | 插件图标（`exports["./icon"]`） |
+- 启动时自动截断「看起来坏了」的日志——撕裂尾部必须显式修复并留报告；
+- 把「返回失败」当成「可能写进去了」——durable 之前的失败不产生任何投影变化；
+- 用 `actor:'human'` 或 `confirm:true` 参数充当人类授权——那只是普通数据；
+- 两个进程同时写同一项目——未取得租约只读或转发；
+- 新旧存储长期双写。
 
-当前旧 Runtime 的项目级数据落在 `<project>/.dsh-myteam/`（`config/` 角色与团队配置、`tasks/<teamId>/ledger.jsonl` 任务账本**入库**；`history/`、`state/`、`export/` 不入库）。当前目录的事实源是 `src/core/workspace/layout.ts` 的 `storeLayout()`，旧口径见 [docs/17](../docs/historical/17-项目级存储架构.md)；目标布局以 [docs/architecture/01](../docs/architecture/01-系统架构.md) 为准。
+## 下一阶段
 
-## 源码结构（五域）
-
-旧实现依赖方向单向：**D1 ← D2 ← D3**，D4 / D5 依赖 D1（历史口径见 [docs/03 §模块划分](../docs/historical/03-架构与ADR.md)）。目标代码边界以 [docs/architecture/01](../docs/architecture/01-系统架构.md) 为准，不把旧五域直接当成新架构。
-
-| 域 | 文件 | 职责 |
-|---|---|---|
-| **D1 账本** | `core/ledger/ledger.ts` | append-only JSONL：事件类型白名单、payload 校验、seq 连续、`rules.version` 首事件、崩溃残行截断 |
-| | `core/ledger/token-sidecar.ts` | tokenUsage 四桶 → 按天桶聚合 → `tokens.json` 侧车（绝不进模型上下文） |
-| **D2 调度** | `core/scheduler/state.ts` | 任务状态机与投影类型（`backlog → ready → in_progress → gate:* → done`；`failed` / `cancelled` 终态） |
-| | `core/scheduler/fold.ts` | 账本事件 → `TeamProjection` 逐型折叠，可从零重放重建（纯函数） |
-| | `core/scheduler/wake.ts` | 四种因果唤醒判定（assign / message / resume / revoke）→ `agent.followup()`；无事件即零请求 |
-| | `core/scheduler/recovery.ts` | archive 门禁的落位校验 + 重启后的有序恢复表 |
-| **D3 成员** | `core/members/member-setup.ts` | `setup(agentCtx)` 作用域组装：10 个成员工具 + `tools.restrict` 收窄 + 角色提示词 + 技能 provider |
-| | `core/members/capability-guard.ts` | 技能 / MCP allowlist 的执行面（MCP 真收窄；技能走 deny-by-shadow，无 deny API） |
-| | `core/members/memory.ts` | 成员记忆区（`memory.md` + `notes/`）的幂等播种与事后审计 |
-| | `src/smoke.ts` | 动态冒烟探针（六项），需真实宿主会话，**不进 CI** |
-| **D4 角色库** | `core/roles/role-store.ts` | 三来源解析（builtin / global / project）、引用即复制、C7 守门、名册队长唯一性 |
-| | `core/roles/builtin-roles.ts` | 内置只读角色 + 五档 `RoleOrigin`（builtin < plugin < global < project-role < project） |
-| | `core/roles/role-ops.ts` | 角色库写操作统一入口 `roleOp` —— 工具侧与面板侧共用同一份实现 |
-| | `core/roles/captain-skills.ts` | 队长内置技能：create-role / modify-role / create-team / write-team-charter |
-| | `core/roles/session-defaults.ts` | 单角色调用（`/myteam+<id>`）的落盘与跨重启恢复 |
-| **D5 接口** | `tools/defs.ts` | `memberToolDefs()` / `leadToolDefs()` 的纯数据定义（见下文「工具面」） |
-| | `remote/service.ts` | `MyTeamRemote`：41 个 Remote 方法（手写 marker 等价装饰器 —— strip-only 环境无装饰器语法） |
-| | `remote/views.ts` | 面板只读投影纯函数：看板 / 详情 / token / 审计 / 配置 |
-
-跨域模块：
-
-| 目录 | 文件 | 职责 |
-|---|---|---|
-| `core/config/` | `team-config.ts` · `config-view.ts` | 三层配置合并（默认 < 项目 < 团队，数组整条替换）+ 在线/离线共用同一份配置载荷 |
-| `core/tasks/` | `diff.ts` · `graph.ts` · `readiness.ts` | 字段级 diff（兼判证据过期）· 依赖图层级与边集（横/竖双布局共用）· 「为什么没人领」诊断 |
-| `core/knowledge/` | `knowledge.ts` · `evidence-pointer.ts` | 团队知识库（策展制 + 索引预算 ≤40 行）· `task:` / `file:` / `session:` 证据指针解析 |
-| `core/index/` | `team-index.ts` · `offline-view.ts` | 工作区级 / 跨工作区级派生索引（可全量重建）· 离线只读看板（不构造 TeamService） |
-| `core/workspace/` | `layout.ts` | `.dsh-myteam/` 目录契约**唯一事实源**：`storeLayout()` / `resolveProjectRoot()` |
-| `core/gates/` | `command-gate.ts` · `scope-audit.ts` | verify 门由 host 执行命令取真实退出码（argv 直传，无 shell）· 完成时 `writeScopes` 越界对账 |
-| `core/contributions/` | `contract.ts` · `discover.ts` · `parse.ts` | 插件团队贡献契约：类型常量 / 目录发现 / **纯函数**解析与冲突裁决（只 `JSON.parse`，永不 `import()`） |
-| `core/archive/` | `archive-store.ts` | 解散归档落盘：`MANIFEST.json` / `team.json` / `tokens.json` / `members/` |
-| `core/host/` | `session-handoff.ts` · `team-charter.ts` | 会话移交（摘要 + 新开会话，不做原地变身）· 团队章程 → 队长 system prompt 注入 |
-| `core/` | `errors.ts` | `MT_*` 错误码唯一来源（`MT_CODES` / `MT_CODE_DOCS`；docs/04 错误码表由 `tools/gen-error-docs.mjs` 生成） |
-| | `service.ts` | `TeamService`：单写者写管线（校验 → 副本 apply → 账本 append），拒绝式返回而非抛异常 |
-
-宿主装配入口：
-
-| 文件 | 职责 |
-|---|---|
-| `host.ts` | `apply(ctx, config)` + `inject`：目录初始化、TeamService 惰性创建与冷启动重放、Lead 工具注册、成员 spawn、唤醒管线 |
-| `panel.ts` | `MyTeamPanelFacade`：根级 typert remote 门面（60 个方法），经 `agentPresets.serviceFor(agent, 'myteam')` 读隔离服务 |
-| `host-workspace.ts` | 旧导出名兼容层（`ensureWorkplaceDirs` 等），实现已收口到 `core/workspace/layout.ts` |
-| `host.js` | 遗留 import 路径的薄转发（仅 `test/t1-workplace.test.js` 用），自身无逻辑 |
-
-## 工具面（68 个 `myteam_*`）
-
-定义在 `src/tools/defs.ts`，纯数据；写操作 execute 全部走 `TeamService.commit()`（单写者管线），读走投影。两层注册（ADR-003）：Lead 工具挂 **preset 层**（仅队长会话可见），成员工具挂**成员 setup 作用域**（仅成员会话可见）。下表省略 `myteam_` 前缀。
-
-| 分组 | 队长 58 个 | 成员 10 个 |
-|---|---|---|
-| 计划与团队 | `submit_plan` `approve_plan` `revise_plan` `discard_plan` `update_team` `disband` | — |
-| 团队库与快照 | `list_teams` `get_team` `copy_team` `publish_team` `export_team` `import_team` | — |
-| 任务 | `create_task` `create_tasks` `edit_task` `assign_task` `participate_task` `reassign_task` `revoke_attempt` `rescope_task` `cancel_task` `batch_task_op` | `get_task` `list_tasks` `claim_task` `update_task` |
-| **任务读面（CHG-200）** | `read_task` `read_board` | — |
-| 成员与消息 | `spawn_member` `release_member` `message` `interrupt` | `peer_message` `wait_for_change` |
-| 门禁与提案 | `review_task` `resolve_proposal` | `propose_task_change` `escalate_task` **`submit_review`（CHG-200）** |
-| 角色与预设 | `list_roles` `create_role` `update_role` `delete_role` `copy_role` `publish_role` `set_project_role` `apply_roles` `list_presets` `save_preset` `copy_preset` `delete_preset` | — |
-| 技能与工具 | `list_skills` `create_skill` `create_tool` | — |
-| 知识 | `propose_knowledge` `adopt_knowledge` `read_knowledge_entry`（CHG-200） | `read_knowledge` |
-| 图谱与观测 | `get_task_graph` `get_tokens` `get_audit` `read_session` | — |
-| 会话 | `handoff` | — |
-| 插件贡献 | `list_contributions` `reload_contributions` | — |
-| 配置 | `save_team_config` `reset_team_config` | — |
-
-几条贯穿全表的口径：任务 / 团队 / 知识类写操作都要 `teamId`；角色与预设是**配置资产**，不带 `teamId`（它们不属于任何团队）。成员侧更新必须带 `attemptId`（陈旧即拒）；`done` 申报必须附证据块（`kind=commands` 或 `kind=na`）；两段确认型操作第一次不带 `confirm` 时只返回影响面，不落账。
-
-**读面与检查分工（CHG-200，用户定案）**：队长读面 `read_task` / `read_board` / `read_knowledge_entry` **只读、不含 `attemptId`**（写凭据只发给当前持有人）、按最新截断并如实报 `omitted`（限界读 NFR-7.6）；两个作用域**零重名**（不复用成员侧 `get_task` / `list_tasks` / `read_knowledge`，CHG-86 的教训）。任务检查由成员用 `submit_review` 自己提交（审查者 = 调用者，强制交叉审查）；队长只做任务创建 / 分发 / 同步与**成果检查**。
-
-## 装载形态（`cordis.patch.yml`）
-
-preset EntryGroup 三行（ADR-005）：
-
-| 行 id | name | 作用 |
-|---|---|---|
-| `myteam-carrier` | `dsh-plugin-myteam` | 客户端载体行。`config.carrier=true` 让 apply 直接返回 —— 只为了让 `client.js` 进 `window.__DSH_BOOT__` 客户端图（含 `/` 的说明符不进图） |
-| `myteam-panel` | `dsh-plugin-myteam/panel` | 根级门面，`inject: ['agents', 'agentPresets']`。隔离服务进不了网关 claims，只有 root 可见服务能提供 `myteam/<method>` 端点 |
-| `myteam-preset-captain` | `@deepseek-ai/dsh-agent-preset` | 「团队模式」预设入口，组合内两行子插件：`myteam-host`（`inject: ['tools','agents']`）+ `myteam-persona-captain`（队长人设） |
-
-两条删不得的约束：
-
-- **`isolate: { myteam: true }`**：preset 子树把服务发布到 root realm 会触发 `Preset services require isolate realms: myteam`，预设卡片直接「加载失败」。
-- **`@deepseek-ai/dsh-persona` 只能挂在 agent scope**（preset 子行）；顶层全局挂载与 deployment persona 冲突，会 fail loud。
-
-成员工具不在这里注册 —— 由 `agents.create` 的 `setup(agentCtx)` 在成员作用域内注册，preset 只负责队长。
-
-## 构建纪律（`scripts/build-lib.mjs`）
-
-`main` 直指 `lib/`，宿主直接 require 产物。旧实现「先 `rmSync(lib)` 再逐文件写、最后才 `throw`」—— 一次编译失败就留下半截 `lib/`，插件整体不可装载且要重启宿主才能恢复（R39）。现在**闸门顺序本身就是协议**，不要调换：
-
-| 闸 | 做什么 | 失败后果 |
-|---|---|---|
-| 0 · 暂存构建 | 全部产物先写 `lib.__staging__/`（与 `lib/` 同卷，`rename` 才是原子的），**任何情况不直写 `lib/`** | 删暂存目录，`lib/` 毫发无伤 |
-| 1 · 语法校验 | 每个暂存产物跑 `node --check`（按 ESM 解析）。`stripTypeScriptTypes` 只保证「类型擦除成功」，不保证输出是合法 JS | 抛错并清理暂存，`lib/` 原样 |
-| 2 · 原子替换 | 全绿才 `rmSync(lib)` + `renameSync(staging → lib)` | 宿主只会看到旧目录或新目录，不会看到半截 |
-| 3 · 宿主在跑就拒绝 | TTY 交互确认；`--force` / `-y` / `DSH_BUILD_YES=1` 跳过；非 TTY（CI/管道）自动放行并告警 | 取消则 `lib/` 未做任何改动 |
-
-两条旁路门禁：
-
-- **产物卫生（D9）**：`//# sourceURL=` 只写 repo 相对路径；构建末尾扫全部产物，命中 `file:///` 或盘符绝对路径即失败。
-- **`lib/build-manifest.json`**：`sourceHash`（全部 src 按路径排序后「路径\0内容」哈希）+ `clientHash`（`client/client.js` 原始字节）。`t42-lib-manifest` 复算比对 —— **改 src 忘重跑 bundle 时测试立即红**。
-
-独立复算面：
-
-```bash
-node tools/check-drift.mjs    # 退出码 0 = MISMATCH: 0
-```
-
-它直接复用 `build-lib.mjs` 导出的 `compileSource` —— 编译口径只有一个来源，不会再出现「两边各写一份实现、永远差一行」的 100% 假阳性。
-
-## 客户端构建（`scripts/build-client.mjs`）
-
-客户端**源码是 `client/src/*.js` 的 46 个片段**，`client/client.js` 是构建产物（13,343 行 / 912 KB）。
-
-为什么不用 ESM 或打包器：
-
-| 约束 | 后果 |
-|---|---|
-| 宿主 `__ModuleLoader__` 只给 `react` / `react/jsx-runtime` 这类**裸模块名** | 没有跨文件 `require` |
-| `client.js` 被 `new Function('window','document',source)` 当**脚本**执行 | 不能用 `import` / `export` |
-| 131 个测试断言 `source.includes('...')` | 任何转译（压缩 / 重命名）都会让断言失效 |
-
-所以片段**逐字节保留**，构建 = 按文件名排序纯文本拼接。
-
-```bash
-cd plugin
-npm run build:client     # 片段 → client/client.js
-npm run check:client     # 校验产物与片段一致（CI 用，退出码 0 = 一致）
-npm run bundle           # build:client + build:lib（打包前必须跑）
-```
-
-两条纪律：
-
-- **不要直接改 `client/client.js`** —— 下次构建会被覆盖；改 `client/src/*.js`。
-- **依赖方向单向**：`00 引导 → 10 词条 → 20 RPC → 30 原语 → 40 样式 → 50-69 功能组件 → 70-79 组合 → 90 注册`。片段只能引用更早片段声明的名字，由 `node tools/check-client-arch.mjs` 守（**棘轮**：当前 9 处 TDZ + 12 处 hoisting 历史债，只许降不许升）。
-
-片段清单与拆分层级见 [`client/src/README.md`](client/src/README.md)。
-
-## 测试
-
-```bash
-cd plugin && npm test
-```
-
-- `test/` 下 136 个测试文件；**条数以 `npm test` 实际输出为准**（当前基线 973 条；增删测试后不要抄旧数字）。
-- 门禁型测试不是装饰：`t42`（src↔lib 指纹）、`t80`（构建三道闸）、`t81`（错误码双向锁死）、`t76`（贡献契约）、`t137`（分层与写盘出口，见 `tools/check-architecture.mjs`）都在「实现与声明分叉」时变红。
-- 需要真实宿主会话的探针（`src/smoke.ts`，CHG-174 从 `core/members/` 移出入口层）不在 CI 内，按文件头注释在插件 dev profile 里跑。
-
-## 相关文档
-
-| 文档 | 什么时候读 |
-|---|---|
-| [../README.md](../README.md) | 项目定位、仓库规范、当前状态 |
-| [../docs/architecture/README.md](../docs/architecture/README.md) | 目标系统架构、迁移蓝图与决策基线 |
-| [../docs/architecture/03-角色能力与工作流.md](../docs/architecture/03-角色能力与工作流.md) | Role、Skill、Workflow、TeamBlueprint 与 Task 的目标边界 |
-| [../docs/03-架构与ADR.md](../docs/historical/03-架构与ADR.md) | 旧五域划分与 ADR-001~016，仅作历史追溯 |
-| [../docs/04-API与数据契约.md](../docs/contracts/04-API与数据契约.md) | 当前 v1 工具 / 端点 / 错误码契约（错误码表由 `tools/gen-error-docs.mjs` 生成，不要手改） |
-| [../docs/11-数据模型与存储设计.md](../docs/historical/11-数据模型与存储设计.md) | 旧账本事件与投影字段 |
-| [../docs/18-配置Schema定稿.md](../docs/contracts/18-配置Schema定稿.md) | 当前 v1 配置字段定义（`team.config.json` / 角色 schema / 模板组合面 / 设置页写契约） |
-| [../docs/16-插件团队贡献契约.md](../docs/contracts/16-插件团队贡献契约.md) | 当前 v1 第三方 Role 与团队模板贡献契约 |
-| [../skills/myteam-plugin-team/README.md](../skills/myteam-plugin-team/README.md) | 贡献方视角的 skill 包与可执行校验器 |
-
----
-
-[← 上级目录](../README.md)
+1. **R3 应用用例**：Workflow Run、依赖重接、门禁裁决、知识、配置 rebase、Effect 请求/对账；
+2. **R4 DSH 适配器**：Root Runtime、Captain/Member preset、工具注册、SessionRef、HumanAuthorizer；
+3. **R5 v2 面板**：只消费 RPC 的统一投影（设计稿见 `design-v2/`）；
+4. **R6 迁移**：`.team-workplace/`、两处旧账本、SQLite、memory.md 的一次性候选导入与对账；
+5. **R7 验收与清理**：真机链路、文档替换、历史资料删除。

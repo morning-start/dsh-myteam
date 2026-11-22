@@ -1,0 +1,15 @@
+# >>> dsh-plugin-myteam managed block >>>
+# 本文件由插件幂等维护，请勿手改本块。
+#
+# 能上传（随仓库共享、可 review）：
+#   manifest.json  README.md  structure.md
+#   config/        ← 角色 / 团队 / 技能 / 工具 / 流程 / 知识
+#   tasks/         ← 任务及依赖（append-only 账本）
+#
+# 不能上传（运行时状态与历史流水，clone 后自动重建）：
+state/
+history/
+export/
+*.tmp
+.tmp/
+# <<< dsh-plugin-myteam managed block <<<

@@ -1,102 +1,36 @@
 /**
- * dsh-myteam client 插件（T13，M1 收窄版 CHG-16 第一刀 + 官方生命周期对齐修订）。
+ * myteam 客户端插件：会话页「团队」视图（只读看板）。
  *
- * 形态（与官方 dsh-experimental-client-ui-agent-team 同构，ui-plugin.md 契约）：
- *   window.__ModuleLoader__.load({ id, factory(require) }) — 懒 CJS 模块表消费；
- *   factory 返回 { apply, inject }：inject 声明必需的浏览器服务，apply(ctx) 注册资源，
- *   所有注册（locale 字典/样式/插槽）放进 ctx.effect —— 卸载即回收。
+ * 形态与 v1 相同：`window.__ModuleLoader__.load({ id, factory })`，factory 返回
+ * `{ apply, inject }`；所有注册放进 `ctx.slots.inject(...)`，卸载即回收。
  *
- * 修订记录（对照官方 client 的三处结构缺陷）：
- *   ① apply 未导出 inject、未注册 locale 字典 → 补（visible text 走 locale service）；
- *   ② 样式在 factory 阶段注入（不可清理）→ 移入 ctx.effect；
- *   ③ Panel/DockChip 依赖的 ctx 经插槽 inject: () => ({ ctx }) 传入（原实现传 () => ({})
- *      导致组件拿到 undefined 一渲染即崩）。
- *
- * 纪律（NFR-7.2/F2）：面板只读服务投影，数据绝不进模型上下文；
- * 写只走 planAction/postComment/disband（ADR-006 面板唯一写入口 = 账本管线）。
- * 样式只用 --dsw-alias-* token（PRD 落点纪律），H4 三通道（文字+图标+形状）不依赖颜色。
- *
- * M2 RPC 通道（阶段四十七~四十九网关取证后定案）：宿主侧新增根级门面服务
- * MyTeamPanelFacade（src/panel.ts，namespace=myteam），方法首参 `agent` 由网关
- * lookup 解析成 Agent 实例（客户端传 sessionId）；隔离的 MyTeamRemote 经
- * agentPresets.serviceFor(agent,'myteam') 读取。客户端不走 $mount/生成描述符
- * （strip-only 无 codegen），直连网关 RPC：connection.rpc.call('/api','myteam/<method>',
- * { args: { agentId, query } })，返回 {ok,value}|{ok,error} 信封（官方 invokeRemote 同形）。
- * slot inject 回调首参 = binding.key = sessionId（dsh-client-ui-renderer runInject）；
- * root 槽（main）无 binding → Panel 先 listTeams 发现队长会话。
+ * 只读：数据走根级门面 `myteam/board`，本组件不写任何东西。渲染失败不冒泡到
+ * 宿主（宿主只看到一块空白，用户拿不到任何信息），所以这里自带错误态与重试。
  */
 ﻿window.__ModuleLoader__.load({
   id: 'dsh-plugin-myteam',
   factory: (require) => {
-    const { jsx: j, jsxs: js } = require('react/jsx-runtime')
     const react = require('react')
+    const h = react.createElement
+    const { useCallback, useEffect, useState } = react
 
-    const PANEL_KEY = 'myteam'
+    const VIEW_ID = 'myteam'
 
-    /**
-     * CHG-155（P1）：**渲染错误边界**——插槽里任何组件抛错，宿主只看到一块空白
-     * （深色主题下就是「黑屏」），用户拿不到任何可读信息，也没法自己恢复。
-     *
-     * 兜底口径：**渲染异常 ≠ 面板消失**。
-     *  - 显示「渲染失败 + 错误摘要 + 重试」，重试只清 error（不重载页面）；
-     *  - 异常照常 `console.error`（保留堆栈，便于定位真因）；
-     *  - 边界自身绝不抛错（locale/console 都不可用时降级成中文常量）。
-     *
-     * 注意：类组件是这里的有意选择——React 的 `getDerivedStateFromError` 只有类有。
-     * 宿主/测试的 react shim 不一定导出 `Component`（mock loader 只给 hooks），
-     * 所以取不到实体时退回一个最小基类：边界在任何 shim 下都能构造。
-     */
-    const RenderBoundaryBase = react.Component ?? class { constructor(props) { this.props = props } }
-    class MyTeamRenderBoundary extends RenderBoundaryBase {
-      constructor(props) {
-        super(props)
-        this.state = { error: null, info: null }
-        this.retry = () => this.setState({ error: null, info: null })
+    async function rpc(connection, method, args) {
+      const result = await connection.rpc.call('/api', `myteam/${method}`, { args })
+      if (result && typeof result === 'object' && 'ok' in result && result.ok === false) {
+        throw new Error(result.error?.message ?? `myteam/${method} 调用失败`)
       }
-
-      static getDerivedStateFromError(error) {
-        return { error }
+      // 宿主可能返回 {ok,value}（连接层）或 {ok,data}（门面本身），两种都接受。
+      const value = result && typeof result === 'object' && 'value' in result ? result.value : result
+      if (value && typeof value === 'object' && 'ok' in value) {
+        if (value.ok === false) throw new Error(value.error?.message ?? `myteam/${method} 返回失败`)
+        return value.data
       }
-
-      componentDidCatch(error, info) {
-        /* 组件栈是定位「谁在循环」的唯一线索（#185 尤其如此）：存进 state 直接显示出来 */
-        this.setState({ info: info ?? null })
-        try {
-          console.error('[myteam] 渲染异常（已兜住，未黑屏）：', error, info?.componentStack)
-        } catch {
-          /* 控制台不可用也不影响兜底 */
-        }
-      }
-
-      render() {
-        const { t, children } = this.props ?? {}
-        if (!this.state.error) return children
-        const label = (key, fallback) => {
-          try {
-            const value = typeof t === 'function' ? t(key) : undefined
-            return value && value !== key ? value : fallback
-          } catch {
-            return fallback
-          }
-        }
-        const detail = String(this.state.error?.message ?? this.state.error ?? '')
-        /* 组件栈只取前 3 帧（再长也没人看），一行内用 ← 串起来 */
-        const frames = String(this.state.info?.componentStack ?? '')
-          .split('\n')
-          .map((line) => line.trim().replace(/^at\s+/, ''))
-          .filter(Boolean)
-          .slice(0, 3)
-        return j('div', { className: 'mt-empty', role: 'alert', children: [
-          j('b', { children: label('errors.renderTitle', '面板渲染失败') }),
-          j('p', { className: 'mt-hint', children: detail.slice(0, 400) }),
-          frames.length > 0
-            ? j('p', { className: 'mt-hint', children: `${label('errors.renderWhere', '出错组件')}：${frames.join(' ← ')}` })
-            : null,
-          j('button', { className: 'mt-btn mt-btn-sm', onClick: this.retry, children: label('errors.renderRetry', '重试') }),
-        ] })
-      }
+      return value
     }
 
+<<<<<<< HEAD
     /**
      * 给插槽组件套一层边界（登记处调用；props 原样透传，`t` 单独取出给兜底 UI 用）。
      * 每次登记新建一个包装组件：插槽是单例登记，不存在重复挂载的开销。
@@ -6659,10 +6593,20 @@
         if (readOnly) { onNotice?.(t('kb3.readonlyHint')); return }
         if (!api || typeof api.adoptKnowledge !== 'function') {
           onNotice?.(t('kb3.adoptUnavailable').replace('{message}', 'adoptKnowledge'))
+=======
+    function BoardView(props) {
+      const { connection, sessionId } = props
+      const [state, setState] = useState({ status: 'loading' })
+
+      const load = useCallback(async () => {
+        if (!sessionId) {
+          setState({ status: 'empty', reason: '当前会话没有绑定工作区' })
+>>>>>>> v2-rewrite
           return
         }
-        setDeciding(proposal.draftId)
+        setState({ status: 'loading' })
         try {
+<<<<<<< HEAD
           const trimmed = note.trim()
           const r = await api.adoptKnowledge({
             /* CHG-202x（P0-5）：提案列表是**全区聚合**的（host 遍历每个 teamId 的账本），
@@ -8055,397 +7999,92 @@
             busy: false,
             pending: null,
           }))
+=======
+          const data = await rpc(connection, 'board', { agentId: sessionId, query: {} })
+          setState({ status: 'ready', data })
+>>>>>>> v2-rewrite
         } catch (error) {
-          setAssets((prev) => ({ ...prev, busy: false, err: String(error?.message ?? error) }))
+          setState({ status: 'error', reason: error instanceof Error ? error.message : String(error) })
         }
+      }, [connection, sessionId])
+
+      useEffect(() => {
+        void load()
+      }, [load])
+
+      const styles = {
+        root: { display: 'flex', flexDirection: 'column', gap: 12, padding: 16, minHeight: 120 },
+        head: { display: 'flex', alignItems: 'baseline', gap: 8 },
+        title: { fontSize: 14, fontWeight: 600, margin: 0 },
+        meta: { fontSize: 12, opacity: 0.7 },
+        columns: { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: 8 },
+        column: { border: '1px solid var(--dsw-alias-border, #e3e6ea)', borderRadius: 8, padding: 8 },
+        columnHead: { display: 'flex', justifyContent: 'space-between', fontSize: 12, fontWeight: 600, marginBottom: 6 },
+        card: { border: '1px solid var(--dsw-alias-border, #e3e6ea)', borderRadius: 6, padding: 6, marginBottom: 6, fontSize: 12 },
+        muted: { fontSize: 12, opacity: 0.7 },
+        button: { fontSize: 12, padding: '2px 8px', borderRadius: 6, cursor: 'pointer' },
       }
 
-      const doReset = async () => {
-        if (!editable || !team?.sessionId || saving) return
-        setSaveErr(null)
-        setSaving(true)
-        try {
-          const api = makeApi(connection, team.sessionId)
-          if (typeof api.resetTeamConfig !== 'function') { setSaveErr(t('settings.unavailable')); return }
-          const r = await api.resetTeamConfig({ teamId: team.teamId, confirm: true })
-          if (r?.status !== 'reset' && r?.status !== 'noop') {
-            setSaveErr(String(r?.message ?? r?.code ?? t('settings.saveFailed').replace('{msg}', '')))
-            return
-          }
-          setResetAsk(false)
-          setSavedNote(t('settings.resetDone'))
-          const view = await api.getConfig({ teamId: team.teamId })
-          onSaved?.(view?.status === 'ok' ? view : null)
-        } catch (e) {
-          setSaveErr(t('settings.saveFailed').replace('{msg}', String(e?.message ?? e)))
-        } finally {
-          setSaving(false)
-        }
+      if (state.status === 'loading') {
+        return h('div', { style: styles.root }, h('p', { style: styles.muted }, 'myteam 看板加载中…'))
       }
-      const sections = Object.keys(c).length
-      const activeLayer = (key) => (config.chain ?? []).some((item) => item.layer === key && item.active === true) || config.source === key
-      const pending = Math.max(0, Number(team?.counts?.tasks ?? 0) - Number(team?.counts?.done ?? 0))
-      const askDisband = async () => {
-        if (!team?.online) return
-        try {
-          const r = await makeApi(connection, team.sessionId).disband({ teamId: team.teamId, confirm: false })
-          if (r?.status === 'confirm-required') setImpact(r.impact ?? {})
-        } catch (e) { setErr(String(e?.message ?? e)) }
+      if (state.status !== 'ready') {
+        return h(
+          'div',
+          { style: styles.root },
+          h('p', { style: styles.muted }, `看板不可用：${state.reason ?? '未知原因'}`),
+          h('div', null, h('button', { style: styles.button, onClick: () => void load() }, '重试')),
+        )
       }
-      const doDisband = async () => {
-        if (!team?.online || busy) return
-        setBusy(true)
-        try {
-          const r = await makeApi(connection, team.sessionId).disband({ teamId: team.teamId, confirm: true })
-          if (r?.ok === false || r?.status === 'error') { setErr(r?.message ?? t('settings.failed').replace('{msg}', '')); return }
-          setImpact(null)
-          onDisbanded?.()
-        } catch (e) { setErr(String(e?.message ?? e)) } finally { setBusy(false) }
-      }
-      /**
-       * CHG-89（M2-E / FR-16.3）：会话移交的两段式入口。
-       *
-       * 为什么面板侧要加一段确认：移交会**程序化新建一个团队预设会话**并注入摘要——
-       * 这是用户可见的副作用（新会话会出现），不能点一下就发生。服务端 `handoffTeam`
-       * 本身是单段的（它只管「建会话 + 注入」），确认放在这里。
-       *
-       * 失败不静默：`MT_UNAVAILABLE`（宿主无 sessionController）与「注入失败但会话已建」
-       * 都原样回显——后者服务端会带 `sessionId`，人可以手动粘贴摘要。
-       */
-      const askHandoff = () => {
-        if (!team?.online || !team?.sessionId || handoffBusy) return
-        setHandoffErr(null)
-        setHandoffResult({ stage: 'confirm' })
-      }
-      const doHandoff = async () => {
-        if (!team?.online || !team?.sessionId || handoffBusy) return
-        setHandoffErr(null)
-        setHandoffBusy(true)
-        try {
-          const r = await makeApi(connection, team.sessionId).handoff({
-            teamId: team.teamId,
-            sourceSessionId: team.sessionId,
-          })
-          if (r?.status === 'ok') {
-            setHandoffResult({ stage: 'done', sessionId: r.sessionId, summary: r.summary, metadata: r.metadata, note: r.note })
-            return
-          }
-          /* 会话已建但注入失败：把 sessionId 一起显示，用户可手动粘贴摘要 */
-          setHandoffResult(r?.sessionId ? { stage: 'partial', sessionId: r.sessionId, message: r.message ?? r.code } : null)
-          setHandoffErr(r?.message ?? r?.code ?? t('settings.handoffFailed').replace('{msg}', ''))
-        } catch (e) {
-          setHandoffErr(t('settings.handoffFailed').replace('{msg}', String(e?.message ?? e)))
-        } finally {
-          setHandoffBusy(false)
-        }
-      }
-      const layerRow = (key, title, src, path, n, unit) => js('div', { className: 'mt-layer', children: [
-        j('span', { className: `mt-layer-ico mt-layer-${key}`, 'aria-hidden': true, children: layerIcon(key) }),
-        js('div', { className: 'mt-layer-main', children: [
-          js('div', { className: 'mt-layer-title', children: [title, j('span', { className: key === 'builtin' ? 'mt-src' : `mt-src mt-src-${key}`, children: src })] }),
-          j('div', { className: 'mt-layer-path', children: path }),
-        ] }),
-        js('div', { className: 'mt-layer-n', children: [String(n), unit ? j('span', { children: unit }) : null] }),
-      ] })
-      const row = (key, title, sub, act) => js('div', { className: 'mt-setrow', key, children: [
-        js('div', { className: 'mt-setrow-main', children: [
-          j('div', { className: 'mt-setrow-title', children: title }),
-          j('div', { className: 'mt-setrow-sub', children: sub }),
-        ] }),
-        js('div', { className: 'mt-setrow-act', children: act }),
-      ] })
-      /** CHG-118：可编辑数字——空值写 `undefined`（由服务端合并回默认），非数字不写 */
-      const numInput = (value, label, onChange, range = {}) => j('input', {
-        className: 'mt-input-num',
-        value: value === undefined || value === null ? '' : String(value),
-        inputMode: 'numeric',
-        'aria-label': label,
-        disabled: !editable,
-        ...(range.min !== undefined ? { min: range.min } : {}),
-        ...(range.max !== undefined ? { max: range.max } : {}),
-        onChange: (event) => {
-          const raw = String(event?.target?.value ?? '').trim()
-          if (raw === '') { onChange?.(undefined); return }
-          const parsed = Number(raw)
-          if (!Number.isFinite(parsed)) return
-          onChange?.(parsed)
-        },
-      })
-      const toggle = (checked, label, onChange) => j('button', {
-        className: 'mt-toggle',
-        role: 'switch',
-        'aria-checked': Boolean(checked),
-        'aria-label': label,
-        disabled: !editable || !onChange,
-        onClick: () => onChange?.(!checked),
-      })
-      const ceiling = (value) => j('span', { className: 'mt-readonly-val', children: t('settings.ceiling').replace('{v}', String(value)) })
-      /* CHG-170（R41-③）：内置工具隐藏显示「实际生效」——删除旧假开关（toggle(false) 永远关闭且禁用）。
-       * hideBuiltinTeamTools 是 host 级行为（此处改不了），设置页只显示三个事实：启用与否 /
-       * 宿主是否提供 tools.restrict（restricted=false = 隐藏未执行）/ 实际 deny 的工具清单。 */
-      const hideInfo = config.runtime?.builtinToolsHide
-      const hideToolsAct = (() => {
-        if (!hideInfo) return j('span', { className: 'mt-readonly-val', children: '—' })
-        if (!hideInfo.enabled) return j('span', { className: 'mt-readonly-val', children: t('settings.hideToolsOff') })
-        if (!hideInfo.restricted) return j('span', { className: 'mt-hideeff-warn', children: t('settings.hideToolsNoRestrict') })
-        return j('span', { className: 'mt-readonly-val', children: t('settings.hideToolsEff').replace('{n}', String(hideInfo.effective.length)).replace('{total}', String(hideInfo.configured.length)) })
-      })()
-      const hideToolsSub = js('div', { children: [
-        j('div', { children: t('settings.hideToolsSub') }),
-        hideInfo && hideInfo.enabled && hideInfo.restricted && hideInfo.effective.length > 0
-          ? j('div', { className: 'mt-hint', children: t('settings.hideToolsList').replace('{list}', hideInfo.effective.join('、')) })
-          : null,
-      ] })
-      return js('div', { className: 'mt-page mt-page-narrow', children: [
-        js('div', { className: 'mt-page-head', children: [
-          js('div', { children: [
-            j('h2', { children: t('settings.page.title') }),
-            j('p', { children: t('settings.page.desc') }),
-          ] }),
-          js('div', { className: 'mt-page-head-actions', children: [
-            j('button', { className: 'mt-btn', 'aria-pressed': showJson, onClick: () => setShowJson(!showJson), children: t('settings.jsonView') }),
-          ] }),
-        ] }),
-        /* CHG-118：JSON 源视图（可编辑）——「应用」解析进表单，解析失败草稿不动 */
-        showJson ? js('section', { className: 'mt-ssection', children: [
-          js('div', { className: 'mt-dsec-head', children: [
-            j('h4', { children: t('settings.jsonView') }),
-            j('span', { className: 'mt-dsec-line', 'aria-hidden': true }),
-            j('span', { className: 'mt-dsec-n', children: t('settings.jsonNote') }),
-          ] }),
-          j('textarea', {
-            className: 'mt-json',
-            rows: 18,
-            spellCheck: false,
-            'aria-label': t('settings.jsonView'),
-            value: jsonText,
-            disabled: !editable,
-            onChange: (event) => { setJsonErr(null); setJsonText(String(event?.target?.value ?? '')) },
-          }),
-          jsonErr ? j('div', { className: 'mt-form-note mt-error-banner', role: 'alert', children: jsonErr }) : null,
-          js('div', { className: 'mt-form-actions', children: [
-            j('button', { className: 'mt-btn', disabled: !editable, onClick: applyJson, children: t('settings.jsonApply') }),
-          ] }),
-        ] }) : null,
-        js('section', { className: 'mt-ssection', children: [
-          js('div', { className: 'mt-dsec-head', children: [
-            j('h4', { children: t('settings.sourceTitle') }),
-            j('span', { className: 'mt-dsec-line', 'aria-hidden': true }),
-            j('span', { className: 'mt-dsec-n', children: t('settings.sourceNote') }),
-          ] }),
-          js('div', { className: 'mt-layers', children: [
-            layerRow('builtin', t('settings.layer.default'), t('settings.layer.readonly'), t('settings.layer.defaultPath'), sections, t('settings.layer.items').replace('{n}', '')),
-            layerRow('project', t('settings.layer.project'), t('settings.layer.thisFile'), t('settings.layer.projectPath'), activeLayer('project') ? sections : '—', activeLayer('project') ? t('settings.layer.covered').replace('{n}', '') : t('settings.layer.idle')),
-            layerRow('global', t('settings.layer.team'), t('settings.layer.teamScope'), t('settings.layer.teamPath'), activeLayer('team') ? sections : '—', activeLayer('team') ? t('settings.layer.covered').replace('{n}', '') : t('settings.layer.idle')),
-          ] }),
-          js('div', { className: 'mt-merge-chain', children: [
-            j('b', { className: activeLayer('default') ? 'mt-cur' : '', children: t('settings.layer.default') }),
-            j('span', { className: 'mt-lt', children: '<' }),
-            j('b', { className: activeLayer('project') ? 'mt-cur' : '', children: activeLayer('project') ? `${t('settings.layer.project')}${t('settings.layer.effective')}` : t('settings.layer.project') }),
-            j('span', { className: 'mt-lt', children: '<' }),
-            j('b', { className: activeLayer('team') ? 'mt-cur' : '', children: activeLayer('team') ? `${t('settings.layer.team')}${t('settings.layer.effective')}` : t('settings.layer.team') }),
-            j('span', { children: t('settings.mergeNote') }),
-          ] }),
-        ] }),
-        js('section', { className: 'mt-ssection', children: [
-          js('div', { className: 'mt-dsec-head', children: [
-            j('h4', { children: t('settings.behavior') }),
-            j('span', { className: 'mt-dsec-line', 'aria-hidden': true }),
-            j('span', { className: 'mt-dsec-n', children: t('settings.behaviorNote') }),
-          ] }),
-          js('div', { className: 'mt-setrows', children: [
-            row('teamSize', t('settings.teamSize'), t('settings.teamSizeSub'), [ceiling(CONFIG_CEILINGS.maxMembers), numInput(limits.maxMembers, t('settings.teamSize'), (v) => editSection('limits', { maxMembers: v }), { min: 1, max: CONFIG_CEILINGS.maxMembers })]),
-            row('depth', t('settings.delegateDepth'), t('settings.delegateDepthSub'), [ceiling(CONFIG_CEILINGS.memberMaxDepth), numInput(limits.memberMaxDepth, t('settings.delegateDepth'), (v) => editSection('limits', { memberMaxDepth: v }), { min: 0, max: CONFIG_CEILINGS.memberMaxDepth })]),
-            /* CHG-187（FR-32 支柱一）：单成员最多直接子成员数（默认 3，硬上限 5） */
-            row('childrenLimit', t('settings.childrenLimit'), t('settings.childrenLimitSub'), [ceiling(CONFIG_CEILINGS.maxChildren), numInput(limits.maxChildren, t('settings.childrenLimit'), (v) => editSection('limits', { maxChildren: v }), { min: 0, max: CONFIG_CEILINGS.maxChildren })]),
-            /* CHG-173（FR-1.3）：DAG 来源——captain（默认，队长推导）/ template（按 pipeline.stages 生成模板任务组） */
-            row('taskPlanning', t('settings.taskPlanning'), t('settings.taskPlanningSub'), [toggle((cfg.taskPlanning ?? 'captain') === 'template', t('settings.taskPlanning'), (v) => editTop({ taskPlanning: v ? 'template' : 'captain' }))]),
-            row('gates', t('settings.gates'), t('settings.gatesSub'), [toggle(gates.enabled !== false, t('settings.gates'), (v) => editSection('gates', { enabled: v }))]),
-            row('timeout', t('settings.gateTimeoutLabel'), t('settings.gateTimeoutSub'), [ceiling(CONFIG_CEILINGS.commandTimeoutMs / 1000), numInput(Math.round(Number(gates.commandTimeoutMs ?? 0) / 1000), t('settings.gateTimeoutLabel'), (v) => editSection('gates', { commandTimeoutMs: v === undefined ? undefined : Math.round(Number(v) * 1000) }), { min: 1, max: CONFIG_CEILINGS.commandTimeoutMs / 1000 }), j('span', { className: 'mt-hint', children: t('settings.seconds') })]),
-            row('hideTools', t('settings.hideTools'), hideToolsSub, [hideToolsAct]),
-            row('evidence', t('settings.evidenceLabel'), t('settings.evidenceSub'), [toggle(cfg.memory?.evidenceRequired !== false, t('settings.evidenceLabel'), (v) => editSection('memory', { evidenceRequired: v }))]),
-          ] }),
-        ] }),
-        /* CHG-118（FR-14.3 / docs/18 §7）：保存 / 恢复默认——两段确认 + 影响面 + 失败不静默 */
-        js('section', { className: 'mt-ssection', children: [
-          js('div', { className: 'mt-dsec-head', children: [
-            j('h4', { children: t('settings.formTitle') }),
-            j('span', { className: 'mt-dsec-line', 'aria-hidden': true }),
-            j('span', { className: 'mt-dsec-n', children: dirty ? t('settings.dirty') : t('settings.formNote') }),
-          ] }),
-          js('div', { className: 'mt-inline-note', children: j('span', { className: 'mt-hint', children: t('settings.editHint') }) }),
-          js('div', { className: 'mt-form-actions', children: [
-            j('button', { className: 'mt-btn mt-btn-primary', 'data-testid': 'settings-save', disabled: !editable || !dirty || saving, onClick: () => save(false), children: saving ? t('state.loading') : t('settings.save') }),
-            j('button', { className: 'mt-btn', 'data-testid': 'settings-reset', disabled: !editable || saving, onClick: () => setResetAsk(true), children: t('settings.resetBtn') }),
-          ] }),
-          savedNote ? j('div', { className: 'mt-note-box mt-note-info', role: 'status', children: savedNote }) : null,
-          saveErr ? j('div', { className: 'mt-form-note mt-error-banner', role: 'alert', children: saveErr }) : null,
-          pendingSave ? js('div', { className: 'mt-impact-box', children: [
-            j('strong', { children: t('settings.confirmSaveBody').replace('{members}', impactCountText(pendingSave.impact?.members)).replace('{tasks}', impactCountText(pendingSave.impact?.runningTasks)) }),
-            js('div', { className: 'mt-form-actions', children: [
-              j('button', { className: 'mt-btn mt-btn-primary', 'data-testid': 'settings-confirm-save', disabled: saving, onClick: () => save(true), children: saving ? t('state.loading') : t('settings.confirmSave') }),
-              j('button', { className: 'mt-btn', onClick: () => setPendingSave(null), children: t('action.cancel') }),
-            ] }),
-          ] }) : null,
-          resetAsk ? js('div', { className: 'mt-impact-box', children: [
-            j('strong', { children: t('settings.resetConfirmBody') }),
-            js('div', { className: 'mt-form-actions', children: [
-              j('button', { className: 'mt-btn mt-btn-danger', 'data-testid': 'settings-confirm-reset', disabled: saving, onClick: doReset, children: saving ? t('state.loading') : t('settings.resetBtn') }),
-              j('button', { className: 'mt-btn', onClick: () => setResetAsk(false), children: t('action.cancel') }),
-            ] }),
-          ] }) : null,
-        ] }),
-        js('section', { className: 'mt-ssection', children: [
-          js('div', { className: 'mt-dsec-head', children: [
-            j('h4', { children: t('settings.stateDir') }),
-            j('span', { className: 'mt-dsec-line', 'aria-hidden': true }),
-          ] }),
-          js('div', { className: 'mt-secbox', children: [
-            js('div', { className: 'mt-inline-note', children: [
-              j('button', { className: 'mt-btn mt-btn-sm', disabled: true, title: t('settings.readonlyTip'), children: t('settings.openDir') }),
-            ] }),
-            js('div', { className: 'mt-inline-note', children: [
-              j('span', { className: 'mt-ok-ink', children: `✓ ${t('settings.gitignore')}` }),
-              j('span', { children: t('settings.ledgerAppend') }),
-            ] }),
-          ] }),
-        ] }),
-        js('section', { className: 'mt-ssection', children: [
-          js('div', { className: 'mt-dsec-head', children: [
-            j('h4', { children: t('settings.lifecycle') }),
-            j('span', { className: 'mt-dsec-line', 'aria-hidden': true }),
-          ] }),
-          js('div', { className: 'mt-setrows', children: [
-            /* CHG-202x（P1-3）：修复前是 disabled 死按钮（title 写「只读」），而「可逆归档没有任何真正入口」。
-             * 本仓的归档就是 `team.disbanded` 那一套（落 archive/ 快照 + 状态 archived，不可逆），
-             * 所以这里给**真入口**：走同一份两段确认（输入 teamId 才可提交），文案如实说不可逆。 */
-            row('archive', t('settings.archiveTitle'), t('settings.archiveSub'), [j('button', { className: 'mt-btn mt-btn-sm', disabled: !team?.online, title: team?.online ? t('settings.archiveHint') : t('settings.offline'), onClick: askDisband, children: t('settings.archiveBtn') })]),
-            /* CHG-89（M2-E / FR-16.3）：会话移交——把当前团队上下文摘要带进一个新团队预设会话 */
-            row('handoff', t('settings.handoffTitle'), t('settings.handoffSub'), [j('button', { className: 'mt-btn mt-btn-sm', disabled: !team?.online || handoffBusy, title: team?.online ? t('settings.handoffHint') : t('settings.offline'), onClick: askHandoff, children: handoffBusy ? t('state.loading') : t('settings.handoffBtn') })]),
-            row('disband', j('span', { className: 'mt-danger-ink', children: t('settings.disbandTitle') }), t('settings.disbandSub').replace('{members}', String((team?.members ?? []).length)).replace('{tasks}', String(pending)), [j('button', { className: 'mt-btn mt-btn-danger mt-btn-sm', disabled: !team?.online, onClick: askDisband, children: t('settings.disbandBtn') })]),
-          ] }),
-          impact ? js('div', { className: 'mt-impact-box', children: [
-            j('strong', { children: t('disband.impact').replace('{members}', impactCountText(impact?.members)).replace('{tasks}', impactCountText(impact?.tasks)) }),
-            js('div', { className: 'mt-form-actions', children: [
-              j('button', { className: 'mt-btn mt-btn-danger', disabled: busy, onClick: doDisband, children: busy ? t('state.loading') : t('settings.confirmDisband') }),
-              j('button', { className: 'mt-btn', onClick: () => setImpact(null), children: t('settings.cancelDisband') }),
-            ] }),
-          ] }) : null,
-          /* CHG-89：移交确认 / 结果（新会话 id + 摘要预览；原会话保留） */
-          handoffResult?.stage === 'confirm' ? js('div', { className: 'mt-impact-box', children: [
-            j('strong', { children: t('settings.handoffConfirm') }),
-            j('span', { children: t('settings.handoffConfirmBody').replace('{team}', String(team?.name ?? team?.teamId ?? '')) }),
-            js('div', { className: 'mt-form-actions', children: [
-              j('button', { className: 'mt-btn mt-btn-primary', disabled: handoffBusy, onClick: doHandoff, children: handoffBusy ? t('state.loading') : t('settings.handoffConfirmBtn') }),
-              j('button', { className: 'mt-btn', onClick: () => setHandoffResult(null), children: t('action.cancel') }),
-            ] }),
-          ] }) : null,
-          handoffResult?.stage === 'done' || handoffResult?.stage === 'partial' ? js('div', { className: 'mt-impact-box', children: [
-            j('strong', { children: handoffResult.stage === 'done' ? t('settings.handoffDone') : t('settings.handoffPartial') }),
-            j('span', { className: 'mt-rolechip mt-rolechip-mono', children: String(handoffResult.sessionId ?? '—') }),
-            handoffResult.note ? j('span', { children: String(handoffResult.note) }) : null,
-            handoffResult.summary ? j('pre', { className: 'mt-prompt-block', children: String(handoffResult.summary) }) : null,
-            /* CHG-120：会话索引 = session:<id> 指针列表，每条都能「考古」只读深读 */
-            (handoffResult.metadata?.sessionIndex ?? []).length > 0 ? js('div', { className: 'mt-setrows', children: [
-              j('b', { children: t('history.index') }),
-              ...handoffResult.metadata.sessionIndex.map((ref) => js('div', { key: ref.sessionId, className: 'mt-setrow', children: [
-                js('div', { className: 'mt-setrow-main', children: [
-                  j('div', { className: 'mt-setrow-title', children: String(ref.title ?? ref.sessionId) }),
-                  j('div', { className: 'mt-setrow-sub', children: `session:${ref.sessionId}${ref.taskId ? ` · ${ref.taskId}` : ''}` }),
-                ] }),
-                js('div', { className: 'mt-setrow-act', children: j('button', {
-                  className: 'mt-btn mt-btn-sm',
-                  'data-testid': `history-open-${ref.sessionId}`,
-                  onClick: () => openHistory(String(ref.sessionId)),
-                  children: t('history.open'),
-                }) }),
-              ] })),
-            ] }) : null,
-            js('div', { className: 'mt-form-actions', children: [
-              j('button', { className: 'mt-btn', onClick: () => setHandoffResult(null), children: t('action.close') }),
-            ] }),
-          ] }) : null,
-          handoffErr ? j('div', { className: 'mt-form-note mt-error-banner', role: 'alert', children: handoffErr }) : null,
-        ] }),
-        /* CHG-140（docs/19 §7）：团队资产——技能清单 / 导出 / 复制 / 发布（隔离提示上屏） */
-        js('section', { className: 'mt-ssection', children: [
-          js('div', { className: 'mt-dsec-head', children: [
-            j('h4', { children: t('assets.title') }),
-            j('span', { className: 'mt-dsec-line', 'aria-hidden': true }),
-            j('span', { className: 'mt-dsec-n', children: t('assets.desc') }),
-          ] }),
-          js('div', { className: 'mt-form-actions', children: [
-            j('button', { className: 'mt-btn', 'data-testid': 'assets-skills', disabled: assets.busy, onClick: () => runAsset('skills'), children: t('assets.skills') }),
-            j('button', { className: 'mt-btn', 'data-testid': 'assets-export', disabled: assets.busy, onClick: () => runAsset('export'), children: t('assets.export') }),
-            j('button', { className: 'mt-btn', 'data-testid': 'assets-copy', disabled: assets.busy, onClick: () => runAsset('copy'), children: t('assets.copy') }),
-            j('button', { className: 'mt-btn', 'data-testid': 'assets-publish', disabled: assets.busy, onClick: () => runAsset('publish', { confirm: assets.pending === 'publish' }), children: t('assets.publish') }),
-          ] }),
-          j('div', { className: 'mt-hint', children: t('assets.isolation') }),
-          assets.skills === null ? null : (assets.skills ?? []).length === 0
-            ? j('div', { className: 'mt-empty', children: t('assets.noSkills') })
-            : js('div', { className: 'mt-setrows', 'data-testid': 'assets-skill-list', children: (assets.skills ?? []).map((item) => js('div', { key: String(item.name), className: 'mt-setrow', children: [
-                js('div', { className: 'mt-setrow-main', children: [
-                  j('div', { className: 'mt-setrow-title', children: String(item.name) }),
-                  j('div', { className: 'mt-setrow-sub', children: (item.boundBy ?? []).map((binding) => String(binding.roleId)).join(' · ') || '—' }),
-                ] }),
-              ] })) }),
-          assets.note ? j('div', { className: 'mt-note-box mt-note-info', 'data-testid': 'assets-note', children: assets.note }) : null,
-          assets.err ? j('div', { className: 'mt-form-note mt-error-banner', role: 'alert', children: assets.err }) : null,
-        ] }),
-        js('p', { className: 'mt-note-box', children: [j('b', { children: t('settings.footNote') }), j('span', { children: t('settings.footNoteSub') })] }),
-        (config.warnings ?? []).length > 0 ? j('div', { className: 'mt-note-box mt-note-info', children: `${t('settings.warnings')}：${config.warnings.join('；')}` }) : null,
-        err ? j('div', { className: 'mt-form-note mt-error-banner', role: 'alert', children: err }) : null,
-        /* CHG-120：会话考古抽屉（只读一页历史；翻页用 beforeSeq 往回读） */
-        history ? j('div', {
-          className: 'mt-overlay',
-          role: 'dialog',
-          'aria-modal': 'true',
-          'aria-label': t('history.title'),
-          onClick: (event) => { if (event?.target === event?.currentTarget) setHistory(null) },
-          children: js('div', { className: 'mt-dialog', children: [
-            js('div', { className: 'mt-dialog-head', children: [
-              js('div', { children: [
-                j('h3', { children: t('history.title') }),
-                j('p', { className: 'mt-hint', children: t('history.desc') }),
-              ] }),
-              j('button', { className: 'mt-btn', 'data-testid': 'history-close', onClick: () => setHistory(null), children: t('action.close') }),
-            ] }),
-            js('div', { className: 'mt-dialog-body', children: [
-              j('span', { className: 'mt-rolechip mt-rolechip-mono', children: `session:${history.sessionId}` }),
-              history.loading
-                ? j('div', { className: 'mt-hint', children: t('history.loading') })
-                : history.err
-                  ? j('div', { className: 'mt-form-note mt-error-banner', role: 'alert', children: history.err })
-                  : (history.data?.items ?? []).length === 0
-                    ? j('div', { className: 'mt-empty', children: t('history.empty') })
-                    : js('ol', { className: 'mt-history-list', children: (history.data.items ?? []).map((item, index) => js('li', { key: index, className: 'mt-history-item', children: [
-                      js('div', { className: 'mt-history-meta', children: [
-                        item.role ? j('b', { children: String(item.role) }) : null,
-                        item.type ? j('span', { children: String(item.type) }) : null,
-                        item.seq !== undefined ? j('span', { children: `#${item.seq}` }) : null,
-                        item.truncated ? j('span', { className: 'mt-chip mt-chip-warn', children: t('history.truncated') }) : null,
-                      ] }),
-                      j('div', { className: 'mt-history-text', children: String(item.text ?? '') }),
-                    ] })) }),
-              history.data ? js('div', { className: 'mt-form-actions', children: [
-                j('span', { className: 'mt-hint', children: t('history.chars').replace('{n}', String(history.data.chars ?? 0)) }),
-                history.data.hasMore ? j('button', {
-                  className: 'mt-btn mt-btn-sm',
-                  'data-testid': 'history-more',
-                  onClick: () => openHistory(history.sessionId, Number((history.data.items ?? [])[0]?.seq ?? 0) || undefined),
-                  children: t('history.more'),
-                }) : null,
-              ] }) : null,
-              history.data ? js('div', { className: 'mt-note-box mt-note-info', children: [
-                j('b', { children: t('history.notes') }),
-                ...(history.data.notes ?? []).map((note, index) => j('div', { key: index, children: String(note) })),
-              ] }) : null,
-            ] }),
-          ] }),
-        }) : null,
-      ] })
+
+      const data = state.data ?? {}
+      const totals = data.totals ?? { all: 0, done: 0, blocked: 0, review: 0 }
+      const columns = Array.isArray(data.columns) ? data.columns : []
+
+      return h(
+        'div',
+        { style: styles.root },
+        h(
+          'div',
+          { style: styles.head },
+          h('h3', { style: styles.title }, 'myteam 看板'),
+          h('span', { style: styles.meta }, `共 ${totals.all} · 完成 ${totals.done} · 评审 ${totals.review} · 阻塞 ${totals.blocked}`),
+          h('button', { style: styles.button, onClick: () => void load() }, '刷新'),
+        ),
+        h(
+          'div',
+          { style: styles.columns },
+          columns.map((column) =>
+            h(
+              'section',
+              { key: column.status, style: styles.column },
+              h(
+                'div',
+                { style: styles.columnHead },
+                h('span', null, column.status),
+                h('span', null, String(column.count ?? 0)),
+              ),
+              column.count === 0
+                ? h('p', { style: styles.muted }, '无任务')
+                : (column.tasks ?? []).map((task) =>
+                    h(
+                      'article',
+                      { key: task.id, style: styles.card },
+                      h('div', null, task.title),
+                      h(
+                        'div',
+                        { style: styles.muted },
+                        `${task.ownerTeamName ?? '未分配团队'}${(task.blockedBy ?? []).length > 0 ? ' · 等待上游' : ''}`,
+                      ),
+                    ),
+                  ),
+            ),
+          ),
+        ),
+      )
     }
 
+<<<<<<< HEAD
 
     /* ── 成本栏（底部常驻：累计 token / 缓存命中率 / 今日未命中·输出 / 估算标注）── */
     const fmtTokens = (n) => {
@@ -13528,125 +13167,29 @@
     // connection：M2 直连网关 RPC 通道（connection.rpc.call('/api', endpoint, {args}, signal)）
     const inject = ['slots', 'locale', 'connection']
 
+=======
+>>>>>>> v2-rewrite
     function apply(ctx) {
-      // ① locale 字典（effect 持有，卸载即注销）
-      if (typeof ctx.effect === 'function' && ctx.locale?.register) {
-        ctx.effect(() => ctx.locale.register(NS, { zh, en }), 'myteam.panel: dictionaries')
-      } else if (ctx.locale?.register) {
-        ctx.locale.register(NS, { zh, en })
-      }
-      // ② 样式（effect 持有，卸载即移除；原实现挂在 factory 阶段不可清理）
-      if (typeof ctx.effect === 'function') {
-        ctx.effect(() => injectStyles(), 'myteam.panel: styles')
-      } else {
-        injectStyles()
-      }
-      // ③ 插槽注册：slot inject 回调首参 = binding.key = sessionId
-      //    （dsh-client-ui-renderer runInject：session 槽有 binding，root 'main' 槽没有）
-      /* CHG-155（P1）：三个可见表面都套渲染错误边界 —— 插槽里抛错不再让整块面板变成黑屏，
-       * 而是渲染「渲染失败 + 摘要 + 重试」的可读兜底。 */
-      /* CHG-201（用户定案「左侧侧边栏打开的页面，只有全局的信息」）：`main` 槽 = **全局页**。
-       * 只读全局资产（内置 + 全局角色 / 预设 / 技能 & MCP / 插件贡献）；不列项目、不记录项目。 */
-      ctx.slots.inject('main', () => ctx.slots.register({
-        name: 'main',
-        key: PANEL_KEY,
-        locale: NS,
-        inject: () => ({ ctx, connection: ctx.connection, mode: 'global' }),
-      }, withRenderBoundary(Panel)))
-      ctx.slots.inject('sidebar.panellist', () => ctx.slots.register({
-        name: 'sidebar.panellist',
-        id: PANEL_KEY,
-        order: 20,
-        locale: NS,
-        label: () => 'myteam',
-      }, SidebarEntry))
-      ctx.slots.inject('conversation.composer.dock', () => ctx.slots.register({
-        name: 'conversation.composer.dock',
-        id: PANEL_KEY,
-        order: 30,
-        locale: NS,
-        // 会话槽：首参 sessionId → DockChip 只在队长会话轮询出数据（非队长 → unavailable → 不亮）
-        inject: (sessionId) => ({ ctx, connection: ctx.connection, sessionId }),
-      }, withRenderBoundary(DockChip)))
-      /* ④ CHG-82 G6：会话页团队视图（conversation.view）+ myteam_* 工具卡（tool.call.toolview）。
-       * 官方契约：conversation.view 用 id + order + label（按会话绑定）；tool.call.toolview 用 key
-       * （按 wire 工具名精确注册，见 dsh-client-ui-tool 的 ask_user_question 参考实现）。
-       * 插件跑在用户真实桌面里 —— 任一注册失败都不能让 apply 抛错（否则整个面板消失），只 warn 降级。 */
       try {
-        /* CHG-201（用户定案「画布中的团队视图 tag = 具体某个项目的视图」）：
-         * `conversation.view` 槽 = **项目页**（按会话工作区解析），与全局页物理分离。 */
-        ctx.slots.inject('conversation.view', () => ctx.slots.register({
-          name: 'conversation.view',
-          id: PANEL_KEY,
-          order: 20,
-          locale: NS,
-          label: () => zh['g6.conv.view'] ?? 'myteam',
-          inject: (sessionId) => ({ ctx, connection: ctx.connection, sessionId, mode: 'project' }),
-        }, withRenderBoundary(Panel)))
-        const TOOL_VIEWS = [
-          /* CHG-158：key = **wire 工具名**（官方按 key 精确匹配）。原 key 在 defs.ts 里不存在，
-           * 这张卡从来没渲染过；真实计划工具是 myteam_submit_plan。 */
-          ['myteam_submit_plan', MyTeamPlanTasksToolView],
-          ['myteam_approve_plan', MyTeamApprovePlanToolView],
-          ['myteam_peer_message', MyTeamPeerMessageToolView],
-          ['myteam_apply_roles', MyTeamApplyRolesToolView],
-        ]
-        for (const [key, component] of TOOL_VIEWS) {
-          ctx.slots.inject('tool.call.toolview', () => ctx.slots.register({
-            name: 'tool.call.toolview',
-            key,
-            locale: NS,
-            inject: (sessionId) => ({ ctx, sessionId, connection: ctx.connection }),
-          }, component))
-        }
-      } catch (e) {
-        console.warn('[myteam] 插槽注册失败：', e)
+        if (!ctx?.slots?.inject) return
+        ctx.slots.inject('conversation.view', () =>
+          ctx.slots.register(
+            {
+              name: 'conversation.view',
+              id: VIEW_ID,
+              order: 90,
+              label: () => '团队',
+              inject: (sessionId) => ({ ctx, connection: ctx.connection, sessionId }),
+            },
+            BoardView,
+          ),
+        )
+      } catch (error) {
+        // 注册失败只记录：绝不让面板把整个会话页拖垮。
+        console.error('[myteam] 视图注册失败', error)
       }
     }
 
-    /* 测试专用出口（t65-design-g5）：设计稿对齐的纯组件，供 mock loader 直接渲染断言结构。
-     * 生产路径不消费它（官方只认 apply / inject）。 */
-    const __test = { DagView, LanesView, TaskCard, DRAG_LEGAL_TARGETS, dagChipOf }
-
-    /* 测试专用出口（t64-design-g4）：G4 五屏的纯组件，供 mock loader 直接渲染断言结构。
-     * 生产路径不消费它（官方只认 apply / inject）。 */
-    const __testG4 = { AuditTab, SettingsTab, CostBar, TeamCard, TeamsHome, ArchiveReplay }
-
-    /* 测试专用出口（t66-design-g6）：G6 六屏的纯组件，供 mock loader 直接渲染断言结构。
-     * 生产路径不消费它（官方只认 apply / inject）。 */
-    const __testG6 = {
-      TeamCreateDrawer,
-      /* CHG-115：看板同源组件（面板任务页 + 团队会话视图共用） */
-      BoardView,
-      MyTeamPlanTasksToolView, MyTeamApprovePlanToolView, MyTeamPeerMessageToolView, MyTeamApplyRolesToolView,
-      TeamPlanTasksCard, TeamCollapsedCard, DockChip,
-      /* CHG-157：团队总览卡（组件 + 纯函数，mock loader 下可断言分桶/叙述） */
-      TeamOverviewCard, teamOverviewOf, ovBucketOf, ovNarrativeText,
-      /* CHG-172（A11）：单角色调用面板入口（角色 tab 管理场景，FR-16.1） */
-      GuestApplySection,
-    }
-
-    /* 测试专用出口（t75-chg89-gaps）：CHG-89 三个新入口所在组件的纯渲染面。
-     * 生产路径不消费它（官方只认 apply / inject）——存在只为让「按钮到底渲没渲染」
-     * 能在 mock loader 下断言，而不是只 grep 源码字符串。 */
-    const __testG89 = { RoleDetailDrawer, TaskFormDrawer, SettingsTab, DiagFix, RescopeDialog, ContributionsSection, contributionsBody }
-
-    /* 测试专用出口（t87-entry-nav）：入口 → 工作台的纯函数面。
-     * 生产路径不消费它——存在只为让「打开面板到底调了哪个宿主 API、交接了什么上下文」
-     * 能在 mock loader 下断言，而不是只 grep 源码字符串。 */
-    const __testEntry = { PANEL_KEY, entryNavForTeam, openWorkbench, takePendingNav, resolveNavForSession }
-
-    /* 测试专用出口（t100-chg155）：**不再黑屏**的两块兜底——渲染错误边界 + 包装器。
-     * 生产路径只看 apply/inject；导出它们是为了让「异常到底有没有兜住」「三个表面有没有套上」
-     * 能在 mock loader 下真断言，而不是只 grep 源码字符串。 */
-    const __testResilience = { MyTeamRenderBoundary, withRenderBoundary }
-
-    /* 测试专用出口（t143-chg193）：**面板任务 tab 的消费方**——数据源归一（索引 → 兜底）与
-     * 复合键打开目标。生产路径只看 apply/inject 与 Panel 内部调用；导出它们是为了让
-     * 「跨团队聚合出几条」「两个 task-1 会不会互相覆盖」「索引坏了降级到哪条路」
-     * 能在 mock loader 下**真渲染断言**，而不是只 grep 源码字符串。 */
-    const __testBoard = { resolveProjectTasks, taskOpenTarget, makeApi }
-
-    return { apply, inject, __test, __testG4, __testG6, __testG89, __testEntry, __testResilience, __testBoard }
+    return { apply, inject: ['slots', 'connection'] }
   },
 })

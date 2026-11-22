@@ -1,0 +1,45 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>myteam · 定义与发布（fixture）</title>
+    <style>
+      :root { --bg:#f6f7f9; --surface:#fff; --border:#e3e6ea; --text:#1b1f24; --muted:#667080; --accent:#2f6fed; --warn:#b25b00; }
+      * { box-sizing:border-box; }
+      body { margin:0; background:var(--bg); color:var(--text); font:14px/1.55 "Segoe UI","Microsoft YaHei",system-ui,sans-serif; }
+      header.panel-head { display:flex; align-items:baseline; gap:12px; padding:16px 24px; background:var(--surface); border-bottom:1px solid var(--border); }
+      header.panel-head h1 { margin:0; font-size:16px; }
+      header.panel-head p { margin:0; color:var(--muted); font-size:12px; }
+      main { padding:20px 24px 40px; }
+      .mt-table { width:100%; border-collapse:collapse; background:var(--surface); border:1px solid var(--border); }
+      .mt-table th, .mt-table td { text-align:left; padding:9px 12px; border-bottom:1px solid var(--border); font-size:13px; }
+      .mt-table th { background:#fafbfc; color:var(--muted); font-weight:600; }
+      .mt-chip { display:inline-block; background:#e8f0fe; color:var(--accent); border-radius:999px; padding:2px 8px; font-size:12px; }
+      .mt-chip-warn { background:#fdeee0; color:var(--warn); }
+      .mt-muted { color:var(--muted); }
+      .mt-empty { color:var(--muted); }
+      tr[data-archived="true"] td { color:var(--muted); text-decoration:line-through; }
+    </style>
+  </head>
+  <body>
+    <header class="panel-head">
+      <h1>定义与发布</h1>
+      <p>静态预览 · fixture 数据 · 不连接 RPC</p>
+    </header>
+    <main id="root"></main>
+    <script type="module">
+      import { toDefinitionRows } from './panel-model.js'
+      import { renderDefinitions } from './panel-render.js'
+
+      const fixture = {
+        items: [
+          { kind: 'role', id: 'role_dev', name: '实现者', revision: 3, archived: false, localChanged: true, upstreamChanged: null, updateAvailable: null, published: null },
+          { kind: 'workflow', id: 'wf_release', name: '发布检查流', revision: 2, archived: false, localChanged: false, upstreamChanged: true, updateAvailable: true, published: { globalHash: 'sha256:abc' } },
+          { kind: 'blueprint', id: 'bp_web', name: 'Web 应用蓝图', revision: 1, archived: true, localChanged: false, upstreamChanged: false, updateAvailable: false, published: null },
+        ],
+      }
+      document.getElementById('root').innerHTML = renderDefinitions(toDefinitionRows(fixture))
+    </script>
+  </body>
+</html>

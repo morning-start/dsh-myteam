@@ -1,7 +1,7 @@
 # myteam-plugin-team — 给 myteam 贡献团队模板的 skill 包
 
 > 让一个 DSH 插件把「一套已经配好的团队」（角色 + 名册 + 门禁链 + 看板列 + 章程）作为**数据**贡献进 myteam 的全局团队库 —— 装插件即得团队。
-> 读者是第三方插件作者，不写 myteam 运行时；权威文档是 [../../docs/contracts/16-插件团队贡献契约.md](../../docs/contracts/16-插件团队贡献契约.md)，本包服从它。
+> 读者是第三方插件作者，不写 myteam 运行时；权威文档是 [../../docs/contracts/16-插件团队贡献契约.md](../../docs/contracts/contribution.md)，本包服从它。
 
 ## 是什么
 
@@ -81,7 +81,7 @@ node tools/check-contribution.mjs ./contributions --root --json
 
 ## 契约概览
 
-详见 [../../docs/contracts/16-插件团队贡献契约.md](../../docs/contracts/16-插件团队贡献契约.md)。
+详见 [../../docs/contracts/16-插件团队贡献契约.md](../../docs/contracts/contribution.md)。
 
 ```
 $DSH_HOME/myteam/plugins/<pluginId>/

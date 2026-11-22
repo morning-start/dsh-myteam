@@ -10,7 +10,7 @@
 3. 迁移和实施批次：[../architecture/02-文档重构与迁移蓝图.md](../architecture/02-文档重构与迁移蓝图.md)；
 4. 功能设计拆分：[../features/README.md](../features/README.md)。
 
-旧 [05-任务板](../historical/05-任务板.md)记录旧 M1～M3 计划，不再作为当前重写任务入口。
+旧 [05-任务板](./README.md)记录旧 M1～M3 计划，不再作为当前重写任务入口。
 
 ## 2. 当前资料
 
