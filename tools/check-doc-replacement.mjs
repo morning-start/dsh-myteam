@@ -8,6 +8,7 @@
  * 脚本只负责把「现在能不能删」变成可核对的结论。
  */
 import { readFileSync } from 'node:fs'
+import { existsSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
 import { join } from 'node:path'
 
@@ -56,6 +57,18 @@ const partial = rows.filter((row) => row.status === '部分替代')
 
 console.log(`清单条目：${rows.length}`)
 for (const status of STATUSES) console.log(`  ${status}：${counts[status]}`)
+
+// 清单里写的文件名必须真的存在：拼错一个字的清单比没有清单更危险。
+const missing = []
+for (const row of rows) {
+  const base = row.file.split('/').pop()
+  const candidates = [join(ROOT, 'docs', 'historical', base), join(ROOT, 'docs', 'contracts', base)]
+  if (!candidates.some((candidate) => existsSync(candidate))) missing.push(row.file)
+}
+if (missing.length > 0) {
+  console.log('\n清单指向的文件不存在（清单本身有误）：')
+  for (const file of missing) console.log(`  - ${file}`)
+}
 
 if (deletable.length > 0) {
   console.log('\n可直接删除（已替代）：')
