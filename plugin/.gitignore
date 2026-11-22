@@ -4,3 +4,10 @@
 # 依赖（本地开发用软链/安装，不随包分发）
 node_modules/
 *.log
+
+# v2 构建产物：可安装前由 `node scripts/build-lib.mjs` 生成，不入库
+lib/
+lib.__staging__/
+
+# 冒烟/本地运行可能在工作区内生成的运行期数据
+.dsh-myteam/

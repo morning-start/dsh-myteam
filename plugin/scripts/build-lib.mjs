@@ -39,6 +39,7 @@ import {
   rmSync,
   renameSync,
   realpathSync,
+  existsSync,
 } from 'node:fs'
 import { createHash } from 'node:crypto'
 import { spawnSync } from 'node:child_process'
@@ -54,7 +55,7 @@ const stagingDir = join(root, 'lib.__staging__')
 /** 浏览器直载产物（不经 src 编译）：package.json exports["./client"]；与源码指纹分开记录 */
 const clientFile = join(root, 'client', 'client.js')
 /** 官方插件契约要求的装载入口（t42 复算） */
-const ENTRY = './lib/host.mjs'
+const ENTRY = './lib/composition/host.mjs'
 
 /**
  * 客户端产物指纹（P2 门禁缺口）：`client/client.js` 由浏览器**直接装载**，不经过 src→lib 构建，
@@ -222,13 +223,9 @@ async function main() {
       `package.json 入口应为 "${ENTRY}"（main=${pkg.main}, exports["."]=${entry}）；请修正后重跑`,
     )
   }
-  let clientHash
-  try {
+  let clientHash = null
+  if (existsSync(clientFile)) {
     clientHash = clientHashOf(clientFile)
-  } catch (e) {
-    throw new Error(
-      `client/client.js 不可读（${e.message}）；本插件面板依赖该浏览器直载产物，请补回后重跑`,
-    )
   }
 
   // 闸 3：破坏性替换之前确认（此刻 lib/ 还是完整的旧产物）
@@ -278,9 +275,8 @@ async function main() {
       entry: ENTRY,
       modules: files.length,
       sourceHash: sourceHashOf(files),
-      // P2：浏览器直载产物单独记指纹（t42 复算比对；不一致提示重跑本脚本）
-      clientFile: 'client/client.js',
-      clientHash,
+      // v2 的浏览器产物在 R5 落地前不存在；有则记指纹，没有就明确缺省。
+      ...(clientHash === null ? {} : { clientFile: 'client/client.js', clientHash }),
       files: files.map((f) => relative(srcDir, f).split(sep).join('/')).sort((a, b) => a.localeCompare(b)),
     }
     // manifest 与产物同批落地（同一次 rename），不会出现「产物新、manifest 旧」
@@ -293,7 +289,7 @@ async function main() {
     swapped = true
     console.log(`[build] OK — ${files.length} module(s) → lib/；入口 ${ENTRY}`)
     console.log(
-      `[build] manifest sourceHash=${manifest.sourceHash.slice(0, 12)}… clientHash=${clientHash.slice(0, 12)}…`,
+      `[build] manifest sourceHash=${manifest.sourceHash.slice(0, 12)}… clientHash=${clientHash === null ? 'n/a' : `${clientHash.slice(0, 12)}…`}`,
     )
   } finally {
     // 失败清理：留下半截暂存目录只会污染下一次构建（成功后 rename 已消费掉它）

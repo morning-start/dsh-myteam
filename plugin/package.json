@@ -8,7 +8,6 @@
     ".": "./lib/composition/host.mjs",
     "./host": "./lib/composition/host.mjs",
     "./member": "./lib/composition/member.mjs",
-    "./panel": "./lib/composition/panel.mjs",
     "./icon": "./icon.svg",
     "./icon.svg": "./icon.svg",
     "./package.json": "./package.json"
