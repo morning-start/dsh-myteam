@@ -6,7 +6,7 @@ import { fileURLToPath } from 'node:url'
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..', '..')
 const CLIENT = join(ROOT, 'plugin', 'client', 'client.js')
-const DESIGN = join(ROOT, 'design')
+const DESIGN = join(ROOT, 'design-v2')
 
 /** 最小 React/宿主替身：只要 factory 能跑完并交回 { apply, inject }。 */
 function fakeRequire() {
@@ -59,7 +59,7 @@ test('客户端入口能在模拟模块加载器下加载，并给出 apply/inje
 
 test('客户端入口与设计稿都不含合并冲突标记', () => {
   const files = [CLIENT]
-  for (const name of ['board.html', 'detail.html', 'roster.html', 'settings.html']) {
+  for (const name of ['p-lanes.html', 'p-task.html', 'p-roster.html', 'p-settings.html']) {
     files.push(join(DESIGN, name))
   }
   for (const file of files) {
@@ -68,27 +68,27 @@ test('客户端入口与设计稿都不含合并冲突标记', () => {
   }
 })
 
-test('设计纪律：页面与客户端不写死颜色；font-family 只允许出现在 app.css', () => {
+test('设计纪律：页面与客户端不写死颜色；font-family 只允许引用宿主字体变量', () => {
   const strict = [CLIENT]
-  for (const name of ['board.html', 'detail.html', 'roster.html', 'settings.html']) {
+  for (const name of ['p-lanes.html', 'p-task.html', 'p-roster.html', 'p-settings.html']) {
     strict.push(join(DESIGN, name))
   }
   for (const file of strict) {
     const text = readFileSync(file, 'utf8')
     assert.ok(!/#[0-9a-fA-F]{3,8}\b/.test(text), `${file} 出现十六进制颜色`)
-    assert.ok(!/font-family\s*:/i.test(text), `${file} 出现 font-family`)
+    assert.ok(!/font-family\s*:\s*(?!var\(--dsh-font)/i.test(text), `${file} 的 font-family 必须写 var(--dsh-font*)`)
   }
-  const css = readFileSync(join(DESIGN, 'app.css'), 'utf8')
-  assert.ok(!/#[0-9a-fA-F]{3,8}\b/.test(css), 'design/app.css 出现十六进制颜色（应走 tokens.css）')
+  const css = readFileSync(join(DESIGN, 'myteam.css'), 'utf8')
+  assert.ok(!/#[0-9a-fA-F]{3,8}\b/.test(css), 'design-v2/myteam.css 出现十六进制颜色（应走 tokens.css）')
 })
 
 test('核心设计资产齐全且引用样式与 token', () => {
-  for (const name of ['board.html', 'detail.html', 'roster.html', 'settings.html', 'app.css', 'tokens.css']) {
-    assert.ok(existsSync(join(DESIGN, name)), `缺少 design/${name}`)
+  for (const name of ['p-lanes.html', 'p-task.html', 'p-roster.html', 'p-settings.html', 'myteam.css', 'tokens.css', 'icons.svg']) {
+    assert.ok(existsSync(join(DESIGN, name)), `缺少 design-v2/${name}`)
   }
-  for (const name of ['board.html', 'detail.html', 'roster.html', 'settings.html']) {
+  for (const name of ['p-lanes.html', 'p-task.html', 'p-roster.html', 'p-settings.html']) {
     const text = readFileSync(join(DESIGN, name), 'utf8')
-    assert.match(text, /app\.css/, `${name} 应引用 app.css`)
+    assert.match(text, /myteam\.css/, `${name} 应引用 myteam.css`)
     assert.match(text, /tokens\.css/, `${name} 应引用 tokens.css`)
   }
 })
