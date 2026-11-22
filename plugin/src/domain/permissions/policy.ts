@@ -56,6 +56,7 @@ export type Action =
 export const HUMAN_ONLY: ReadonlySet<Action> = new Set<Action>([
   'definition.publish.confirm',
   'team.disband',
+  'captain.handoff.confirm',
   'plan.approve',
   'migration.cutover',
 ])

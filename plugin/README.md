@@ -71,14 +71,15 @@ composition → infrastructure → application → domain → contracts
 | 迁移影响面可复现：CLI 与报告同一结构，阻断时不给导入顺序 | `infrastructure/migration/v1/report.ts` | `t13` |
 | 面板只读服务：协议版本不匹配即拒绝，未知方法/缺参数结构化报错 | `application/panel-service.ts` | `t14` |
 | 人类确认令牌绑定 operationId/action/targetHash/impactHash/一次性 nonce | `domain/permissions/human-authorizer.ts` | `t15` |
+| 解散团队/队长接管：预览 → 确认 → 执行；影响面变化即失效 | `application/human-actions.ts` | `t16` |
 
 ## 运行
 
 ```bash
 cd plugin
-node --test test/*.test.ts        # 86 个测试
-node ../tools/check-architecture.mjs   # ARCH_OK files=41 violations=0
-node scripts/build-lib.mjs        # 41 个模块 → lib/（入口 lib/composition/host.mjs）
+node --test test/*.test.ts        # 90 个测试
+node ../tools/check-architecture.mjs   # ARCH_OK files=42 violations=0
+node scripts/build-lib.mjs        # 42 个模块 → lib/（入口 lib/composition/host.mjs）
 
 # v1 数据只读分析（不写旧文件、不迁移）
 node ../tools/myteam-migrate.mjs analyze --root "E:\Workplace\extension\dsh-myteam"
