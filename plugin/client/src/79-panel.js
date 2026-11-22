@@ -95,14 +95,14 @@
       const [error, setError] = react.useState(null)
       const [selectedTeamId, setSelectedTeamId] = react.useState(entryNav?.teamId ?? null)
       const [teamTab, setTeamTab] = react.useState(entryNav?.teamTab ?? 'members')     // 队员 | 参与任务 | 知识 | 审计 | 设置
-      /* design/team-tasks.html：本队角色筛选（全部 / 主责 / 协作） */
+      /* design-v2/p-teams.html：本队角色筛选（全部 / 主责 / 协作） */
       const [teamTaskFilter, setTeamTaskFilter] = react.useState('all')
       const [taskView, setTaskView] = react.useState('board')     // 列表 | 看板 | 流程 | 依赖图
       /* CHG-202x（P0-3）：角色库的来源筛选（all | project | global | builtin）——受控，
        * 好让「引入全局角色」这类跨区块入口真的能切视图。 */
       const [roleOriginFilter, setRoleOriginFilter] = react.useState('all')
       const [dagDir, setDagDir] = react.useState('h')
-      // CHG-82：拖拽流转态（design/dragging.html）—— 被拖起的卡 + 当前落点列 + 被拒回执
+      // CHG-82：拖拽流转态（design-v2/p-drag.html）—— 被拖起的卡 + 当前落点列 + 被拒回执
       const [dragTask, setDragTask] = react.useState(null)
       const [dragToast, setDragToast] = react.useState(null)
       const [dragShake, setDragShake] = react.useState(null)      // 非法落点：源卡抖动 + 弹回 150ms
@@ -129,7 +129,7 @@
       const [showCost, setShowCost] = react.useState(false)
       /* CHG-202x（P1-13）：成本栏刷新令牌（+1 = 重新拉一次 tokens 侧车） */
       const [costToken, setCostToken] = react.useState(0)
-      /* CHG-82（G3）：全局作用域的随行资产子页——角色库 / 预设库 / 技能 & MCP（design/presets.html · skills.html） */
+      /* CHG-82（G3）：全局作用域的随行资产子页——角色库 / 预设库 / 技能 & MCP（design-v2/g-blueprints.html · skills.html） */
       const [globalPage, setGlobalPage] = react.useState('roles')
       const [disband, setDisband] = react.useState(null)
       /* CHG-86 / P0-2：归档快照（getArchive 的真实落盘内容；undefined=未加载，null=未归档） */
@@ -637,7 +637,7 @@
         ] }),
       ] })
 
-      /* CHG-82（G3）：全局作用域的随行资产子页——预设库（design/presets.html）与技能 & MCP（design/skills.html）。
+      /* CHG-82（G3）：全局作用域的随行资产子页——预设库（design-v2/g-blueprints.html）与技能 & MCP（design-v2/README.md）。
        * 两层都是「入口不藏」：随行资产卡直接进，页内 teambar 的「← 全局」回角色库。 */
       /* CHG-201：全局子页（预设 / 技能 & MCP）**不依赖项目**——只读全局资产。 */
       if (scope === 'global' && globalPage !== 'roles') {
@@ -679,7 +679,7 @@
         }
         return js('div', { className: 'mt-panel', ...themeAttr, children: [
           topbar,
-          /* CHG-80：信息条按 design/global.html 的 header.teambar——作用域标题 + 副标题 + 说明 + 主按钮 */
+          /* CHG-80：信息条按 design-v2/g-overview.html 的 header.teambar——作用域标题 + 副标题 + 说明 + 主按钮 */
           js('div', { className: 'mt-teambar', children: [
             js('span', { className: 'mt-teambar-title', children: [
               j('b', { children: t('scope.global') }),
@@ -727,7 +727,7 @@
             globalRoles.length === 0
               ? j('div', { className: 'mt-empty-inline mt-hint', children: t('roles.empty') })
               : js('div', { className: 'mt-cardgrid', children: globalRoles.map((role) => j(RoleCard, { key: `${role.origin}:${role.id}`, t, role, onOpen: setOpenRole })) }),
-            /* CHG-80：随行资产按 design/global.html 的卡片结构重做——
+            /* CHG-80：随行资产按 design-v2/g-overview.html 的卡片结构重做——
              * 图标 + 标题 + 副标题 + 一行内容 + 跳转脚；点击滚到下方对应区块，不再用大留白静态卡。 */
             js('div', { className: 'mt-section-head', children: [
               j('h3', { children: t('global.assets') }),
@@ -759,7 +759,7 @@
                     : t('global.presetsEmpty') }),
                   js('div', { className: 'mt-assetcard-foot', children: [
                     j('span', { className: 'mt-hint', children: t('global.presetCount').replace('{n}', String(presets?.entries?.length ?? 0)) }),
-                    /* CHG-85：跳转指示用 SVG chevron（design/icons.svg#i-chevron-right），不用 → 字符 */
+                    /* CHG-85：跳转指示用 SVG chevron（design-v2/icons.svg#i-chevron-right），不用 → 字符 */
                     j('span', { className: 'mt-assetcard-chev', 'aria-hidden': true, children: j('svg', {
                       width: 14, height: 14, viewBox: '0 0 24 24', fill: 'none',
                       children: j('path', { d: 'M9.5 6l6 6-6 6', stroke: 'currentColor', strokeWidth: 1.75, strokeLinecap: 'round', strokeLinejoin: 'round' }),
@@ -798,7 +798,7 @@
                 ],
               }),
             ] }),
-            /* CHG-82（G3）：预设库与技能 & MCP 各自成页（design/presets.html · skills.html），
+            /* CHG-82（G3）：预设库与技能 & MCP 各自成页（design-v2/g-blueprints.html · skills.html），
              * 入口就是上面的随行资产卡——这里不再内联一份预设卡列表（避免两套模板渲染）。 */
           ] }),
           openRole ? j(RoleDetailDrawer, {
@@ -1024,7 +1024,7 @@
         }
       }
       /* CHG-73：批量编排——按主责团队分组逐个 batchTaskOp（每条事件同一 batchId 由服务端落） */
-      /* 角色页（design/roles.html）：三层来源分区 + 搜索/来源筛选 + 引用计数 + 复制/对比 + 创建卡 */
+      /* 角色页（design-v2/p-teams.html）：三层来源分区 + 搜索/来源筛选 + 引用计数 + 复制/对比 + 创建卡 */
       /* CHG-202c：**必须带类名**。`.mt-workspace` 是 `display:flex` 的**行**容器，这个根 div 是它的
        * flex item（`flex:0 1 auto`）——不给 `flex:1` 就退化成「内容宽度」，于是里面
        * `padding-inline: calc((100% - 1100px)/2)` 的百分比按**收缩后的宽度**算（2148 画布下实测
@@ -1069,7 +1069,7 @@
       const teamsPage = selectedTeam
         ? (() => {
           const team = selectedTeam
-          /* [G4 ledger · 归档回放] —— design/archive.html：归档团队整体换归档条 + 只读回放 */
+          /* [G4 ledger · 归档回放] —— design-v2/p-archive.html：归档团队整体换归档条 + 只读回放 */
           if (team.state === 'archived') {
             const archivedTasks = (pv.tasks ?? []).filter((task) => task.ownerTeamId === team.teamId)
             const loadMoreAudit = async () => {
@@ -1115,7 +1115,7 @@
             return t(`tab.${key}`)
           }
           let content
-          /* [G2 roster · 名册 tab] —— 团队内「队员」tab（design/roster.html）：一张卡一个角色 + 实例行 + 召唤卡 */
+          /* [G2 roster · 名册 tab] —— 团队内「队员」tab（design-v2/p-roster.html）：一张卡一个角色 + 实例行 + 召唤卡 */
           if (teamTab === 'members') {
             const active = members.filter((m) => m.status === 'active' || m.status === 'suspended')
             const inactive = members.filter((m) => m.status !== 'active' && m.status !== 'suspended')
@@ -1202,7 +1202,7 @@
               }),
               j('p', { className: 'mt-note', children: t('roster.limitNote').replace('{n}', String(maxMembers)).replace('{active}', String(members.filter((m) => m.status === 'active' || m.status === 'suspended').length)) }),
             ] })
-          /* [G2 roster · 参与任务 tab] —— 团队参与的跨团队任务（design/team-tasks.html） */
+          /* [G2 roster · 参与任务 tab] —— 团队参与的跨团队任务（design-v2/p-teams.html） */
           } else if (teamTab === 'participating') {
             const leadCount = teamTasksAll.filter((task) => (task.participants ?? []).some((p) => p.teamId === team.teamId && p.role === 'lead')).length
             const coopCount = teamTasksAll.filter((task) => (task.participants ?? []).some((p) => p.teamId === team.teamId && p.role === 'coop')).length
@@ -1220,7 +1220,7 @@
             const shown = filtered.slice(0, PARTICIPATING_LIMIT)
             const rest = filtered.slice(PARTICIPATING_LIMIT)
             content = js('div', { className: 'mt-page', children: [
-              /* 任务头 + 页头（design/team-tasks.html 的 .page-head：只列本团队参与的任务与主责/协作） */
+              /* 任务头 + 页头（design-v2/p-teams.html 的 .page-head：只列本团队参与的任务与主责/协作） */
               js('div', { className: 'mt-section-head', children: [
                 j('h3', { children: t('g6.teamTasks.title') }),
                 j('span', { className: 'mt-rule', 'aria-hidden': true }),
@@ -1257,7 +1257,7 @@
                       j('span', { className: 'mt-tid', children: task.id }),
                       j('span', { className: 'mt-tt', children: task.title }),
                       j('span', {
-                        /* design/team-tasks.html：主责 = 实心主色 chip，协作 = 虚线 chip */
+                        /* design-v2/p-teams.html：主责 = 实心主色 chip，协作 = 虚线 chip */
                         className: `mt-status-chip ${mine.role === 'lead' ? 'mt-status-filled' : 'mt-status-dashed'}`,
                         children: [
                           j('span', { className: 'mt-shape', 'aria-hidden': true }),
@@ -1298,7 +1298,7 @@
                 j('span', { children: t('g6.teamTasks.note') }),
               ] }),
             ] })
-          /* [G3 knowledge · 知识 tab] —— design/knowledge.html */
+          /* [G3 knowledge · 知识 tab] —— design-v2/p-knowledge.html */
           } else if (teamTab === 'knowledge') {
             /* 写路径（提案裁决）与只读数据面分开渲染：KnowledgeTab 的 props 契约保持
              * `{ t, data, members }`（t63-1 断言），采纳 / 驳回由 KnowledgeProposals 直通 adoptKnowledge。 */
@@ -1316,7 +1316,7 @@
               }),
               j(KnowledgeTab, { t, data: kb, members }),
             ] })
-          /* [G4 ledger · 审计 tab] —— design/audit.html */
+          /* [G4 ledger · 审计 tab] —— design-v2/p-audit.html */
           } else if (teamTab === 'audit') {
             content = j(AuditTab, {
               t, audit, tasks: teamTasksAll, memberName,
@@ -1340,7 +1340,7 @@
           /* [G4 ledger · 反馈 tab] —— design 未单列屏；FR-11.6「先可观测不自动改」 */
           } else if (teamTab === 'feedback') {
             content = j(PlanFeedbackTab, { t, feedback })
-          /* [G4 ledger · 设置 tab] —— design/settings.html */
+          /* [G4 ledger · 设置 tab] —— design-v2/p-settings.html */
           } else {
             content = j(SettingsTab, {
               t,
@@ -1386,7 +1386,7 @@
               j('span', { className: 'mt-hint', children: `${t('global.counts').replace('{done}', String(team.counts?.done ?? 0)).replace('{total}', String(team.counts?.tasks ?? 0))} · ${t('global.running').replace('{n}', String(team.counts?.running ?? 0))}` }),
               team.online ? j('button', { className: 'mt-btn mt-btn-danger', onClick: askDisband, children: t('action.disband') }) : null,
             ] }),
-            /* CHG-82 G1：解散改走 design/confirm.html 的两段确认（四条不可撤销影响 + 输入 teamId 才可提交） */
+            /* CHG-82 G1：解散改走 design-v2/p-dissolve.html 的两段确认（四条不可撤销影响 + 输入 teamId 才可提交） */
             disband ? j(DisbandDialog, {
               t,
               teamId: team.teamId,
@@ -1501,7 +1501,7 @@
         setNotice(failureNotes.length > 0 ? `${withRewired} · ${t('batch.failedItems').replace('{items}', failureNotes.join('；'))}` : withRewired)
         exitSelect()
       }
-      /* design/lanes.html 的 .trail：参与团队轨（行首头像 + 名称 + 参与统计） */
+      /* design-v2/p-lanes.html 的 .trail：参与团队轨（行首头像 + 名称 + 参与统计） */
       const railItem = (key, name, meta, avatar, pressed) => js('button', {
         key,
         className: 'mt-teamrail-item mt-titem',
@@ -1533,7 +1533,7 @@
        * 写路径的 service 由 `TaskDetail` 用 `openTask.sessionId`（**任务所属团队**）取。 */
       const openTaskOf = (task) => { const target = taskOpenTarget(task); if (target) setOpenTask(target) }
 
-      /* CHG-82：拖拽流转（design/dragging.html）—— 落点由状态机判定；非法落点抖动 + 弹回 + 左下角回执 */
+      /* CHG-82：拖拽流转（design-v2/p-drag.html）—— 落点由状态机判定；非法落点抖动 + 弹回 + 左下角回执 */
       /** attempt 失效（门禁未过 / 已取消）的卡锁住不可拖 */
       const dragLocked = (task) => Boolean(task?.evidenceStale || task?.cancelled)
       /** 状态机允许的落点：门禁 → 完成要求门禁已过（超时过的卡 = 门禁未过） */
@@ -1579,7 +1579,7 @@
       const dragPropsOf = (task) => ({ locked: dragLocked(task), shake: dragShake === task.key, onDragStart: startDrag, onDragEnd: endDrag })
       const draggedTask = dragTask ? allProjectTasks.find((item) => item.key === dragTask.key) : null
       const runningCodes = shownTasks.filter((task) => task.state === 'in_progress' || task.state === 're-scoping').map((task) => task.id)
-      /** 拖起的卡悬在「进行中 → 门禁」交界的空中（design/dragging.html 的 .tcard.lift） */
+      /** 拖起的卡悬在「进行中 → 门禁」交界的空中（design-v2/p-drag.html 的 .tcard.lift） */
       const liftCard = draggedTask ? js('div', {
         className: 'mt-task mt-task-lift',
         'aria-grabbed': 'true',
@@ -1626,8 +1626,8 @@
           },
         })
       } else if (taskView === 'list') {
-        /* 项目级任务列表（design/tasks.html）：任务头 + 汇总条 + 按团队分组任务行 + 视图条 */
-        /** design/tasks.html：每个团队组只列 6 行，其余收成「… 其余在看板」 */
+        /* 项目级任务列表（design-v2/p-tasks.html）：任务头 + 汇总条 + 按团队分组任务行 + 视图条 */
+        /** design-v2/p-tasks.html：每个团队组只列 6 行，其余收成「… 其余在看板」 */
         const TASK_GROUP_LIMIT = 6
         const stateChipClass = (state) => (state === 'done' ? 'mt-status-done'
           : state === 'failed' || state === 'cancelled' ? 'mt-status-fail'
@@ -1725,7 +1725,7 @@
               j('button', { className: 'mt-mini-link', onClick: () => setTaskView('board'), children: t('g6.tasks.boardLink') }),
             ] }),
             ...group.tasks.slice(0, TASK_GROUP_LIMIT).map(taskRow),
-            /* design/tasks.html：每组只列前几行 + 一条虚线「… 其余在看板」行（完整清单去看板/其他视图） */
+            /* design-v2/p-tasks.html：每组只列前几行 + 一条虚线「… 其余在看板」行（完整清单去看板/其他视图） */
             group.tasks.length > TASK_GROUP_LIMIT
               ? js('button', {
                 className: 'mt-trow mt-trow-more',
@@ -1767,7 +1767,7 @@
       }
 
       const tasksPage = js('div', { className: 'mt-workbench', children: [
-        /* design/tasks.html 的任务头（.teambar）：任务 + 数量 / 团队参与数 + 一句话说明 + 阶段统计 + 操作 */
+        /* design-v2/p-tasks.html 的任务头（.teambar）：任务 + 数量 / 团队参与数 + 一句话说明 + 阶段统计 + 操作 */
         js('div', { className: 'mt-taskhead', children: [
           js('span', { className: 'mt-taskhead-title', children: [
             j('b', { children: t('g6.tasks.headTitle') }),
@@ -1795,7 +1795,7 @@
         js('div', { className: 'mt-viewbar', children: [
           /* CHG-84 / CHG-202u：任务头整块已删（新建 / 批量新建入口移除），这里只剩视图切换 */
           j('span', { className: 'mt-viewbar-hint', children: t('view.label') }),
-          /* design/tasks.html 的 .viewbar .vlinks：列表 / 看板 / 流程 / 依赖图（保留 mt-seg 供既有交互脚本与样式复用） */
+          /* design-v2/p-tasks.html 的 .viewbar .vlinks：列表 / 看板 / 流程 / 依赖图（保留 mt-seg 供既有交互脚本与样式复用） */
           js('div', { className: 'mt-viewlinks', role: 'group', 'aria-label': t('view.label'), children: [
             ...['list', 'board', 'lanes', 'dag'].map((key) => j('button', {
               key,
@@ -1807,7 +1807,7 @@
                 : key === 'lanes' ? t('g6.tasks.viewFlow') : t('g6.tasks.viewDag'),
             })),
           ] }),
-          /* design/dag.html · dag-vertical.html：视图条右上「方向」seg 两版互链 + 显示模型 + 已高亮依赖链 */
+          /* design-v2/p-dag.html · dag-vertical.html：视图条右上「方向」seg 两版互链 + 显示模型 + 已高亮依赖链 */
           taskView === 'dag' ? js('span', { className: 'mt-viewbar-dir', children: [
             j('span', { className: 'mt-filterlabel', children: t('view.dir') }),
             j('button', {
@@ -1845,7 +1845,7 @@
               ],
             }),
           ] }) : null,
-          /* design/lanes.html：行 = 角色（分行方式由设置页 pipeline.swimlaneBy 决定） */
+          /* design-v2/p-lanes.html：行 = 角色（分行方式由设置页 pipeline.swimlaneBy 决定） */
           taskView === 'lanes' ? js('span', { className: 'mt-viewbar-right', children: [
             j('span', { className: 'mt-chip', children: t('lanes.groupBy') }),
             j('button', { className: 'mt-btn mt-btn-sm', title: t('lanes.byStageHint'), onClick: () => setNotice(t('lanes.byStageHint')), children: t('lanes.byStage') }),
@@ -1854,7 +1854,7 @@
           j('input', {
             className: 'mt-search mt-search-sm',
             value: taskQuery,
-            /* design/tasks.html 的搜索框文案：任务号 / 标题 / 团队 */
+            /* design-v2/p-tasks.html 的搜索框文案：任务号 / 标题 / 团队 */
             placeholder: t('g6.tasks.searchPlaceholder'),
             'aria-label': t('g6.tasks.searchPlaceholder'),
             onChange: (e) => setTaskQuery(e.target.value),
@@ -1906,16 +1906,16 @@
            * 为什么删而不是留：那条说明是**教学文案**（「待规划 → 就绪/受阻；……」），
            * 对已经会用的人只是常驻噪音，还占掉一整行高度；而它描述的约束在**交互层**已经
            * 兑现（拖到非法列会抖动弹回 + 左下角回执说明原因），文案重复。真要查规则，
-           * 设计稿 design/dragging.html 里也有一份。
+           * 设计稿 design-v2/p-drag.html 里也有一份。
            * 词条 `rules.title` / `rules.body` / `drag.rulesBadge` 保留在词表里（不删数据，
            * 将来若要放进帮助浮层可直接复用）。 */
         ] }),
         js('div', { className: 'mt-body', children: [
-          /* 列表视图用「按团队筛选」seg 取代参与团队轨（design/tasks.html 无左轨） */
+          /* 列表视图用「按团队筛选」seg 取代参与团队轨（design-v2/p-tasks.html 无左轨） */
           taskView === 'list' ? null : rail,
           js('div', { className: 'mt-view', children: [tasksContent] }),
         ] }),
-        /* design/dragging.html：左下角拖拽回执（被拒案例：gate 未过的卡进不了已完成） */
+        /* design-v2/p-drag.html：左下角拖拽回执（被拒案例：gate 未过的卡进不了已完成） */
         dragToast ? js('div', { className: 'mt-dragtoast', role: 'status', children: [
           j('svg', {
             width: 16, height: 16, viewBox: '0 0 16 16', fill: 'none', 'aria-hidden': true, className: 'mt-lock-icon',
@@ -2065,7 +2065,7 @@
             roles: pv.roles ?? [],
             onClose: () => setTeamCreate(false),
             onRetryPresets: () => setPresets(undefined),
-            /* design/new-team-1.html 的脚注「管理预设库」：跳到全局页的预设区块（同一份目录） */
+            /* design-v2/README.md 的脚注「管理预设库」：跳到全局页的预设区块（同一份目录） */
             onManagePresets: () => {
               setTeamCreate(false)
               setScope('global')

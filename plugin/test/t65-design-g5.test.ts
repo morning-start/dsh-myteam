@@ -1,7 +1,7 @@
 /**
  * T65 设计稿对齐 · G5（泳道 / 依赖图横竖两版 / 拖拽态）
  *
- * 对照：design/lanes.html、design/dag.html、design/dag-vertical.html、design/dragging.html
+ * 对照：design-v2/p-lanes.html、design-v2/p-dag.html、design-v2/p-dag.html、design-v2/p-drag.html
  * 做法：mock loader + 浅渲染（不依赖真实浏览器）——DAG 的矩形测量在 mock 下量不到，
  *       走固定回退高度（78px），因此这里只断言节点 / 边 / class / 文案结构，不断言像素级定位。
  */
@@ -97,17 +97,17 @@ const GRAPH_TASKS = [
 test('t65-1: 四屏的设计稿元素在实现里都有对应 class（lanes / dag / dag-vertical / dragging）', () => {
   const { source } = loadClient()
   for (const cls of [
-    /* design/lanes.html */
+    /* design-v2/p-lanes.html */
     'mt-lanes', 'mt-lane', 'mt-lane-head', 'mt-lane-label', 'mt-lane-cell', 'mt-lane-node', 'mt-lane-tk',
     'mt-trail', 'mt-trail-cap', 'mt-titem', 'mt-tav', 'mt-tinfo', 'mt-viewbar-right',
     'mt-lane-count', 'mt-lane-label-unassigned', 'mt-avatar-dashed', 'mt-lane-empty',
-    /* design/dag.html · dag-vertical.html */
+    /* design-v2/p-dag.html · dag-vertical.html */
     /* CHG-202f：`mt-dag-note`（依赖图图注条）按用户定案删除——箭头方向是图例常识，
      * 「哪些在跑」已有节点高亮，60 字说明常驻底部只是噪音。 */
     'mt-dagwrap', 'mt-dag-canvas', 'mt-dag-card', 'mt-dag-card-top', 'mt-dag-card-title', 'mt-dag-card-meta',
     'mt-dag-svg', 'mt-dag-edge', 'mt-dag-edge-hot', 'mt-arrow', 'mt-arrow-hot',
     'mt-dag-node-focus', 'mt-dag-node-chain', 'mt-viewbar-dir', 'mt-chip-gate',
-    /* design/dragging.html */
+    /* design-v2/p-drag.html */
     'mt-col-drop', 'mt-col-nodrop', 'mt-dropzone', 'mt-task-ghost', 'mt-task-lift', 'mt-lift-tag',
     'mt-dragtoast', 'mt-task-locked', 'mt-lock-icon', 'mt-task-shake',
   ]) {
@@ -119,7 +119,7 @@ test('t65-1: 四屏的设计稿元素在实现里都有对应 class（lanes / da
   // 否则 9 个无依赖任务拉成一列 900px 高、底部被面板裁掉
   assert.ok(source.includes('const perRowV ='), '竖向同层折行参数')
   assert.ok(source.includes('const perRowH ='), '横向同层分列参数')
-  // 行高统一（design/app.css `.lane-cell{min-height:56px}` —— CHG-178 从 96 收回设计稿口径）
+  // 行高统一（design-v2/myteam.css `.lane-cell{min-height:56px}` —— CHG-178 从 96 收回设计稿口径）
   assert.ok(/\.mt-lane-label\{[^}]*min-height:56px/.test(source), '泳道行头最小高度统一（56px）')
   assert.ok(/\.mt-lane-cell\{[^}]*min-height:56px/.test(source), '泳道格子最小高度与行头一致（56px）')
   // CHG-178：泳道行不参与 flex 收缩，否则行被压扁 + overflow:hidden 把行内文字切掉
@@ -171,8 +171,8 @@ test('t65-2: 四屏文案（zh + en 都落，禁硬编码只走 locale）', () =
 
 test('t65-3: 样式纪律——G5 区块只用 --dsw-alias-* token，无十六进制色、无 font-family', () => {
   const { source } = loadClient()
-  const start = source.indexOf('/* [G5 graph] design/lanes.html')
-  const end = source.indexOf('/* [G6 flow] design/new-team.html')
+  const start = source.indexOf('/* [G5 graph] design-v2/p-lanes.html')
+  const end = source.indexOf('/* [G6 flow] design-v2/README.md')
   assert.ok(start > 0 && end > start, 'G5 样式落点存在且在自己区域')
   const block = source.slice(start, end)
   assert.ok(block.length > 2000, 'G5 样式块非空')
@@ -352,7 +352,7 @@ test('t65-8: 拖拽态——被拖起的卡可拖、attempt 失效卡锁住不�
 test('t65-9: 拖拽落点由状态机判定（进行中 → 门禁合法；门禁未过 → 已完成被拒）', () => {
   const { test: api } = loadClient()
   assert.deepEqual(api.DRAG_LEGAL_TARGETS['进行中'], ['门禁'], '进行中只能落到门禁')
-  /* CHG-85：看板列名对齐 design/board.html（「已完成」不是「完成」） */
+  /* CHG-85：看板列名对齐 design-v2/p-tasks.html（「已完成」不是「完成」） */
   assert.deepEqual(api.DRAG_LEGAL_TARGETS['门禁'], ['已完成'], '门禁通过后落已完成')
   assert.deepEqual(api.DRAG_LEGAL_TARGETS['已完成'], [], '已完成是终态，不再接受拖入')
   // 门禁未过（超时过）的卡：门禁 → 已完成被拒

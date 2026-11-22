@@ -1,5 +1,5 @@
 /**
- * T66 · CHG-82 G6 设计稿对齐（design/new-team-1.html · new-team.html · tasks.html ·
+ * T66 · CHG-82 G6 设计稿对齐（design-v2/README.md · new-team.html · tasks.html ·
  * team-tasks.html · conversation.html · guest.html）
  *
  * 自证方式（不依赖真实浏览器/宿主）：
@@ -252,7 +252,7 @@ test('t66-4: 项目级任务列表（tasks.html）——任务头 + 汇总条 + 
   assert.ok(source.includes("className: 'mt-trow'") && source.includes('mt-mini-chip mt-mini-chip-team') && source.includes('mt-mini-chip-coop'))
   assert.ok(source.includes("t('g6.tasks.boardLink')"), '组头看板入口')
   assert.ok(source.includes("t('g6.tasks.draftNote')"), '草稿团队空态说明')
-  // CHG-84：每组只列前 6 行 + 虚线「… 其余在看板」行（design/tasks.html）
+  // CHG-84：每组只列前 6 行 + 虚线「… 其余在看板」行（design-v2/p-tasks.html）
   assert.ok(source.includes('TASK_GROUP_LIMIT') && source.includes('group.tasks.slice(0, TASK_GROUP_LIMIT)'), '分组行数上限')
   assert.ok(source.includes("t('g6.tasks.restInBoard')") && source.includes('mt-trow-more'), '「其余在看板」虚线行')
   // 视图条：列表 / 看板 / 流程 / 依赖图

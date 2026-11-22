@@ -285,4 +285,4 @@
       ] })
     }
 
-    /** 团队卡（design/shell.html 的 .team-card：名称 + 状态 chip + 在线/离线 + 描述 + 完成度行） */
+    /** 团队卡（design-v2/p-teams.html 的 .team-card：名称 + 状态 chip + 在线/离线 + 描述 + 完成度行） */

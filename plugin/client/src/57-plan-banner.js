@@ -1,5 +1,5 @@
     /* ── 暂存横幅三动作（FR-1.2：面板唯一写入口）──
-     * CHG-82（G1）：Discard 换成 design/discard.html 的两段确认对话框（不再用 window.confirm） */
+     * CHG-82（G1）：Discard 换成 design-v2/p-approval.html 的两段确认对话框（不再用 window.confirm） */
     function StagedBanner({ api, t, teamId, inbox, onAct }) {
       const [discard, setDiscard] = react.useState(null)
       const [busy, setBusy] = react.useState(false)

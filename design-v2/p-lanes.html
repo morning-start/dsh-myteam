@@ -1,0 +1,164 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=1280">
+<meta name="dsh-design" content="dshplugin 1280x800">
+<title>流程泳道 · myteam</title>
+<link rel="stylesheet" href="dsh-shell.css">
+<link rel="stylesheet" href="tokens.css">
+<link rel="stylesheet" href="myteam.css">
+<!-- 外框（DSH 插件 · 会话标签页）：只改 data-slot 里面，别动外框的结构、文字和 dsh-shell.css -->
+</head>
+<body>
+<div class="dsh-app" data-frame="dsh/view">
+  <aside class="dsh-side">
+    <div class="dsh-brand"><div class="dsh-logo">deepseek<span class="dsh-logo-tag">HARNESS</span></div><div class="dsh-iconbtn"><svg class="dsh-i" viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M9 3v18"/></svg></div></div>
+    <div class="dsh-new"><svg class="dsh-i" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 8v8M8 12h8"/></svg>新会话</div>
+    <nav class="dsh-nav">
+      <div class="dsh-row"><svg class="dsh-i" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2.5l3 3-3 3-3-3zM18.5 9l3 3-3 3-3-3zM5.5 9l3 3-3 3-3-3zM12 15.5l3 3-3 3-3-3z"/></svg>插件</div>
+      <div class="dsh-row"><svg class="dsh-i" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>自动化任务</div>
+      <div class="dsh-row"><svg class="dsh-i" viewBox="0 0 24 24" aria-hidden="true"><rect x="4" y="4" width="6" height="6" rx="1.5"/><rect x="14" y="4" width="6" height="6" rx="3"/><rect x="4" y="14" width="6" height="6" rx="1.5"/><rect x="14" y="14" width="6" height="6" rx="1.5"/></svg>更多</div>
+    </nav>
+    <div class="dsh-sec">工作区<div class="dsh-sec-acts"><div class="dsh-iconbtn"><svg class="dsh-i" viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="M20 20l-4-4"/></svg></div><div class="dsh-iconbtn"><svg class="dsh-i" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 8h10M18 8h2M4 16h2M10 16h10"/><circle cx="16" cy="8" r="2"/><circle cx="8" cy="16" r="2"/></svg></div><div class="dsh-iconbtn"><svg class="dsh-i" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><path d="M12 11v5M9.5 13.5h5"/></svg></div></div></div>
+    <div class="dsh-row"><span class="dsh-folder"><svg class="dsh-i" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></svg></span>我的项目</div>
+    <div class="dsh-sess on">整理会议记录<span class="dsh-time">2 小时</span></div>
+    <div class="dsh-sess">新会话</div>
+    <div class="dsh-acct"><div class="dsh-avatar">我</div>我的账号</div>
+  </aside>
+  <main class="dsh-main">
+    <header class="dsh-head">
+      <div class="dsh-crumbs">整理会议记录<span class="dsh-mode">标准模式<svg class="dsh-i" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg></span></div>
+      <div class="dsh-utils"><div class="dsh-split"><svg class="dsh-i" viewBox="0 0 24 24" aria-hidden="true"><path d="M9 8l-4 4 4 4M15 8l4 4-4 4"/></svg><svg class="dsh-i" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg></div><div class="dsh-iconbtn"><svg class="dsh-i" viewBox="0 0 24 24" aria-hidden="true"><circle cx="5" cy="12" r="1"/><circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/></svg></div></div>
+      <div class="dsh-iconbtn dsh-corner"><svg class="dsh-i" viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M15 3v18"/></svg></div>
+      <div class="dsh-tabs" role="tablist"><div class="dsh-tab">对话</div><div class="dsh-tab">轨迹</div><div class="dsh-tab on"><span data-slot="tab-label">项目</span></div></div>
+    </header>
+    <div data-slot="main">
+      <div class="wt">
+        <aside class="ir">
+          <a class="team" href="p-overview.html" title="项目 storefront · 切换项目" style="font-family:var(--dsh-font-code);font-size:12px">st</a>
+          <div class="line"></div>
+          <nav class="ir-nav">
+            <a class="ri " href="p-overview.html" title="概览"><svg class="ic" viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/></svg><span>概览</span></a>
+            <a class="ri on" href="p-tasks.html" title="任务与看板"><svg class="ic" viewBox="0 0 24 24"><rect x="3" y="4" width="5" height="16" rx="1.5"/><rect x="10" y="4" width="5" height="11" rx="1.5"/><rect x="17" y="4" width="4" height="7" rx="1.5"/></svg><span>任务</span><i class="bdg"></i></a>
+            <a class="ri " href="p-teams.html" title="团队与成员"><svg class="ic" viewBox="0 0 24 24"><circle cx="9" cy="8" r="3"/><path d="M3 20a6 6 0 0 1 12 0"/><path d="M16 5.5a3 3 0 0 1 0 5M17 14a6 6 0 0 1 4 6"/></svg><span>团队</span></a>
+            <a class="ri " href="p-runs.html" title="工作流运行"><svg class="ic" viewBox="0 0 24 24"><circle cx="6" cy="6" r="2.5"/><circle cx="18" cy="6" r="2.5"/><circle cx="12" cy="18" r="2.5"/><path d="M8.5 6h7M7 8.4l4 7.2M17 8.4l-4 7.2"/></svg><span>流程</span></a>
+            <a class="ri " href="p-defs.html" title="项目定义"><svg class="ic" viewBox="0 0 24 24"><path d="M12 3l8 4-8 4-8-4z"/><path d="M4 12l8 4 8-4"/><path d="M4 17l8 4 8-4"/></svg><span>定义</span></a>
+            <a class="ri " href="p-knowledge.html" title="项目知识"><svg class="ic" viewBox="0 0 24 24"><path d="M4 5.5A2.5 2.5 0 0 1 6.5 3H19v16H6.5A2.5 2.5 0 0 0 4 21.5z"/><path d="M8 7h7M8 11h5"/></svg><span>知识</span></a>
+            <a class="ri " href="p-memory.html" title="长期记忆"><svg class="ic" viewBox="0 0 24 24"><ellipse cx="12" cy="6" rx="7" ry="3"/><path d="M5 6v6c0 1.7 3.1 3 7 3s7-1.3 7-3V6"/><path d="M5 12v6c0 1.7 3.1 3 7 3s7-1.3 7-3v-6"/></svg><span>记忆</span></a>
+            <a class="ri " href="p-audit.html" title="审计"><svg class="ic" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg><span>审计</span></a>
+            <a class="ri " href="p-settings.html" title="项目设置"><svg class="ic" viewBox="0 0 24 24"><path d="M4 8h10M18 8h2M4 16h2M10 16h10"/><circle cx="16" cy="8" r="2"/><circle cx="8" cy="16" r="2"/></svg><span>设置</span></a>
+          </nav>
+        </aside>
+
+        <div class="pane">
+<div class="hd">
+            <div class="hd-l">
+              <h2>storefront<span class="scope"><b>项目</b> · 流程泳道</span></h2>
+              <p class="sub">
+                <span class="l">17 个任务</span><i class="sep"></i>
+                <span class="l">6 名成员</span><i class="sep"></i>
+                <span class="l">按成员</span><i class="sep"></i>
+                <span class="l">2 个团队</span>
+                <span class="tr">行 = 成员，列 = 阶段；同一份项目投影换一种看法，不做第二套状态</span>
+              </p>
+            </div>
+            <div class="hd-r">
+              <button class="ibtn" title="刷新"><svg class="ic" viewBox="0 0 24 24"><path d="M20 11a8 8 0 1 0-2 5.5"/><path d="M20 5v6h-6"/></svg></button>
+              <button class="ibtn" title="更多"><svg class="ic" viewBox="0 0 24 24"><circle cx="5" cy="12" r="1"/><circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/></svg></button>
+            </div>
+          </div>
+
+          <div class="bar">
+            <div class="seg">
+              <a href="p-tasks.html">看板</a>
+              <a href="p-tasks.html">列表</a>
+              <a href="p-lanes.html" class="on">泳道</a>
+              <a href="p-runs.html">按 Run</a>
+              <a href="p-dag.html">依赖图</a>
+            </div>
+            <span class="grow"></span>
+            <label class="field w"><svg class="ic s" viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="M20 20l-4-4"/></svg><input placeholder="搜索任务号、标题" aria-label="搜索任务"></label>
+            <button class="btn"><svg class="ic s" viewBox="0 0 24 24"><path d="M4 6h16M7 12h10M10 18h4"/></svg>筛选</button>
+          </div>
+
+          <div class="body">
+            <div class="lanes">
+              <div class="lane-head">
+                <div>按成员 · 6</div>
+                <div><span class="dot idle"></span><span class="nm">待规划</span><span class="n">3</span></div>
+                <div><span class="dot"></span><span class="nm">就绪</span><span class="n">3</span></div>
+                <div><span class="dot run"></span><span class="nm">进行中</span><span class="n">3</span></div>
+                <div><span class="dot gate"></span><span class="nm">门禁</span><span class="n">3</span></div>
+                <div><span class="dot run"></span><span class="nm">已完成</span><span class="n">5</span></div>
+              </div>
+
+              <div class="lane">
+                <div class="who"><span class="av">林</span><div><div class="nm">林</div><div class="rl">结 · 实现者</div></div></div>
+                <div class="cell"><span class="none">—</span></div>
+                <div class="cell"><span class="none">—</span></div>
+                <div class="cell"><a class="tchip run" href="p-task.html"><span class="id">t7</span><span class="tt">抽结算服务边界</span></a></div>
+                <div class="cell"><span class="none">—</span></div>
+                <div class="cell"><a class="tchip done" href="p-task.html"><span class="id">t1</span><span class="tt">确定对外契约</span></a></div>
+              </div>
+
+              <div class="lane">
+                <div class="who"><span class="av">周</span><div><div class="nm">周</div><div class="rl">结 · 实现者</div></div></div>
+                <div class="cell"><span class="none">—</span></div>
+                <div class="cell"><span class="none">—</span></div>
+                <div class="cell"><a class="tchip run" href="p-task.html"><span class="id">t6</span><span class="tt">结算页 UI 迁移</span></a></div>
+                <div class="cell"><span class="none">—</span></div>
+                <div class="cell">
+                  <a class="tchip done" href="p-task.html"><span class="id">t2</span><span class="tt">调用点清单</span></a>
+                  <a class="tchip done" href="p-task.html"><span class="id">t9</span><span class="tt">CI 产物校验</span></a>
+                </div>
+              </div>
+
+              <div class="lane">
+                <div class="who"><span class="av">陈</span><div><div class="nm">陈</div><div class="rl">结 · 审查者 · 2 待裁决</div></div></div>
+                <div class="cell"><span class="none">—</span></div>
+                <div class="cell"><a class="tchip" href="p-task.html"><span class="id">t5</span><span class="tt">旧调用点与灰度</span></a></div>
+                <div class="cell"><span class="none">—</span></div>
+                <div class="cell"><a class="tchip gate" href="p-task.html"><span class="id">t4</span><span class="tt">调用点替换冒烟</span></a></div>
+                <div class="cell"><a class="tchip done" href="p-task.html"><span class="id">t11</span><span class="tt">README 迁移说明</span></a></div>
+              </div>
+
+              <div class="lane">
+                <div class="who"><span class="av">苏</span><div><div class="nm">苏</div><div class="rl">结 · 需求验证</div></div></div>
+                <div class="cell"><span class="none">—</span></div>
+                <div class="cell"><a class="tchip" href="p-task.html"><span class="id">t8</span><span class="tt">12 条回归用例</span></a></div>
+                <div class="cell"><span class="none">—</span></div>
+                <div class="cell"><a class="tchip gate" href="p-task.html"><span class="id">t3</span><span class="tt">移除旧组件目录</span></a></div>
+                <div class="cell"><a class="tchip done" href="p-task.html"><span class="id">t0</span><span class="tt">现状与依赖</span></a></div>
+              </div>
+
+              <div class="lane">
+                <div class="who"><span class="av">方</span><div><div class="nm">方</div><div class="rl">上 · 审查者</div></div></div>
+                <div class="cell"><span class="none">—</span></div>
+                <div class="cell"><a class="tchip" href="p-task.html"><span class="id">c3</span><span class="tt">灰度窗口确认</span></a></div>
+                <div class="cell"><a class="tchip run" href="p-task.html"><span class="id">c4</span><span class="tt">监控大盘核对</span></a></div>
+                <div class="cell"><a class="tchip gate" href="p-task.html"><span class="id">c5</span><span class="tt">发版检查报告</span></a></div>
+                <div class="cell"><span class="none">—</span></div>
+              </div>
+
+              <div class="lane">
+                <div class="who"><span class="av" style="background:transparent;border:1px dashed var(--dsh-line)">未</span><div><div class="nm">未指派</div><div class="rl">等计划批准</div></div></div>
+                <div class="cell">
+                  <a class="tchip" href="p-task.html"><span class="id">v5</span><span class="tt">破坏性变更清单</span></a>
+                  <a class="tchip" href="p-task.html"><span class="id">c1</span><span class="tt">发布清单核对</span></a>
+                  <a class="tchip" href="p-task.html"><span class="id">c2</span><span class="tt">回滚步骤核对</span></a>
+                </div>
+                <div class="cell"><span class="none">—</span></div>
+                <div class="cell"><span class="none">—</span></div>
+                <div class="cell"><span class="none">—</span></div>
+                <div class="cell"><span class="none">—</span></div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </main>
+</div>
+</body>
+</html>

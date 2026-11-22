@@ -50,7 +50,7 @@
     "pipeline": {
       "type": "object",
       "additionalProperties": false,
-      "description": "蛇形泳道图（design/flow.html）",
+      "description": "蛇形泳道图（design-v2/p-lanes.html）",
       "properties": {
         "swimlaneBy": { "enum": ["stage", "member", "priority"], "default": "stage" },
         "stages": {
@@ -65,7 +65,7 @@
     "dag": {
       "type": "object",
       "additionalProperties": false,
-      "description": "依赖图（design/dag.html）",
+      "description": "依赖图（design-v2/p-dag.html）",
       "properties": {
         "showModel": { "type": "boolean", "default": true },
         "collapseGroups": { "type": "boolean", "default": true },

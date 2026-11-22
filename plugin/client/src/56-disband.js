@@ -1,4 +1,4 @@
-    /* ── 解散团队的两段确认（design/confirm.html）──
+    /* ── 解散团队的两段确认（design-v2/p-dissolve.html）──
      * 四条不可撤销影响 + 输入团队 ID 才能提交 + 「改用归档」出口；
      * 第一段（confirm:false 拿影响面）由调用方 askDisband 完成，本组件只做第二段。 */
     function DisbandDialog({ t, teamId, teamName, impact, busy, error, onConfirm, onClose, onArchive }) {

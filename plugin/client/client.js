@@ -25,7 +25,7 @@
  * slot inject 回调首参 = binding.key = sessionId（dsh-client-ui-renderer runInject）；
  * root 槽（main）无 binding → Panel 先 listTeams 发现队长会话。
  */
-window.__ModuleLoader__.load({
+﻿window.__ModuleLoader__.load({
   id: 'dsh-plugin-myteam',
   factory: (require) => {
     const { jsx: j, jsxs: js } = require('react/jsx-runtime')
@@ -125,7 +125,7 @@ window.__ModuleLoader__.load({
     /** 会话 → 入口上下文：能解析出团队就落团队页，解析不到回全局库（不空转） */
     const NS = 'myteam.panel'
     /**
-     * 轮询间隔（R34 / design-notes §十：面板 5s 轮询）。
+     * 轮询间隔（R34 / design-v2/README.md §十：面板 5s 轮询）。
      *
      * 修复前两处各自写死 15000 / 20000，且**完全不看** `document.visibilityState`——
      * 面板切到后台（或宿主窗口最小化）时仍在按秒发 RPC，白烧网关与账本折叠。
@@ -217,7 +217,7 @@ window.__ModuleLoader__.load({
     /** 面板表面根：把「解析后的深色态」写到插件自己的根节点上（见 CHG-99 / C13） */
     const useDarkTheme = () => useSyncExternalStoreSafe(subscribeDarkTheme, readDarkTheme) === true
 
-    /* ── locale 字典（ui-plugin.md：visible text 走 locale service；zh 为键源，en 对照）── */
+﻿    /* ── locale 字典（ui-plugin.md：visible text 走 locale service；zh 为键源，en 对照）── */
     const zh = {
       'panel.title': 'myteam 团队面板',
       'banner.staged': '计划已暂存',
@@ -664,7 +664,7 @@ window.__ModuleLoader__.load({
       'diag.fixUnlockDepsHint': '上游已被取消，永远等不到 done——摘掉这条依赖，本任务才能进入可领队列',
       'diag.fixUnlockDepsReason': '解除对已取消上游的依赖：{deps}',
       'diag.fixUnlockDepsDone': '已解除对 {deps} 的依赖',
-      /* [G1 detail] 任务详情 / 两段确认（design/detail.html · confirm.html · discard.html） */
+      /* [G1 detail] 任务详情 / 两段确认（design-v2/p-task.html · confirm.html · discard.html） */
       'detail.crumb': '面包屑',
       'detail.crumbBoard': '看板',
       'detail.attemptN': '第 {n} 次尝试',
@@ -801,7 +801,7 @@ window.__ModuleLoader__.load({
       'detail.deleteConfirmBtn': '确认删除',
       'detail.deleteFailed': '删除失败：{msg}',
       'task.deleted': '已删除任务 {id}',
-      /* 解散团队（design/confirm.html）：四条不可撤销影响 + 输入团队 ID 才能提交 */
+      /* 解散团队（design-v2/p-dissolve.html）：四条不可撤销影响 + 输入团队 ID 才能提交 */
       'disband.title': '解散「{name}」？',
       'disband.irreversible': '不可撤销',
       'disband.step': '第 2 步，共 2 步',
@@ -816,7 +816,7 @@ window.__ModuleLoader__.load({
       'disband.inputHint': '「归档」与「解散」是同一套动作（落归档快照并结束团队），不可逆——它不是暂停。',
       'disband.archive': '改用归档',
       'disband.needId': '输入的团队 ID 与 {teamId} 不一致',
-      /* 丢弃暂存计划（design/discard.html）：影响面 + 引导改用 Revise */
+      /* 丢弃暂存计划（design-v2/p-approval.html）：影响面 + 引导改用 Revise */
       'discard.step': '第 2 步，共 2 步',
       'discard.title': '丢弃这份计划？',
       'discard.desc': '丢弃后这份草稿作废、团队进入 discarded 状态（不会自动重建）。**不写归档快照**——归档是「解散/归档」的动作。角色一个都还没拉进来，不涉及任何实例会话。',
@@ -833,7 +833,7 @@ window.__ModuleLoader__.load({
       'discard.failed': '丢弃失败：{msg}',
       /* CHG-82：设计稿对齐的 locale 落点（zh 为键源；en 在下面同序追加） */
       /* [G1 detail] */ /* [G2 roster] */ /* [G3 knowledge] */
-      /* [G2 roster] 角色库 / 名册 / 角色详情 / 实例管理菜单（design/roles.html · roster.html · role-detail.html · member-menu.html） */
+      /* [G2 roster] 角色库 / 名册 / 角色详情 / 实例管理菜单（design-v2/p-teams.html · roster.html · role-detail.html · member-menu.html） */
       'roles.page.title': '角色库',
       'roles.page.desc': '角色是配置单元：职责、系统提示词、工具策略、技能引用、模型路由。同一个角色可以被多次召唤，每次产生一个实例。改角色不会影响已经在跑的实例 —— 它们拿的是召唤那一刻的快照。',
       'roles.createRole': '创建角色',
@@ -1143,7 +1143,7 @@ window.__ModuleLoader__.load({
       'shell.empty': '这个项目还没有团队。',
       'shell.noMatch': '没有匹配的团队。',
       'shell.newTeam': '新建团队',
-      /* G5 · design/lanes.html · dag.html · dag-vertical.html · dragging.html */
+      /* G5 · design-v2/p-lanes.html · dag.html · dag-vertical.html · dragging.html */
       'view.dir.arrow.h': '横向 →',
       'view.dir.arrow.v': '竖向 ↓',
       'lanes.groupBy': '行 = 角色',
@@ -1294,7 +1294,7 @@ window.__ModuleLoader__.load({
       'guest.failed': '应用失败',
       'guest.honesty': '只写 config/session-defaults.json：不进团队账本、不产生实例会话、不影响在线团队。',
     }
-    const en = {
+﻿    const en = {
       'panel.title': 'myteam panel',
       'banner.staged': 'Plan staged',
       'banner.waiting': 'Awaiting human decision',
@@ -1736,7 +1736,7 @@ window.__ModuleLoader__.load({
       'diag.fixUnlockDepsHint': 'The upstream was cancelled, so it will never reach done — drop this dependency and the task becomes claimable',
       'diag.fixUnlockDepsReason': 'Drop dependency on cancelled upstream(s): {deps}',
       'diag.fixUnlockDepsDone': 'Dropped dependency on {deps}',
-      /* [G1 detail] task detail / two-step confirmations (design/detail.html · confirm.html · discard.html) */
+      /* [G1 detail] task detail / two-step confirmations (design-v2/p-task.html · confirm.html · discard.html) */
       'detail.crumb': 'Breadcrumb',
       'detail.crumbBoard': 'Board',
       'detail.attemptN': 'attempt {n}',
@@ -2204,7 +2204,7 @@ window.__ModuleLoader__.load({
       'shell.empty': 'This project has no teams yet.',
       'shell.noMatch': 'No matching teams.',
       'shell.newTeam': 'New team',
-      /* G5 · design/lanes.html · dag.html · dag-vertical.html · dragging.html */
+      /* G5 · design-v2/p-lanes.html · dag.html · dag-vertical.html · dragging.html */
       'view.dir.arrow.h': 'Horizontal →',
       'view.dir.arrow.v': 'Vertical ↓',
       'lanes.groupBy': 'Rows = roles',
@@ -2355,7 +2355,7 @@ window.__ModuleLoader__.load({
       'guest.honesty': 'Writes config/session-defaults.json only: no team ledger events, no instance sessions, online teams untouched.',
     }
 
-    /* ══ [G3 knowledge] design/knowledge.html · presets.html · skills.html ══
+    /* ══ [G3 knowledge] design-v2/p-knowledge.html · presets.html · skills.html ══
      * 三屏的 locale（zh 为键源，en 同序）。
      * 用 Object.assign 追加而不是改写 zh/en 字面量：六组的落点在同一行，
      * 逐组往字面量里插行会互相踩（并发写协议 §三-2「少而大」）。 */
@@ -2384,7 +2384,7 @@ window.__ModuleLoader__.load({
       'ov.allRunning': '全部已开工',
       'ov.allDone': '全部已交付',
       'ov.idleNote': '全部可开工 · {n} 项待认领',
-      /* 知识库（团队内「知识」tab，design/knowledge.html） */
+      /* 知识库（团队内「知识」tab，design-v2/p-knowledge.html） */
       'kb3.title': '团队知识库',
       'kb3.desc': '团队记忆分三层：AGENTS.md 是共识层，config/knowledge/ 是共享知识库，实例私有 memory.md 只属于本人。常驻的只有 40 行以内的索引，正文按需读取。',
       'kb3.index': '查看索引',
@@ -2441,7 +2441,7 @@ window.__ModuleLoader__.load({
       /* CHG-84：无活跃会话 / 读取中——骨架照出，用一条说明讲清为什么还没有条目 */
       'kb3.needsSession': '当前团队没有活跃的团队会话：上面是知识库的三层骨架。在「团队模式」会话里提交计划后，条目、证据与提案会出现在这里。',
       'kb3.loadingHint': '正在读取团队知识库…',
-      /* 预设库（全局作用域子页，design/presets.html） */
+      /* 预设库（全局作用域子页，design-v2/g-blueprints.html） */
       'preset3.title': '预设库',
       'preset3.desc': '预设是团队模板：名册（队长 + N 个角色引用）加上看板列、流程维度、门禁链。新建团队时选一个，就得到一套现成的分工与流程。名册里存的是角色引用（聘任记录），不是副本 —— 改角色会立刻影响之后新建的团队，但不会影响已经聘任的实例。',
       'preset3.new': '新建预设',
@@ -2506,7 +2506,7 @@ window.__ModuleLoader__.load({
       'preset3.tabPresets': '预设',
       'preset3.tabSkills': '技能',
       'preset3.more': '预设操作',
-      /* 技能 & MCP（全局作用域子页，design/skills.html） */
+      /* 技能 & MCP（全局作用域子页，design-v2/README.md） */
       'skill3.title': '技能与 MCP',
       'skill3.desc': '角色的能力由两样东西组成：技能按四层来源取，MCP 分两段看。实例化时按角色绑定注入，注入后只对那个实例可见，不会漏到别的实例身上。',
       'skill3.teambarSub': '全局 · 能力库',
@@ -3101,7 +3101,7 @@ window.__ModuleLoader__.load({
      */
     const DARK_SURFACE = ':is(.mt-panel,.mt-conv,.mt-dockrow,.mt-entry,.mt-toolcard)[data-theme="dark"]'
 
-    /* ── 样式（单文件形态；只用 --dsw-alias-* token；由 ctx.effect 持有）── */
+﻿    /* ── 样式（单文件形态；只用 --dsw-alias-* token；由 ctx.effect 持有）── */
     const css = [
       '.mt-panel{position:relative;display:flex;flex-direction:column;height:100%;min-width:0;color:var(--dsw-alias-label-primary);font-size:13px}',
       /* CHG-202c（用户定案「整个视图要居中，左右两侧留一些空余的位置，以避免文字溢出」）：
@@ -3146,7 +3146,7 @@ window.__ModuleLoader__.load({
       '.mt-btn-danger{color:var(--dsw-alias-state-error-primary)}',
       '.mt-banner{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:8px 16px;background:var(--dsw-alias-bg-layer-2);border-bottom:.5px solid var(--dsw-alias-border-l2);flex:none}',
       '.mt-banner-actions{display:flex;gap:8px}',
-      /* CHG-82：领域 tab 对齐 design/app.css 的 .tabbar/.tab（40px 高、13px、选中 2px 下划线走 ::after） */
+      /* CHG-82：领域 tab 对齐 design-v2/myteam.css 的 .tabbar/.tab（40px 高、13px、选中 2px 下划线走 ::after） */
       '.mt-tabs{display:flex;gap:0;padding:0 16px;border-bottom:1px solid var(--dsw-alias-border-l2);flex:none;flex-wrap:wrap}',
       '.mt-tab{position:relative;display:inline-flex;align-items:center;gap:5px;margin-right:20px;padding:0 1px;height:40px;border:0;background:none;color:var(--dsw-alias-label-secondary);font-size:13px;font-weight:500;cursor:pointer}',
       '.mt-tab:hover{color:var(--dsw-alias-label-primary)}',
@@ -3176,18 +3176,18 @@ window.__ModuleLoader__.load({
          .mt-board 自身再 hidden 就会把 .mt-columns 的 overflow-x:auto 一起裁掉（滚不动、看不见）。
          做法：.mt-board 不裁（visible），由 .mt-columns 自己滚；列头行与列体共用同一滚动容器。 */
       '.mt-columns{flex:1;min-height:0;display:flex;gap:10px;align-items:stretch;overflow-x:auto;overflow-y:hidden;padding-bottom:2px;min-width:0}',
-      /* design/app.css 的 .board{display:flex;gap:10px;overflow:auto} + .col{flex:1 1 200px;min-width:200px}：
+      /* design-v2/myteam.css 的 .board{display:flex;gap:10px;overflow:auto} + .col{flex:1 1 200px;min-width:200px}：
          列要能一起放进面板宽度，而不是每列硬占 200px 把自己顶出容器（原来用 grid-auto-columns，
          6 列 ×200px 必然溢出，第 6 列被裁且滚不动）。
          CHG-85：min-width 降到 150px —— 6 列（含 gap）在 1109px 的面板里能各分到 ~176px 全部可见；
          再窄就交给 overflow-x:auto 横向滚。 */
       '.mt-col{flex:1 1 200px;min-width:150px;display:flex;flex-direction:column;min-height:0;background:var(--dsw-alias-bg-layer-1);border:.5px solid var(--dsw-alias-border-l2);border-radius:10px;padding:8px;overflow:hidden}',
-      /* design/app.css 的 .col.done-col{flex:0 0 168px;background:transparent;border-style:dashed}：
+      /* design-v2/myteam.css 的 .col.done-col{flex:0 0 168px;background:transparent;border-style:dashed}：
          末列（未完成/异常收口）固定窄宽 + 虚线，视觉上与主列区分。 */
       '.mt-col-done{flex:0 1 168px;min-width:132px;background:transparent;border-style:dashed}',
       '.mt-col-head{display:flex;align-items:center;gap:6px;font-size:12px;color:var(--dsw-alias-label-primary);margin:0 2px 10px;padding-bottom:6px;border-bottom:.5px solid var(--dsw-alias-border-l2);flex:none}',
       '.mt-col-head .mt-count{margin-left:auto}',
-      /* CHG-81：列头形状点 + 列名 + 列内新建（design/board.html 的 .col-head） */
+      /* CHG-81：列头形状点 + 列名 + 列内新建（design-v2/p-tasks.html 的 .col-head） */
       '.mt-col-shape{flex:none;width:7px;height:7px;border-radius:50%;background:var(--dsw-alias-border-l3)}',
       '.mt-col-name{margin:0;font-size:12px;font-weight:600;letter-spacing:.02em;color:var(--dsw-alias-label-primary);white-space:nowrap}',
       '.mt-col-add{flex:none;width:22px;height:22px;display:grid;place-items:center;border:0;background:none;color:var(--dsw-alias-label-primary);border-radius:5px;cursor:pointer;font-size:13px;line-height:1;padding:0}',
@@ -3195,7 +3195,7 @@ window.__ModuleLoader__.load({
       '.mt-col-body{flex:1;min-height:0;overflow-y:auto;display:flex;flex-direction:column;gap:8px;padding-right:2px}',
       '.mt-col-empty{color:var(--dsw-alias-label-tertiary);font-size:11px;text-align:center;padding:18px 0;border:.5px dashed var(--dsw-alias-border-l2);border-radius:8px}',
       '.mt-count{color:var(--dsw-alias-label-tertiary);font-variant-numeric:tabular-nums}',
-      /* CHG-81：看板卡按 design/board.html 的 .tcard 五段结构（号+优先级 / 标题 / 角色 / 团队 / 阻塞） */
+      /* CHG-81：看板卡按 design-v2/p-tasks.html 的 .tcard 五段结构（号+优先级 / 标题 / 角色 / 团队 / 阻塞） */
       '.mt-task{box-sizing:border-box;display:flex;flex-direction:column;width:100%;text-align:left;cursor:pointer;background:var(--dsw-alias-bg-layer-2);border:.5px solid var(--dsw-alias-border-l2);border-radius:8px;padding:9px 10px;color:var(--dsw-alias-label-primary);font-size:12px;line-height:1.4}',
       '.mt-task:hover{border-color:var(--dsw-alias-border-l3);background:var(--dsw-alias-bg-layer-1)}',
       '.mt-task-top{display:flex;align-items:center;gap:5px;margin-bottom:3px;flex-wrap:wrap}',
@@ -3211,7 +3211,7 @@ window.__ModuleLoader__.load({
       '.mt-pri-P3{color:var(--dsw-alias-label-primary)}',
       '.mt-task-meta{display:flex;gap:4px;flex-wrap:wrap;align-items:center;min-width:0;color:var(--dsw-alias-label-tertiary);font-size:11px;margin-top:5px}',
       /* CHG-85：卡片里的 chip 不能用页头那套 margin-left:auto（会把 chip 顶到卡外），
-         也不能无限撑宽 —— 长团队名省略号收尾（design/app.css .tcard-teams 的 mini-chip 靠左排）。 */
+         也不能无限撑宽 —— 长团队名省略号收尾（design-v2/myteam.css .tcard-teams 的 mini-chip 靠左排）。 */
       '.mt-task .mt-chip{margin-left:0;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}',
       '.mt-task-meta .mt-flow-warn{font-weight:600}',
       '.mt-task-dep{display:flex;align-items:center;gap:4px;min-width:0;font-size:11px;color:var(--dsw-alias-label-primary);margin-top:5px;padding-top:5px;border-top:.5px dashed var(--dsw-alias-border-l2);line-height:1.4}',
@@ -3324,7 +3324,7 @@ window.__ModuleLoader__.load({
       '.mt-section-head h3{margin:0;font-size:13px;font-weight:600}',
       '.mt-section-head .mt-hint{margin-left:auto}',
       '.mt-cardgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));align-items:start;gap:8px}',
-      /* CHG-80：随行资产按 design/global.html 的 .card 结构重做（图标 + 标题 + 副标题 + 内容行 + 跳转脚） */
+      /* CHG-80：随行资产按 design-v2/g-overview.html 的 .card 结构重做（图标 + 标题 + 副标题 + 内容行 + 跳转脚） */
       '.mt-assets{display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:8px}',
       '.mt-assetcard{box-sizing:border-box;display:flex;flex-direction:column;gap:8px;width:100%;min-width:0;text-align:left;cursor:pointer;background:var(--dsw-alias-bg-layer-1);border:.5px solid var(--dsw-alias-border-l2);border-radius:10px;padding:12px 14px;color:var(--dsw-alias-label-primary);font:inherit}',
       '.mt-assetcard:hover{border-color:var(--dsw-alias-border-l3);background:var(--dsw-alias-bg-layer-2)}',
@@ -3335,10 +3335,10 @@ window.__ModuleLoader__.load({
       '.mt-assetcard-sub{font-size:12px;line-height:1.5;color:var(--dsw-alias-label-primary);margin-top:2px;overflow-wrap:anywhere}',
       '.mt-assetcard-row{display:flex;gap:6px;flex-wrap:wrap;align-items:center;font-size:12px;color:var(--dsw-alias-label-primary);overflow-wrap:anywhere}',
       '.mt-assetcard-foot{display:flex;align-items:center;justify-content:space-between;gap:8px;font-size:11px;border-top:.5px dashed var(--dsw-alias-border-l2);padding-top:8px;margin-top:2px}',
-      /* CHG-85：跳转 chevron（design/icons.svg#i-chevron-right） */
+      /* CHG-85：跳转 chevron（design-v2/icons.svg#i-chevron-right） */
       '.mt-assetcard-chev{flex:none;display:inline-flex;align-items:center;justify-content:center;color:var(--dsw-alias-label-tertiary)}',
       '.mt-section-head .mt-rule{flex:1;height:1px;background:var(--dsw-alias-border-l2);align-self:center;min-width:12px}',
-      /* CHG-80：角色卡按 design/global.html 的 .card 结构（圆形头像 + 标题/副标题 + 兴趣词行 + 能力行 + 脚） */
+      /* CHG-80：角色卡按 design-v2/g-overview.html 的 .card 结构（圆形头像 + 标题/副标题 + 兴趣词行 + 能力行 + 脚） */
       '.mt-rolecard{display:flex;flex-direction:column;gap:8px;text-align:left;width:100%;box-sizing:border-box;min-height:132px;cursor:pointer;background:var(--dsw-alias-bg-layer-1);border:.5px solid var(--dsw-alias-border-l2);border-radius:10px;padding:12px;color:var(--dsw-alias-label-primary);font:inherit}',
       '.mt-rolecard:hover{border-color:var(--dsw-alias-border-l3);background:var(--dsw-alias-bg-layer-2)}',
       '.mt-avatar{flex:none;width:32px;height:32px;border-radius:50%;display:inline-flex;align-items:center;justify-content:center;font-size:12px;font-weight:600;border:.5px solid var(--dsw-alias-border-l2);background:var(--dsw-alias-bg-layer-2);color:var(--dsw-alias-label-primary)}',
@@ -3356,7 +3356,7 @@ window.__ModuleLoader__.load({
       '.mt-rolechip{border:.5px solid var(--dsw-alias-border-l2);border-radius:4px;padding:0 6px;font-size:11px;line-height:18px;color:var(--dsw-alias-label-primary);background:var(--dsw-alias-bg-layer-2)}',
       '.mt-rolecard-foot{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-top:auto;padding-top:8px;border-top:.5px solid var(--dsw-alias-border-l2);color:var(--dsw-alias-label-primary);font-size:11px}',
       '.mt-rolecard-foot .mt-chip{margin-left:0}',
-      /* CHG-80：全局页信息条（design/global.html 的 header.teambar） */
+      /* CHG-80：全局页信息条（design-v2/g-overview.html 的 header.teambar） */
       '.mt-teambar{display:flex;align-items:center;gap:12px;flex-wrap:wrap;padding:10px 16px;border-bottom:.5px solid var(--dsw-alias-border-l2);flex:none}',
       '.mt-teambar-title{display:inline-flex;align-items:baseline;gap:8px;flex:none}',
       '.mt-teambar-title b{font-size:13px;font-weight:600}',
@@ -3479,12 +3479,12 @@ window.__ModuleLoader__.load({
       '.mt-impactlist{display:flex;flex-direction:column;gap:2px;font-size:11px;color:var(--dsw-alias-label-secondary);overflow-wrap:anywhere}',
       '.mt-impactlist .mt-chip{margin-left:0}',
       /* ══════════════════════════════════════════════════════════════════════════
-       * CHG-82：设计稿对齐（design/*.html）—— 按分组预留的样式落点
+       * CHG-82：设计稿对齐（design-v2/*.html）—— 按分组预留的样式落点
        * 纪律：只用 --dsw-alias-* token；禁写十六进制颜色；禁写 font-family。
        * 每组只在自己那一行后面追加规则，不要动别人的落点。
        * ══════════════════════════════════════════════════════════════════════════ */
-      /* [G1 detail] design/detail.html · confirm.html · discard.html */
-      /* 任务详情 = 主区整页（design/detail.html）：盖住工作台，自己的面包屑 + 双栏 + 成本归因 */
+      /* [G1 detail] design-v2/p-task.html · confirm.html · discard.html */
+      /* 任务详情 = 主区整页（design-v2/p-task.html）：盖住工作台，自己的面包屑 + 双栏 + 成本归因 */
       '.mt-detail-page{display:flex;flex-direction:column;flex:1 1 100%;min-width:0;min-height:0;overflow:hidden;background:var(--dsw-alias-bg-base)}',
       '.mt-workspace:has(> .mt-detail-page){position:relative}',
       '.mt-workspace:has(> .mt-detail-page) > :not(.mt-detail-page){display:none}',
@@ -3558,7 +3558,7 @@ window.__ModuleLoader__.load({
       '.mt-cost-label{font-size:12px;line-height:1.35;color:var(--dsw-alias-label-tertiary)}',
       '.mt-cost-val{font-size:13px;font-weight:600;line-height:1.35;color:var(--dsw-alias-label-primary);font-variant-numeric:tabular-nums}',
       '.mt-cost-val small{font-size:12px;font-weight:400;color:var(--dsw-alias-label-tertiary)}',
-      /* 两段确认（design/confirm.html · discard.html）：先说影响面 → 再输入 / 再点一次 */
+      /* 两段确认（design-v2/p-dissolve.html · discard.html）：先说影响面 → 再输入 / 再点一次 */
       '.mt-impact{margin:0;padding:12px;border:.5px solid color-mix(in srgb, var(--dsw-alias-state-error-primary) 40%, transparent);border-radius:6px;background:color-mix(in srgb, var(--dsw-alias-state-error-primary) 8%, transparent);color:var(--dsw-alias-label-secondary);font-size:12px;line-height:1.75}',
       '.mt-impact b{font-weight:600;color:var(--dsw-alias-label-primary)}',
       '.mt-impact ul{margin:4px 0 0;padding-left:16px}',
@@ -3615,7 +3615,7 @@ window.__ModuleLoader__.load({
       '.mt-input:focus{border-color:var(--dsw-alias-label-emphasis, var(--dsw-alias-label-primary));box-shadow:0 0 0 3px color-mix(in srgb, var(--dsw-alias-label-emphasis, var(--dsw-alias-label-primary)) 18%, transparent)}',
       '.mt-dialog-foot{display:flex;align-items:center;gap:8px}',
       '.mt-dialog-foot .mt-right{margin-left:auto;display:flex;gap:8px}',
-      /* ── CHG-84 复检：对着 design/detail.html 补齐的形态 ── */
+      /* ── CHG-84 复检：对着 design-v2/p-task.html 补齐的形态 ── */
       /* 参与团队卡里的 主责/协作 是 chip（design .chip.run / .chip.idle），不是 mini-chip */
       '.mt-detail-page .mt-tc-head .mt-chip{display:inline-flex;align-items:center;gap:5px;height:20px;margin:0;padding:0 8px;border-radius:999px;font-size:12px;font-weight:500;white-space:nowrap;flex:none;background:var(--dsw-alias-bg-layer-1);border:.5px solid var(--dsw-alias-border-l2);color:var(--dsw-alias-label-secondary)}',
       '.mt-detail-page .mt-tc-head .mt-chip .mt-task-dot{width:7px;height:7px;margin-top:0}',
@@ -3635,8 +3635,8 @@ window.__ModuleLoader__.load({
       '.mt-dt-summary{border:.5px solid var(--dsw-alias-border-l2);border-radius:8px;padding:10px 12px;background:var(--dsw-alias-bg-layer-1)}',
       '.mt-dt-summary-title{font-size:12px;font-weight:600;color:var(--dsw-alias-label-primary)}',
       '.mt-dt-summary-sub{margin-top:2px;font-size:12px;line-height:1.55;color:var(--dsw-alias-label-tertiary)}',
-      /* [G2 roster] design/roles.html · roster.html · role-detail.html · member-menu.html */
-      /* CHG-82 G2：角色库（design/roles.html 的 .page-head / .dsec-head / .filterbar / .card / 创建卡） */
+      /* [G2 roster] design-v2/p-teams.html · roster.html · role-detail.html · member-menu.html */
+      /* CHG-82 G2：角色库（design-v2/p-teams.html 的 .page-head / .dsec-head / .filterbar / .card / 创建卡） */
       '.mt-dsec-block{display:flex;flex-direction:column;gap:8px}',
       '.mt-searchfield{display:inline-flex;align-items:center;gap:6px;flex:0 1 240px;min-width:160px;border:.5px solid var(--dsw-alias-border-l2);border-radius:6px;background:var(--dsw-alias-bg-base);padding:3px 8px}',
       '.mt-searchfield-ico{flex:none;font-size:12px;line-height:1;color:var(--dsw-alias-label-tertiary)}',
@@ -3647,7 +3647,7 @@ window.__ModuleLoader__.load({
       '.mt-segbtn[aria-pressed="true"]{background:var(--dsw-alias-bg-layer-2);color:var(--dsw-alias-label-primary);font-weight:600}',
       '.mt-cardgrid-3{grid-template-columns:repeat(auto-fill,minmax(256px,1fr));gap:12px;align-items:stretch}',
       '.mt-rolecard-lib{min-height:150px}',
-      /* design/roles.html：队长卡主色描边 + 浅主色底（.card 的 border-color:primary-line / background:primary-soft） */
+      /* design-v2/p-teams.html：队长卡主色描边 + 浅主色底（.card 的 border-color:primary-line / background:primary-soft） */
       '.mt-rolecard-captain{border-color:var(--dsw-alias-border-accent,var(--dsw-alias-border-l3));background:color-mix(in srgb, var(--dsw-alias-label-emphasis, var(--dsw-alias-label-primary)) 7%, transparent)}',
       '.mt-avatar-a1{background:color-mix(in srgb, var(--dsw-alias-label-emphasis, var(--dsw-alias-label-primary)) 14%, transparent);border-color:color-mix(in srgb, var(--dsw-alias-label-emphasis, var(--dsw-alias-label-primary)) 30%, transparent);color:var(--dsw-alias-label-emphasis, var(--dsw-alias-label-primary))}',
       '.mt-avatar-a2{background:color-mix(in srgb, var(--dsw-alias-state-ok-primary) 14%, transparent);border-color:color-mix(in srgb, var(--dsw-alias-state-ok-primary) 32%, transparent);color:var(--dsw-alias-state-ok-primary)}',
@@ -3698,7 +3698,7 @@ window.__ModuleLoader__.load({
       '.mt-team-meta{display:flex;gap:10px;flex-wrap:wrap;color:var(--dsw-alias-label-tertiary);font-size:11px;margin-top:4px;align-items:center;margin:0}',
       '.mt-note-alert{display:flex;gap:8px;align-items:flex-start;margin:0}',
       '.mt-note-ico{flex:none;width:16px;height:16px;border-radius:50%;display:inline-flex;align-items:center;justify-content:center;border:.5px solid var(--dsw-alias-state-warning-primary);color:var(--dsw-alias-state-warning-primary);font-size:11px;line-height:1}',
-      /* CHG-82 G2：名册 = 本团队的角色编排（design/roster.html + member-menu.html） */
+      /* CHG-82 G2：名册 = 本团队的角色编排（design-v2/p-roster.html + member-menu.html） */
       '.mt-roster-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(348px,1fr));gap:12px;align-items:stretch}',
       '.mt-roster-card{display:flex;flex-direction:column;gap:6px;min-width:0;background:var(--dsw-alias-bg-layer-1);border:.5px solid var(--dsw-alias-border-l2);border-radius:10px;padding:10px 12px}',
       '.mt-roster-card-gate{border-color:var(--dsw-alias-state-warning-primary)}',
@@ -3749,7 +3749,7 @@ window.__ModuleLoader__.load({
       '.mt-menu-steer textarea:disabled{opacity:.55}',
       '.mt-menu-steer-actions{display:flex;gap:6px;justify-content:flex-end}',
       '.mt-menu-steer-alert{padding:4px 6px;font-size:11px;line-height:1.5;color:var(--dsw-alias-label-primary);border:.5px solid var(--dsw-alias-state-warning-primary);border-left-width:3px;border-radius:6px;background:color-mix(in srgb, var(--dsw-alias-state-warning-primary) 12%, transparent)}',
-      /* CHG-82 G2：角色详情（design/role-detail.html 的 .detail-grid + .sec + .abl-row + 侧列） */
+      /* CHG-82 G2：角色详情（design-v2/p-teams.html 的 .detail-grid + .sec + .abl-row + 侧列） */
       '.mt-roledetail{width:min(680px,100%)}',
       '.mt-roledetail-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:10px;align-items:start}',
       '.mt-roledetail-main,.mt-roledetail-side{display:flex;flex-direction:column;gap:8px;min-width:0}',
@@ -3773,12 +3773,12 @@ window.__ModuleLoader__.load({
       '.mt-roledetail .mt-membership .mt-tchip{margin-left:0}',
       '.mt-side-actions{display:flex;flex-direction:column;gap:6px}',
       '.mt-side-actions .mt-btn{width:100%;box-sizing:border-box}',
-      /* [G3 knowledge] design/knowledge.html · presets.html · skills.html */
-      /* ── CHG-84 复检补充（design/app.css 的 .grid-2 / .iname / 空态兜底卡）── */
+      /* [G3 knowledge] design-v2/p-knowledge.html · presets.html · skills.html */
+      /* ── CHG-84 复检补充（design-v2/myteam.css 的 .grid-2 / .iname / 空态兜底卡）── */
       '.mt-presetgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(348px,1fr));gap:8px;align-items:start}',
       '.mt-kb3-name{font-size:13px;font-weight:600;color:var(--dsw-alias-label-primary);letter-spacing:-.01em;overflow-wrap:anywhere}',
       '.mt-p3-newcard-icon{font-size:18px;line-height:1;color:var(--dsw-alias-label-tertiary)}',
-      /* ── 三层作用域清单（design/app.css .layers / .layer / .layer-ico / .layer-n；knowledge 三层记忆、
+      /* ── 三层作用域清单（design-v2/myteam.css .layers / .layer / .layer-ico / .layer-n；knowledge 三层记忆、
        *    presets 三个来源、skills 四层来源共用。来源小标 .mt-src 同源同形）── */
       '.mt-layers{display:flex;flex-direction:column;border:.5px solid var(--dsw-alias-border-l2);border-radius:8px;overflow:hidden;background:var(--dsw-alias-bg-base)}',
       '.mt-layer+.mt-layer{border-top:.5px solid var(--dsw-alias-border-l2)}',
@@ -3787,7 +3787,7 @@ window.__ModuleLoader__.load({
       '.mt-layer-ico-project{background:color-mix(in srgb, var(--dsw-alias-label-emphasis, var(--dsw-alias-label-primary)) 14%, transparent);color:var(--dsw-alias-label-emphasis, var(--dsw-alias-label-primary))}',
       '.mt-layer-ico-bound{background:var(--dsw-alias-bg-layer-2);color:var(--dsw-alias-label-secondary)}',
       '.mt-layer .mt-btn{flex:none}',
-      /* ── 知识库：页头 + 筛选条 + 行列表（design/knowledge.html .page-head / .filterbar / .rows）── */
+      /* ── 知识库：页头 + 筛选条 + 行列表（design-v2/p-knowledge.html .page-head / .filterbar / .rows）── */
       '.mt-kb3{display:flex;flex-direction:column;gap:10px;flex:1;min-width:0;min-height:0;overflow:auto;padding:12px 16px}',
       '.mt-kb3-head{display:flex;align-items:flex-start;gap:12px;flex-wrap:wrap}',
       '.mt-kb3-head h2{margin:0;font-size:15px;font-weight:600;letter-spacing:-.01em;color:var(--dsw-alias-label-primary)}',
@@ -3826,7 +3826,7 @@ window.__ModuleLoader__.load({
       '.mt-iconbtn:hover{border-color:var(--dsw-alias-border-l2);color:var(--dsw-alias-label-primary)}',
       '.mt-btn-ghost{background:none;border-color:transparent;color:var(--dsw-alias-label-secondary)}',
       '.mt-btn-ghost:hover{background:var(--dsw-alias-bg-layer-2);color:var(--dsw-alias-label-primary)}',
-      /* ── 预设卡：名册预览（队长高亮 + 角色引用 chips）+ 模板三行 + 引用计数（design/presets.html）── */
+      /* ── 预设卡：名册预览（队长高亮 + 角色引用 chips）+ 模板三行 + 引用计数（design-v2/g-blueprints.html）── */
       '.mt-p3-card{display:flex;flex-direction:column;gap:10px;border:.5px solid var(--dsw-alias-border-l2);border-radius:10px;background:var(--dsw-alias-bg-layer-1);padding:12px;min-width:0}',
       '.mt-p3-card-builtin{background:var(--dsw-alias-bg-layer-2)}',
       '.mt-p3-card:hover{border-color:var(--dsw-alias-border-l3)}',
@@ -3850,7 +3850,7 @@ window.__ModuleLoader__.load({
       '.mt-colpreview{display:inline-flex;align-items:center;gap:3px;flex-wrap:wrap}',
       '.mt-colpreview b{font-weight:400;font-size:11px;line-height:16px;padding:0 6px;border-radius:4px;background:var(--dsw-alias-bg-layer-2);color:var(--dsw-alias-label-secondary)}',
       '.mt-colpreview .mt-ar{color:var(--dsw-alias-label-tertiary);font-size:11px}',
-      /* ── MCP 两段式：连接层 ∩ 可见层（design/skills.html）── */
+      /* ── MCP 两段式：连接层 ∩ 可见层（design-v2/README.md）── */
       '.mt-mcp-split{display:grid;grid-template-columns:minmax(0,1fr) 40px minmax(0,1fr);align-items:stretch}',
       '.mt-mcp-pane{border:.5px solid var(--dsw-alias-border-l2);border-radius:10px;background:var(--dsw-alias-bg-layer-1);overflow:hidden;min-width:0}',
       '.mt-mcp-head{display:flex;align-items:baseline;gap:8px;flex-wrap:wrap;padding:8px 12px;border-bottom:.5px solid var(--dsw-alias-border-l2);background:var(--dsw-alias-bg-layer-2)}',
@@ -3866,8 +3866,8 @@ window.__ModuleLoader__.load({
       '.mt-mcp-join{display:grid;place-items:center;color:var(--dsw-alias-label-tertiary);font-size:14px;font-weight:600}',
       '.mt-mcp-item .mt-avatar{width:22px;height:22px;font-size:10px}',
       '@media (max-width:760px){.mt-mcp-split{grid-template-columns:minmax(0,1fr)}.mt-mcp-join{display:none}}',
-      /* [G4 ledger] design/audit.html · settings.html · archive.html · overview.html · shell.html */
-      /* ── 审计视图（design/audit.html：三档回放 + attempt 分组事件流 + 只读标注）── */
+      /* [G4 ledger] design-v2/p-audit.html · settings.html · archive.html · overview.html · shell.html */
+      /* ── 审计视图（design-v2/p-audit.html：三档回放 + attempt 分组事件流 + 只读标注）── */
       '.mt-audit-page{flex:1;min-height:0;display:flex;flex-direction:column;overflow:hidden}',
       '.mt-audit-segbar{flex:none;display:flex;align-items:center;gap:8px;padding:8px 20px;border-bottom:.5px solid var(--dsw-alias-border-l2);flex-wrap:wrap}',
       '.mt-audit-seg{display:flex;gap:2px;border:.5px solid var(--dsw-alias-border-l2);border-radius:7px;padding:2px}',
@@ -3919,7 +3919,7 @@ window.__ModuleLoader__.load({
       '.mt-tone-done{color:var(--dsw-alias-state-ok-primary);border-color:var(--dsw-alias-state-ok-primary)}',
       '.mt-tone-fail{color:var(--dsw-alias-state-error-primary);border-color:var(--dsw-alias-state-error-primary)}',
       '.mt-tone-idle{color:var(--dsw-alias-label-tertiary);border-color:var(--dsw-alias-border-l2);background:var(--dsw-alias-bg-layer-2)}',
-      /* ── 团队设置（design/settings.html：三层合并链 + 行为配置硬上限 + 状态目录 + 生命周期）── */
+      /* ── 团队设置（design-v2/p-settings.html：三层合并链 + 行为配置硬上限 + 状态目录 + 生命周期）── */
       '.mt-page-head{display:flex;align-items:flex-start;justify-content:space-between;gap:12px;flex-wrap:wrap;margin-bottom:16px}',
       '.mt-page-head h2{margin:0;font-size:20px;font-weight:600;letter-spacing:-.02em;line-height:1.35}',
       '.mt-page-head p{margin:6px 0 0;font-size:12px;color:var(--dsw-alias-label-tertiary);margin-top:2px;max-width:64ch;line-height:1.6}',
@@ -3977,7 +3977,7 @@ window.__ModuleLoader__.load({
       '.mt-impact-box{border:.5px solid var(--dsw-alias-state-error-primary);border-radius:8px;padding:8px 12px;font-size:12px;color:var(--dsw-alias-label-secondary);display:flex;flex-direction:column;gap:4px}',
       '.mt-impact-box strong{color:var(--dsw-alias-state-error-primary);font-weight:600}',
       '.mt-danger-ink{color:var(--dsw-alias-state-error-primary)}',
-      /* ── 归档回放（design/archive.html：归档条 + 结局卡 + 进度分段 + 五项分解 + 任务历史 + 账本）── */
+      /* ── 归档回放（design-v2/p-archive.html：归档条 + 结局卡 + 进度分段 + 五项分解 + 任务历史 + 账本）── */
       '.mt-archbar{flex:none;display:flex;align-items:center;gap:12px;flex-wrap:wrap;padding:12px 16px;min-height:58px;border-bottom:.5px solid var(--dsw-alias-border-l2);background:var(--dsw-alias-bg-layer-2)}',
       '.mt-team-id{display:flex;flex-direction:column;align-items:flex-start;min-width:0}',
       '.mt-team-id b{font-size:13px;font-weight:600;line-height:1.35;color:var(--dsw-alias-label-secondary)}',
@@ -4029,7 +4029,7 @@ window.__ModuleLoader__.load({
       '.mt-costbar-label{font-size:12px;color:var(--dsw-alias-label-tertiary);line-height:1.35}',
       '.mt-costbar-val{font-size:13px;font-weight:600;line-height:1.35;color:var(--dsw-alias-label-primary);font-variant-numeric:tabular-nums}',
       '.mt-costbar-val small{font-size:12px;font-weight:400;color:var(--dsw-alias-label-tertiary)}',
-      /* ── 项目 · 团队列表（design/shell.html：按工作区分组的团队卡）── */
+      /* ── 项目 · 团队列表（design-v2/p-teams.html：按工作区分组的团队卡）── */
       '.mt-home{flex:1;overflow-y:auto;min-height:0;padding:16px 20px 24px}',
       '.mt-home-filter{display:flex;align-items:center;gap:16px;margin-bottom:16px;flex-wrap:wrap}',
       '.mt-search-field{display:flex;align-items:center;gap:8px;width:360px;max-width:100%;box-sizing:border-box;background:var(--dsw-alias-bg-base);border:.5px solid var(--dsw-alias-border-l3);border-radius:6px;padding:0 10px;height:34px}',
@@ -4051,9 +4051,9 @@ window.__ModuleLoader__.load({
       '.mt-tc-dot{width:6px;height:6px;border-radius:50%;background:var(--dsw-alias-state-ok-primary);flex:none}',
       '.mt-tc-desc{margin:4px 0 0;font-size:12px;color:var(--dsw-alias-label-tertiary);margin-top:4px;line-height:1.6}',
       '.mt-tc-meta{margin-top:8px;display:flex;gap:16px;flex-wrap:wrap;font-size:12px;color:var(--dsw-alias-label-tertiary);font-variant-numeric:tabular-nums}',
-      /* ── 全局 · 全部团队（design/overview.html：库作用域 + 活跃团队卡 + 已归档 run 列表）── */
-      /* [G5 graph] design/lanes.html · dag.html · dag-vertical.html · dragging.html */
-      /* ── 泳道（design/lanes.html：蛇形泳道，行 = 角色，列 = 四阶段，格 = 该角色在该阶段的节点）── */
+      /* ── 全局 · 全部团队（design-v2/p-overview.html：库作用域 + 活跃团队卡 + 已归档 run 列表）── */
+      /* [G5 graph] design-v2/p-lanes.html · dag.html · dag-vertical.html · dragging.html */
+      /* ── 泳道（design-v2/p-lanes.html：蛇形泳道，行 = 角色，列 = 四阶段，格 = 该角色在该阶段的节点）── */
       '.mt-trail{width:156px}',
       '.mt-trail-cap{font-size:12px;color:var(--dsw-alias-label-tertiary);padding:2px 6px 6px}',
       '.mt-titem{display:flex;align-items:center;gap:8px;width:100%;padding:7px 6px;border:0;border-radius:8px;background:none;text-align:left;cursor:pointer;color:var(--dsw-alias-label-primary);font:inherit;transition:background .16s ease}',
@@ -4083,10 +4083,10 @@ window.__ModuleLoader__.load({
       '.mt-lane-label .mt-avatar{width:24px;height:24px;font-size:12px}',
       '.mt-lane-label .mt-avatar-dashed{border-style:dashed;color:var(--dsw-alias-label-tertiary)}',
       /* CHG-85：格子内卡片多了要能滚，不该把整行撑到几百 px（未认领行 9 张卡时行高失控，
-         泳道页底部被面板裁掉）。design/app.css 的 .lane-cell{min-height:56px} 是「最小」不是「无限」。
+         泳道页底部被面板裁掉）。design-v2/myteam.css 的 .lane-cell{min-height:56px} 是「最小」不是「无限」。
          CHG-85 后续：改成「限 4 张 + 折叠成『还有 N 个』」，格子本身不再需要限高。 */
       '.mt-lane-cell{background:var(--dsw-alias-bg-base);padding:5px;display:flex;flex-direction:column;gap:4px;min-height:56px;min-width:0}',
-      /* CHG-85：折叠行（design/tasks.html 的 mt-trow-more 同款） */
+      /* CHG-85：折叠行（design-v2/p-tasks.html 的 mt-trow-more 同款） */
       '.mt-lane-more{display:block;width:100%;box-sizing:border-box;margin-top:1px;padding:3px 6px;border:.5px dashed var(--dsw-alias-border-l2);border-radius:4px;background:none;color:var(--dsw-alias-label-tertiary);font:inherit;font-size:11px;line-height:1.5;text-align:center;cursor:default}',
       '.mt-lane-cell-empty{background:var(--dsw-alias-bg-layer-1)}',
       '.mt-lane-node{display:flex;align-items:center;gap:5px;min-width:0;text-align:left;background:var(--dsw-alias-bg-layer-1);border:.5px solid var(--dsw-alias-border-l2);border-left:2px solid var(--dsw-alias-border-l3);border-radius:4px;padding:4px 6px;color:var(--dsw-alias-label-primary);font:inherit;font-size:12px;cursor:pointer}',
@@ -4103,10 +4103,10 @@ window.__ModuleLoader__.load({
       '.mt-lanes-note svg{flex:none;margin-top:2px;color:var(--dsw-alias-state-warning-primary)}',
       '.mt-lanes-note b{color:var(--dsw-alias-label-primary);font-weight:600}',
       '.mt-viewbar-right{display:flex;align-items:center;gap:6px;margin-left:auto;flex-wrap:wrap}',
-      /* ── 依赖图（design/dag.html + dag-vertical.html：真实 DOM 测量 + SVG 贝塞尔连线 + marker 箭头）── */
+      /* ── 依赖图（design-v2/p-dag.html + dag-vertical.html：真实 DOM 测量 + SVG 贝塞尔连线 + marker 箭头）── */
       '.mt-viewbar-dir{display:flex;align-items:center;gap:6px;margin-left:auto}',
       '.mt-viewbar-dir .mt-filterlabel{margin-left:0}',
-      /* design/dag.html 的画布是点阵底（16px 网格），撑满视图条与图注之间 */
+      /* design-v2/p-dag.html 的画布是点阵底（16px 网格），撑满视图条与图注之间 */
       '.mt-dagwrap{flex:1 1 0;min-height:0;position:relative;overflow:auto;padding:0;display:flex;min-width:0;gap:0;background:radial-gradient(circle at 1px 1px, var(--dsw-alias-border-l2) 1px, transparent 0) 0 0 / 16px 16px, var(--dsw-alias-bg-layer-1)}',
       '.mt-dag-canvas{position:relative;margin:auto;flex:none}',
       '.mt-dag-svg{position:absolute;left:0;top:0;pointer-events:none;overflow:visible}',
@@ -4137,7 +4137,7 @@ window.__ModuleLoader__.load({
       '.mt-dag-arrow{fill:var(--dsw-alias-border-l3)}',
       '.mt-dag-arrow-hot{fill:var(--dsw-alias-label-emphasis, var(--dsw-alias-label-primary))}',
       /* CHG-202f：`.mt-dag-note` 三条（依赖图图注）随组件一起删除 */
-      /* ── 拖拽流转态（design/dragging.html：lift 悬空卡 + 源列幽灵 + 合法落点高亮 + 被拒回执）── */
+      /* ── 拖拽流转态（design-v2/p-drag.html：lift 悬空卡 + 源列幽灵 + 合法落点高亮 + 被拒回执）── */
       '.mt-workbench{display:flex;flex-direction:column;flex:1;min-height:0;min-width:0;position:relative}',
       '.mt-board{flex:1;min-width:0;padding:10px 14px;display:flex;flex-direction:column;min-height:0;overflow:hidden;border-left:.5px solid var(--dsw-alias-border-l2);position:relative}',
       '.mt-col-drop{position:relative;border-color:var(--dsw-alias-label-emphasis, var(--dsw-alias-label-primary));background:color-mix(in srgb, var(--dsw-alias-label-emphasis, var(--dsw-alias-label-primary)) 10%, var(--dsw-alias-bg-base))}',
@@ -4158,7 +4158,7 @@ window.__ModuleLoader__.load({
       '.mt-task-shake{animation:mt-shake 150ms ease}',
       '@keyframes mt-shake{0%,100%{transform:translateX(0)}25%{transform:translateX(-4px)}75%{transform:translateX(4px)}}',
       '@media (max-width: 980px){.mt-task-lift{right:24px;top:40px}}',
-      /* [G6 flow] design/new-team.html · new-team-1.html · conversation.html · guest.html · tasks.html · team-tasks.html */
+      /* [G6 flow] design-v2/README.md · new-team-1.html · conversation.html · guest.html · tasks.html · team-tasks.html */
       /* CHG-84：向导是绝对定位浮层，必须让工作区成为定位祖先（否则会被裁到视口外/丢失背景遮罩） */
       '.mt-panel .mt-workspace{position:relative}',
       '.mt-wizard{position:absolute;inset:0;z-index:20;display:flex;align-items:center;justify-content:center;padding:16px;background:color-mix(in srgb, var(--dsw-alias-label-primary) 26%, transparent)}',
@@ -4377,7 +4377,7 @@ window.__ModuleLoader__.load({
       '.mt-status-filled .mt-shape{border-radius:50%}',
       '.mt-status-dashed{border-style:dashed;color:var(--dsw-alias-label-secondary)}',
       /* ── 深色模式（R34 / UI-1 过门条件；CHG-99 C13 改为读宿主**解析后**的信号）──────
-       * design/design-notes.md §九：颜色按「角色」定义，深色整段换值、变量名不动。
+       * design-v2/README.md §九：颜色按「角色」定义，深色整段换值、变量名不动。
        * **修复前这里是 13 组双写**：`@media`（系统偏好媒体查询）+ `:root[data-theme="dark"]`
        * （自建属性）。媒体查询读的是**系统**偏好——用户在宿主里
        * 手动切深色（不跟随系统）时它不触发，13 组 color-mix 叠加色停在旧模式，深色底上叠出
@@ -4428,7 +4428,7 @@ window.__ModuleLoader__.load({
       return () => { tag.remove() }
     }
 
-    /* ── 主工作台（常驻面板：全局视图=团队列表+角色↔团队关系；团队视图=工作台+任务流转）── */
+﻿    /* ── 主工作台（常驻面板：全局视图=团队列表+角色↔团队关系；团队视图=工作台+任务流转）── */
 /* ══ CHG-69：全局 / 项目双作用域面板（角色 · 团队 · 任务） ══ */
 
     /** 项目任务按状态分列（项目级看板：不依赖单个团队的 config 列） */
@@ -4437,7 +4437,7 @@ window.__ModuleLoader__.load({
       { name: '就绪', states: ['ready'] },
       { name: '进行中', states: ['in_progress', 're-scoping'] },
       { name: '门禁', states: ['gate:review', 'gate:verify', 'gate:archive'] },
-      /* CHG-85：列名对齐 design/board.html（「已完成」；末列是虚线收口列） */
+      /* CHG-85：列名对齐 design-v2/p-tasks.html（「已完成」；末列是虚线收口列） */
       { name: '已完成', states: ['done'] },
       { name: '未完成', states: ['failed', 'blocked', 'cancelled'], done: true },
     ]
@@ -4510,7 +4510,7 @@ window.__ModuleLoader__.load({
       }
     }
 
-    /** CHG-82 G2：角色卡按 design/roles.html 的 .card 结构——
+    /** CHG-82 G2：角色卡按 design-v2/p-teams.html 的 .card 结构——
      *  圆形头像 + 角色名/ID + 来源 chip + 描述 + 兴趣词 + 模型路由/Skill/MCP + 复制来源 + 脚（实例 / 用它单干 / 复制进项目）。
      *  CHG-74：同名副本要能一眼分辨——被压过的那份标「同名 X 副本（以此为准）」。 */
     const fmtClock = (ts) => {
@@ -4744,7 +4744,7 @@ window.__ModuleLoader__.load({
       return { done: mine.filter((task) => String(task.state ?? '') === 'done').length, total: mine.length }
     }
 
-    /* ── G2 名册卡：一张卡一个角色（design/roster.html + member-menu.html）
+﻿    /* ── G2 名册卡：一张卡一个角色（design-v2/p-roster.html + member-menu.html）
      * 实现者 ×2 是同一张卡的两个实例行；队长不在名册里（roster.captainNote）。
      * 实例行 = iname / 在跑任务 / 交付 x/y · token；⋯ 展开实例管理菜单（指导 / 暂停 / 归档 / 移除 + 影响面）。 */
     function MemberCard({ t, roleId, role, members, tasks, tokens, teamName, taskTitle, readOnly, api, teamId, onOpen, onChanged, onError, onNotice }) {
@@ -5003,7 +5003,7 @@ window.__ModuleLoader__.load({
       })
     }
 
-    /** 名册末尾的「召唤角色」虚线卡（design/roster.html 最后一格） */
+    /** 名册末尾的「召唤角色」虚线卡（design-v2/p-roster.html 最后一格） */
     function RosterSummonCard({ t, onSummon }) {
       return js('button', {
         className: 'mt-roster-card mt-roster-card-summon',
@@ -5125,7 +5125,7 @@ window.__ModuleLoader__.load({
       ] })
     }
 
-    /* ── 看板卡（CHG-69：多队员负责 + 参与团队 chip；优先级只渲染一次）──
+﻿    /* ── 看板卡（CHG-69：多队员负责 + 参与团队 chip；优先级只渲染一次）──
      * CHG-73：证据过期 / 已取消 chip；多选模式下点卡片 = 勾选（不嵌套 button，用 aria-pressed） */
     function TaskCard({ task, onOpen, memberName, t, teamName, selectable, selected, onToggle, showTeamName = true, drag }) {
       const deps = (task.deps ?? []).filter((dep) => dep !== task.id)
@@ -5156,7 +5156,7 @@ window.__ModuleLoader__.load({
         'aria-pressed': picking ? Boolean(selected) : undefined,
         onClick: () => (picking ? onToggle?.(task) : onOpen(task.id)),
         children: [
-          /* design/board.html 的 .tcard-top：任务号 + 优先级（+ 模型徽标） */
+          /* design-v2/p-tasks.html 的 .tcard-top：任务号 + 优先级（+ 模型徽标） */
           js('span', { className: 'mt-task-top', children: [
             picking ? j('span', { className: 'mt-task-check' + (selected ? ' mt-task-check-on' : ''), 'aria-hidden': true, children: selected ? '✓' : '' }) : null,
             locked ? j('span', { className: 'mt-lock-icon', 'aria-hidden': true, children: j('svg', {
@@ -5227,10 +5227,10 @@ window.__ModuleLoader__.load({
       })
     }
 
-    /* ── 泳道（design/lanes.html：蛇形泳道，行 = 角色实例，列 = 四阶段，格 = 该实例在该阶段的节点）──
+﻿    /* ── 泳道（design-v2/p-lanes.html：蛇形泳道，行 = 角色实例，列 = 四阶段，格 = 该实例在该阶段的节点）──
      * 三视图同源同抽屉：节点点开仍是同一个任务详情（onOpen）。列取四个流转阶段；完成 / 未完成是终态桶，不进泳道。 */
     const LANE_STAGES = ['待规划', '就绪', '进行中', '门禁']
-    /** CHG-85：泳道格子内最多显示几张卡，超出折叠（design/tasks.html 同款「还有 N 个」） */
+    /** CHG-85：泳道格子内最多显示几张卡，超出折叠（design-v2/p-tasks.html 同款「还有 N 个」） */
     const LANE_CELL_LIMIT = 4
     const laneStageOf = (state) => {
       for (const name of LANE_STAGES) {
@@ -5243,7 +5243,7 @@ window.__ModuleLoader__.load({
     const assigneesOf = (task) => (task.assignees && task.assignees.length > 0 ? task.assignees : task.assignee ? [task.assignee] : [])
 
     /**
-     * CHG-115：**看板同源换挂载点**（design-notes §五「会话页不重复造面板」）。
+     * CHG-115：**看板同源换挂载点**（design-v2/README.md §五「会话页不重复造面板」）。
      *
      * 面板「任务」页与团队会话视图渲染的是**同一个** BoardView：
      *  - 面板传 `drag` / `onAdd` → 可拖拽、可列内新建的完整看板；
@@ -5288,7 +5288,7 @@ window.__ModuleLoader__.load({
                 j('span', { className: 'mt-col-shape', 'aria-hidden': true }),
                 j('h4', { className: 'mt-col-name', children: col.name }),
                 j('span', { className: 'mt-count', children: list.length }),
-                /* design/board.html 的 .col-head .add：列内直达新建（只读视图不传 onAdd） */
+                /* design-v2/p-tasks.html 的 .col-head .add：列内直达新建（只读视图不传 onAdd） */
                 onAdd ? j('button', {
                   className: 'mt-col-add',
                   title: t('board.addToCol').replace('{col}', col.name),
@@ -5296,7 +5296,7 @@ window.__ModuleLoader__.load({
                   children: '＋',
                 }) : null,
               ] }),
-              /* design/dragging.html 的 .dropzone：合法落点给「释放移入 · 进入后走 审查 → 命令验证 → 存档」 */
+              /* design-v2/p-drag.html 的 .dropzone：合法落点给「释放移入 · 进入后走 审查 → 命令验证 → 存档」 */
               legal ? js('div', { className: 'mt-dropzone', children: [
                 j('svg', {
                   width: 14, height: 14, viewBox: '0 0 16 16', fill: 'none', 'aria-hidden': true,
@@ -5785,7 +5785,7 @@ window.__ModuleLoader__.load({
       return partial ? { tone: 'partial', text: t('cost.partial') } : { tone: 'ok', text: '' }
     }
 
-    /* ── 任务详情（design/detail.html）：主区整页 = 面包屑 + 主列/侧列 + 成本归因 ── */
+﻿    /* ── 任务详情（design-v2/p-task.html）：主区整页 = 面包屑 + 主列/侧列 + 成本归因 ── */
     // T25：离线团队走 loader（getOfflineTaskDetail），readOnly=true 时隐藏沟通输入
     // CHG-73：动作条（重新规划/取消/编辑）+ 证据过期横幅 + 改动记录折叠区 + 取消横幅
     function TaskDetail({ api, t, teamId, taskId, onClose, readOnly, loader, memberName, teamName, members, onEdit, onRescope, onCancel, onDelete, refreshToken, onDiagnosisFixed }) {
@@ -6296,7 +6296,7 @@ window.__ModuleLoader__.load({
       ] })
     }
 
-    /* ── 丢弃暂存计划的两段确认（design/discard.html）──
+﻿    /* ── 丢弃暂存计划的两段确认（design-v2/p-approval.html）──
      * 影响面（N 任务作废 / 归档路径 / 不产生 token）+ 引导改用 Revise；
      * 影响面的计数从 getBoard 现算（单一事实源，不缓存第二份）。 */
     function DiscardDialog({ t, api, teamId, staged, onClose, onDone }) {
@@ -6373,7 +6373,7 @@ window.__ModuleLoader__.load({
       }) })
     }
 
-    /* ── 解散团队的两段确认（design/confirm.html）──
+﻿    /* ── 解散团队的两段确认（design-v2/p-dissolve.html）──
      * 四条不可撤销影响 + 输入团队 ID 才能提交 + 「改用归档」出口；
      * 第一段（confirm:false 拿影响面）由调用方 askDisband 完成，本组件只做第二段。 */
     function DisbandDialog({ t, teamId, teamName, impact, busy, error, onConfirm, onClose, onArchive }) {
@@ -6453,8 +6453,8 @@ window.__ModuleLoader__.load({
       }) })
     }
 
-    /* ── 暂存横幅三动作（FR-1.2：面板唯一写入口）──
-     * CHG-82（G1）：Discard 换成 design/discard.html 的两段确认对话框（不再用 window.confirm） */
+﻿    /* ── 暂存横幅三动作（FR-1.2：面板唯一写入口）──
+     * CHG-82（G1）：Discard 换成 design-v2/p-approval.html 的两段确认对话框（不再用 window.confirm） */
     function StagedBanner({ api, t, teamId, inbox, onAct }) {
       const [discard, setDiscard] = react.useState(null)
       const [busy, setBusy] = react.useState(false)
@@ -6495,7 +6495,7 @@ window.__ModuleLoader__.load({
       ] })
     }
 
-    /* ── 成本 tab（FR-8.2/8.4，CHG-47）：四桶 + 命中率；在线读侧车，离线读 tokens.json ── */
+﻿    /* ── 成本 tab（FR-8.2/8.4，CHG-47）：四桶 + 命中率；在线读侧车，离线读 tokens.json ── */
     /* CHG-153（P2-5 / FR-8.4）：计量覆盖率徽标（三态三色 + 口径文案 title）+ 上下文占比 /
        命中率段条（复用 .mt-segbar 写法；颜色只走 --dsw-alias-* 语义 token，不硬编码色值） */
     function TokensTab({ t, tokens, members, emptyText }) {
@@ -6586,7 +6586,7 @@ window.__ModuleLoader__.load({
     }
 
 
-    /** 三层来源的图标（design/icons.svg 的 i-lock / i-globe / i-folder / i-link；内联，不依赖外部 sprite） */
+    /** 三层来源的图标（design-v2/icons.svg 的 i-lock / i-globe / i-folder / i-link；内联，不依赖外部 sprite） */
     function G3LayerIcon({ kind }) {
       const stroke = { fill: 'none', stroke: 'currentColor', strokeWidth: 1.25, strokeLinecap: 'round', strokeLinejoin: 'round' }
       const paths = kind === 'builtin'
@@ -6740,7 +6740,7 @@ window.__ModuleLoader__.load({
       }) })
     }
 
-    /* ── 知识 tab（FR-17.5 / CHG-82 设计稿对齐，design/knowledge.html）：
+﻿    /* ── 知识 tab（FR-17.5 / CHG-82 设计稿对齐，design-v2/p-knowledge.html）：
           三层记忆（AGENTS.md 共识 / 项目共享库 / 实例私有）+ 证据数 + 「可能过期」标记
           + 待确认提案 + 搜索 + 提案入口 + 条目详情演化时间线（knowledge.revised 账本流）── */
     function KnowledgeTab({ t, data, members }) {
@@ -6748,7 +6748,7 @@ window.__ModuleLoader__.load({
       const [layer, setLayer] = react.useState('all')
       const [openId, setOpenId] = react.useState(null)
       const [showIndex, setShowIndex] = react.useState(false)
-      /* CHG-84：无活跃会话（null）/ 读取中（undefined）也要给满屏骨架 —— design/knowledge.html 是满屏内容，
+      /* CHG-84：无活跃会话（null）/ 读取中（undefined）也要给满屏骨架 —— design-v2/p-knowledge.html 是满屏内容，
        * 不能整页只剩一句话：三层记忆、筛选条、空态与脚注照常渲染，只在提案位放一条说明 note。 */
       const loading = data === undefined
       const unavailable = data === null
@@ -6894,7 +6894,7 @@ window.__ModuleLoader__.load({
       ] })
     }
 
-    /* ── 预设库（design/presets.html）—— 全局作用域子页：
+﻿    /* ── 预设库（design-v2/g-blueprints.html）—— 全局作用域子页：
           三层来源分区 + 每张卡的「名册预览（队长高亮 + 角色引用 chips）+ 模板三行 + 引用计数」
           + 内置层兜底模板 + 删除守门提示。数据只从 getOfflinePresets / getProject().teams 派生。── */
     function PresetsPage({ t, presets, teams, onBack, onUse, onNotice, onSkills }) {
@@ -7000,7 +7000,7 @@ window.__ModuleLoader__.load({
         js('div', { className: 'mt-layer-n', children: [String(n), j('span', { children: unit })] }),
         action ? j('button', { className: 'mt-btn mt-btn-sm', onClick: action, children: actionLabel }) : null,
       ] })
-      /* design/presets.html：项目分区末尾跟着一张虚线「新建预设」卡（和卡片同栅格），不是页头按钮的重复 */
+      /* design-v2/g-blueprints.html：项目分区末尾跟着一张虚线「新建预设」卡（和卡片同栅格），不是页头按钮的重复 */
       const newCard = js('button', {
         className: 'mt-p3-newcard',
         onClick: () => onNotice?.(t('preset3.readonlyHint')),
@@ -7038,7 +7038,7 @@ window.__ModuleLoader__.load({
           js('div', { className: 'mt-kb3-head', children: [
             js('div', { children: [j('h2', { children: t('preset3.title') }), j('p', { children: t('preset3.desc') })] }),
             js('div', { className: 'mt-kb3-head-actions', children: [
-              /* design/presets.html：页头主按钮是描边（不是实底主色），只有空态兜底卡用虚线 */
+              /* design-v2/g-blueprints.html：页头主按钮是描边（不是实底主色），只有空态兜底卡用虚线 */
               j('button', { className: 'mt-btn', onClick: () => onNotice?.(t('preset3.readonlyHint')), children: `＋ ${t('preset3.new')}` }),
             ] }),
           ] }),
@@ -7075,7 +7075,7 @@ window.__ModuleLoader__.load({
       ] })
     }
 
-    /* ── 技能 & MCP（design/skills.html）—— 全局作用域子页：
+﻿    /* ── 技能 & MCP（design-v2/README.md）—— 全局作用域子页：
           技能四层来源（内置 / 全局 / 项目 / 角色绑定）+ 成员级隔离说明 + 技能条目（绑定次数 / 绑进角色）
           + 下半部 MCP 两段式左右对照（连接层 ∩ 可见层，中间链接图标表示交集）。── */
     function SkillsPage({ t, roles, catalog, onBack, onBind, onNotice, onPresets }) {
@@ -7256,8 +7256,8 @@ window.__ModuleLoader__.load({
     const allTasksOf = (board) => (board?.board?.columns ?? []).flatMap((col) => col.tasks ?? [])
 
 
-    /* ── 依赖图（CHG-69/CHG-82：真实 DOM 测量 + SVG 贝塞尔连线 + 横向/竖向两种布局）──
-     * 口径对齐 design/dag.js：先把节点宽度钉死再测量（横向 176 定宽；竖向按容器 ~34%、240–400），
+﻿    /* ── 依赖图（CHG-69/CHG-82：真实 DOM 测量 + SVG 贝塞尔连线 + 横向/竖向两种布局）──
+     * 口径对齐 design-v2/p-dag.html：先把节点宽度钉死再测量（横向 176 定宽；竖向按容器 ~34%、240–400），
      * 依赖层级 = 主轴（h: 列 / v: 行），同层多节点在副轴居中，层间距 60；
      * 画布宽高取 max(内容, 容器)，节点在画布里居中；箭头永远从上游指到下游。
      * tasks 需要已把 deps 映射成图内 id（项目级用 ownerTeamId/taskId 复合键）。 */
@@ -7270,7 +7270,7 @@ window.__ModuleLoader__.load({
     const DAG_MAX_LAYOUT_PASSES = 8
     const DAG_MODEL_RE = /^(sonnet|gpt-|claude|opus|qwen|gemini|deepseek|llama|mistral|glm)/i
     /** 任务状态 → 节点色带（H4：文字 + 形状为主，色带只作第三顺位） */
-    /** 状态机允许的拖拽落点（design/dragging.html：门禁未过的卡进不了已完成） */
+    /** 状态机允许的拖拽落点（design-v2/p-drag.html：门禁未过的卡进不了已完成） */
     const DRAG_LEGAL_TARGETS = {
       '待规划': ['就绪'],
       '就绪': ['进行中'],
@@ -7455,7 +7455,7 @@ window.__ModuleLoader__.load({
       const canvasH = Math.max(contentH, avail.h)
       const extraX = Math.max(0, (canvasW - contentW) / 2)
       const extraY = Math.max(0, (canvasH - contentH) / 2)
-      // 5) 在跑的依赖链 = 运行节点 + 全部上游 + 全部下游（design/dag.js 的 HOT 口径）
+      // 5) 在跑的依赖链 = 运行节点 + 全部上游 + 全部下游（design-v2/p-dag.html 的 HOT 口径）
       const hot = new Set()
       for (const task of tasks) {
         if (dagChipOf(task.state) !== 'run') continue
@@ -7586,7 +7586,7 @@ window.__ModuleLoader__.load({
     }
 
 
-    /* ── 审计回放（design/audit.html：按任务/角色/时间三档 + attempt 分组 + 只读标注 + 分页）── */
+﻿    /* ── 审计回放（design-v2/p-audit.html：按任务/角色/时间三档 + attempt 分组 + 只读标注 + 分页）── */
     const AUDIT_VIEWS = ['task', 'member', 'time']
     /** 事件 → 圆点语义（claimed 领取 / run 进展 / warn 门禁·知识 / failed 失败；颜色只作第三顺位） */
     const auditDotClass = (type) => {
@@ -7597,7 +7597,7 @@ window.__ModuleLoader__.load({
       if (raw === 'task.escalated' || raw === 'task.gate.result' || raw === 'plan.revised' || raw.startsWith('knowledge.')) return 'mt-evdot-warn'
       return ''
     }
-    /** 审计左轨的任务状态点（design/audit.html：门禁 = 琥珀菱形，其余走状态点；文字另有，颜色只作第三顺位） */
+    /** 审计左轨的任务状态点（design-v2/p-audit.html：门禁 = 琥珀菱形，其余走状态点；文字另有，颜色只作第三顺位） */
     const auditRailDotClass = (state) => {
       const raw = String(state ?? '')
       if (!raw) return 'mt-mdot'
@@ -7771,7 +7771,7 @@ window.__ModuleLoader__.load({
       ] })
     }
 
-    /* ── 团队设置（design/settings.html：配置来源三层合并链 + 行为配置硬上限 + 状态目录 + 生命周期）── */
+﻿    /* ── 团队设置（design-v2/p-settings.html：配置来源三层合并链 + 行为配置硬上限 + 状态目录 + 生命周期）── */
     /* CHG-187（FR-32 支柱一）：硬上限与 `PATCH_CEILINGS` 同源（memberMaxDepth 2 / maxChildren 5） */
     const CONFIG_CEILINGS = { maxMembers: 6, memberMaxDepth: 2, maxChildren: 5, commandTimeoutMs: 600000 }
     const LAYER_ICONS = {
@@ -8494,7 +8494,7 @@ window.__ModuleLoader__.load({
       ] })
     }
 
-    function RoleCard({ t, role, onOpen, onGuest, onCopyToProject, onCompare, projectCopyExists }) {
+﻿    function RoleCard({ t, role, onOpen, onGuest, onCopyToProject, onCompare, projectCopyExists }) {
       const words = role.interestWords ?? []
       const instances = (role.memberships ?? []).map((membership) => membership.instanceName)
       const fork = role.shadowedBy
@@ -8542,7 +8542,7 @@ window.__ModuleLoader__.load({
             j('span', { children: fork }),
           ] }) : null,
           js('div', { className: 'mt-rolecard-foot', children: [
-            /* design/roles.html：队长卡脚只写「不可召唤 · 即当前会话」（不列 0 实例） */
+            /* design-v2/p-teams.html：队长卡脚只写「不可召唤 · 即当前会话」（不列 0 实例） */
             role.isCaptain && instances.length === 0
               ? null
               : role.origin === 'project'
@@ -8562,7 +8562,7 @@ window.__ModuleLoader__.load({
       })
     }
 
-    /** 项目自身角色卡（design/roles.html 的 .team-card：名称 + ID chip + 在线点 + 描述 + meta） */
+    /** 项目自身角色卡（design-v2/p-teams.html 的 .team-card：名称 + ID chip + 在线点 + 描述 + meta） */
     function ProjectRoleCard({ t, role, onOpen }) {
       return js('div', { className: 'mt-team-card mt-projectrole-card', children: [
         js('div', { className: 'mt-team-head', children: [
@@ -8580,7 +8580,7 @@ window.__ModuleLoader__.load({
       ] })
     }
 
-    /** 创建角色虚线卡（design/roles.html 最后一格） */
+    /** 创建角色虚线卡（design-v2/p-teams.html 最后一格） */
     function RoleCardCreate({ t, onCreate }) {
       return js('button', { className: 'mt-rolecard mt-rolecard-lib mt-rolecard-create', onClick: () => onCreate?.(), children: [
         j('span', { className: 'mt-rolecard-create-ico', 'aria-hidden': true, children: '＋' }),
@@ -8637,7 +8637,7 @@ window.__ModuleLoader__.load({
       ] })
     }
 
-    /** CHG-82 G2：角色库（design/roles.html）——三层来源分区 + 搜索/来源筛选 + 引用计数 + 复制/对比 + 创建卡 */
+    /** CHG-82 G2：角色库（design-v2/p-teams.html）——三层来源分区 + 搜索/来源筛选 + 引用计数 + 复制/对比 + 创建卡 */
     function RoleLibrary({ t, pv, onOpen, onGuest, onCopyToProject, onCompare, onCreate, onIntroGlobal, filter, onFilter }) {
       const [query, setQuery] = react.useState('')
       /* CHG-202x（P0-3）：来源筛选可**受控**——「引入全局角色」按钮把它切到 global（列表里就能复制/对比），
@@ -8728,7 +8728,7 @@ window.__ModuleLoader__.load({
       ] })
     }
 
-    /** CHG-82 G2：角色详情（design/role-detail.html）——
+    /** CHG-82 G2：角色详情（design-v2/p-teams.html）——
      *  左列：定义与设定（职责 / 边界 / 兴趣词 + 系统提示词块 + 模型路由）· 技能（启用开关）· MCP 与工具；
      *  侧列：在册情况（跨团队聘任与实例）· 快照规则 · 操作（复制到项目 / 在队长会话试召唤 / 删除）。
      *  CHG-73：删除角色两段确认（先展示 usage）。 */
@@ -8870,7 +8870,7 @@ window.__ModuleLoader__.load({
       return contributionsBody(t, data, { busy, onReload: reload, err })
     }
 
-    /* CHG-202z（FR-33 · M3-7b）：roleTasks = 这个角色在项目里的任务（「在跑 / 待领」反向视图） */
+﻿    /* CHG-202z（FR-33 · M3-7b）：roleTasks = 这个角色在项目里的任务（「在跑 / 待领」反向视图） */
     function RoleDetailDrawer({ t, data, onClose, teamName, onEdit, onDelete, deleteHint, onCopyToProject, onGuest, skillTotal, onPublish, copyHint, roleTasks }) {
       const [usage, setUsage] = react.useState(null)
       const [delBusy, setDelBusy] = react.useState(false)
@@ -9157,8 +9157,8 @@ window.__ModuleLoader__.load({
       ] })
     }
 
-    /** 团队卡（design/shell.html 的 .team-card：名称 + 状态 chip + 在线/离线 + 描述 + 完成度行） */
-    function ArchiveReplay({ t, team: teamProp, tasks: tasksProp, tokens: tokensProp, audit: auditProp, memberName, onBack, onMoreAudit, onOpenAll, onOpenTask, archive, archiveRoot }) {
+    /** 团队卡（design-v2/p-teams.html 的 .team-card：名称 + 状态 chip + 在线/离线 + 描述 + 完成度行） */
+﻿    function ArchiveReplay({ t, team: teamProp, tasks: tasksProp, tokens: tokensProp, audit: auditProp, memberName, onBack, onMoreAudit, onOpenAll, onOpenTask, archive, archiveRoot }) {
       const snap = archive && typeof archive === 'object' ? archive : null
       /* 快照优先：字段名与 host 侧 ArchiveTeamSnapshot 一一对应（不重命名、不猜） */
       const team = snap
@@ -9239,7 +9239,7 @@ window.__ModuleLoader__.load({
         ] }),
         js('div', { className: 'mt-listrow-act', children: act ?? null }),
       ] })
-      /* 视图条 = 回放分区锚点（design/archive.html 的 nav.seg：结局 / 名册 · N / 任务历史 · N / 账本与产物） */
+      /* 视图条 = 回放分区锚点（design-v2/p-archive.html 的 nav.seg：结局 / 名册 · N / 任务历史 · N / 账本与产物） */
       const archiveNav = (label, id) => j('button', {
         key: id,
         className: 'mt-audit-segbtn',
@@ -9416,7 +9416,7 @@ window.__ModuleLoader__.load({
     }
 
     /** 诊断 chip（CHG-72，FR-30）：把「为什么没人领」直接放在任务卡/详情上 */
-    function TeamCard({ t, team, taskCount, gateCount, onOpen }) {
+﻿    function TeamCard({ t, team, taskCount, gateCount, onOpen }) {
       const counts = team.counts ?? {}
       const tone = team.state === 'archived' ? 'idle' : team.state === 'draft' ? 'gate' : team.online ? 'run' : 'idle'
       return js('button', {
@@ -9439,10 +9439,10 @@ window.__ModuleLoader__.load({
       })
     }
 
-    /* CHG-83：design/overview.html 的「全部团队」不再内联在全局页 —— 它把「角色库三层」与
+    /* CHG-83：design-v2/p-overview.html 的「全部团队」不再内联在全局页 —— 它把「角色库三层」与
      * 「团队 tab」两处内容又摆了一遍（用户："怎么还有一个这个区域"）。归档团队仍从
      * 「团队」tab 进来（TeamCard 带「已归档」状态 chip，点开就是归档回放）。 */
-    /** 项目 · 团队列表（design/shell.html：筛选行 + 按工作区分组的团队卡） */
+    /** 项目 · 团队列表（design-v2/p-teams.html：筛选行 + 按工作区分组的团队卡） */
     function TeamsHome({ t, teams, tasks, gateOf, onOpen, workspaceRoot, onCreateTeam }) {
       const [query, setQuery] = react.useState('')
       const needle = String(query ?? '').trim().toLowerCase()
@@ -9474,7 +9474,7 @@ window.__ModuleLoader__.load({
           ] }),
           j('p', { className: 'mt-home-hint', children: t('shell.hint') }),
           /* CHG-84 收口：CHG-83 撤掉全局页的「全部团队」后，面板里就没有建团入口了
-           * （预设卡上的「用这个建团队」只在项目层有预设时出现）。按 design/shell.html
+           * （预设卡上的「用这个建团队」只在项目层有预设时出现）。按 design-v2/p-teams.html
            * 工作区头的「新建」补回一颗，落在「项目 → 团队」tab。 */
           onCreateTeam ? j('button', { className: 'mt-btn mt-btn-primary', onClick: onCreateTeam, children: t('shell.newTeam') }) : null,
         ] }),
@@ -9499,9 +9499,9 @@ window.__ModuleLoader__.load({
     }
 
 
-    /** 归档回放（design/archive.html：归档条 + 结局卡 + 进度分段 + 名册 + 五项分解 + 任务历史 + 账本） */
+    /** 归档回放（design-v2/p-archive.html：归档条 + 结局卡 + 进度分段 + 名册 + 五项分解 + 任务历史 + 账本） */
     /**
-     * 归档回放（design/archive.html）。
+     * 归档回放（design-v2/p-archive.html）。
      *
      * CHG-86 / P0-2：**优先用 `getArchive` 返回的真实快照**（`archive/<teamId>/team.json`、
      * `tokens.json`、`members/*.json`、`artifacts/` 的落盘内容），拿不到时（离线团队 /
@@ -9516,7 +9516,7 @@ window.__ModuleLoader__.load({
      *  离线/只读：按钮 disabled + title 用既有只读文案。 */
 
     /** 剪贴板（建队指令复制；不可用时降级 execCommand） */
-    const copyText = async (text) => {
+﻿    const copyText = async (text) => {
       try {
         if (typeof navigator !== 'undefined' && navigator.clipboard?.writeText) {
           await navigator.clipboard.writeText(text)
@@ -9567,7 +9567,7 @@ window.__ModuleLoader__.load({
     }
 
     /** 建队引导抽屉（CHG-72，FR-26 P1）：填名称/目标/模板 → 打开团队模式会话并预填首条消息 */
-    /** 建团向导（CHG-82 / G6）：design/new-team-1.html 第 1 步「选预设」→ design/new-team.html 第 2 步「组建名册」→ 第 3 步「写目标」。
+    /** 建团向导（CHG-82 / G6）：design-v2/README.md 第 1 步「选预设」→ design-v2/README.md 第 2 步「组建名册」→ 第 3 步「写目标」。
      *  名册里存角色引用（实例名决定将创建的实例，同名自动加 -2）；队长 = 会话本身，不占名册；成员会话在点「创建团队」后才创建。 */
     function CapabilityPicker({ t, label, value, options, onChange, emptyText, placeholder }) {
       const picked = value ?? []
@@ -10047,7 +10047,7 @@ window.__ModuleLoader__.load({
         ] }),
       ] })
     }
-    function TeamCreateDrawer({ t, ctx, projectRoot, presets, roles, onClose, onManagePresets, onRetryPresets }) {
+﻿    function TeamCreateDrawer({ t, ctx, projectRoot, presets, roles, onClose, onManagePresets, onRetryPresets }) {
       const [step, setStep] = react.useState(1)
       const [name, setName] = react.useState('')
       const [goal, setGoal] = react.useState('')
@@ -10059,7 +10059,7 @@ window.__ModuleLoader__.load({
       const [copied, setCopied] = react.useState(false)
       const entries = presets?.entries ?? []
       const MAX_ROSTER = 6
-      /** design/new-team-1.html 的加载态：预设目录是异步拉的（getOfflinePresets 要读预设目录），
+      /** design-v2/README.md 的加载态：预设目录是异步拉的（getOfflinePresets 要读预设目录），
        *  未就绪时立刻给骨架，别让用户以为点了没反应；读取失败给「重试」+ 兜底「不套预设」。 */
       const presetsLoading = presets === undefined
       const presetsFailed = presets === null
@@ -10301,7 +10301,7 @@ window.__ModuleLoader__.load({
             j('p', { className: 'mt-wizard-desc', children: t(DESC_KEYS[step]) }),
           ] }),
           js('div', { className: 'mt-wizard-body', children: [
-            /* 第 1 步：预设未就绪先给骨架/失败态，再给选项（design/new-team-1.html） */
+            /* 第 1 步：预设未就绪先给骨架/失败态，再给选项（design-v2/README.md） */
             step === 1 && presetsLoading ? presetSkeleton : null,
             step === 1 && presetsFailed ? presetFailedNote : null,
             /* 失败时仍给「不套预设」兜底（presetList 在 entries 为空时只剩这一条） */
@@ -10319,9 +10319,9 @@ window.__ModuleLoader__.load({
     }
 
     /** 角色表单（CHG-72，FR-27；CHG-73：技能/MCP 改目录多选）：写项目角色库；同名两段确认；内置/全局走「复制到项目」 */
-    /* ── 会话页（design/conversation.html）与单角色调用（design/guest.html）──
+﻿    /* ── 会话页（design-v2/README.md）与单角色调用（design-v2/README.md）──
      * 落点：conversation.view（团队视图壳）+ tool.call.toolview（myteam_* 工具卡）。
-     * 纪律（design-notes §五）：会话页不重复造面板 —— 工具卡只给摘要 + 两个出口，
+     * 纪律（design-v2/README.md §五）：会话页不重复造面板 —— 工具卡只给摘要 + 两个出口，
      * 不把整个看板塞进对话流；composer 输入框属于宿主，插件侧以视图内演示区块代替。 */
 
     /** 工具卡外壳（design .toolcard）：图标 + 工具名 + 摘要 + 折叠箭头 + 体 + 脚 */
@@ -10875,7 +10875,7 @@ window.__ModuleLoader__.load({
       return j(ToolCardShell, { t, icon: '⛓', name: 'myteam_apply_roles', stat, children: body })
     }
 
-    /* ── composer dock chip（会话槽：inject 回调首参 = sessionId；非队长会话轮询得 unavailable → 不亮）── */
+﻿    /* ── composer dock chip（会话槽：inject 回调首参 = sessionId；非队长会话轮询得 unavailable → 不亮）── */
     function DockChip(props) {
       const { ctx, connection, sessionId, t: tProp } = props
       const t = tProp ?? ((k) => zh[k] ?? k)
@@ -10917,7 +10917,7 @@ window.__ModuleLoader__.load({
           if (typeof document !== 'undefined') document.removeEventListener('visibilitychange', onVisible)
         }
       }, [sessionId, connection])
-      /* design/conversation.html 的 .dockrow：live=0 且 unread=0 时整块不渲染 */
+      /* design-v2/README.md 的 .dockrow：live=0 且 unread=0 时整块不渲染 */
       if (live === 0 && unread === 0) return null
       return js('div', { className: 'mt-dockrow', ...themeAttr, children: [
         j('button', {
@@ -11403,7 +11403,7 @@ window.__ModuleLoader__.load({
       ] })
     }
 
-    function Panel(props) {
+﻿    function Panel(props) {
       const { ctx, connection, t: tProp, mode = 'global', sessionId: panelSessionId } = props
       const t = tProp ?? ((k) => zh[k] ?? k)
       /* CHG-201：作用域由**挂载点**决定（不是界面状态）——界面内的 setScope 一律无效，
@@ -11500,14 +11500,14 @@ window.__ModuleLoader__.load({
       const [error, setError] = react.useState(null)
       const [selectedTeamId, setSelectedTeamId] = react.useState(entryNav?.teamId ?? null)
       const [teamTab, setTeamTab] = react.useState(entryNav?.teamTab ?? 'members')     // 队员 | 参与任务 | 知识 | 审计 | 设置
-      /* design/team-tasks.html：本队角色筛选（全部 / 主责 / 协作） */
+      /* design-v2/p-teams.html：本队角色筛选（全部 / 主责 / 协作） */
       const [teamTaskFilter, setTeamTaskFilter] = react.useState('all')
       const [taskView, setTaskView] = react.useState('board')     // 列表 | 看板 | 流程 | 依赖图
       /* CHG-202x（P0-3）：角色库的来源筛选（all | project | global | builtin）——受控，
        * 好让「引入全局角色」这类跨区块入口真的能切视图。 */
       const [roleOriginFilter, setRoleOriginFilter] = react.useState('all')
       const [dagDir, setDagDir] = react.useState('h')
-      // CHG-82：拖拽流转态（design/dragging.html）—— 被拖起的卡 + 当前落点列 + 被拒回执
+      // CHG-82：拖拽流转态（design-v2/p-drag.html）—— 被拖起的卡 + 当前落点列 + 被拒回执
       const [dragTask, setDragTask] = react.useState(null)
       const [dragToast, setDragToast] = react.useState(null)
       const [dragShake, setDragShake] = react.useState(null)      // 非法落点：源卡抖动 + 弹回 150ms
@@ -11534,7 +11534,7 @@ window.__ModuleLoader__.load({
       const [showCost, setShowCost] = react.useState(false)
       /* CHG-202x（P1-13）：成本栏刷新令牌（+1 = 重新拉一次 tokens 侧车） */
       const [costToken, setCostToken] = react.useState(0)
-      /* CHG-82（G3）：全局作用域的随行资产子页——角色库 / 预设库 / 技能 & MCP（design/presets.html · skills.html） */
+      /* CHG-82（G3）：全局作用域的随行资产子页——角色库 / 预设库 / 技能 & MCP（design-v2/g-blueprints.html · skills.html） */
       const [globalPage, setGlobalPage] = react.useState('roles')
       const [disband, setDisband] = react.useState(null)
       /* CHG-86 / P0-2：归档快照（getArchive 的真实落盘内容；undefined=未加载，null=未归档） */
@@ -12042,7 +12042,7 @@ window.__ModuleLoader__.load({
         ] }),
       ] })
 
-      /* CHG-82（G3）：全局作用域的随行资产子页——预设库（design/presets.html）与技能 & MCP（design/skills.html）。
+      /* CHG-82（G3）：全局作用域的随行资产子页——预设库（design-v2/g-blueprints.html）与技能 & MCP（design-v2/README.md）。
        * 两层都是「入口不藏」：随行资产卡直接进，页内 teambar 的「← 全局」回角色库。 */
       /* CHG-201：全局子页（预设 / 技能 & MCP）**不依赖项目**——只读全局资产。 */
       if (scope === 'global' && globalPage !== 'roles') {
@@ -12084,7 +12084,7 @@ window.__ModuleLoader__.load({
         }
         return js('div', { className: 'mt-panel', ...themeAttr, children: [
           topbar,
-          /* CHG-80：信息条按 design/global.html 的 header.teambar——作用域标题 + 副标题 + 说明 + 主按钮 */
+          /* CHG-80：信息条按 design-v2/g-overview.html 的 header.teambar——作用域标题 + 副标题 + 说明 + 主按钮 */
           js('div', { className: 'mt-teambar', children: [
             js('span', { className: 'mt-teambar-title', children: [
               j('b', { children: t('scope.global') }),
@@ -12132,7 +12132,7 @@ window.__ModuleLoader__.load({
             globalRoles.length === 0
               ? j('div', { className: 'mt-empty-inline mt-hint', children: t('roles.empty') })
               : js('div', { className: 'mt-cardgrid', children: globalRoles.map((role) => j(RoleCard, { key: `${role.origin}:${role.id}`, t, role, onOpen: setOpenRole })) }),
-            /* CHG-80：随行资产按 design/global.html 的卡片结构重做——
+            /* CHG-80：随行资产按 design-v2/g-overview.html 的卡片结构重做——
              * 图标 + 标题 + 副标题 + 一行内容 + 跳转脚；点击滚到下方对应区块，不再用大留白静态卡。 */
             js('div', { className: 'mt-section-head', children: [
               j('h3', { children: t('global.assets') }),
@@ -12164,7 +12164,7 @@ window.__ModuleLoader__.load({
                     : t('global.presetsEmpty') }),
                   js('div', { className: 'mt-assetcard-foot', children: [
                     j('span', { className: 'mt-hint', children: t('global.presetCount').replace('{n}', String(presets?.entries?.length ?? 0)) }),
-                    /* CHG-85：跳转指示用 SVG chevron（design/icons.svg#i-chevron-right），不用 → 字符 */
+                    /* CHG-85：跳转指示用 SVG chevron（design-v2/icons.svg#i-chevron-right），不用 → 字符 */
                     j('span', { className: 'mt-assetcard-chev', 'aria-hidden': true, children: j('svg', {
                       width: 14, height: 14, viewBox: '0 0 24 24', fill: 'none',
                       children: j('path', { d: 'M9.5 6l6 6-6 6', stroke: 'currentColor', strokeWidth: 1.75, strokeLinecap: 'round', strokeLinejoin: 'round' }),
@@ -12203,7 +12203,7 @@ window.__ModuleLoader__.load({
                 ],
               }),
             ] }),
-            /* CHG-82（G3）：预设库与技能 & MCP 各自成页（design/presets.html · skills.html），
+            /* CHG-82（G3）：预设库与技能 & MCP 各自成页（design-v2/g-blueprints.html · skills.html），
              * 入口就是上面的随行资产卡——这里不再内联一份预设卡列表（避免两套模板渲染）。 */
           ] }),
           openRole ? j(RoleDetailDrawer, {
@@ -12429,7 +12429,7 @@ window.__ModuleLoader__.load({
         }
       }
       /* CHG-73：批量编排——按主责团队分组逐个 batchTaskOp（每条事件同一 batchId 由服务端落） */
-      /* 角色页（design/roles.html）：三层来源分区 + 搜索/来源筛选 + 引用计数 + 复制/对比 + 创建卡 */
+      /* 角色页（design-v2/p-teams.html）：三层来源分区 + 搜索/来源筛选 + 引用计数 + 复制/对比 + 创建卡 */
       /* CHG-202c：**必须带类名**。`.mt-workspace` 是 `display:flex` 的**行**容器，这个根 div 是它的
        * flex item（`flex:0 1 auto`）——不给 `flex:1` 就退化成「内容宽度」，于是里面
        * `padding-inline: calc((100% - 1100px)/2)` 的百分比按**收缩后的宽度**算（2148 画布下实测
@@ -12474,7 +12474,7 @@ window.__ModuleLoader__.load({
       const teamsPage = selectedTeam
         ? (() => {
           const team = selectedTeam
-          /* [G4 ledger · 归档回放] —— design/archive.html：归档团队整体换归档条 + 只读回放 */
+          /* [G4 ledger · 归档回放] —— design-v2/p-archive.html：归档团队整体换归档条 + 只读回放 */
           if (team.state === 'archived') {
             const archivedTasks = (pv.tasks ?? []).filter((task) => task.ownerTeamId === team.teamId)
             const loadMoreAudit = async () => {
@@ -12520,7 +12520,7 @@ window.__ModuleLoader__.load({
             return t(`tab.${key}`)
           }
           let content
-          /* [G2 roster · 名册 tab] —— 团队内「队员」tab（design/roster.html）：一张卡一个角色 + 实例行 + 召唤卡 */
+          /* [G2 roster · 名册 tab] —— 团队内「队员」tab（design-v2/p-roster.html）：一张卡一个角色 + 实例行 + 召唤卡 */
           if (teamTab === 'members') {
             const active = members.filter((m) => m.status === 'active' || m.status === 'suspended')
             const inactive = members.filter((m) => m.status !== 'active' && m.status !== 'suspended')
@@ -12607,7 +12607,7 @@ window.__ModuleLoader__.load({
               }),
               j('p', { className: 'mt-note', children: t('roster.limitNote').replace('{n}', String(maxMembers)).replace('{active}', String(members.filter((m) => m.status === 'active' || m.status === 'suspended').length)) }),
             ] })
-          /* [G2 roster · 参与任务 tab] —— 团队参与的跨团队任务（design/team-tasks.html） */
+          /* [G2 roster · 参与任务 tab] —— 团队参与的跨团队任务（design-v2/p-teams.html） */
           } else if (teamTab === 'participating') {
             const leadCount = teamTasksAll.filter((task) => (task.participants ?? []).some((p) => p.teamId === team.teamId && p.role === 'lead')).length
             const coopCount = teamTasksAll.filter((task) => (task.participants ?? []).some((p) => p.teamId === team.teamId && p.role === 'coop')).length
@@ -12625,7 +12625,7 @@ window.__ModuleLoader__.load({
             const shown = filtered.slice(0, PARTICIPATING_LIMIT)
             const rest = filtered.slice(PARTICIPATING_LIMIT)
             content = js('div', { className: 'mt-page', children: [
-              /* 任务头 + 页头（design/team-tasks.html 的 .page-head：只列本团队参与的任务与主责/协作） */
+              /* 任务头 + 页头（design-v2/p-teams.html 的 .page-head：只列本团队参与的任务与主责/协作） */
               js('div', { className: 'mt-section-head', children: [
                 j('h3', { children: t('g6.teamTasks.title') }),
                 j('span', { className: 'mt-rule', 'aria-hidden': true }),
@@ -12662,7 +12662,7 @@ window.__ModuleLoader__.load({
                       j('span', { className: 'mt-tid', children: task.id }),
                       j('span', { className: 'mt-tt', children: task.title }),
                       j('span', {
-                        /* design/team-tasks.html：主责 = 实心主色 chip，协作 = 虚线 chip */
+                        /* design-v2/p-teams.html：主责 = 实心主色 chip，协作 = 虚线 chip */
                         className: `mt-status-chip ${mine.role === 'lead' ? 'mt-status-filled' : 'mt-status-dashed'}`,
                         children: [
                           j('span', { className: 'mt-shape', 'aria-hidden': true }),
@@ -12703,7 +12703,7 @@ window.__ModuleLoader__.load({
                 j('span', { children: t('g6.teamTasks.note') }),
               ] }),
             ] })
-          /* [G3 knowledge · 知识 tab] —— design/knowledge.html */
+          /* [G3 knowledge · 知识 tab] —— design-v2/p-knowledge.html */
           } else if (teamTab === 'knowledge') {
             /* 写路径（提案裁决）与只读数据面分开渲染：KnowledgeTab 的 props 契约保持
              * `{ t, data, members }`（t63-1 断言），采纳 / 驳回由 KnowledgeProposals 直通 adoptKnowledge。 */
@@ -12721,7 +12721,7 @@ window.__ModuleLoader__.load({
               }),
               j(KnowledgeTab, { t, data: kb, members }),
             ] })
-          /* [G4 ledger · 审计 tab] —— design/audit.html */
+          /* [G4 ledger · 审计 tab] —— design-v2/p-audit.html */
           } else if (teamTab === 'audit') {
             content = j(AuditTab, {
               t, audit, tasks: teamTasksAll, memberName,
@@ -12745,7 +12745,7 @@ window.__ModuleLoader__.load({
           /* [G4 ledger · 反馈 tab] —— design 未单列屏；FR-11.6「先可观测不自动改」 */
           } else if (teamTab === 'feedback') {
             content = j(PlanFeedbackTab, { t, feedback })
-          /* [G4 ledger · 设置 tab] —— design/settings.html */
+          /* [G4 ledger · 设置 tab] —— design-v2/p-settings.html */
           } else {
             content = j(SettingsTab, {
               t,
@@ -12791,7 +12791,7 @@ window.__ModuleLoader__.load({
               j('span', { className: 'mt-hint', children: `${t('global.counts').replace('{done}', String(team.counts?.done ?? 0)).replace('{total}', String(team.counts?.tasks ?? 0))} · ${t('global.running').replace('{n}', String(team.counts?.running ?? 0))}` }),
               team.online ? j('button', { className: 'mt-btn mt-btn-danger', onClick: askDisband, children: t('action.disband') }) : null,
             ] }),
-            /* CHG-82 G1：解散改走 design/confirm.html 的两段确认（四条不可撤销影响 + 输入 teamId 才可提交） */
+            /* CHG-82 G1：解散改走 design-v2/p-dissolve.html 的两段确认（四条不可撤销影响 + 输入 teamId 才可提交） */
             disband ? j(DisbandDialog, {
               t,
               teamId: team.teamId,
@@ -12906,7 +12906,7 @@ window.__ModuleLoader__.load({
         setNotice(failureNotes.length > 0 ? `${withRewired} · ${t('batch.failedItems').replace('{items}', failureNotes.join('；'))}` : withRewired)
         exitSelect()
       }
-      /* design/lanes.html 的 .trail：参与团队轨（行首头像 + 名称 + 参与统计） */
+      /* design-v2/p-lanes.html 的 .trail：参与团队轨（行首头像 + 名称 + 参与统计） */
       const railItem = (key, name, meta, avatar, pressed) => js('button', {
         key,
         className: 'mt-teamrail-item mt-titem',
@@ -12938,7 +12938,7 @@ window.__ModuleLoader__.load({
        * 写路径的 service 由 `TaskDetail` 用 `openTask.sessionId`（**任务所属团队**）取。 */
       const openTaskOf = (task) => { const target = taskOpenTarget(task); if (target) setOpenTask(target) }
 
-      /* CHG-82：拖拽流转（design/dragging.html）—— 落点由状态机判定；非法落点抖动 + 弹回 + 左下角回执 */
+      /* CHG-82：拖拽流转（design-v2/p-drag.html）—— 落点由状态机判定；非法落点抖动 + 弹回 + 左下角回执 */
       /** attempt 失效（门禁未过 / 已取消）的卡锁住不可拖 */
       const dragLocked = (task) => Boolean(task?.evidenceStale || task?.cancelled)
       /** 状态机允许的落点：门禁 → 完成要求门禁已过（超时过的卡 = 门禁未过） */
@@ -12984,7 +12984,7 @@ window.__ModuleLoader__.load({
       const dragPropsOf = (task) => ({ locked: dragLocked(task), shake: dragShake === task.key, onDragStart: startDrag, onDragEnd: endDrag })
       const draggedTask = dragTask ? allProjectTasks.find((item) => item.key === dragTask.key) : null
       const runningCodes = shownTasks.filter((task) => task.state === 'in_progress' || task.state === 're-scoping').map((task) => task.id)
-      /** 拖起的卡悬在「进行中 → 门禁」交界的空中（design/dragging.html 的 .tcard.lift） */
+      /** 拖起的卡悬在「进行中 → 门禁」交界的空中（design-v2/p-drag.html 的 .tcard.lift） */
       const liftCard = draggedTask ? js('div', {
         className: 'mt-task mt-task-lift',
         'aria-grabbed': 'true',
@@ -13031,8 +13031,8 @@ window.__ModuleLoader__.load({
           },
         })
       } else if (taskView === 'list') {
-        /* 项目级任务列表（design/tasks.html）：任务头 + 汇总条 + 按团队分组任务行 + 视图条 */
-        /** design/tasks.html：每个团队组只列 6 行，其余收成「… 其余在看板」 */
+        /* 项目级任务列表（design-v2/p-tasks.html）：任务头 + 汇总条 + 按团队分组任务行 + 视图条 */
+        /** design-v2/p-tasks.html：每个团队组只列 6 行，其余收成「… 其余在看板」 */
         const TASK_GROUP_LIMIT = 6
         const stateChipClass = (state) => (state === 'done' ? 'mt-status-done'
           : state === 'failed' || state === 'cancelled' ? 'mt-status-fail'
@@ -13130,7 +13130,7 @@ window.__ModuleLoader__.load({
               j('button', { className: 'mt-mini-link', onClick: () => setTaskView('board'), children: t('g6.tasks.boardLink') }),
             ] }),
             ...group.tasks.slice(0, TASK_GROUP_LIMIT).map(taskRow),
-            /* design/tasks.html：每组只列前几行 + 一条虚线「… 其余在看板」行（完整清单去看板/其他视图） */
+            /* design-v2/p-tasks.html：每组只列前几行 + 一条虚线「… 其余在看板」行（完整清单去看板/其他视图） */
             group.tasks.length > TASK_GROUP_LIMIT
               ? js('button', {
                 className: 'mt-trow mt-trow-more',
@@ -13172,7 +13172,7 @@ window.__ModuleLoader__.load({
       }
 
       const tasksPage = js('div', { className: 'mt-workbench', children: [
-        /* design/tasks.html 的任务头（.teambar）：任务 + 数量 / 团队参与数 + 一句话说明 + 阶段统计 + 操作 */
+        /* design-v2/p-tasks.html 的任务头（.teambar）：任务 + 数量 / 团队参与数 + 一句话说明 + 阶段统计 + 操作 */
         js('div', { className: 'mt-taskhead', children: [
           js('span', { className: 'mt-taskhead-title', children: [
             j('b', { children: t('g6.tasks.headTitle') }),
@@ -13200,7 +13200,7 @@ window.__ModuleLoader__.load({
         js('div', { className: 'mt-viewbar', children: [
           /* CHG-84 / CHG-202u：任务头整块已删（新建 / 批量新建入口移除），这里只剩视图切换 */
           j('span', { className: 'mt-viewbar-hint', children: t('view.label') }),
-          /* design/tasks.html 的 .viewbar .vlinks：列表 / 看板 / 流程 / 依赖图（保留 mt-seg 供既有交互脚本与样式复用） */
+          /* design-v2/p-tasks.html 的 .viewbar .vlinks：列表 / 看板 / 流程 / 依赖图（保留 mt-seg 供既有交互脚本与样式复用） */
           js('div', { className: 'mt-viewlinks', role: 'group', 'aria-label': t('view.label'), children: [
             ...['list', 'board', 'lanes', 'dag'].map((key) => j('button', {
               key,
@@ -13212,7 +13212,7 @@ window.__ModuleLoader__.load({
                 : key === 'lanes' ? t('g6.tasks.viewFlow') : t('g6.tasks.viewDag'),
             })),
           ] }),
-          /* design/dag.html · dag-vertical.html：视图条右上「方向」seg 两版互链 + 显示模型 + 已高亮依赖链 */
+          /* design-v2/p-dag.html · dag-vertical.html：视图条右上「方向」seg 两版互链 + 显示模型 + 已高亮依赖链 */
           taskView === 'dag' ? js('span', { className: 'mt-viewbar-dir', children: [
             j('span', { className: 'mt-filterlabel', children: t('view.dir') }),
             j('button', {
@@ -13250,7 +13250,7 @@ window.__ModuleLoader__.load({
               ],
             }),
           ] }) : null,
-          /* design/lanes.html：行 = 角色（分行方式由设置页 pipeline.swimlaneBy 决定） */
+          /* design-v2/p-lanes.html：行 = 角色（分行方式由设置页 pipeline.swimlaneBy 决定） */
           taskView === 'lanes' ? js('span', { className: 'mt-viewbar-right', children: [
             j('span', { className: 'mt-chip', children: t('lanes.groupBy') }),
             j('button', { className: 'mt-btn mt-btn-sm', title: t('lanes.byStageHint'), onClick: () => setNotice(t('lanes.byStageHint')), children: t('lanes.byStage') }),
@@ -13259,7 +13259,7 @@ window.__ModuleLoader__.load({
           j('input', {
             className: 'mt-search mt-search-sm',
             value: taskQuery,
-            /* design/tasks.html 的搜索框文案：任务号 / 标题 / 团队 */
+            /* design-v2/p-tasks.html 的搜索框文案：任务号 / 标题 / 团队 */
             placeholder: t('g6.tasks.searchPlaceholder'),
             'aria-label': t('g6.tasks.searchPlaceholder'),
             onChange: (e) => setTaskQuery(e.target.value),
@@ -13311,16 +13311,16 @@ window.__ModuleLoader__.load({
            * 为什么删而不是留：那条说明是**教学文案**（「待规划 → 就绪/受阻；……」），
            * 对已经会用的人只是常驻噪音，还占掉一整行高度；而它描述的约束在**交互层**已经
            * 兑现（拖到非法列会抖动弹回 + 左下角回执说明原因），文案重复。真要查规则，
-           * 设计稿 design/dragging.html 里也有一份。
+           * 设计稿 design-v2/p-drag.html 里也有一份。
            * 词条 `rules.title` / `rules.body` / `drag.rulesBadge` 保留在词表里（不删数据，
            * 将来若要放进帮助浮层可直接复用）。 */
         ] }),
         js('div', { className: 'mt-body', children: [
-          /* 列表视图用「按团队筛选」seg 取代参与团队轨（design/tasks.html 无左轨） */
+          /* 列表视图用「按团队筛选」seg 取代参与团队轨（design-v2/p-tasks.html 无左轨） */
           taskView === 'list' ? null : rail,
           js('div', { className: 'mt-view', children: [tasksContent] }),
         ] }),
-        /* design/dragging.html：左下角拖拽回执（被拒案例：gate 未过的卡进不了已完成） */
+        /* design-v2/p-drag.html：左下角拖拽回执（被拒案例：gate 未过的卡进不了已完成） */
         dragToast ? js('div', { className: 'mt-dragtoast', role: 'status', children: [
           j('svg', {
             width: 16, height: 16, viewBox: '0 0 16 16', fill: 'none', 'aria-hidden': true, className: 'mt-lock-icon',
@@ -13470,7 +13470,7 @@ window.__ModuleLoader__.load({
             roles: pv.roles ?? [],
             onClose: () => setTeamCreate(false),
             onRetryPresets: () => setPresets(undefined),
-            /* design/new-team-1.html 的脚注「管理预设库」：跳到全局页的预设区块（同一份目录） */
+            /* design-v2/README.md 的脚注「管理预设库」：跳到全局页的预设区块（同一份目录） */
             onManagePresets: () => {
               setTeamCreate(false)
               setScope('global')

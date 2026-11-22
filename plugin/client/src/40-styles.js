@@ -43,7 +43,7 @@
       '.mt-btn-danger{color:var(--dsw-alias-state-error-primary)}',
       '.mt-banner{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:8px 16px;background:var(--dsw-alias-bg-layer-2);border-bottom:.5px solid var(--dsw-alias-border-l2);flex:none}',
       '.mt-banner-actions{display:flex;gap:8px}',
-      /* CHG-82：领域 tab 对齐 design/app.css 的 .tabbar/.tab（40px 高、13px、选中 2px 下划线走 ::after） */
+      /* CHG-82：领域 tab 对齐 design-v2/myteam.css 的 .tabbar/.tab（40px 高、13px、选中 2px 下划线走 ::after） */
       '.mt-tabs{display:flex;gap:0;padding:0 16px;border-bottom:1px solid var(--dsw-alias-border-l2);flex:none;flex-wrap:wrap}',
       '.mt-tab{position:relative;display:inline-flex;align-items:center;gap:5px;margin-right:20px;padding:0 1px;height:40px;border:0;background:none;color:var(--dsw-alias-label-secondary);font-size:13px;font-weight:500;cursor:pointer}',
       '.mt-tab:hover{color:var(--dsw-alias-label-primary)}',
@@ -73,18 +73,18 @@
          .mt-board 自身再 hidden 就会把 .mt-columns 的 overflow-x:auto 一起裁掉（滚不动、看不见）。
          做法：.mt-board 不裁（visible），由 .mt-columns 自己滚；列头行与列体共用同一滚动容器。 */
       '.mt-columns{flex:1;min-height:0;display:flex;gap:10px;align-items:stretch;overflow-x:auto;overflow-y:hidden;padding-bottom:2px;min-width:0}',
-      /* design/app.css 的 .board{display:flex;gap:10px;overflow:auto} + .col{flex:1 1 200px;min-width:200px}：
+      /* design-v2/myteam.css 的 .board{display:flex;gap:10px;overflow:auto} + .col{flex:1 1 200px;min-width:200px}：
          列要能一起放进面板宽度，而不是每列硬占 200px 把自己顶出容器（原来用 grid-auto-columns，
          6 列 ×200px 必然溢出，第 6 列被裁且滚不动）。
          CHG-85：min-width 降到 150px —— 6 列（含 gap）在 1109px 的面板里能各分到 ~176px 全部可见；
          再窄就交给 overflow-x:auto 横向滚。 */
       '.mt-col{flex:1 1 200px;min-width:150px;display:flex;flex-direction:column;min-height:0;background:var(--dsw-alias-bg-layer-1);border:.5px solid var(--dsw-alias-border-l2);border-radius:10px;padding:8px;overflow:hidden}',
-      /* design/app.css 的 .col.done-col{flex:0 0 168px;background:transparent;border-style:dashed}：
+      /* design-v2/myteam.css 的 .col.done-col{flex:0 0 168px;background:transparent;border-style:dashed}：
          末列（未完成/异常收口）固定窄宽 + 虚线，视觉上与主列区分。 */
       '.mt-col-done{flex:0 1 168px;min-width:132px;background:transparent;border-style:dashed}',
       '.mt-col-head{display:flex;align-items:center;gap:6px;font-size:12px;color:var(--dsw-alias-label-primary);margin:0 2px 10px;padding-bottom:6px;border-bottom:.5px solid var(--dsw-alias-border-l2);flex:none}',
       '.mt-col-head .mt-count{margin-left:auto}',
-      /* CHG-81：列头形状点 + 列名 + 列内新建（design/board.html 的 .col-head） */
+      /* CHG-81：列头形状点 + 列名 + 列内新建（design-v2/p-tasks.html 的 .col-head） */
       '.mt-col-shape{flex:none;width:7px;height:7px;border-radius:50%;background:var(--dsw-alias-border-l3)}',
       '.mt-col-name{margin:0;font-size:12px;font-weight:600;letter-spacing:.02em;color:var(--dsw-alias-label-primary);white-space:nowrap}',
       '.mt-col-add{flex:none;width:22px;height:22px;display:grid;place-items:center;border:0;background:none;color:var(--dsw-alias-label-primary);border-radius:5px;cursor:pointer;font-size:13px;line-height:1;padding:0}',
@@ -92,7 +92,7 @@
       '.mt-col-body{flex:1;min-height:0;overflow-y:auto;display:flex;flex-direction:column;gap:8px;padding-right:2px}',
       '.mt-col-empty{color:var(--dsw-alias-label-tertiary);font-size:11px;text-align:center;padding:18px 0;border:.5px dashed var(--dsw-alias-border-l2);border-radius:8px}',
       '.mt-count{color:var(--dsw-alias-label-tertiary);font-variant-numeric:tabular-nums}',
-      /* CHG-81：看板卡按 design/board.html 的 .tcard 五段结构（号+优先级 / 标题 / 角色 / 团队 / 阻塞） */
+      /* CHG-81：看板卡按 design-v2/p-tasks.html 的 .tcard 五段结构（号+优先级 / 标题 / 角色 / 团队 / 阻塞） */
       '.mt-task{box-sizing:border-box;display:flex;flex-direction:column;width:100%;text-align:left;cursor:pointer;background:var(--dsw-alias-bg-layer-2);border:.5px solid var(--dsw-alias-border-l2);border-radius:8px;padding:9px 10px;color:var(--dsw-alias-label-primary);font-size:12px;line-height:1.4}',
       '.mt-task:hover{border-color:var(--dsw-alias-border-l3);background:var(--dsw-alias-bg-layer-1)}',
       '.mt-task-top{display:flex;align-items:center;gap:5px;margin-bottom:3px;flex-wrap:wrap}',
@@ -108,7 +108,7 @@
       '.mt-pri-P3{color:var(--dsw-alias-label-primary)}',
       '.mt-task-meta{display:flex;gap:4px;flex-wrap:wrap;align-items:center;min-width:0;color:var(--dsw-alias-label-tertiary);font-size:11px;margin-top:5px}',
       /* CHG-85：卡片里的 chip 不能用页头那套 margin-left:auto（会把 chip 顶到卡外），
-         也不能无限撑宽 —— 长团队名省略号收尾（design/app.css .tcard-teams 的 mini-chip 靠左排）。 */
+         也不能无限撑宽 —— 长团队名省略号收尾（design-v2/myteam.css .tcard-teams 的 mini-chip 靠左排）。 */
       '.mt-task .mt-chip{margin-left:0;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}',
       '.mt-task-meta .mt-flow-warn{font-weight:600}',
       '.mt-task-dep{display:flex;align-items:center;gap:4px;min-width:0;font-size:11px;color:var(--dsw-alias-label-primary);margin-top:5px;padding-top:5px;border-top:.5px dashed var(--dsw-alias-border-l2);line-height:1.4}',
@@ -221,7 +221,7 @@
       '.mt-section-head h3{margin:0;font-size:13px;font-weight:600}',
       '.mt-section-head .mt-hint{margin-left:auto}',
       '.mt-cardgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));align-items:start;gap:8px}',
-      /* CHG-80：随行资产按 design/global.html 的 .card 结构重做（图标 + 标题 + 副标题 + 内容行 + 跳转脚） */
+      /* CHG-80：随行资产按 design-v2/g-overview.html 的 .card 结构重做（图标 + 标题 + 副标题 + 内容行 + 跳转脚） */
       '.mt-assets{display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:8px}',
       '.mt-assetcard{box-sizing:border-box;display:flex;flex-direction:column;gap:8px;width:100%;min-width:0;text-align:left;cursor:pointer;background:var(--dsw-alias-bg-layer-1);border:.5px solid var(--dsw-alias-border-l2);border-radius:10px;padding:12px 14px;color:var(--dsw-alias-label-primary);font:inherit}',
       '.mt-assetcard:hover{border-color:var(--dsw-alias-border-l3);background:var(--dsw-alias-bg-layer-2)}',
@@ -232,10 +232,10 @@
       '.mt-assetcard-sub{font-size:12px;line-height:1.5;color:var(--dsw-alias-label-primary);margin-top:2px;overflow-wrap:anywhere}',
       '.mt-assetcard-row{display:flex;gap:6px;flex-wrap:wrap;align-items:center;font-size:12px;color:var(--dsw-alias-label-primary);overflow-wrap:anywhere}',
       '.mt-assetcard-foot{display:flex;align-items:center;justify-content:space-between;gap:8px;font-size:11px;border-top:.5px dashed var(--dsw-alias-border-l2);padding-top:8px;margin-top:2px}',
-      /* CHG-85：跳转 chevron（design/icons.svg#i-chevron-right） */
+      /* CHG-85：跳转 chevron（design-v2/icons.svg#i-chevron-right） */
       '.mt-assetcard-chev{flex:none;display:inline-flex;align-items:center;justify-content:center;color:var(--dsw-alias-label-tertiary)}',
       '.mt-section-head .mt-rule{flex:1;height:1px;background:var(--dsw-alias-border-l2);align-self:center;min-width:12px}',
-      /* CHG-80：角色卡按 design/global.html 的 .card 结构（圆形头像 + 标题/副标题 + 兴趣词行 + 能力行 + 脚） */
+      /* CHG-80：角色卡按 design-v2/g-overview.html 的 .card 结构（圆形头像 + 标题/副标题 + 兴趣词行 + 能力行 + 脚） */
       '.mt-rolecard{display:flex;flex-direction:column;gap:8px;text-align:left;width:100%;box-sizing:border-box;min-height:132px;cursor:pointer;background:var(--dsw-alias-bg-layer-1);border:.5px solid var(--dsw-alias-border-l2);border-radius:10px;padding:12px;color:var(--dsw-alias-label-primary);font:inherit}',
       '.mt-rolecard:hover{border-color:var(--dsw-alias-border-l3);background:var(--dsw-alias-bg-layer-2)}',
       '.mt-avatar{flex:none;width:32px;height:32px;border-radius:50%;display:inline-flex;align-items:center;justify-content:center;font-size:12px;font-weight:600;border:.5px solid var(--dsw-alias-border-l2);background:var(--dsw-alias-bg-layer-2);color:var(--dsw-alias-label-primary)}',
@@ -253,7 +253,7 @@
       '.mt-rolechip{border:.5px solid var(--dsw-alias-border-l2);border-radius:4px;padding:0 6px;font-size:11px;line-height:18px;color:var(--dsw-alias-label-primary);background:var(--dsw-alias-bg-layer-2)}',
       '.mt-rolecard-foot{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-top:auto;padding-top:8px;border-top:.5px solid var(--dsw-alias-border-l2);color:var(--dsw-alias-label-primary);font-size:11px}',
       '.mt-rolecard-foot .mt-chip{margin-left:0}',
-      /* CHG-80：全局页信息条（design/global.html 的 header.teambar） */
+      /* CHG-80：全局页信息条（design-v2/g-overview.html 的 header.teambar） */
       '.mt-teambar{display:flex;align-items:center;gap:12px;flex-wrap:wrap;padding:10px 16px;border-bottom:.5px solid var(--dsw-alias-border-l2);flex:none}',
       '.mt-teambar-title{display:inline-flex;align-items:baseline;gap:8px;flex:none}',
       '.mt-teambar-title b{font-size:13px;font-weight:600}',
@@ -376,12 +376,12 @@
       '.mt-impactlist{display:flex;flex-direction:column;gap:2px;font-size:11px;color:var(--dsw-alias-label-secondary);overflow-wrap:anywhere}',
       '.mt-impactlist .mt-chip{margin-left:0}',
       /* ══════════════════════════════════════════════════════════════════════════
-       * CHG-82：设计稿对齐（design/*.html）—— 按分组预留的样式落点
+       * CHG-82：设计稿对齐（design-v2/*.html）—— 按分组预留的样式落点
        * 纪律：只用 --dsw-alias-* token；禁写十六进制颜色；禁写 font-family。
        * 每组只在自己那一行后面追加规则，不要动别人的落点。
        * ══════════════════════════════════════════════════════════════════════════ */
-      /* [G1 detail] design/detail.html · confirm.html · discard.html */
-      /* 任务详情 = 主区整页（design/detail.html）：盖住工作台，自己的面包屑 + 双栏 + 成本归因 */
+      /* [G1 detail] design-v2/p-task.html · confirm.html · discard.html */
+      /* 任务详情 = 主区整页（design-v2/p-task.html）：盖住工作台，自己的面包屑 + 双栏 + 成本归因 */
       '.mt-detail-page{display:flex;flex-direction:column;flex:1 1 100%;min-width:0;min-height:0;overflow:hidden;background:var(--dsw-alias-bg-base)}',
       '.mt-workspace:has(> .mt-detail-page){position:relative}',
       '.mt-workspace:has(> .mt-detail-page) > :not(.mt-detail-page){display:none}',
@@ -455,7 +455,7 @@
       '.mt-cost-label{font-size:12px;line-height:1.35;color:var(--dsw-alias-label-tertiary)}',
       '.mt-cost-val{font-size:13px;font-weight:600;line-height:1.35;color:var(--dsw-alias-label-primary);font-variant-numeric:tabular-nums}',
       '.mt-cost-val small{font-size:12px;font-weight:400;color:var(--dsw-alias-label-tertiary)}',
-      /* 两段确认（design/confirm.html · discard.html）：先说影响面 → 再输入 / 再点一次 */
+      /* 两段确认（design-v2/p-dissolve.html · discard.html）：先说影响面 → 再输入 / 再点一次 */
       '.mt-impact{margin:0;padding:12px;border:.5px solid color-mix(in srgb, var(--dsw-alias-state-error-primary) 40%, transparent);border-radius:6px;background:color-mix(in srgb, var(--dsw-alias-state-error-primary) 8%, transparent);color:var(--dsw-alias-label-secondary);font-size:12px;line-height:1.75}',
       '.mt-impact b{font-weight:600;color:var(--dsw-alias-label-primary)}',
       '.mt-impact ul{margin:4px 0 0;padding-left:16px}',
@@ -512,7 +512,7 @@
       '.mt-input:focus{border-color:var(--dsw-alias-label-emphasis, var(--dsw-alias-label-primary));box-shadow:0 0 0 3px color-mix(in srgb, var(--dsw-alias-label-emphasis, var(--dsw-alias-label-primary)) 18%, transparent)}',
       '.mt-dialog-foot{display:flex;align-items:center;gap:8px}',
       '.mt-dialog-foot .mt-right{margin-left:auto;display:flex;gap:8px}',
-      /* ── CHG-84 复检：对着 design/detail.html 补齐的形态 ── */
+      /* ── CHG-84 复检：对着 design-v2/p-task.html 补齐的形态 ── */
       /* 参与团队卡里的 主责/协作 是 chip（design .chip.run / .chip.idle），不是 mini-chip */
       '.mt-detail-page .mt-tc-head .mt-chip{display:inline-flex;align-items:center;gap:5px;height:20px;margin:0;padding:0 8px;border-radius:999px;font-size:12px;font-weight:500;white-space:nowrap;flex:none;background:var(--dsw-alias-bg-layer-1);border:.5px solid var(--dsw-alias-border-l2);color:var(--dsw-alias-label-secondary)}',
       '.mt-detail-page .mt-tc-head .mt-chip .mt-task-dot{width:7px;height:7px;margin-top:0}',
@@ -532,8 +532,8 @@
       '.mt-dt-summary{border:.5px solid var(--dsw-alias-border-l2);border-radius:8px;padding:10px 12px;background:var(--dsw-alias-bg-layer-1)}',
       '.mt-dt-summary-title{font-size:12px;font-weight:600;color:var(--dsw-alias-label-primary)}',
       '.mt-dt-summary-sub{margin-top:2px;font-size:12px;line-height:1.55;color:var(--dsw-alias-label-tertiary)}',
-      /* [G2 roster] design/roles.html · roster.html · role-detail.html · member-menu.html */
-      /* CHG-82 G2：角色库（design/roles.html 的 .page-head / .dsec-head / .filterbar / .card / 创建卡） */
+      /* [G2 roster] design-v2/p-teams.html · roster.html · role-detail.html · member-menu.html */
+      /* CHG-82 G2：角色库（design-v2/p-teams.html 的 .page-head / .dsec-head / .filterbar / .card / 创建卡） */
       '.mt-dsec-block{display:flex;flex-direction:column;gap:8px}',
       '.mt-searchfield{display:inline-flex;align-items:center;gap:6px;flex:0 1 240px;min-width:160px;border:.5px solid var(--dsw-alias-border-l2);border-radius:6px;background:var(--dsw-alias-bg-base);padding:3px 8px}',
       '.mt-searchfield-ico{flex:none;font-size:12px;line-height:1;color:var(--dsw-alias-label-tertiary)}',
@@ -544,7 +544,7 @@
       '.mt-segbtn[aria-pressed="true"]{background:var(--dsw-alias-bg-layer-2);color:var(--dsw-alias-label-primary);font-weight:600}',
       '.mt-cardgrid-3{grid-template-columns:repeat(auto-fill,minmax(256px,1fr));gap:12px;align-items:stretch}',
       '.mt-rolecard-lib{min-height:150px}',
-      /* design/roles.html：队长卡主色描边 + 浅主色底（.card 的 border-color:primary-line / background:primary-soft） */
+      /* design-v2/p-teams.html：队长卡主色描边 + 浅主色底（.card 的 border-color:primary-line / background:primary-soft） */
       '.mt-rolecard-captain{border-color:var(--dsw-alias-border-accent,var(--dsw-alias-border-l3));background:color-mix(in srgb, var(--dsw-alias-label-emphasis, var(--dsw-alias-label-primary)) 7%, transparent)}',
       '.mt-avatar-a1{background:color-mix(in srgb, var(--dsw-alias-label-emphasis, var(--dsw-alias-label-primary)) 14%, transparent);border-color:color-mix(in srgb, var(--dsw-alias-label-emphasis, var(--dsw-alias-label-primary)) 30%, transparent);color:var(--dsw-alias-label-emphasis, var(--dsw-alias-label-primary))}',
       '.mt-avatar-a2{background:color-mix(in srgb, var(--dsw-alias-state-ok-primary) 14%, transparent);border-color:color-mix(in srgb, var(--dsw-alias-state-ok-primary) 32%, transparent);color:var(--dsw-alias-state-ok-primary)}',
@@ -595,7 +595,7 @@
       '.mt-team-meta{display:flex;gap:10px;flex-wrap:wrap;color:var(--dsw-alias-label-tertiary);font-size:11px;margin-top:4px;align-items:center;margin:0}',
       '.mt-note-alert{display:flex;gap:8px;align-items:flex-start;margin:0}',
       '.mt-note-ico{flex:none;width:16px;height:16px;border-radius:50%;display:inline-flex;align-items:center;justify-content:center;border:.5px solid var(--dsw-alias-state-warning-primary);color:var(--dsw-alias-state-warning-primary);font-size:11px;line-height:1}',
-      /* CHG-82 G2：名册 = 本团队的角色编排（design/roster.html + member-menu.html） */
+      /* CHG-82 G2：名册 = 本团队的角色编排（design-v2/p-roster.html + member-menu.html） */
       '.mt-roster-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(348px,1fr));gap:12px;align-items:stretch}',
       '.mt-roster-card{display:flex;flex-direction:column;gap:6px;min-width:0;background:var(--dsw-alias-bg-layer-1);border:.5px solid var(--dsw-alias-border-l2);border-radius:10px;padding:10px 12px}',
       '.mt-roster-card-gate{border-color:var(--dsw-alias-state-warning-primary)}',
@@ -646,7 +646,7 @@
       '.mt-menu-steer textarea:disabled{opacity:.55}',
       '.mt-menu-steer-actions{display:flex;gap:6px;justify-content:flex-end}',
       '.mt-menu-steer-alert{padding:4px 6px;font-size:11px;line-height:1.5;color:var(--dsw-alias-label-primary);border:.5px solid var(--dsw-alias-state-warning-primary);border-left-width:3px;border-radius:6px;background:color-mix(in srgb, var(--dsw-alias-state-warning-primary) 12%, transparent)}',
-      /* CHG-82 G2：角色详情（design/role-detail.html 的 .detail-grid + .sec + .abl-row + 侧列） */
+      /* CHG-82 G2：角色详情（design-v2/p-teams.html 的 .detail-grid + .sec + .abl-row + 侧列） */
       '.mt-roledetail{width:min(680px,100%)}',
       '.mt-roledetail-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:10px;align-items:start}',
       '.mt-roledetail-main,.mt-roledetail-side{display:flex;flex-direction:column;gap:8px;min-width:0}',
@@ -670,12 +670,12 @@
       '.mt-roledetail .mt-membership .mt-tchip{margin-left:0}',
       '.mt-side-actions{display:flex;flex-direction:column;gap:6px}',
       '.mt-side-actions .mt-btn{width:100%;box-sizing:border-box}',
-      /* [G3 knowledge] design/knowledge.html · presets.html · skills.html */
-      /* ── CHG-84 复检补充（design/app.css 的 .grid-2 / .iname / 空态兜底卡）── */
+      /* [G3 knowledge] design-v2/p-knowledge.html · presets.html · skills.html */
+      /* ── CHG-84 复检补充（design-v2/myteam.css 的 .grid-2 / .iname / 空态兜底卡）── */
       '.mt-presetgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(348px,1fr));gap:8px;align-items:start}',
       '.mt-kb3-name{font-size:13px;font-weight:600;color:var(--dsw-alias-label-primary);letter-spacing:-.01em;overflow-wrap:anywhere}',
       '.mt-p3-newcard-icon{font-size:18px;line-height:1;color:var(--dsw-alias-label-tertiary)}',
-      /* ── 三层作用域清单（design/app.css .layers / .layer / .layer-ico / .layer-n；knowledge 三层记忆、
+      /* ── 三层作用域清单（design-v2/myteam.css .layers / .layer / .layer-ico / .layer-n；knowledge 三层记忆、
        *    presets 三个来源、skills 四层来源共用。来源小标 .mt-src 同源同形）── */
       '.mt-layers{display:flex;flex-direction:column;border:.5px solid var(--dsw-alias-border-l2);border-radius:8px;overflow:hidden;background:var(--dsw-alias-bg-base)}',
       '.mt-layer+.mt-layer{border-top:.5px solid var(--dsw-alias-border-l2)}',
@@ -684,7 +684,7 @@
       '.mt-layer-ico-project{background:color-mix(in srgb, var(--dsw-alias-label-emphasis, var(--dsw-alias-label-primary)) 14%, transparent);color:var(--dsw-alias-label-emphasis, var(--dsw-alias-label-primary))}',
       '.mt-layer-ico-bound{background:var(--dsw-alias-bg-layer-2);color:var(--dsw-alias-label-secondary)}',
       '.mt-layer .mt-btn{flex:none}',
-      /* ── 知识库：页头 + 筛选条 + 行列表（design/knowledge.html .page-head / .filterbar / .rows）── */
+      /* ── 知识库：页头 + 筛选条 + 行列表（design-v2/p-knowledge.html .page-head / .filterbar / .rows）── */
       '.mt-kb3{display:flex;flex-direction:column;gap:10px;flex:1;min-width:0;min-height:0;overflow:auto;padding:12px 16px}',
       '.mt-kb3-head{display:flex;align-items:flex-start;gap:12px;flex-wrap:wrap}',
       '.mt-kb3-head h2{margin:0;font-size:15px;font-weight:600;letter-spacing:-.01em;color:var(--dsw-alias-label-primary)}',
@@ -723,7 +723,7 @@
       '.mt-iconbtn:hover{border-color:var(--dsw-alias-border-l2);color:var(--dsw-alias-label-primary)}',
       '.mt-btn-ghost{background:none;border-color:transparent;color:var(--dsw-alias-label-secondary)}',
       '.mt-btn-ghost:hover{background:var(--dsw-alias-bg-layer-2);color:var(--dsw-alias-label-primary)}',
-      /* ── 预设卡：名册预览（队长高亮 + 角色引用 chips）+ 模板三行 + 引用计数（design/presets.html）── */
+      /* ── 预设卡：名册预览（队长高亮 + 角色引用 chips）+ 模板三行 + 引用计数（design-v2/g-blueprints.html）── */
       '.mt-p3-card{display:flex;flex-direction:column;gap:10px;border:.5px solid var(--dsw-alias-border-l2);border-radius:10px;background:var(--dsw-alias-bg-layer-1);padding:12px;min-width:0}',
       '.mt-p3-card-builtin{background:var(--dsw-alias-bg-layer-2)}',
       '.mt-p3-card:hover{border-color:var(--dsw-alias-border-l3)}',
@@ -747,7 +747,7 @@
       '.mt-colpreview{display:inline-flex;align-items:center;gap:3px;flex-wrap:wrap}',
       '.mt-colpreview b{font-weight:400;font-size:11px;line-height:16px;padding:0 6px;border-radius:4px;background:var(--dsw-alias-bg-layer-2);color:var(--dsw-alias-label-secondary)}',
       '.mt-colpreview .mt-ar{color:var(--dsw-alias-label-tertiary);font-size:11px}',
-      /* ── MCP 两段式：连接层 ∩ 可见层（design/skills.html）── */
+      /* ── MCP 两段式：连接层 ∩ 可见层（design-v2/README.md）── */
       '.mt-mcp-split{display:grid;grid-template-columns:minmax(0,1fr) 40px minmax(0,1fr);align-items:stretch}',
       '.mt-mcp-pane{border:.5px solid var(--dsw-alias-border-l2);border-radius:10px;background:var(--dsw-alias-bg-layer-1);overflow:hidden;min-width:0}',
       '.mt-mcp-head{display:flex;align-items:baseline;gap:8px;flex-wrap:wrap;padding:8px 12px;border-bottom:.5px solid var(--dsw-alias-border-l2);background:var(--dsw-alias-bg-layer-2)}',
@@ -763,8 +763,8 @@
       '.mt-mcp-join{display:grid;place-items:center;color:var(--dsw-alias-label-tertiary);font-size:14px;font-weight:600}',
       '.mt-mcp-item .mt-avatar{width:22px;height:22px;font-size:10px}',
       '@media (max-width:760px){.mt-mcp-split{grid-template-columns:minmax(0,1fr)}.mt-mcp-join{display:none}}',
-      /* [G4 ledger] design/audit.html · settings.html · archive.html · overview.html · shell.html */
-      /* ── 审计视图（design/audit.html：三档回放 + attempt 分组事件流 + 只读标注）── */
+      /* [G4 ledger] design-v2/p-audit.html · settings.html · archive.html · overview.html · shell.html */
+      /* ── 审计视图（design-v2/p-audit.html：三档回放 + attempt 分组事件流 + 只读标注）── */
       '.mt-audit-page{flex:1;min-height:0;display:flex;flex-direction:column;overflow:hidden}',
       '.mt-audit-segbar{flex:none;display:flex;align-items:center;gap:8px;padding:8px 20px;border-bottom:.5px solid var(--dsw-alias-border-l2);flex-wrap:wrap}',
       '.mt-audit-seg{display:flex;gap:2px;border:.5px solid var(--dsw-alias-border-l2);border-radius:7px;padding:2px}',
@@ -816,7 +816,7 @@
       '.mt-tone-done{color:var(--dsw-alias-state-ok-primary);border-color:var(--dsw-alias-state-ok-primary)}',
       '.mt-tone-fail{color:var(--dsw-alias-state-error-primary);border-color:var(--dsw-alias-state-error-primary)}',
       '.mt-tone-idle{color:var(--dsw-alias-label-tertiary);border-color:var(--dsw-alias-border-l2);background:var(--dsw-alias-bg-layer-2)}',
-      /* ── 团队设置（design/settings.html：三层合并链 + 行为配置硬上限 + 状态目录 + 生命周期）── */
+      /* ── 团队设置（design-v2/p-settings.html：三层合并链 + 行为配置硬上限 + 状态目录 + 生命周期）── */
       '.mt-page-head{display:flex;align-items:flex-start;justify-content:space-between;gap:12px;flex-wrap:wrap;margin-bottom:16px}',
       '.mt-page-head h2{margin:0;font-size:20px;font-weight:600;letter-spacing:-.02em;line-height:1.35}',
       '.mt-page-head p{margin:6px 0 0;font-size:12px;color:var(--dsw-alias-label-tertiary);margin-top:2px;max-width:64ch;line-height:1.6}',
@@ -874,7 +874,7 @@
       '.mt-impact-box{border:.5px solid var(--dsw-alias-state-error-primary);border-radius:8px;padding:8px 12px;font-size:12px;color:var(--dsw-alias-label-secondary);display:flex;flex-direction:column;gap:4px}',
       '.mt-impact-box strong{color:var(--dsw-alias-state-error-primary);font-weight:600}',
       '.mt-danger-ink{color:var(--dsw-alias-state-error-primary)}',
-      /* ── 归档回放（design/archive.html：归档条 + 结局卡 + 进度分段 + 五项分解 + 任务历史 + 账本）── */
+      /* ── 归档回放（design-v2/p-archive.html：归档条 + 结局卡 + 进度分段 + 五项分解 + 任务历史 + 账本）── */
       '.mt-archbar{flex:none;display:flex;align-items:center;gap:12px;flex-wrap:wrap;padding:12px 16px;min-height:58px;border-bottom:.5px solid var(--dsw-alias-border-l2);background:var(--dsw-alias-bg-layer-2)}',
       '.mt-team-id{display:flex;flex-direction:column;align-items:flex-start;min-width:0}',
       '.mt-team-id b{font-size:13px;font-weight:600;line-height:1.35;color:var(--dsw-alias-label-secondary)}',
@@ -926,7 +926,7 @@
       '.mt-costbar-label{font-size:12px;color:var(--dsw-alias-label-tertiary);line-height:1.35}',
       '.mt-costbar-val{font-size:13px;font-weight:600;line-height:1.35;color:var(--dsw-alias-label-primary);font-variant-numeric:tabular-nums}',
       '.mt-costbar-val small{font-size:12px;font-weight:400;color:var(--dsw-alias-label-tertiary)}',
-      /* ── 项目 · 团队列表（design/shell.html：按工作区分组的团队卡）── */
+      /* ── 项目 · 团队列表（design-v2/p-teams.html：按工作区分组的团队卡）── */
       '.mt-home{flex:1;overflow-y:auto;min-height:0;padding:16px 20px 24px}',
       '.mt-home-filter{display:flex;align-items:center;gap:16px;margin-bottom:16px;flex-wrap:wrap}',
       '.mt-search-field{display:flex;align-items:center;gap:8px;width:360px;max-width:100%;box-sizing:border-box;background:var(--dsw-alias-bg-base);border:.5px solid var(--dsw-alias-border-l3);border-radius:6px;padding:0 10px;height:34px}',
@@ -948,9 +948,9 @@
       '.mt-tc-dot{width:6px;height:6px;border-radius:50%;background:var(--dsw-alias-state-ok-primary);flex:none}',
       '.mt-tc-desc{margin:4px 0 0;font-size:12px;color:var(--dsw-alias-label-tertiary);margin-top:4px;line-height:1.6}',
       '.mt-tc-meta{margin-top:8px;display:flex;gap:16px;flex-wrap:wrap;font-size:12px;color:var(--dsw-alias-label-tertiary);font-variant-numeric:tabular-nums}',
-      /* ── 全局 · 全部团队（design/overview.html：库作用域 + 活跃团队卡 + 已归档 run 列表）── */
-      /* [G5 graph] design/lanes.html · dag.html · dag-vertical.html · dragging.html */
-      /* ── 泳道（design/lanes.html：蛇形泳道，行 = 角色，列 = 四阶段，格 = 该角色在该阶段的节点）── */
+      /* ── 全局 · 全部团队（design-v2/p-overview.html：库作用域 + 活跃团队卡 + 已归档 run 列表）── */
+      /* [G5 graph] design-v2/p-lanes.html · dag.html · dag-vertical.html · dragging.html */
+      /* ── 泳道（design-v2/p-lanes.html：蛇形泳道，行 = 角色，列 = 四阶段，格 = 该角色在该阶段的节点）── */
       '.mt-trail{width:156px}',
       '.mt-trail-cap{font-size:12px;color:var(--dsw-alias-label-tertiary);padding:2px 6px 6px}',
       '.mt-titem{display:flex;align-items:center;gap:8px;width:100%;padding:7px 6px;border:0;border-radius:8px;background:none;text-align:left;cursor:pointer;color:var(--dsw-alias-label-primary);font:inherit;transition:background .16s ease}',
@@ -980,10 +980,10 @@
       '.mt-lane-label .mt-avatar{width:24px;height:24px;font-size:12px}',
       '.mt-lane-label .mt-avatar-dashed{border-style:dashed;color:var(--dsw-alias-label-tertiary)}',
       /* CHG-85：格子内卡片多了要能滚，不该把整行撑到几百 px（未认领行 9 张卡时行高失控，
-         泳道页底部被面板裁掉）。design/app.css 的 .lane-cell{min-height:56px} 是「最小」不是「无限」。
+         泳道页底部被面板裁掉）。design-v2/myteam.css 的 .lane-cell{min-height:56px} 是「最小」不是「无限」。
          CHG-85 后续：改成「限 4 张 + 折叠成『还有 N 个』」，格子本身不再需要限高。 */
       '.mt-lane-cell{background:var(--dsw-alias-bg-base);padding:5px;display:flex;flex-direction:column;gap:4px;min-height:56px;min-width:0}',
-      /* CHG-85：折叠行（design/tasks.html 的 mt-trow-more 同款） */
+      /* CHG-85：折叠行（design-v2/p-tasks.html 的 mt-trow-more 同款） */
       '.mt-lane-more{display:block;width:100%;box-sizing:border-box;margin-top:1px;padding:3px 6px;border:.5px dashed var(--dsw-alias-border-l2);border-radius:4px;background:none;color:var(--dsw-alias-label-tertiary);font:inherit;font-size:11px;line-height:1.5;text-align:center;cursor:default}',
       '.mt-lane-cell-empty{background:var(--dsw-alias-bg-layer-1)}',
       '.mt-lane-node{display:flex;align-items:center;gap:5px;min-width:0;text-align:left;background:var(--dsw-alias-bg-layer-1);border:.5px solid var(--dsw-alias-border-l2);border-left:2px solid var(--dsw-alias-border-l3);border-radius:4px;padding:4px 6px;color:var(--dsw-alias-label-primary);font:inherit;font-size:12px;cursor:pointer}',
@@ -1000,10 +1000,10 @@
       '.mt-lanes-note svg{flex:none;margin-top:2px;color:var(--dsw-alias-state-warning-primary)}',
       '.mt-lanes-note b{color:var(--dsw-alias-label-primary);font-weight:600}',
       '.mt-viewbar-right{display:flex;align-items:center;gap:6px;margin-left:auto;flex-wrap:wrap}',
-      /* ── 依赖图（design/dag.html + dag-vertical.html：真实 DOM 测量 + SVG 贝塞尔连线 + marker 箭头）── */
+      /* ── 依赖图（design-v2/p-dag.html + dag-vertical.html：真实 DOM 测量 + SVG 贝塞尔连线 + marker 箭头）── */
       '.mt-viewbar-dir{display:flex;align-items:center;gap:6px;margin-left:auto}',
       '.mt-viewbar-dir .mt-filterlabel{margin-left:0}',
-      /* design/dag.html 的画布是点阵底（16px 网格），撑满视图条与图注之间 */
+      /* design-v2/p-dag.html 的画布是点阵底（16px 网格），撑满视图条与图注之间 */
       '.mt-dagwrap{flex:1 1 0;min-height:0;position:relative;overflow:auto;padding:0;display:flex;min-width:0;gap:0;background:radial-gradient(circle at 1px 1px, var(--dsw-alias-border-l2) 1px, transparent 0) 0 0 / 16px 16px, var(--dsw-alias-bg-layer-1)}',
       '.mt-dag-canvas{position:relative;margin:auto;flex:none}',
       '.mt-dag-svg{position:absolute;left:0;top:0;pointer-events:none;overflow:visible}',
@@ -1034,7 +1034,7 @@
       '.mt-dag-arrow{fill:var(--dsw-alias-border-l3)}',
       '.mt-dag-arrow-hot{fill:var(--dsw-alias-label-emphasis, var(--dsw-alias-label-primary))}',
       /* CHG-202f：`.mt-dag-note` 三条（依赖图图注）随组件一起删除 */
-      /* ── 拖拽流转态（design/dragging.html：lift 悬空卡 + 源列幽灵 + 合法落点高亮 + 被拒回执）── */
+      /* ── 拖拽流转态（design-v2/p-drag.html：lift 悬空卡 + 源列幽灵 + 合法落点高亮 + 被拒回执）── */
       '.mt-workbench{display:flex;flex-direction:column;flex:1;min-height:0;min-width:0;position:relative}',
       '.mt-board{flex:1;min-width:0;padding:10px 14px;display:flex;flex-direction:column;min-height:0;overflow:hidden;border-left:.5px solid var(--dsw-alias-border-l2);position:relative}',
       '.mt-col-drop{position:relative;border-color:var(--dsw-alias-label-emphasis, var(--dsw-alias-label-primary));background:color-mix(in srgb, var(--dsw-alias-label-emphasis, var(--dsw-alias-label-primary)) 10%, var(--dsw-alias-bg-base))}',
@@ -1055,7 +1055,7 @@
       '.mt-task-shake{animation:mt-shake 150ms ease}',
       '@keyframes mt-shake{0%,100%{transform:translateX(0)}25%{transform:translateX(-4px)}75%{transform:translateX(4px)}}',
       '@media (max-width: 980px){.mt-task-lift{right:24px;top:40px}}',
-      /* [G6 flow] design/new-team.html · new-team-1.html · conversation.html · guest.html · tasks.html · team-tasks.html */
+      /* [G6 flow] design-v2/README.md · new-team-1.html · conversation.html · guest.html · tasks.html · team-tasks.html */
       /* CHG-84：向导是绝对定位浮层，必须让工作区成为定位祖先（否则会被裁到视口外/丢失背景遮罩） */
       '.mt-panel .mt-workspace{position:relative}',
       '.mt-wizard{position:absolute;inset:0;z-index:20;display:flex;align-items:center;justify-content:center;padding:16px;background:color-mix(in srgb, var(--dsw-alias-label-primary) 26%, transparent)}',
@@ -1274,7 +1274,7 @@
       '.mt-status-filled .mt-shape{border-radius:50%}',
       '.mt-status-dashed{border-style:dashed;color:var(--dsw-alias-label-secondary)}',
       /* ── 深色模式（R34 / UI-1 过门条件；CHG-99 C13 改为读宿主**解析后**的信号）──────
-       * design/design-notes.md §九：颜色按「角色」定义，深色整段换值、变量名不动。
+       * design-v2/README.md §九：颜色按「角色」定义，深色整段换值、变量名不动。
        * **修复前这里是 13 组双写**：`@media`（系统偏好媒体查询）+ `:root[data-theme="dark"]`
        * （自建属性）。媒体查询读的是**系统**偏好——用户在宿主里
        * 手动切深色（不跟随系统）时它不触发，13 组 color-mix 叠加色停在旧模式，深色底上叠出

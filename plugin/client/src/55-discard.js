@@ -1,4 +1,4 @@
-    /* ── 丢弃暂存计划的两段确认（design/discard.html）──
+    /* ── 丢弃暂存计划的两段确认（design-v2/p-approval.html）──
      * 影响面（N 任务作废 / 归档路径 / 不产生 token）+ 引导改用 Revise；
      * 影响面的计数从 getBoard 现算（单一事实源，不缓存第二份）。 */
     function DiscardDialog({ t, api, teamId, staged, onClose, onDone }) {

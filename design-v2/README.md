@@ -15,7 +15,7 @@
 | 谁能写 | 只有人类确认后写（`$DSH_HOME/myteam`） | 队长、成员按权限提案与执行；破坏性动作要人类确认 |
 | 导航 | 概览 · 角色 · 工作流 · 蓝图 · 发布 | 概览 · 任务 · 团队 · 流程 · 定义 · 知识 · 记忆 · 审计 · 设置 |
 
-## 19 屏
+## 24 屏
 
 **全局库 · 左侧栏入口（5 屏）**
 
@@ -33,27 +33,34 @@
 |---|---|
 | `p-overview.html` | 项目概览：写者 / `projectSeq` / `schema`，团队、任务、Run、待确认四个数字，跨团队依赖，最近事件 |
 | `p-tasks.html` | 任务看板：五列阶段，卡片带团队标记（结 / 上）、门禁进度与 token；跨团队只看一张图 |
+| `p-lanes.html` | 流程泳道：行 = 成员，列 = 阶段，含「未指派」泳道；同一份投影换一种看法 |
 | `p-dag.html` | 依赖图：按依赖层级四列，跨团队依赖用强调色虚线；图只有一个，来自同一项目投影 |
 | `p-task.html` | 任务详情：主责 / 协作、Run、Attempt 与 `configRev`、AC 逐条、证据按 Attempt 分组、时间线 |
-| `p-teams.html` | 团队与成员：每团队一张卡（队长任期、名册、蓝图来源、`configRev`），成员列表与队长任期说明 |
+| `p-teams.html` | 团队与成员：每团队一张卡（队长任期、名册、蓝图来源、`configRev`），成员列表、队长任期说明与已归档团队入口 |
+| `p-roster.html` | 名册树：父子成员与深度 chip（含硬上限）、委派授权、释放影响面，成员菜单展开态 |
+| `p-drag.html` | 拖拽一帧（看板的状态屏）：被拖卡浮在目标列、源列留幽灵占位、非法落点红框 + 被拒回执 |
 | `p-runs.html` | 工作流运行：Run 列表 + 详情（定义 revision、完成条件 `completionRevision`、`templateKey → taskId` 映射、变更历史） |
 | `p-defs.html` | 项目定义副本：`origin / baseHash / 有更新 / 可发布 / 已分叉` 五种状态分开显示，不自动合并 |
 | `p-knowledge.html` | 项目知识：已采纳条目（证据、修订、引用）与提案；`config/knowledge/*.md` 是生成视图 |
 | `p-memory.html` | 长期记忆：团队 bank 与成员 bank、最近条目、bank 所有权；SQLite 唯一权威，不进全局 |
 | `p-audit.html` | 审计：按批次的事件流（`projectSeq`、批次 hash）与 Effect 三态说明；只读 |
+| `p-archive.html` | 归档回放（只读）：归档条、结局卡、完成 / blocked / 未开始分段条、名册终态、token 五项表、事件与产物清单位置 |
+| `p-dissolve.html` | 解散团队确认：写明「解散只写事件、账本与产物都还在」，四条即时影响 + 输入团队名 + 改为归档出口 |
 | `p-settings.html` | 项目设置：配置四层链、编排与硬上限、写者与存储路径、迁移入口、删除数据的危险区 |
 | `p-approval.html` | 待你确认：计划批准、队长接管、全局发布请求三张卡，逐项写清影响面与确认方式 |
 | `p-migrate.html` | 迁移：旧布局两类路径、索引孤儿（b5 / b5-dogfood）、对账结果、cutover 五步与不可逆提示 |
 | `p-unavailable.html` | 未初始化项目：这个会话的工作区还没有 `.dsh-myteam/`，给出初始化三步；在那之前不写任何文件 |
 
-上一版（团队作用域、22 屏）归档在 `drafts/prev-round/`，只作对照。
+上一版（团队作用域、28 屏）**已删除**：它曾位于 `design/`，现已全量备份为仓库上一级的 `dsh-myteam-design-legacy-2026-11-22.zip`（34 个文件），`icons.svg` 已复制到本目录。代码、测试、schema 与文档链接都已改指本目录，旧路径不再存在。
 
 ## 共用资产
 
 | 文件 | 说明 |
 |---|---|
 | `dsh-shell.css` | **原样**拷自 DSH 0.2.2 插件外框（`ui-design/frames/dsh`），一个字没改 |
-| `myteam.css` | 插件样式。每条选择器都从 `[data-slot="main"]` 开头；颜色取 `--dsh-*` 与 `--mt-*`；含主从布局、状态 chip、审批卡、bank、发布预览、危险区等组件 |
+| `tokens.css` | **唯一色值来源**：`--mt-*` 语义层，宿主有对应角色的写成 `var(--dsw-alias-*, fallback)`，深浅两段写全；页面里不写裸色值（`t82-design-tokens.test.ts` 守这条） |
+| `myteam.css` | 插件样式。每条选择器都从 `[data-slot="main"]` 开头；颜色与阴影一律取 `--dsh-*` 与 `--mt-*`；含主从布局、状态 chip、审批卡、bank、发布预览、危险区等组件 |
+| `icons.svg` | 43 个线性图标（`<symbol id>`）。当前每屏内联 SVG；落地时抽成 Sprite，按 id 取用即可 |
 | 外框 HTML | 两套：`dsh/sidebar`（左侧栏入口，主区 1000×760，入口名 **myteam**）与 `dsh/view`（会话标签页，主区 1000×724，标签名 **项目**） |
 
 ## 这一版的关键规则
@@ -84,9 +91,9 @@
 
 ## 已知
 
-- `dissolve`（上一版）与本版 `p-approval` 的弹层、`drafts/` 里的旧稿都在 `design-v2/drafts/`，不参与画布。
-- 演示数据：项目 `storefront`，团队 `结算页模块化`（12 任务）与 `上线检查清单`（5 任务），累计 1.86M token，`projectSeq 1,284`。
-- 还没画：会话内的 `composer.dock` 状态 chip 与 `myteam_*` 工具调用卡（属于对话流）；全局角色 / 工作流的编辑态（当前只展示只读详情 + 发布确认）；Run 动态改图的一帧。
+- `p-dissolve` 的体检「文字叠在一起」是**正常状态**：弹层压在团队页上，检查器把底下的文字也算进重叠；`p-drag` 回执里全角冒号悬挂会被量成「切掉 13px」，截图里是完整的。
+- 演示数据：项目 `storefront`，团队 `结算页模块化`（12 任务）与 `上线检查清单`（5 任务），已归档团队 `支付页重构`（12 任务），累计 1.86M token，`projectSeq 1,284`。
+- 还没画：会话内的 `composer.dock` 状态 chip 与 `myteam_*` 工具调用卡（属于对话流，不属于这两个插件位置）；全局角色 / 工作流的编辑态（当前只读详情 + 发布确认）；Run 动态改图的一帧（增删任务、重接依赖的编辑态）。
 
 ## 相关
 
@@ -95,4 +102,5 @@
 | [01-系统架构](../docs/architecture/01-系统架构.md) | 作用域、事件真源、写者与队长任期、权限矩阵 |
 | [03-角色能力与工作流](../docs/architecture/03-角色能力与工作流.md) | RoleDefinition / WorkflowDefinition / Run 的边界 |
 | [产品基线](../docs/product/README.md) | 目标、场景与非目标 |
-| [旧设计稿](../design/README.md) | 上一版 28 屏（团队作用域），仅作历史对照 |
+
+旧设计稿（28 屏，团队作用域）已删除，全量备份为仓库上一级的 `dsh-myteam-design-legacy-2026-11-22.zip`，不再作为任何实现或文档的依据。

@@ -67,7 +67,7 @@ myteam 将系统分为三层：
 | [`docs/research/`](docs/research/README.md) · [`docs/audits/`](docs/audits/README.md) · [`docs/historical/`](docs/historical/README.md) | 研究、时点证据与历史文档 |
 | [`docs/historical/dsh-myteam-requirements.md`](docs/historical/dsh-myteam-requirements.md) | 原根目录 PRD，已历史化 |
 | [`plugin/`](plugin/README.md) | 插件实现：`src/`、`lib/`、`client/`、`test/`、装载 patch 与 locale |
-| [`design/`](design/README.md) | UI 设计资产 |
+| [`design-v2/`](design-v2/README.md) | UI 设计稿（现行：全局库 / 项目工作台 24 屏 + tokens / 样式 / 图标） |
 | [`skills/`](skills/README.md) | 对外 skill 包与第三方贡献辅助资产 |
 | [`tools/`](tools/README.md) | 构建检查、实机探针、RPC、架构报告与 Web 测试启动工具 |
 | `refs/` | 本地参考材料，不入库；克隆后不存在属于正常情况 |

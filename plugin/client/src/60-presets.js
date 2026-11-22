@@ -1,4 +1,4 @@
-    /* ── 预设库（design/presets.html）—— 全局作用域子页：
+    /* ── 预设库（design-v2/g-blueprints.html）—— 全局作用域子页：
           三层来源分区 + 每张卡的「名册预览（队长高亮 + 角色引用 chips）+ 模板三行 + 引用计数」
           + 内置层兜底模板 + 删除守门提示。数据只从 getOfflinePresets / getProject().teams 派生。── */
     function PresetsPage({ t, presets, teams, onBack, onUse, onNotice, onSkills }) {
@@ -104,7 +104,7 @@
         js('div', { className: 'mt-layer-n', children: [String(n), j('span', { children: unit })] }),
         action ? j('button', { className: 'mt-btn mt-btn-sm', onClick: action, children: actionLabel }) : null,
       ] })
-      /* design/presets.html：项目分区末尾跟着一张虚线「新建预设」卡（和卡片同栅格），不是页头按钮的重复 */
+      /* design-v2/g-blueprints.html：项目分区末尾跟着一张虚线「新建预设」卡（和卡片同栅格），不是页头按钮的重复 */
       const newCard = js('button', {
         className: 'mt-p3-newcard',
         onClick: () => onNotice?.(t('preset3.readonlyHint')),
@@ -142,7 +142,7 @@
           js('div', { className: 'mt-kb3-head', children: [
             js('div', { children: [j('h2', { children: t('preset3.title') }), j('p', { children: t('preset3.desc') })] }),
             js('div', { className: 'mt-kb3-head-actions', children: [
-              /* design/presets.html：页头主按钮是描边（不是实底主色），只有空态兜底卡用虚线 */
+              /* design-v2/g-blueprints.html：页头主按钮是描边（不是实底主色），只有空态兜底卡用虚线 */
               j('button', { className: 'mt-btn', onClick: () => onNotice?.(t('preset3.readonlyHint')), children: `＋ ${t('preset3.new')}` }),
             ] }),
           ] }),

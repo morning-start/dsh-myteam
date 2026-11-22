@@ -1,4 +1,4 @@
-    /* ── 团队设置（design/settings.html：配置来源三层合并链 + 行为配置硬上限 + 状态目录 + 生命周期）── */
+    /* ── 团队设置（design-v2/p-settings.html：配置来源三层合并链 + 行为配置硬上限 + 状态目录 + 生命周期）── */
     /* CHG-187（FR-32 支柱一）：硬上限与 `PATCH_CEILINGS` 同源（memberMaxDepth 2 / maxChildren 5） */
     const CONFIG_CEILINGS = { maxMembers: 6, memberMaxDepth: 2, maxChildren: 5, commandTimeoutMs: 600000 }
     const LAYER_ICONS = {

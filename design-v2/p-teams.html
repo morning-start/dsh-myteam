@@ -1,4 +1,4 @@
-﻿<!doctype html>
+<!doctype html>
 <html lang="zh-CN">
 <head>
 <meta charset="utf-8">
@@ -6,6 +6,7 @@
 <meta name="dsh-design" content="dshplugin 1280x800">
 <title>团队 · myteam</title>
 <link rel="stylesheet" href="dsh-shell.css">
+<link rel="stylesheet" href="tokens.css">
 <link rel="stylesheet" href="myteam.css">
 <!-- 外框（DSH 插件 · 会话标签页）：只改 data-slot 里面，别动外框的结构、文字和 dsh-shell.css -->
 </head>
@@ -102,7 +103,9 @@
                 <span class="av sm" title="赵 · api-reviewer">赵</span>
                 <span class="muted" style="font-size:12px;margin-left:6px">6 名成员 · 累计 1.86M token</span>
                 <span class="grow"></span>
-                <a class="link" href="p-approval.html">队长接管请求</a>
+                <a class="link" href="p-roster.html">名册树</a>
+                <a class="link" href="p-roster.html">成员菜单</a>
+                <a class="link" href="p-dissolve.html">解散</a>
                 <button class="btn">设置</button>
               </div>
             </div>
@@ -132,6 +135,19 @@
               </div>
             </div>
 
+            <div class="team-card" style="margin-top:10px;border-style:dashed">
+              <div class="rc-h">
+                <span class="dot idle"></span><span class="nm" style="font-size:14px">支付页重构</span>
+                <span class="tag line">已归档</span>
+                <span class="cnt">08-14</span>
+                <span class="grow"></span>
+                <a class="btn" href="p-archive.html" style="text-decoration:none">回放</a>
+              </div>
+              <div class="meta-grid">
+                <span class="k">终态</span><span class="v">4 名成员释放 · 7 个任务 blocked · 1.79M token</span>
+                <span class="k">数据</span><span class="v">事件留在项目日志，账本与产物仍可检索</span>
+              </div>
+            </div>
             <div class="layer"><b>成员</b><span>6 名 · 会话只是执行载体</span><i class="rule"></i></div>
             <div class="list">
               <div class="item">

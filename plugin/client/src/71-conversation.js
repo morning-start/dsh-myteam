@@ -1,6 +1,6 @@
-    /* ── 会话页（design/conversation.html）与单角色调用（design/guest.html）──
+    /* ── 会话页（design-v2/README.md）与单角色调用（design-v2/README.md）──
      * 落点：conversation.view（团队视图壳）+ tool.call.toolview（myteam_* 工具卡）。
-     * 纪律（design-notes §五）：会话页不重复造面板 —— 工具卡只给摘要 + 两个出口，
+     * 纪律（design-v2/README.md §五）：会话页不重复造面板 —— 工具卡只给摘要 + 两个出口，
      * 不把整个看板塞进对话流；composer 输入框属于宿主，插件侧以视图内演示区块代替。 */
 
     /** 工具卡外壳（design .toolcard）：图标 + 工具名 + 摘要 + 折叠箭头 + 体 + 脚 */

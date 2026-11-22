@@ -1,0 +1,57 @@
+/* ============================================================
+   design-v2 · tokens.css
+   myteam 插件在 DSH 槽位里用的设计变量（唯一色值来源）。
+
+   规则
+   - 页面里不写裸色值：颜色、阴影全部从这里取。
+   - 宿主确有对应 alias 的角色写成 `var(--dsw-alias-*, fallback)`：
+     嵌进 DSH 时自动跟随宿主主题，独立打开时走 fallback。
+   - 深浅两段，两段同名变量写全（`t82` 守这一点）。
+   - `--dsh-*` 由外框 `dsh-shell.css` 提供（bg / card / fg / line / hover / accent /
+     主按钮 / 圆角 / 字体），这里不重复定义，只在其上定义 `--mt-*` 语义层。
+   - 宿主没有对应物的角色（成员标记、强调文字、忙碌绿/空闲灰的深档）保留字面值。
+   ============================================================ */
+
+:root {
+  /* 状态：点与边框用 -run / -gate / -fail，浅底上的文字用 *-ink */
+  --mt-run: var(--dsw-alias-state-ok-primary, #15803d);
+  --mt-run-ink: #166534;
+  --mt-gate: var(--dsw-alias-state-warning-primary, #b45309);
+  --mt-fail: var(--dsw-alias-state-error-primary, #b91c1c);
+  --mt-idle: var(--dsw-alias-label-tertiary, #9aa0a6);
+
+  /* 文字与强调 */
+  --mt-muted: var(--dsw-alias-label-secondary, #5c6167);
+  --mt-accent-ink: #2f5fd0;
+
+  /* 线 / 焦点环 */
+  --mt-line-soft: color-mix(in srgb, var(--dsh-line) 55%, transparent);
+  --mt-focus: 0 0 0 2px color-mix(in srgb, var(--dsh-accent) 45%, transparent);
+
+  /* 浮层阴影：宿主不用阴影堆层级，只给浮层三档 */
+  --mt-shadow-seg: 0 1px 2px rgba(0, 0, 0, .06);
+  --mt-shadow-drag: 0 12px 28px rgba(0, 0, 0, .14);
+  --mt-shadow-toast: 0 10px 28px rgba(0, 0, 0, .14);
+  --mt-shadow-menu: 0 14px 36px rgba(0, 0, 0, .16);
+  --mt-shadow-modal: 0 24px 64px rgba(0, 0, 0, .18);
+}
+
+[data-theme="dark"] {
+  --mt-run: var(--dsw-alias-state-ok-primary, #4ade80);
+  --mt-run-ink: #86efac;
+  --mt-gate: var(--dsw-alias-state-warning-primary, #fbbf24);
+  --mt-fail: var(--dsw-alias-state-error-primary, #f87171);
+  --mt-idle: var(--dsw-alias-label-tertiary, #6b7280);
+
+  --mt-muted: var(--dsw-alias-label-secondary, #b9bec5);
+  --mt-accent-ink: #9cc2ff;
+
+  --mt-line-soft: color-mix(in srgb, var(--dsh-line) 55%, transparent);
+  --mt-focus: 0 0 0 2px color-mix(in srgb, var(--dsh-accent) 45%, transparent);
+
+  --mt-shadow-seg: 0 1px 2px rgba(0, 0, 0, .4);
+  --mt-shadow-drag: 0 12px 28px rgba(0, 0, 0, .5);
+  --mt-shadow-toast: 0 10px 28px rgba(0, 0, 0, .5);
+  --mt-shadow-menu: 0 14px 36px rgba(0, 0, 0, .55);
+  --mt-shadow-modal: 0 24px 64px rgba(0, 0, 0, .6);
+}

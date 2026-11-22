@@ -1,5 +1,5 @@
     /* ── 依赖图（CHG-69/CHG-82：真实 DOM 测量 + SVG 贝塞尔连线 + 横向/竖向两种布局）──
-     * 口径对齐 design/dag.js：先把节点宽度钉死再测量（横向 176 定宽；竖向按容器 ~34%、240–400），
+     * 口径对齐 design-v2/p-dag.html：先把节点宽度钉死再测量（横向 176 定宽；竖向按容器 ~34%、240–400），
      * 依赖层级 = 主轴（h: 列 / v: 行），同层多节点在副轴居中，层间距 60；
      * 画布宽高取 max(内容, 容器)，节点在画布里居中；箭头永远从上游指到下游。
      * tasks 需要已把 deps 映射成图内 id（项目级用 ownerTeamId/taskId 复合键）。 */
@@ -12,7 +12,7 @@
     const DAG_MAX_LAYOUT_PASSES = 8
     const DAG_MODEL_RE = /^(sonnet|gpt-|claude|opus|qwen|gemini|deepseek|llama|mistral|glm)/i
     /** 任务状态 → 节点色带（H4：文字 + 形状为主，色带只作第三顺位） */
-    /** 状态机允许的拖拽落点（design/dragging.html：门禁未过的卡进不了已完成） */
+    /** 状态机允许的拖拽落点（design-v2/p-drag.html：门禁未过的卡进不了已完成） */
     const DRAG_LEGAL_TARGETS = {
       '待规划': ['就绪'],
       '就绪': ['进行中'],
@@ -197,7 +197,7 @@
       const canvasH = Math.max(contentH, avail.h)
       const extraX = Math.max(0, (canvasW - contentW) / 2)
       const extraY = Math.max(0, (canvasH - contentH) / 2)
-      // 5) 在跑的依赖链 = 运行节点 + 全部上游 + 全部下游（design/dag.js 的 HOT 口径）
+      // 5) 在跑的依赖链 = 运行节点 + 全部上游 + 全部下游（design-v2/p-dag.html 的 HOT 口径）
       const hot = new Set()
       for (const task of tasks) {
         if (dagChipOf(task.state) !== 'run') continue

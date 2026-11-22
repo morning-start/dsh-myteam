@@ -89,10 +89,10 @@ function loadClient() {
   return { registered, styles, effects, apply: captured[0]?.apply, ctx }
 }
 
-/* ── 一、知识库（design/knowledge.html） ─────────────────────────────── */
+/* ── 一、知识库（design-v2/p-knowledge.html） ─────────────────────────────── */
 
 test('t63-1: 知识库——三层记忆（共识 / 共享 / 实例私有）+ 证据数 + 可能过期 + 待确认提案 + 仅本人可见', () => {
-  // 三层记忆清单：复用 design/app.css 的 .layers / .layer / .layer-ico 结构
+  // 三层记忆清单：复用 design-v2/myteam.css 的 .layers / .layer / .layer-ico 结构
   assert.ok(source.includes("className: 'mt-layers'"), '三层记忆容器')
   assert.ok(source.includes('mt-layer-ico-builtin') && source.includes('mt-layer-ico-project') && source.includes('mt-layer-ico-global'), '三层各自的图标底（内置 / 项目 / 全局）')
   for (const key of ['kb3.consensus', 'kb3.shared', 'kb3.private']) {
@@ -115,7 +115,7 @@ test('t63-1: 知识库——三层记忆（共识 / 共享 / 实例私有）+ �
   assert.ok(source.includes("getKnowledge: (query) => call('getKnowledge'"), '数据面仍是门面 getKnowledge（不造第二事实源）')
 })
 
-/* ── 二、预设库（design/presets.html） ─────────────────────────────── */
+/* ── 二、预设库（design-v2/g-blueprints.html） ─────────────────────────────── */
 
 test('t63-2: 预设库——三层来源分区 + 名册预览（队长高亮 + 角色引用 chips）+ 模板三行 + 引用计数', () => {
   assert.ok(source.includes('function PresetsPage('), '预设库子页组件')
@@ -143,7 +143,7 @@ test('t63-2: 预设库——三层来源分区 + 名册预览（队长高亮 + �
   assert.ok(source.includes("t('preset3.tabRoles')") && source.includes("t('preset3.tabSkills')"), '角色 / 预设 / 技能 切换')
 })
 
-/* ── 三、技能 & MCP（design/skills.html） ───────────────────────────── */
+/* ── 三、技能 & MCP（design-v2/README.md） ───────────────────────────── */
 
 test('t63-3: 技能与 MCP——四层来源 + 成员级隔离 + 绑定次数 / 绑进角色 + MCP 两段式（连接层 ∩ 可见层）', () => {
   assert.ok(source.includes('function SkillsPage('), '技能 & MCP 子页组件')
@@ -384,7 +384,7 @@ test('t63-8: CHG-84 复检——知识页无会话也是满屏骨架；预设卡
   assert.ok(source.includes('j(G3LayerIcon, { kind: icoKind })'), '三层图标用内联 SVG（i-lock / i-globe / i-folder / i-role）')
   assert.ok(source.includes("'role', 'global'") || source.includes("'role'"), '实例私有层用 role 图标')
 
-  // ② 预设页：卡片栅格（design/app.css .grid-2 = minmax(348px,1fr)）+ 虚线「新建预设」卡
+  // ② 预设页：卡片栅格（design-v2/myteam.css .grid-2 = minmax(348px,1fr)）+ 虚线「新建预设」卡
   assert.ok(source.includes("'.mt-presetgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(348px,1fr))"), '预设卡栅格（此前 CSS 缺失 → 卡片整行铺满）')
   assert.ok(source.includes("className: 'mt-p3-newcard'") && source.includes("t('preset3.newCardHint')"), '项目分区末尾的虚线「新建预设」卡')
   assert.ok(source.includes("className: 'mt-p3-newcard-icon'"), '虚线卡上的 ＋ 图标')

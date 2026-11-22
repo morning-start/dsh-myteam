@@ -10,7 +10,7 @@
       const [copied, setCopied] = react.useState(false)
       const entries = presets?.entries ?? []
       const MAX_ROSTER = 6
-      /** design/new-team-1.html 的加载态：预设目录是异步拉的（getOfflinePresets 要读预设目录），
+      /** design-v2/README.md 的加载态：预设目录是异步拉的（getOfflinePresets 要读预设目录），
        *  未就绪时立刻给骨架，别让用户以为点了没反应；读取失败给「重试」+ 兜底「不套预设」。 */
       const presetsLoading = presets === undefined
       const presetsFailed = presets === null
@@ -252,7 +252,7 @@
             j('p', { className: 'mt-wizard-desc', children: t(DESC_KEYS[step]) }),
           ] }),
           js('div', { className: 'mt-wizard-body', children: [
-            /* 第 1 步：预设未就绪先给骨架/失败态，再给选项（design/new-team-1.html） */
+            /* 第 1 步：预设未就绪先给骨架/失败态，再给选项（design-v2/README.md） */
             step === 1 && presetsLoading ? presetSkeleton : null,
             step === 1 && presetsFailed ? presetFailedNote : null,
             /* 失败时仍给「不套预设」兜底（presetList 在 entries 为空时只剩这一条） */

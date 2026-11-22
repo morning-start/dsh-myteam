@@ -79,7 +79,7 @@
         ] }),
         js('div', { className: 'mt-listrow-act', children: act ?? null }),
       ] })
-      /* 视图条 = 回放分区锚点（design/archive.html 的 nav.seg：结局 / 名册 · N / 任务历史 · N / 账本与产物） */
+      /* 视图条 = 回放分区锚点（design-v2/p-archive.html 的 nav.seg：结局 / 名册 · N / 任务历史 · N / 账本与产物） */
       const archiveNav = (label, id) => j('button', {
         key: id,
         className: 'mt-audit-segbtn',

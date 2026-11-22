@@ -1,5 +1,5 @@
 /**
- * T61 · G1 设计稿对齐（CHG-82）—— design/detail.html · confirm.html · discard.html
+ * T61 · G1 设计稿对齐（CHG-82）—— design-v2/p-task.html · confirm.html · discard.html
  *
  * 覆盖口径（docs/delivery/13-UI对齐分工.md §四）：
  *  1) mock loader 能加载 client.js（window.__ModuleLoader__ + react / react/jsx-runtime 模块表），
@@ -87,9 +87,9 @@ function slice(from, to) {
   return source.slice(start, end)
 }
 
-const TASK_DETAIL_FROM = '    /* ── 任务详情（design/detail.html）：主区整页 = 面包屑 + 主列/侧列 + 成本归因 ── */'
-const DISCARD_FROM = '    /* ── 丢弃暂存计划的两段确认（design/discard.html）──'
-const DISBAND_FROM = '    /* ── 解散团队的两段确认（design/confirm.html）──'
+const TASK_DETAIL_FROM = '    /* ── 任务详情（design-v2/p-task.html）：主区整页 = 面包屑 + 主列/侧列 + 成本归因 ── */'
+const DISCARD_FROM = '    /* ── 丢弃暂存计划的两段确认（design-v2/p-approval.html）──'
+const DISBAND_FROM = '    /* ── 解散团队的两段确认（design-v2/p-dissolve.html）──'
 const BANNER_FROM = '    /* ── 暂存横幅三动作（FR-1.2：面板唯一写入口）──'
 const TABS_END = '    /* ── 成本 tab（FR-8.2/8.4，CHG-47）'
 
@@ -101,8 +101,8 @@ const discardSrc = () => slice(DISCARD_FROM, DISBAND_FROM)
 const disbandSrc = () => slice(DISBAND_FROM, BANNER_FROM)
 /** 暂存横幅源码 */
 const bannerSrc = () => slice(BANNER_FROM, TABS_END)
-/** G1 的样式落点：`/* [G1 detail] design/detail.html` 到 `/* [G2 roster] design/roles.html` 之间 */
-const g1CssSrc = () => slice('/* [G1 detail] design/detail.html', '/* [G2 roster] design/roles.html')
+/** G1 的样式落点：`/* [G1 detail] design-v2/p-task.html` 到 `/* [G2 roster] design-v2/p-teams.html` 之间 */
+const g1CssSrc = () => slice('/* [G1 detail] design-v2/p-task.html', '/* [G2 roster] design-v2/p-teams.html')
 
 /* ── 1. mock loader：可加载、注样式、注册插槽 ─────────────────────────── */
 
@@ -110,7 +110,7 @@ test('t61-1: client.js 可经 mock loader 加载，apply 注入样式并注册�
   const { registered, styles, apply, ctx, effects } = loadClient()
   assert.equal(styles.length, 0, 'factory 无副作用（不在加载期注入样式）')
   apply(ctx)
-  // CHG-82：插槽数不再硬编码 3 —— 会话页/工具卡（design-notes §二）追加了
+  // CHG-82：插槽数不再硬编码 3 —— 会话页/工具卡（design-v2/README.md §二）追加了
   // conversation.view + 4 个 keyed tool.call.toolview。这里只保证「基础三插槽存在」。
   assert.ok(registered.length >= 3, `至少 3 个插槽，实际 ${registered.length}`)
   for (const name of ['main', 'sidebar.panellist', 'conversation.composer.dock']) {
@@ -301,7 +301,7 @@ test('t61-9: G1 的 locale 键在 zh 与 en 都补齐（键集合一致）', () 
 
 test('t61-10: 复检（CHG-84）——区块标题字面 / 竖排任务操作 / 主责·协作 chip / 成本四行常显', () => {
   const detail = taskDetailSrc()
-  // 区块标题与 design/detail.html 字面一致（依赖关系 / 门禁链）
+  // 区块标题与 design-v2/p-task.html 字面一致（依赖关系 / 门禁链）
   assert.ok(detail.includes("t('detail.depsTitle')"), '标题「依赖关系」')
   assert.ok(detail.includes("t('detail.gatesTitle')"), '标题「门禁链」')
   // 任务操作：design 是竖排三颗、「取消此任务」

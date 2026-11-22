@@ -40,7 +40,7 @@
           if (typeof document !== 'undefined') document.removeEventListener('visibilitychange', onVisible)
         }
       }, [sessionId, connection])
-      /* design/conversation.html 的 .dockrow：live=0 且 unread=0 时整块不渲染 */
+      /* design-v2/README.md 的 .dockrow：live=0 且 unread=0 时整块不渲染 */
       if (live === 0 && unread === 0) return null
       return js('div', { className: 'mt-dockrow', ...themeAttr, children: [
         j('button', {

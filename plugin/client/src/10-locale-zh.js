@@ -445,7 +445,7 @@
       'diag.fixUnlockDepsHint': '上游已被取消，永远等不到 done——摘掉这条依赖，本任务才能进入可领队列',
       'diag.fixUnlockDepsReason': '解除对已取消上游的依赖：{deps}',
       'diag.fixUnlockDepsDone': '已解除对 {deps} 的依赖',
-      /* [G1 detail] 任务详情 / 两段确认（design/detail.html · confirm.html · discard.html） */
+      /* [G1 detail] 任务详情 / 两段确认（design-v2/p-task.html · confirm.html · discard.html） */
       'detail.crumb': '面包屑',
       'detail.crumbBoard': '看板',
       'detail.attemptN': '第 {n} 次尝试',
@@ -582,7 +582,7 @@
       'detail.deleteConfirmBtn': '确认删除',
       'detail.deleteFailed': '删除失败：{msg}',
       'task.deleted': '已删除任务 {id}',
-      /* 解散团队（design/confirm.html）：四条不可撤销影响 + 输入团队 ID 才能提交 */
+      /* 解散团队（design-v2/p-dissolve.html）：四条不可撤销影响 + 输入团队 ID 才能提交 */
       'disband.title': '解散「{name}」？',
       'disband.irreversible': '不可撤销',
       'disband.step': '第 2 步，共 2 步',
@@ -597,7 +597,7 @@
       'disband.inputHint': '「归档」与「解散」是同一套动作（落归档快照并结束团队），不可逆——它不是暂停。',
       'disband.archive': '改用归档',
       'disband.needId': '输入的团队 ID 与 {teamId} 不一致',
-      /* 丢弃暂存计划（design/discard.html）：影响面 + 引导改用 Revise */
+      /* 丢弃暂存计划（design-v2/p-approval.html）：影响面 + 引导改用 Revise */
       'discard.step': '第 2 步，共 2 步',
       'discard.title': '丢弃这份计划？',
       'discard.desc': '丢弃后这份草稿作废、团队进入 discarded 状态（不会自动重建）。**不写归档快照**——归档是「解散/归档」的动作。角色一个都还没拉进来，不涉及任何实例会话。',
@@ -614,7 +614,7 @@
       'discard.failed': '丢弃失败：{msg}',
       /* CHG-82：设计稿对齐的 locale 落点（zh 为键源；en 在下面同序追加） */
       /* [G1 detail] */ /* [G2 roster] */ /* [G3 knowledge] */
-      /* [G2 roster] 角色库 / 名册 / 角色详情 / 实例管理菜单（design/roles.html · roster.html · role-detail.html · member-menu.html） */
+      /* [G2 roster] 角色库 / 名册 / 角色详情 / 实例管理菜单（design-v2/p-teams.html · roster.html · role-detail.html · member-menu.html） */
       'roles.page.title': '角色库',
       'roles.page.desc': '角色是配置单元：职责、系统提示词、工具策略、技能引用、模型路由。同一个角色可以被多次召唤，每次产生一个实例。改角色不会影响已经在跑的实例 —— 它们拿的是召唤那一刻的快照。',
       'roles.createRole': '创建角色',
@@ -924,7 +924,7 @@
       'shell.empty': '这个项目还没有团队。',
       'shell.noMatch': '没有匹配的团队。',
       'shell.newTeam': '新建团队',
-      /* G5 · design/lanes.html · dag.html · dag-vertical.html · dragging.html */
+      /* G5 · design-v2/p-lanes.html · dag.html · dag-vertical.html · dragging.html */
       'view.dir.arrow.h': '横向 →',
       'view.dir.arrow.v': '竖向 ↓',
       'lanes.groupBy': '行 = 角色',

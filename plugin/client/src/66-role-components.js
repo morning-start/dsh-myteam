@@ -46,7 +46,7 @@
             j('span', { children: fork }),
           ] }) : null,
           js('div', { className: 'mt-rolecard-foot', children: [
-            /* design/roles.html：队长卡脚只写「不可召唤 · 即当前会话」（不列 0 实例） */
+            /* design-v2/p-teams.html：队长卡脚只写「不可召唤 · 即当前会话」（不列 0 实例） */
             role.isCaptain && instances.length === 0
               ? null
               : role.origin === 'project'
@@ -66,7 +66,7 @@
       })
     }
 
-    /** 项目自身角色卡（design/roles.html 的 .team-card：名称 + ID chip + 在线点 + 描述 + meta） */
+    /** 项目自身角色卡（design-v2/p-teams.html 的 .team-card：名称 + ID chip + 在线点 + 描述 + meta） */
     function ProjectRoleCard({ t, role, onOpen }) {
       return js('div', { className: 'mt-team-card mt-projectrole-card', children: [
         js('div', { className: 'mt-team-head', children: [
@@ -84,7 +84,7 @@
       ] })
     }
 
-    /** 创建角色虚线卡（design/roles.html 最后一格） */
+    /** 创建角色虚线卡（design-v2/p-teams.html 最后一格） */
     function RoleCardCreate({ t, onCreate }) {
       return js('button', { className: 'mt-rolecard mt-rolecard-lib mt-rolecard-create', onClick: () => onCreate?.(), children: [
         j('span', { className: 'mt-rolecard-create-ico', 'aria-hidden': true, children: '＋' }),
@@ -141,7 +141,7 @@
       ] })
     }
 
-    /** CHG-82 G2：角色库（design/roles.html）——三层来源分区 + 搜索/来源筛选 + 引用计数 + 复制/对比 + 创建卡 */
+    /** CHG-82 G2：角色库（design-v2/p-teams.html）——三层来源分区 + 搜索/来源筛选 + 引用计数 + 复制/对比 + 创建卡 */
     function RoleLibrary({ t, pv, onOpen, onGuest, onCopyToProject, onCompare, onCreate, onIntroGlobal, filter, onFilter }) {
       const [query, setQuery] = react.useState('')
       /* CHG-202x（P0-3）：来源筛选可**受控**——「引入全局角色」按钮把它切到 global（列表里就能复制/对比），
@@ -232,7 +232,7 @@
       ] })
     }
 
-    /** CHG-82 G2：角色详情（design/role-detail.html）——
+    /** CHG-82 G2：角色详情（design-v2/p-teams.html）——
      *  左列：定义与设定（职责 / 边界 / 兴趣词 + 系统提示词块 + 模型路由）· 技能（启用开关）· MCP 与工具；
      *  侧列：在册情况（跨团队聘任与实例）· 快照规则 · 操作（复制到项目 / 在队长会话试召唤 / 删除）。
      *  CHG-73：删除角色两段确认（先展示 usage）。 */

@@ -1,4 +1,4 @@
-    /* ── 技能 & MCP（design/skills.html）—— 全局作用域子页：
+    /* ── 技能 & MCP（design-v2/README.md）—— 全局作用域子页：
           技能四层来源（内置 / 全局 / 项目 / 角色绑定）+ 成员级隔离说明 + 技能条目（绑定次数 / 绑进角色）
           + 下半部 MCP 两段式左右对照（连接层 ∩ 可见层，中间链接图标表示交集）。── */
     function SkillsPage({ t, roles, catalog, onBack, onBind, onNotice, onPresets }) {

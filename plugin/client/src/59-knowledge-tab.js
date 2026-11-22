@@ -1,4 +1,4 @@
-    /* ── 知识 tab（FR-17.5 / CHG-82 设计稿对齐，design/knowledge.html）：
+    /* ── 知识 tab（FR-17.5 / CHG-82 设计稿对齐，design-v2/p-knowledge.html）：
           三层记忆（AGENTS.md 共识 / 项目共享库 / 实例私有）+ 证据数 + 「可能过期」标记
           + 待确认提案 + 搜索 + 提案入口 + 条目详情演化时间线（knowledge.revised 账本流）── */
     function KnowledgeTab({ t, data, members }) {
@@ -6,7 +6,7 @@
       const [layer, setLayer] = react.useState('all')
       const [openId, setOpenId] = react.useState(null)
       const [showIndex, setShowIndex] = react.useState(false)
-      /* CHG-84：无活跃会话（null）/ 读取中（undefined）也要给满屏骨架 —— design/knowledge.html 是满屏内容，
+      /* CHG-84：无活跃会话（null）/ 读取中（undefined）也要给满屏骨架 —— design-v2/p-knowledge.html 是满屏内容，
        * 不能整页只剩一句话：三层记忆、筛选条、空态与脚注照常渲染，只在提案位放一条说明 note。 */
       const loading = data === undefined
       const unavailable = data === null

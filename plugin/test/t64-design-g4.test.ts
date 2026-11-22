@@ -1,7 +1,7 @@
 /**
  * T64 · G4 ledger 设计稿对齐（CHG-82）
  *
- * 对齐 design/audit.html · settings.html · archive.html · overview.html · shell.html 五屏。
+ * 对齐 design-v2/p-audit.html · settings.html · archive.html · overview.html · shell.html 五屏。
  * 纪律：不碰 CDP（Lead 统一截图）；本文件用「mock loader 渲染 + 结构断言」自证。
  *
  * 断言口径：
@@ -109,16 +109,16 @@ const t = (key: string) => key
 /* ── 1. 落点 ── */
 
 test('t64-1: G4 只在自己的锚点后追加（CSS / zh / en / 审计 tab / 设置 tab）', () => {
-  assert.ok(source.includes('/* [G4 ledger] design/audit.html · settings.html · archive.html · overview.html · shell.html */'), 'CSS G4 锚点')
+  assert.ok(source.includes('/* [G4 ledger] design-v2/p-audit.html · settings.html · archive.html · overview.html · shell.html */'), 'CSS G4 锚点')
   assert.ok(source.includes("/* [G4 ledger] */ /* [G5 graph] */ /* [G6 flow] */"), 'locale G4 锚点（zh + en 各一处）')
-  assert.ok(source.includes('/* [G4 ledger · 审计 tab] —— design/audit.html */'), '审计 tab 锚点')
-  assert.ok(source.includes('/* [G4 ledger · 设置 tab] —— design/settings.html */'), '设置 tab 锚点')
+  assert.ok(source.includes('/* [G4 ledger · 审计 tab] —— design-v2/p-audit.html */'), '审计 tab 锚点')
+  assert.ok(source.includes('/* [G4 ledger · 设置 tab] —— design-v2/p-settings.html */'), '设置 tab 锚点')
   // 五屏各自的组件/区块存在
   for (const name of ['function AuditTab(', 'function SettingsTab(', 'function ArchiveReplay(', 'function TeamsHome(', 'function TeamCard(', 'function CostBar(']) {
     assert.ok(source.includes(name), `${name} 存在`)
   }
   // CSS 追加在 G4 锚点之后（不是别人的段落里）
-  const anchor = source.indexOf('/* [G4 ledger] design/audit.html')
+  const anchor = source.indexOf('/* [G4 ledger] design-v2/p-audit.html')
   const firstRule = source.indexOf("'.mt-audit-page{", anchor)
   assert.ok(anchor > 0 && firstRule > anchor, 'G4 样式在锚点之后')
 })
@@ -165,7 +165,7 @@ test('t64-3: 团队设置（settings.html）—— 三层合并链 + 行为配�
     assert.ok(source.includes(key), `层名 ${key}`)
   }
   assert.ok(source.includes('mt-merge-chain') && source.includes('mt-lt') && source.includes('mt-cur'), '合并链 + 生效层高亮（mt-cur）')
-  assert.ok(!source.includes("'mt-win'") && !source.includes('mt-win '), '不占用 .win（design-notes §五点五 的坑）')
+  assert.ok(!source.includes("'mt-win'") && !source.includes('mt-win '), '不占用 .win（design-v2/README.md §五点五 的坑）')
   assert.ok(source.includes("'settings.mergeNote'"), '数组整条替换说明')
   // 行为配置 + 硬上限只读列
   assert.ok(source.includes('const CONFIG_CEILINGS = { maxMembers: 6, memberMaxDepth: 2, maxChildren: 5, commandTimeoutMs: 600000 }'), '硬上限口径（与 PATCH_CEILINGS 一致；CHG-187 起 memberMaxDepth 2 / maxChildren 5）')
@@ -341,7 +341,7 @@ test('t64-10: 审计视图渲染——任务轨 2 条、attempt 分组、事件�
   assert.equal(countClass(tree, 'mt-evrow'), 3, '事件行 = 3 条（t1）')
   assert.ok(hasClass(tree, 'mt-audit-ledger-path'), '账本路径（只读派生）')
   assert.ok(textOf(tree).includes('audit.loadMore'), '分页「加载更多」')
-  // CHG-84 复检：左轨元信息 = 角色 · N 条事件 · N 次尝试（design/audit.html）
+  // CHG-84 复检：左轨元信息 = 角色 · N 条事件 · N 次尝试（design-v2/p-audit.html）
   assert.ok(textOf(tree).includes('audit.attempts'), '左轨「N 次尝试」')
   // 任务轨状态点：in_progress → 有尺寸的状态点（mt-mdot 自带 6px，不再依赖 mt-task-dot 基类）
   const dots = collect(tree).filter((node) => classOf(node).split(/\s+/).includes('mt-mdot'))

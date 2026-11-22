@@ -1,4 +1,4 @@
-    /* ── G2 名册卡：一张卡一个角色（design/roster.html + member-menu.html）
+    /* ── G2 名册卡：一张卡一个角色（design-v2/p-roster.html + member-menu.html）
      * 实现者 ×2 是同一张卡的两个实例行；队长不在名册里（roster.captainNote）。
      * 实例行 = iname / 在跑任务 / 交付 x/y · token；⋯ 展开实例管理菜单（指导 / 暂停 / 归档 / 移除 + 影响面）。 */
     function MemberCard({ t, roleId, role, members, tasks, tokens, teamName, taskTitle, readOnly, api, teamId, onOpen, onChanged, onError, onNotice }) {
@@ -257,7 +257,7 @@
       })
     }
 
-    /** 名册末尾的「召唤角色」虚线卡（design/roster.html 最后一格） */
+    /** 名册末尾的「召唤角色」虚线卡（design-v2/p-roster.html 最后一格） */
     function RosterSummonCard({ t, onSummon }) {
       return js('button', {
         className: 'mt-roster-card mt-roster-card-summon',

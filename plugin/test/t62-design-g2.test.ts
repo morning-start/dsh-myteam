@@ -1,6 +1,6 @@
 /**
  * T62 · CHG-82 G2 设计稿对齐契约测试（不依赖真实浏览器/宿主）：
- *  - 四屏：design/roles.html · roster.html · role-detail.html · member-menu.html
+ *  - 四屏：design-v2/p-teams.html · roster.html · role-detail.html · member-menu.html
  *  - 断言：①G2 组件与设计稿 class 都在实现里 ②zh/en 词条成对 ③样式纪律（只用 --dsw-alias-*、无十六进制、无 font-family）
  *    ④界面词汇纪律：新增 G2 中文词条不出现「成员」（团队内只说角色 / 实例）
  *  - 渲染路径由 Lead 的 CDP 截图收口（docs/delivery/13-UI对齐分工.md 四）；这里只做结构自证。

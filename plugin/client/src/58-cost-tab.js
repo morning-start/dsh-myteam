@@ -89,7 +89,7 @@
     }
 
 
-    /** 三层来源的图标（design/icons.svg 的 i-lock / i-globe / i-folder / i-link；内联，不依赖外部 sprite） */
+    /** 三层来源的图标（design-v2/icons.svg 的 i-lock / i-globe / i-folder / i-link；内联，不依赖外部 sprite） */
     function G3LayerIcon({ kind }) {
       const stroke = { fill: 'none', stroke: 'currentColor', strokeWidth: 1.25, strokeLinecap: 'round', strokeLinejoin: 'round' }
       const paths = kind === 'builtin'

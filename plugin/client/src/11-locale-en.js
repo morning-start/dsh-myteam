@@ -440,7 +440,7 @@
       'diag.fixUnlockDepsHint': 'The upstream was cancelled, so it will never reach done — drop this dependency and the task becomes claimable',
       'diag.fixUnlockDepsReason': 'Drop dependency on cancelled upstream(s): {deps}',
       'diag.fixUnlockDepsDone': 'Dropped dependency on {deps}',
-      /* [G1 detail] task detail / two-step confirmations (design/detail.html · confirm.html · discard.html) */
+      /* [G1 detail] task detail / two-step confirmations (design-v2/p-task.html · confirm.html · discard.html) */
       'detail.crumb': 'Breadcrumb',
       'detail.crumbBoard': 'Board',
       'detail.attemptN': 'attempt {n}',
@@ -908,7 +908,7 @@
       'shell.empty': 'This project has no teams yet.',
       'shell.noMatch': 'No matching teams.',
       'shell.newTeam': 'New team',
-      /* G5 · design/lanes.html · dag.html · dag-vertical.html · dragging.html */
+      /* G5 · design-v2/p-lanes.html · dag.html · dag-vertical.html · dragging.html */
       'view.dir.arrow.h': 'Horizontal →',
       'view.dir.arrow.v': 'Vertical ↓',
       'lanes.groupBy': 'Rows = roles',
@@ -1059,7 +1059,7 @@
       'guest.honesty': 'Writes config/session-defaults.json only: no team ledger events, no instance sessions, online teams untouched.',
     }
 
-    /* ══ [G3 knowledge] design/knowledge.html · presets.html · skills.html ══
+    /* ══ [G3 knowledge] design-v2/p-knowledge.html · presets.html · skills.html ══
      * 三屏的 locale（zh 为键源，en 同序）。
      * 用 Object.assign 追加而不是改写 zh/en 字面量：六组的落点在同一行，
      * 逐组往字面量里插行会互相踩（并发写协议 §三-2「少而大」）。 */
@@ -1088,7 +1088,7 @@
       'ov.allRunning': '全部已开工',
       'ov.allDone': '全部已交付',
       'ov.idleNote': '全部可开工 · {n} 项待认领',
-      /* 知识库（团队内「知识」tab，design/knowledge.html） */
+      /* 知识库（团队内「知识」tab，design-v2/p-knowledge.html） */
       'kb3.title': '团队知识库',
       'kb3.desc': '团队记忆分三层：AGENTS.md 是共识层，config/knowledge/ 是共享知识库，实例私有 memory.md 只属于本人。常驻的只有 40 行以内的索引，正文按需读取。',
       'kb3.index': '查看索引',
@@ -1145,7 +1145,7 @@
       /* CHG-84：无活跃会话 / 读取中——骨架照出，用一条说明讲清为什么还没有条目 */
       'kb3.needsSession': '当前团队没有活跃的团队会话：上面是知识库的三层骨架。在「团队模式」会话里提交计划后，条目、证据与提案会出现在这里。',
       'kb3.loadingHint': '正在读取团队知识库…',
-      /* 预设库（全局作用域子页，design/presets.html） */
+      /* 预设库（全局作用域子页，design-v2/g-blueprints.html） */
       'preset3.title': '预设库',
       'preset3.desc': '预设是团队模板：名册（队长 + N 个角色引用）加上看板列、流程维度、门禁链。新建团队时选一个，就得到一套现成的分工与流程。名册里存的是角色引用（聘任记录），不是副本 —— 改角色会立刻影响之后新建的团队，但不会影响已经聘任的实例。',
       'preset3.new': '新建预设',
@@ -1210,7 +1210,7 @@
       'preset3.tabPresets': '预设',
       'preset3.tabSkills': '技能',
       'preset3.more': '预设操作',
-      /* 技能 & MCP（全局作用域子页，design/skills.html） */
+      /* 技能 & MCP（全局作用域子页，design-v2/README.md） */
       'skill3.title': '技能与 MCP',
       'skill3.desc': '角色的能力由两样东西组成：技能按四层来源取，MCP 分两段看。实例化时按角色绑定注入，注入后只对那个实例可见，不会漏到别的实例身上。',
       'skill3.teambarSub': '全局 · 能力库',

@@ -1,7 +1,7 @@
-    /* ── 泳道（design/lanes.html：蛇形泳道，行 = 角色实例，列 = 四阶段，格 = 该实例在该阶段的节点）──
+    /* ── 泳道（design-v2/p-lanes.html：蛇形泳道，行 = 角色实例，列 = 四阶段，格 = 该实例在该阶段的节点）──
      * 三视图同源同抽屉：节点点开仍是同一个任务详情（onOpen）。列取四个流转阶段；完成 / 未完成是终态桶，不进泳道。 */
     const LANE_STAGES = ['待规划', '就绪', '进行中', '门禁']
-    /** CHG-85：泳道格子内最多显示几张卡，超出折叠（design/tasks.html 同款「还有 N 个」） */
+    /** CHG-85：泳道格子内最多显示几张卡，超出折叠（design-v2/p-tasks.html 同款「还有 N 个」） */
     const LANE_CELL_LIMIT = 4
     const laneStageOf = (state) => {
       for (const name of LANE_STAGES) {
@@ -14,7 +14,7 @@
     const assigneesOf = (task) => (task.assignees && task.assignees.length > 0 ? task.assignees : task.assignee ? [task.assignee] : [])
 
     /**
-     * CHG-115：**看板同源换挂载点**（design-notes §五「会话页不重复造面板」）。
+     * CHG-115：**看板同源换挂载点**（design-v2/README.md §五「会话页不重复造面板」）。
      *
      * 面板「任务」页与团队会话视图渲染的是**同一个** BoardView：
      *  - 面板传 `drag` / `onAdd` → 可拖拽、可列内新建的完整看板；
@@ -59,7 +59,7 @@
                 j('span', { className: 'mt-col-shape', 'aria-hidden': true }),
                 j('h4', { className: 'mt-col-name', children: col.name }),
                 j('span', { className: 'mt-count', children: list.length }),
-                /* design/board.html 的 .col-head .add：列内直达新建（只读视图不传 onAdd） */
+                /* design-v2/p-tasks.html 的 .col-head .add：列内直达新建（只读视图不传 onAdd） */
                 onAdd ? j('button', {
                   className: 'mt-col-add',
                   title: t('board.addToCol').replace('{col}', col.name),
@@ -67,7 +67,7 @@
                   children: '＋',
                 }) : null,
               ] }),
-              /* design/dragging.html 的 .dropzone：合法落点给「释放移入 · 进入后走 审查 → 命令验证 → 存档」 */
+              /* design-v2/p-drag.html 的 .dropzone：合法落点给「释放移入 · 进入后走 审查 → 命令验证 → 存档」 */
               legal ? js('div', { className: 'mt-dropzone', children: [
                 j('svg', {
                   width: 14, height: 14, viewBox: '0 0 16 16', fill: 'none', 'aria-hidden': true,

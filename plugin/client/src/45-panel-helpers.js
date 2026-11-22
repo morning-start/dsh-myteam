@@ -7,7 +7,7 @@
       { name: '就绪', states: ['ready'] },
       { name: '进行中', states: ['in_progress', 're-scoping'] },
       { name: '门禁', states: ['gate:review', 'gate:verify', 'gate:archive'] },
-      /* CHG-85：列名对齐 design/board.html（「已完成」；末列是虚线收口列） */
+      /* CHG-85：列名对齐 design-v2/p-tasks.html（「已完成」；末列是虚线收口列） */
       { name: '已完成', states: ['done'] },
       { name: '未完成', states: ['failed', 'blocked', 'cancelled'], done: true },
     ]
@@ -80,7 +80,7 @@
       }
     }
 
-    /** CHG-82 G2：角色卡按 design/roles.html 的 .card 结构——
+    /** CHG-82 G2：角色卡按 design-v2/p-teams.html 的 .card 结构——
      *  圆形头像 + 角色名/ID + 来源 chip + 描述 + 兴趣词 + 模型路由/Skill/MCP + 复制来源 + 脚（实例 / 用它单干 / 复制进项目）。
      *  CHG-74：同名副本要能一眼分辨——被压过的那份标「同名 X 副本（以此为准）」。 */
     const fmtClock = (ts) => {

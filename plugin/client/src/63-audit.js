@@ -1,4 +1,4 @@
-    /* ── 审计回放（design/audit.html：按任务/角色/时间三档 + attempt 分组 + 只读标注 + 分页）── */
+    /* ── 审计回放（design-v2/p-audit.html：按任务/角色/时间三档 + attempt 分组 + 只读标注 + 分页）── */
     const AUDIT_VIEWS = ['task', 'member', 'time']
     /** 事件 → 圆点语义（claimed 领取 / run 进展 / warn 门禁·知识 / failed 失败；颜色只作第三顺位） */
     const auditDotClass = (type) => {
@@ -9,7 +9,7 @@
       if (raw === 'task.escalated' || raw === 'task.gate.result' || raw === 'plan.revised' || raw.startsWith('knowledge.')) return 'mt-evdot-warn'
       return ''
     }
-    /** 审计左轨的任务状态点（design/audit.html：门禁 = 琥珀菱形，其余走状态点；文字另有，颜色只作第三顺位） */
+    /** 审计左轨的任务状态点（design-v2/p-audit.html：门禁 = 琥珀菱形，其余走状态点；文字另有，颜色只作第三顺位） */
     const auditRailDotClass = (state) => {
       const raw = String(state ?? '')
       if (!raw) return 'mt-mdot'

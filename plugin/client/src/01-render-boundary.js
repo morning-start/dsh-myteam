@@ -98,7 +98,7 @@ window.__ModuleLoader__.load({
     /** 会话 → 入口上下文：能解析出团队就落团队页，解析不到回全局库（不空转） */
     const NS = 'myteam.panel'
     /**
-     * 轮询间隔（R34 / design-notes §十：面板 5s 轮询）。
+     * 轮询间隔（R34 / design-v2/README.md §十：面板 5s 轮询）。
      *
      * 修复前两处各自写死 15000 / 20000，且**完全不看** `document.visibilityState`——
      * 面板切到后台（或宿主窗口最小化）时仍在按秒发 RPC，白烧网关与账本折叠。

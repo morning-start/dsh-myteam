@@ -78,7 +78,7 @@ test('t13c-1: client.js 可加载且注册三个基础插槽（main keyed=myteam
   const { registered, apply, ctx } = loadClient()
   assert.equal(typeof apply, 'function')
   apply(ctx) // 触发插槽注册
-  // CHG-82：插槽数不再是硬编码 3 —— 会话页/工具卡（design-notes §二 插槽落点地图）
+  // CHG-82：插槽数不再是硬编码 3 —— 会话页/工具卡（design-v2/README.md §二 插槽落点地图）
   // 会追加 conversation.view 与 tool.call.toolview。这里改成「基础三插槽必须存在」+「新增的只能是
   // 文档登记过的槽名」，既保留契约又不因合法新增而误红。
   assert.ok(registered.length >= 3, `至少注册 3 个插槽，实际 ${registered.length}`)
@@ -337,11 +337,11 @@ test('t13c-2h: 居中列（CHG-202c）——每个「行」都吃同一个 gutte
 
 test('t13c-2g: 看板/名册 UI 修复契约（CHG-62）——列全高可滚、优先级不重复、成员显示任务名与在岗态', () => {
   const source = readFileSync(clientPath, 'utf8')
-  // 看板：列体滚动 + 列等宽（CHG-85：按 design/app.css 的 .board{display:flex} + .col{flex:1 1 200px;min-width:200px} 改成 flex 布局；
+  // 看板：列体滚动 + 列等宽（CHG-85：按 design-v2/myteam.css 的 .board{display:flex} + .col{flex:1 1 200px;min-width:200px} 改成 flex 布局；
   // 原来的 grid-auto-columns:minmax(200px,1fr) 会让 6 列硬占 1250px、把末列顶出容器被裁且滚不动）
   assert.ok(source.includes('mt-col-body'), '列体容器（卡片滚动区）')
-  assert.ok(/'\.mt-columns\{[^}]*display:flex/.test(source), '列容器用 flex（design/app.css .board）')
-  assert.ok(/'\.mt-col\{[^}]*flex:1 1 200px;min-width:150px/.test(source), '列等宽 + 不压缩卡片（design/app.css .col；CHG-85 min-width 降到 150 让 6 列同屏可见）')
+  assert.ok(/'\.mt-columns\{[^}]*display:flex/.test(source), '列容器用 flex（design-v2/myteam.css .board）')
+  assert.ok(/'\.mt-col\{[^}]*flex:1 1 200px;min-width:150px/.test(source), '列等宽 + 不压缩卡片（design-v2/myteam.css .col；CHG-85 min-width 降到 150 让 6 列同屏可见）')
   assert.ok(source.includes('overflow-x:auto'), '列容器窄屏可横向滚动')
   assert.ok(source.includes('mt-col-empty'), '空列占位')
   // 优先级：只渲染一次（旧实现 `P${t.priority}` → PP1）

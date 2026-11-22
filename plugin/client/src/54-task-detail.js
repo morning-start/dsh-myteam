@@ -1,4 +1,4 @@
-    /* ── 任务详情（design/detail.html）：主区整页 = 面包屑 + 主列/侧列 + 成本归因 ── */
+    /* ── 任务详情（design-v2/p-task.html）：主区整页 = 面包屑 + 主列/侧列 + 成本归因 ── */
     // T25：离线团队走 loader（getOfflineTaskDetail），readOnly=true 时隐藏沟通输入
     // CHG-73：动作条（重新规划/取消/编辑）+ 证据过期横幅 + 改动记录折叠区 + 取消横幅
     function TaskDetail({ api, t, teamId, taskId, onClose, readOnly, loader, memberName, teamName, members, onEdit, onRescope, onCancel, onDelete, refreshToken, onDiagnosisFixed }) {

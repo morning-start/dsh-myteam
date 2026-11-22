@@ -29,7 +29,7 @@
         'aria-pressed': picking ? Boolean(selected) : undefined,
         onClick: () => (picking ? onToggle?.(task) : onOpen(task.id)),
         children: [
-          /* design/board.html 的 .tcard-top：任务号 + 优先级（+ 模型徽标） */
+          /* design-v2/p-tasks.html 的 .tcard-top：任务号 + 优先级（+ 模型徽标） */
           js('span', { className: 'mt-task-top', children: [
             picking ? j('span', { className: 'mt-task-check' + (selected ? ' mt-task-check-on' : ''), 'aria-hidden': true, children: selected ? '✓' : '' }) : null,
             locked ? j('span', { className: 'mt-lock-icon', 'aria-hidden': true, children: j('svg', {

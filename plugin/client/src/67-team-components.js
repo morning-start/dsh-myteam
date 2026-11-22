@@ -21,10 +21,10 @@
       })
     }
 
-    /* CHG-83：design/overview.html 的「全部团队」不再内联在全局页 —— 它把「角色库三层」与
+    /* CHG-83：design-v2/p-overview.html 的「全部团队」不再内联在全局页 —— 它把「角色库三层」与
      * 「团队 tab」两处内容又摆了一遍（用户："怎么还有一个这个区域"）。归档团队仍从
      * 「团队」tab 进来（TeamCard 带「已归档」状态 chip，点开就是归档回放）。 */
-    /** 项目 · 团队列表（design/shell.html：筛选行 + 按工作区分组的团队卡） */
+    /** 项目 · 团队列表（design-v2/p-teams.html：筛选行 + 按工作区分组的团队卡） */
     function TeamsHome({ t, teams, tasks, gateOf, onOpen, workspaceRoot, onCreateTeam }) {
       const [query, setQuery] = react.useState('')
       const needle = String(query ?? '').trim().toLowerCase()
@@ -56,7 +56,7 @@
           ] }),
           j('p', { className: 'mt-home-hint', children: t('shell.hint') }),
           /* CHG-84 收口：CHG-83 撤掉全局页的「全部团队」后，面板里就没有建团入口了
-           * （预设卡上的「用这个建团队」只在项目层有预设时出现）。按 design/shell.html
+           * （预设卡上的「用这个建团队」只在项目层有预设时出现）。按 design-v2/p-teams.html
            * 工作区头的「新建」补回一颗，落在「项目 → 团队」tab。 */
           onCreateTeam ? j('button', { className: 'mt-btn mt-btn-primary', onClick: onCreateTeam, children: t('shell.newTeam') }) : null,
         ] }),
@@ -81,9 +81,9 @@
     }
 
 
-    /** 归档回放（design/archive.html：归档条 + 结局卡 + 进度分段 + 名册 + 五项分解 + 任务历史 + 账本） */
+    /** 归档回放（design-v2/p-archive.html：归档条 + 结局卡 + 进度分段 + 名册 + 五项分解 + 任务历史 + 账本） */
     /**
-     * 归档回放（design/archive.html）。
+     * 归档回放（design-v2/p-archive.html）。
      *
      * CHG-86 / P0-2：**优先用 `getArchive` 返回的真实快照**（`archive/<teamId>/team.json`、
      * `tokens.json`、`members/*.json`、`artifacts/` 的落盘内容），拿不到时（离线团队 /
