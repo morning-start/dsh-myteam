@@ -77,9 +77,10 @@ composition → infrastructure → application → domain → contracts
 
 ```bash
 cd plugin
-node --test test/*.test.ts        # 90 个测试
+node --test test/*.test.ts        # 92 个测试
 node ../tools/check-architecture.mjs   # ARCH_OK files=42 violations=0
 node scripts/build-lib.mjs        # 42 个模块 → lib/（入口 lib/composition/host.mjs）
+node ../tools/gen-panel-contract.mjs --check   # 面板契约文档与代码一致
 
 # v1 数据只读分析（不写旧文件、不迁移）
 node ../tools/myteam-migrate.mjs analyze --root "E:\Workplace\extension\dsh-myteam"
