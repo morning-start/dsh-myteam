@@ -1,95 +1,128 @@
-﻿# dsh-plugin-myteam 路 v2
+# dsh-plugin-myteam · v2
 
-椤圭洰绾у鏅鸿兘浣撳洟闃熻繍琛屾椂銆倂2 鏄?*閲嶅啓**锛屼笉鏄粰 v1 鎵撹ˉ涓侊細v1 鐨勫畬鏁村疄鐜颁繚瀛樺湪
-Git 鏍囩 `v1-backup`锛屾湰鍒嗘敮浠庢柊鐨勫垎灞傞鏋跺紑濮嬮噸鏂板疄鐜般€?
-> 鐘舵€侊細`2.0.0-alpha.1`銆俁0锝濺3锛堝绾︺€侀鍩熷唴鏍搞€佷簨浠跺簱涓庢姇褰便€侀」鐩敤渚嬶級宸茶惤鍦板苟鏈夋祴璇曪紱
-> R4 瀹屾垚闃熼暱/鎴愬憳宸ュ叿闈笌瑁呴厤锛堝皻鏈畨瑁呰繘 DSH 楠岃瘉锛夛紱R5锝濺7 鏈畬鎴愩€?> **鍙畨瑁呮€?*锛歚lib/composition/host.mjs` 宸茶兘鏋勫缓骞堕€氳繃鍐掔儫锛?2 涓槦闀垮伐鍏锋敞鍐屻€佽鐪嬫澘鍙敤锛夛紝
-> 浣?`panel` RPC 涓?`cordis.patch.yml` 鐨?preset 琛屽皻鏈帴涓婏紝鍥犳 R5 鍓嶄笉瑕佸畨瑁呭埌 profile銆?
-## 涓轰粈涔堣閲嶅啓
+项目级多智能体团队运行时。v2 是**重写**，不是给 v1 打补丁：v1 的完整实现保存在
+Git 标签 `v1-backup`，本分支从新的分层骨架开始重新实现。
 
-v1 鐨勯棶棰樹笉鏄€屾枃浠跺お澶с€嶏紝鑰屾槸杈圭晫閿欎簡锛屼笖閿欏湪浼氳鎸佺画娌跨敤锛?
-- 涓氬姟 Host 鎸傚湪 captain preset 閲岋紝鎴愬憳宸ュ叿鍙嶅悜渚濊禆鍏ュ彛 Host锛?- 閰嶇疆銆佺煡璇嗐€佹垚鍛樺崱銆佽韩浠藉揩鐓т笌绱㈠紩鍚勬湁澶氫唤鏉冨▉涓庨潪鍘熷瓙鍐欙紱
-- 闈㈡澘鍦ㄧ嚎/绂荤嚎瀛樺湪澶氭潯璇诲啓璺緞锛岀绾胯鍥惧彟璧蜂竴濂楃姸鎬佹満锛?- `actor:'human'` / `confirm:true` 鍙槸鏅€氬弬鏁帮紝涓嶈兘鏋勬垚鍙俊浜虹被鎺堟潈銆?
-缁х画銆屽師鍦版崲鍐呮牳銆嶄細璁╂棫 Host 缁х画鍐冲畾绯荤粺杈圭晫锛屾墍浠?v2 鍦ㄩ殧绂?worktree 涓噸寤猴紝
-鏈€缁堟暣浣撴浛鎹紙瑙?[鍏ㄩ噺閲嶆瀯瀹炴柦璁捐](../docs/architecture/04-鍏ㄩ噺閲嶆瀯瀹炴柦璁捐.md)锛夈€?
-## 鍒嗗眰涓庝緷璧栨柟鍚?
+> 状态：`2.0.0-alpha.1`。R0～R3（契约、领域内核、事件库与投影、项目用例）已落地并有测试；
+> R4 完成队长/成员工具面与装配（尚未安装进 DSH 验证）；R5～R7 未完成。
+> **可安装性**：`lib/composition/host.mjs` 已能构建并通过冒烟（12 个队长工具注册、读看板可用），
+> 但 `panel` RPC 与 `cordis.patch.yml` 的 preset 行尚未接上，因此 R5 前不要安装到 profile。
+
+## 为什么要重写
+
+v1 的问题不是「文件太大」，而是边界错了，且错在会被持续沿用：
+
+- 业务 Host 挂在 captain preset 里，成员工具反向依赖入口 Host；
+- 配置、知识、成员卡、身份快照与索引各有多份权威与非原子写；
+- 面板在线/离线存在多条读写路径，离线视图另起一套状态机；
+- `actor:'human'` / `confirm:true` 只是普通参数，不能构成可信人类授权。
+
+继续「原地换内核」会让旧 Host 继续决定系统边界，所以 v2 在隔离 worktree 中重建，
+最终整体替换（见 [全量重构实施设计](../docs/architecture/04-全量重构实施设计.md)）。
+
+## 分层与依赖方向
+
 ```text
 plugin/src/
-鈹溾攢鈹€ contracts/      浜嬩欢銆佹壒娆″抚銆佸疄浣撳舰鐘躲€侀敊璇爜銆佺増鏈笌瑙勮寖鍖?hash
-鈹溾攢鈹€ domain/         绾鍩熻鍒欙細瀹氫箟璧勪骇銆佷换鍔?DAG銆佺姸鎬佹満銆侀厤缃悎骞躲€佹潈闄?鈹溾攢鈹€ application/    鐢ㄤ緥鍛戒护銆侀」鐩繍琛屾椂銆佸唴瀛樻姇褰憋紙绾?reducer锛?鈹溾攢鈹€ infrastructure/ 鏂囦欢浜嬩欢搴撱€佸啓鑰呯绾︼紙鏈潵锛欴SH 閫傞厤鍣ㄣ€佽縼绉昏鍙栧櫒锛?鈹斺攢鈹€ composition/    锛圧4锛塂SH 瑁呰浇涓庝緷璧栬閰?```
-
-渚濊禆鍙兘鍚戝唴锛?
-```text
-composition 鈫?infrastructure 鈫?application 鈫?domain 鈫?contracts
+├── contracts/      事件、批次帧、实体形状、错误码、版本与规范化 hash
+├── domain/         纯领域规则：定义资产、任务 DAG、状态机、配置合并、权限
+├── application/    用例命令、项目运行时、内存投影（纯 reducer）
+├── infrastructure/ 文件事件库、写者租约（未来：DSH 适配器、迁移读取器）
+└── composition/    （R4）DSH 装载与依赖装配
 ```
 
-鐢?`tools/check-architecture.mjs` 鏈烘妫€鏌ワ紙V1锝濾5锛氱洰褰曞綊灞炪€佷緷璧栨柟鍚戙€佸涓绘ā鍧椼€?绗笁鏂瑰寘銆佹墦鍗拌竟鐣岋級銆俙contracts/domain/application` 涓嶅緱 import `fs` /
-`child_process` / `path`锛屼篃涓嶅緱 `console.log`锛涢渶瑕?IO 鎴栨棩蹇楁椂鐢?`application/ports.ts` 鐨勭鍙ｃ€?
-## 宸插疄鐜扮殑涓嶅彉閲?
-| 涓嶅彉閲?| 钀界偣 | 娴嬭瘯 |
-|---|---|---|
-| 浜嬩欢鍐呭 hash 涓庡瓧娈甸『搴忔棤鍏炽€佹嫆缁濅笉鍙棤鎹熻〃杈剧殑鍊?| `contracts/json.ts` | `t01` |
-| 鎵规 = 澶村抚 + 浜嬩欢甯?+ 鎻愪氦甯э紱hash/鏁伴噺/搴忓彿涓夎€呭榻愭墠鏄?durable 鎻愪氦鐐?| `contracts/batch.ts` | `t01` |
-| 鎾曡灏鹃儴涓庢崯鍧忎弗鏍煎尯鍒嗭細鍓嶈€呭彲鏄惧紡淇锛屽悗鑰呮暣涓」鐩仠鍐?| `infrastructure/event-store/log-scan.ts` | `t01`銆乣t05` |
-| 杩藉姞鍓嶆牳瀵?projectSeq 杩炵画锛涜烦鍙锋嫆缁濅笖涓嶅啓鍧忔棩蹇?| `infrastructure/event-store/file-store.ts` | `t05` |
-| 鍐欒€呯绾︾嫭鍗犮€乫encing 鍗曡皟銆佽繃鏈熷彲鎺ョ銆侀噴鏀剧暀澧撶 | `infrastructure/event-store/writer-lease.ts` | `t05` |
-| 鑳藉姏鍙敹绐勶紱deny 涓嶈兘琚笅灞傞噸鏂版墦寮€锛沗*` 涓庣┖ allow 璇箟涓嶅悓 | `domain/definitions/role.ts` | `t02` |
-| 宸ヤ綔娴佸畾涔夊彲瀹炰緥鍖栵細key 鍞竴銆佷緷璧栧瓨鍦ㄣ€佹棤鐜€佸畬鎴愭潯浠跺彲瑙ｆ瀽 | `domain/definitions/workflow.ts` | `t03` |
-| 浠诲姟灏辩华鍙涓婃父 `done`锛沗cancelled` 涓嶈В闄や笅娓?| `domain/tasks/dag.ts` | `t03` |
-| 瀹屾垚 = review + 闂ㄧ pass + 璇佹嵁/浜や粯鐗╅綈 + 渚濊禆瀹屾垚锛岀己涓€涓嶅彲 | `domain/tasks/task.ts` | `t04` |
-| 閰嶇疆鍒嗗眰鍚堝苟鍚庢寜瀹夊叏涓婇檺閽冲埗锛岄挸鍒堕」鍐欒繘蹇収锛涙湭鐭ラ敭鎶ラ敊 | `domain/config/merge.ts` | `t04` |
-| 浜虹被涓撳睘鍔ㄤ綔瀵逛换浣?agent 杩斿洖 `HUMAN_ONLY` | `domain/permissions/policy.ts` | `t04` |
-| 椤圭洰閲嶅紑鍚庣殑鎶曞奖涓庡叧闂墠閫愬瓧娈典竴鑷?| `application/project-runtime.ts` | `t06` |
-| 姣忎釜浜嬩欢绫诲瀷閮芥湁鎶曞奖澶勭悊锛堢洰褰曚笌 switch 涓嶆紓绉伙級 | `application/projections/project-state.ts` | `t07` |
-| Run 瀹炰緥鍖?= 涓€涓師瀛愭壒娆★紱瀹屾垚鏉′欢婊¤冻鏃跺悓鎵规鍏?Run | `application/run-commands.ts`銆乣task-commands.ts` | `t08` |
-| 瀹屾垚涓€涓换鍔℃椂鍚屾壒娆℃斁寮€宸叉弧瓒充緷璧栫殑涓嬫父浠诲姟 | `application/task-commands.ts` | `t08` |
-| 鐭ヨ瘑鎻愭蹇呴』鏈夎瘉鎹紱鎻愭涓庨噰绾冲垎绂?| `application/knowledge-commands.ts` | `t09` |
-| 閰嶇疆 rebase 蹇呴』甯?`expectedConfigRevision` | `application/commands.ts` | `t09` |
-| Effect 鍙兘 `requested鈫抋ccepted鈫抍ompleted`锛涙湭鐭ョ粨鏋滀笉閲嶆斁 | `application/effect-commands.ts` | `t10` |
-| v1 鍒嗘瀽锛氭湭鐭ヤ簨浠?搴忓彿鏂闃绘柇锛岀储寮曞鍎垮彧鍛婅 | `infrastructure/migration/v1/analyze.ts` | `t11` |
-| 宸ュ叿韬唤鍙潵鑷細璇濈粦瀹氾紱鏈煡浼氳瘽 = FORBIDDEN | `application/actor-resolution.ts` | `t12` |
-| 闃熼暱 12 涓伐鍏枫€佹垚鍛?3 涓伐鍏凤紝浜掍笉娉勬紡 | `composition/host.ts`銆乣composition/member.ts` | `t12` |
-| 鍚屼竴宸ヤ綔鍖哄彧寮€涓€涓」鐩繍琛屾椂锛堝苟鍙戞墦寮€鎶樺彔涓轰竴涓?Promise锛?| `infrastructure/dsh/project-hosts.ts` | `t12` |
-| 杩佺Щ褰卞搷闈㈠彲澶嶇幇锛欳LI 涓庢姤鍛婂悓涓€缁撴瀯锛岄樆鏂椂涓嶇粰瀵煎叆椤哄簭 | `infrastructure/migration/v1/report.ts` | `t13` |
-| 闈㈡澘鍙鏈嶅姟锛氬崗璁増鏈笉鍖归厤鍗虫嫆缁濓紝鏈煡鏂规硶/缂哄弬鏁扮粨鏋勫寲鎶ラ敊 | `application/panel-service.ts` | `t14` |
-| 浜虹被纭浠ょ墝缁戝畾 operationId/action/targetHash/impactHash/涓€娆℃€?nonce | `domain/permissions/human-authorizer.ts` | `t15` |
-| 瑙ｆ暎鍥㈤槦/闃熼暱鎺ョ锛氶瑙?鈫?纭 鈫?鎵ц锛涘奖鍝嶉潰鍙樺寲鍗冲け鏁?| `application/human-actions.ts` | `t16` |
-| 鍊欓€夊鍏ュ彧鏀寔宸茬‘璁ょ殑浜嬩欢褰㈢姸锛涘叾浠栦簨浠堕樆鏂€岄潪璺宠繃 | `infrastructure/migration/v1/convert.ts` | `t18` |
-| 鍊欓€夊啓鍏ュ悗浠庣鐩橀噸鏀惧璐︼紝鏁伴噺涓嶇鍗冲け璐?| `infrastructure/migration/v1/convert.ts` | `t18` |
-| 浠诲姟鎸夌粓鎬佹姌鍙犺縼绉伙紱鍦ㄩ€旀墽琛屽洖钀?ready锛屾棫 Attempt 涓嶈縼绉?| `infrastructure/migration/v1/convert.ts` | `t18` |
-| 鐭ヨ瘑淇濈暀銆屾彁妗堚啋閲囩撼銆嶉摼锛涜椹冲洖鐨勬彁妗堜笉杩佺Щ | `infrastructure/migration/v1/convert.ts` | `t18` |
-| cutover 鍓嶅繀椤昏瘉鏄庡€欓€夋湭杩囨湡锛堟潵婧?hash 瀵瑰緱涓婏級 | `infrastructure/migration/v1/cutover.ts` | `t19` |
-| 璁板繂灞炰簬 bank 涓嶅睘浜庝細璇濓紱璺?bank 璇诲彇瑙嗕负涓嶅瓨鍦紱纭垹闄や粎浜虹被 | `infrastructure/memory-store/sqlite-memory.ts` | `t20` |
+依赖只能向内：
 
-## 杩愯
+```text
+composition → infrastructure → application → domain → contracts
+```
+
+由 `tools/check-architecture.mjs` 机械检查（V1～V5：目录归属、依赖方向、宿主模块、
+第三方包、打印边界）。`contracts/domain/application` 不得 import `fs` /
+`child_process` / `path`，也不得 `console.log`；需要 IO 或日志时用
+`application/ports.ts` 的端口。
+
+## 已实现的不变量
+
+| 不变量 | 落点 | 测试 |
+|---|---|---|
+| 事件内容 hash 与字段顺序无关、拒绝不可无损表达的值 | `contracts/json.ts` | `t01` |
+| 批次 = 头帧 + 事件帧 + 提交帧；hash/数量/序号三者对齐才是 durable 提交点 | `contracts/batch.ts` | `t01` |
+| 撕裂尾部与损坏严格区分：前者可显式修复，后者整个项目停写 | `infrastructure/event-store/log-scan.ts` | `t01`、`t05` |
+| 追加前核对 projectSeq 连续；跳号拒绝且不写坏日志 | `infrastructure/event-store/file-store.ts` | `t05` |
+| 写者租约独占、fencing 单调、过期可接管、释放留墓碑 | `infrastructure/event-store/writer-lease.ts` | `t05` |
+| 能力只收窄；deny 不能被下层重新打开；`*` 与空 allow 语义不同 | `domain/definitions/role.ts` | `t02` |
+| 工作流定义可实例化：key 唯一、依赖存在、无环、完成条件可解析 | `domain/definitions/workflow.ts` | `t03` |
+| 任务就绪只认上游 `done`；`cancelled` 不解除下游 | `domain/tasks/dag.ts` | `t03` |
+| 完成 = review + 门禁 pass + 证据/交付物齐 + 依赖完成，缺一不可 | `domain/tasks/task.ts` | `t04` |
+| 配置分层合并后按安全上限钳制，钳制项写进快照；未知键报错 | `domain/config/merge.ts` | `t04` |
+| 人类专属动作对任何 agent 返回 `HUMAN_ONLY` | `domain/permissions/policy.ts` | `t04` |
+| 项目重开后的投影与关闭前逐字段一致 | `application/project-runtime.ts` | `t06` |
+| 每个事件类型都有投影处理（目录与 switch 不漂移） | `application/projections/project-state.ts` | `t07` |
+| Run 实例化 = 一个原子批次；完成条件满足时同批次关 Run | `application/run-commands.ts`、`task-commands.ts` | `t08` |
+| 完成一个任务时同批次放开已满足依赖的下游任务 | `application/task-commands.ts` | `t08` |
+| 知识提案必须有证据；提案与采纳分离 | `application/knowledge-commands.ts` | `t09` |
+| 配置 rebase 必须带 `expectedConfigRevision` | `application/commands.ts` | `t09` |
+| Effect 只能 `requested→accepted→completed`；未知结果不重放 | `application/effect-commands.ts` | `t10` |
+| v1 分析：未知事件/序号断裂阻断，索引孤儿只告警 | `infrastructure/migration/v1/analyze.ts` | `t11` |
+| 工具身份只来自会话绑定；未知会话 = FORBIDDEN | `application/actor-resolution.ts` | `t12` |
+| 队长 12 个工具、成员 3 个工具，互不泄漏 | `composition/host.ts`、`composition/member.ts` | `t12` |
+| 同一工作区只开一个项目运行时（并发打开折叠为一个 Promise） | `infrastructure/dsh/project-hosts.ts` | `t12` |
+| 迁移影响面可复现：CLI 与报告同一结构，阻断时不给导入顺序 | `infrastructure/migration/v1/report.ts` | `t13` |
+| 面板只读服务：协议版本不匹配即拒绝，未知方法/缺参数结构化报错 | `application/panel-service.ts` | `t14` |
+| 人类确认令牌绑定 operationId/action/targetHash/impactHash/一次性 nonce | `domain/permissions/human-authorizer.ts` | `t15` |
+| 解散团队/队长接管：预览 → 确认 → 执行；影响面变化即失效 | `application/human-actions.ts` | `t16` |
+| 候选导入只支持已确认的事件形状；其他事件阻断而非跳过 | `infrastructure/migration/v1/convert.ts` | `t18` |
+| 候选写入后从磁盘重放对账，数量不符即失败 | `infrastructure/migration/v1/convert.ts` | `t18` |
+| 任务按终态折叠迁移；在途执行回落 ready，旧 Attempt 不迁移 | `infrastructure/migration/v1/convert.ts` | `t18` |
+| 知识保留「提案→采纳」链；被驳回的提案不迁移 | `infrastructure/migration/v1/convert.ts` | `t18` |
+| cutover 前必须证明候选未过期（来源 hash 对得上） | `infrastructure/migration/v1/cutover.ts` | `t19` |
+| 记忆属于 bank 不属于会话；跨 bank 读取视为不存在；硬删除仅人类 | `infrastructure/memory-store/sqlite-memory.ts` | `t20` |
+
+## 运行
 
 ```bash
 cd plugin
-node --test test/*.test.ts        # 109 涓祴璇?node ../tools/check-architecture.mjs   # ARCH_OK files=47 violations=0
-node scripts/build-lib.mjs        # 47 涓ā鍧?鈫?lib/锛堝叆鍙?lib/composition/host.mjs锛?node ../tools/gen-panel-contract.mjs --check   # 闈㈡澘濂戠害鏂囨。涓庝唬鐮佷竴鑷?
-# v1 鏁版嵁鍙鍒嗘瀽锛堜笉鍐欐棫鏂囦欢銆佷笉杩佺Щ锛?node ../tools/myteam-migrate.mjs analyze --root "E:\Workplace\extension\dsh-myteam"
+node --test test/*.test.ts        # 105 个测试
+node ../tools/check-architecture.mjs   # ARCH_OK files=47 violations=0
+node scripts/build-lib.mjs        # 47 个模块 → lib/（入口 lib/composition/host.mjs）
+node ../tools/gen-panel-contract.mjs --check   # 面板契约文档与代码一致
+
+# v1 数据只读分析（不写旧文件、不迁移）
+node ../tools/myteam-migrate.mjs analyze --root "E:\Workplace\extension\dsh-myteam"
 node ../tools/myteam-migrate.mjs plan    --root "E:\Workplace\extension\dsh-myteam" --json
-# 鍊欓€夊鍏ワ細鍐欏埌涓€涓嫭绔嬬洰褰曪紝鏃у伐浣滃尯涓嶅姩锛涘啓瀹岀珛鍗冲璐?node ../tools/myteam-migrate.mjs candidate --root "E:\Workplace\extension\dsh-myteam" --candidate "<鍊欓€夌洰褰?"
-# cutover 璁″垝锛氭鏌ュ€欓€夊畬鏁存€с€佹簮鏄惁鍙樺寲銆佸垪鍑烘楠や笌鍥炴粴杈圭晫锛堜笉鎵ц鍒囨崲锛?node ../tools/myteam-migrate.mjs cutover-plan --root "E:\Workplace\extension\dsh-myteam" --candidate "<鍊欓€夌洰褰?"
+# 候选导入：写到一个独立目录，旧工作区不动；写完立即对账
+node ../tools/myteam-migrate.mjs candidate --root "E:\Workplace\extension\dsh-myteam" --candidate "<候选目录>"
+# cutover 计划：检查候选完整性、源是否变化、列出步骤与回滚边界（不执行切换）
+node ../tools/myteam-migrate.mjs cutover-plan --root "E:\Workplace\extension\dsh-myteam" --candidate "<候选目录>"
 ```
 
-涓嶉渶瑕?`npm install`锛歂ode 鈮?22.18 鐩存帴鎿﹂櫎绫诲瀷杩愯 `.ts`锛屼粨搴撲繚鎸侀浂杩愯鏃朵緷璧栥€?
-## 鏁版嵁甯冨眬锛坴2 鐩爣锛孯6 杩佺Щ鍚庣敓鏁堬級
+不需要 `npm install`：Node ≥ 22.18 直接擦除类型运行 `.ts`，仓库保持零运行时依赖。
+
+## 数据布局（v2 目标，R6 迁移后生效）
 
 ```text
 <project>/.dsh-myteam/
-鈹溾攢鈹€ manifest.json          # projectId銆乴ayoutVersion銆乻chemaVersion
-鈹溾攢鈹€ events/project.jsonl   # 椤圭洰鍞竴涓氬姟浜嬪疄婧愶紙鍘熷瓙鎵规锛?鈹溾攢鈹€ config/                # 鐢熸垚瑙嗗浘锛岀姝㈢洿鎺ュ啓
-鈹溾攢鈹€ memory/memory.db       # 闀挎湡璁板繂鍞竴鏉冨▉锛圧3锛?鈹溾攢鈹€ state/projections/     # 鍙噸寤虹紦瀛?鈹斺攢鈹€ state/writer.lock      # 鍐欒€呭崗璋冿紝涓嶆槸涓氬姟浜嬪疄
+├── manifest.json          # projectId、layoutVersion、schemaVersion
+├── events/project.jsonl   # 项目唯一业务事实源（原子批次）
+├── config/                # 生成视图，禁止直接写
+├── memory/memory.db       # 长期记忆唯一权威（R3）
+├── state/projections/     # 可重建缓存
+└── state/writer.lock      # 写者协调，不是业务事实
 ```
 
-## 鏄庣‘涓嶅仛
+## 明确不做
 
-- 鍚姩鏃惰嚜鍔ㄦ埅鏂€岀湅璧锋潵鍧忎簡銆嶇殑鏃ュ織鈥斺€旀挄瑁傚熬閮ㄥ繀椤绘樉寮忎慨澶嶅苟鐣欐姤鍛婏紱
-- 鎶娿€岃繑鍥炲け璐ャ€嶅綋鎴愩€屽彲鑳藉啓杩涘幓浜嗐€嶁€斺€攄urable 涔嬪墠鐨勫け璐ヤ笉浜х敓浠讳綍鎶曞奖鍙樺寲锛?- 鐢?`actor:'human'` 鎴?`confirm:true` 鍙傛暟鍏呭綋浜虹被鎺堟潈鈥斺€旈偅鍙槸鏅€氭暟鎹紱
-- 涓や釜杩涚▼鍚屾椂鍐欏悓涓€椤圭洰鈥斺€旀湭鍙栧緱绉熺害鍙鎴栬浆鍙戯紱
-- 鏂版棫瀛樺偍闀挎湡鍙屽啓銆?
-## 涓嬩竴闃舵
+- 启动时自动截断「看起来坏了」的日志——撕裂尾部必须显式修复并留报告；
+- 把「返回失败」当成「可能写进去了」——durable 之前的失败不产生任何投影变化；
+- 用 `actor:'human'` 或 `confirm:true` 参数充当人类授权——那只是普通数据；
+- 两个进程同时写同一项目——未取得租约只读或转发；
+- 新旧存储长期双写。
 
-1. **R3 搴旂敤鐢ㄤ緥**锛歐orkflow Run銆佷緷璧栭噸鎺ャ€侀棬绂佽鍐炽€佺煡璇嗐€侀厤缃?rebase銆丒ffect 璇锋眰/瀵硅处锛?2. **R4 DSH 閫傞厤鍣?*锛歊oot Runtime銆丆aptain/Member preset銆佸伐鍏锋敞鍐屻€丼essionRef銆丠umanAuthorizer锛?3. **R5 v2 闈㈡澘**锛氬彧娑堣垂 RPC 鐨勭粺涓€鎶曞奖锛堣璁＄瑙?`design-v2/`锛夛紱
-4. **R6 杩佺Щ**锛歚.team-workplace/`銆佷袱澶勬棫璐︽湰銆丼QLite銆乵emory.md 鐨勪竴娆℃€у€欓€夊鍏ヤ笌瀵硅处锛?5. **R7 楠屾敹涓庢竻鐞?*锛氱湡鏈洪摼璺€佹枃妗ｆ浛鎹€佸巻鍙茶祫鏂欏垹闄ゃ€
+## 下一阶段
+
+1. **R3 应用用例**：Workflow Run、依赖重接、门禁裁决、知识、配置 rebase、Effect 请求/对账；
+2. **R4 DSH 适配器**：Root Runtime、Captain/Member preset、工具注册、SessionRef、HumanAuthorizer；
+3. **R5 v2 面板**：只消费 RPC 的统一投影（设计稿见 `design-v2/`）；
+4. **R6 迁移**：`.team-workplace/`、两处旧账本、SQLite、memory.md 的一次性候选导入与对账；
+5. **R7 验收与清理**：真机链路、文档替换、历史资料删除。
