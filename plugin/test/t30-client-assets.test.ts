@@ -26,6 +26,19 @@ function fakeRequire() {
   return (name) => (name === 'react' ? react : new Proxy({}, { get: () => noop }))
 }
 
+test('package.json 必须声明客户端半体：dsh.client 与 ./client 导出', () => {
+  const pkg = JSON.parse(readFileSync(join(ROOT, 'plugin', 'package.json'), 'utf8')) as {
+    dsh?: { client?: { platform?: string; inject?: string[] } }
+    exports?: Record<string, string>
+  }
+  assert.equal(pkg.dsh?.client?.platform, 'web', '缺少 dsh.client.platform，DSH 不会加载客户端')
+  assert.equal(pkg.exports?.['./client'], './client/client.js')
+  assert.ok(existsSync(CLIENT), '缺少 client/client.js')
+  const inject = pkg.dsh?.client?.inject ?? []
+  assert.ok(inject.includes('slots'), `客户端 inject 必须含 slots：${inject.join(',')}`)
+  assert.ok(inject.includes('connection'), `客户端 inject 必须含 connection：${inject.join(',')}`)
+})
+
 test('客户端入口能在模拟模块加载器下加载，并给出 apply/inject', () => {
   const code = readFileSync(CLIENT, 'utf8')
   let module = null

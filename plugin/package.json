@@ -14,7 +14,8 @@
     "./human-cards": "./lib/composition/human-card-kind.mjs",
     "./icon": "./icon.svg",
     "./icon.svg": "./icon.svg",
-    "./package.json": "./package.json"
+    "./package.json": "./package.json",
+    "./client": "./client/client.js"
   },
   "icon": "./icon.svg",
   "engines": {
@@ -24,6 +25,13 @@
   "dsh": {
     "bundle": {
       "patch": "./cordis.patch.yml"
+    },
+    "client": {
+      "platform": "web",
+      "inject": [
+        "slots",
+        "connection"
+      ]
     }
   },
   "files": [
