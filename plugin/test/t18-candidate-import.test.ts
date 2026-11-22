@@ -97,12 +97,12 @@ test('候选导入：不支持的事件阻断而不是跳过', () => {
     buildSource(
       source,
       line(0, 1000, 'team.created', { teamId: 'A', name: '甲队', goal: 'g' }) +
-        line(1, 2000, 'task.created', { teamId: 'A', taskId: 't1', task: {} }),
+        line(1, 2000, 'knowledge.proposed', { teamId: 'A', draftId: 'd1', draft: { title: 'k', body: 'b' } }),
     )
     const { conversion } = convert(source)
     assert.equal(conversion.ok, false)
     assert.ok(conversion.issues.some((issue) => issue.code === 'UNSUPPORTED_FOR_IMPORT' && issue.severity === 'blocking'))
-    assert.ok(conversion.disposition.some((item) => item.type === 'task.created' && item.outcome === 'blocked'))
+    assert.ok(conversion.disposition.some((item) => item.type === 'knowledge.proposed' && item.outcome === 'blocked'))
 
     const candidate = mkdtempSync(join(tmpdir(), 'myteam-candidate-'))
     try {
@@ -123,6 +123,82 @@ test('候选导入：不支持的事件阻断而不是跳过', () => {
     }
   } finally {
     rmSync(source, { recursive: true, force: true })
+  }
+})
+
+test('候选导入：任务按终态折叠，依赖重映射，在途执行回落 ready', () => {
+  const source = mkdtempSync(join(tmpdir(), 'myteam-convert-'))
+  const candidate = mkdtempSync(join(tmpdir(), 'myteam-candidate-'))
+  try {
+    buildSource(
+      source,
+      line(0, 1000, 'team.created', { teamId: 'A', name: '甲队', goal: 'g' }) +
+        line(1, 2000, 'task.created', {
+          teamId: 'A',
+          taskId: 't1',
+          task: {
+            title: '设计',
+            description: '',
+            acceptanceCriteria: ['有结论'],
+            deps: [],
+            requiredRole: null,
+            priority: 'P2',
+          },
+        }) +
+        line(2, 3000, 'task.claimed', { teamId: 'A', taskId: 't1', memberId: 'm1', attemptId: 'a1' }) +
+        line(3, 4000, 'task.completed', { teamId: 'A', taskId: 't1', attemptId: 'a1' }) +
+        line(4, 5000, 'task.created', {
+          teamId: 'A',
+          taskId: 't2',
+          task: {
+            title: '实现',
+            description: '',
+            acceptanceCriteria: ['通过测试'],
+            deps: ['t1'],
+            requiredRole: null,
+            priority: 'P2',
+            deliverableSpec: { path: 'src/a.ts' },
+            verifyCommand: { argv: ['npm', 'test'] },
+          },
+        }),
+      [{ teamId: 'A', name: '甲队', state: 'active', counts: { tasks: 2 } }],
+    )
+
+    const { conversion } = convert(source)
+    assert.equal(conversion.ok, true, JSON.stringify(conversion.issues))
+    assert.equal(conversion.counts.tasks, 2)
+    assert.equal(conversion.records.length, 3, 'team + 2 tasks')
+
+    const written = writeCandidateProject(conversion, {
+      candidateRoot: candidate,
+      projectId: newId('project'),
+      projectName: 'demo-migrated',
+      now: NOW,
+      ids: newId,
+      clock: { now: () => NOW },
+    })
+    assert.equal(written.verification.ok, true, written.verification.problems.join('; '))
+    assert.equal(written.verification.tasks, 2)
+
+    const rebuilt = (() => {
+      const store = new FileEventStore(join(candidate, EVENTS_FILE))
+      return store.readCommitted().events
+    })()
+    const taskEvents = rebuilt.filter((event) => event.type === 'task.created')
+    const first = taskEvents[0]!.payload as { task: { status: string; completedAt: string | null } }
+    assert.equal(first.task.status, 'done')
+    assert.equal(first.task.completedAt, new Date(4000).toISOString())
+
+    const second = (taskEvents[1]!.payload as { task: { dependencies: string[]; gate: { commands: string[] }; deliverable: { paths: string[] } | null } }).task
+    assert.equal(second.dependencies.length, 1)
+    assert.deepEqual(second.gate.commands, ['npm test'])
+    assert.deepEqual(second.deliverable!.paths, ['src/a.ts'])
+
+    // claimed/progress/completed 里的执行细节没有逐条重放，但被明确计数。
+    assert.ok(conversion.skipped.some((item) => item.type === 'task.claimed' && item.count === 1))
+  } finally {
+    rmSync(source, { recursive: true, force: true })
+    rmSync(candidate, { recursive: true, force: true })
   }
 })
 

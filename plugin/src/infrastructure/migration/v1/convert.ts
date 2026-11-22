@@ -15,7 +15,7 @@
  * 写入后立即做对账：重放候选事件，与转换时声明的计数逐项比较。
  */
 import { join } from 'node:path'
-import type { Member, RoleDefinition, Team } from '../../../contracts/entities.ts'
+import type { Member, RoleDefinition, Task, TaskStatus, Team } from '../../../contracts/entities.ts'
 import { ERROR_CODES, fail, toErrorShape } from '../../../contracts/errors.ts'
 import type { ActorRef, EntityRef, EventType } from '../../../contracts/events.ts'
 import type { IdFactory } from '../../../contracts/ids.ts'
@@ -52,7 +52,7 @@ export interface ConversionResult {
   records: ConvertedRecord[]
   skipped: { type: string; count: number; reason: string }[]
   mappings: { teams: Record<string, string>; members: Record<string, string> }
-  counts: { teams: number; members: number }
+  counts: { teams: number; members: number; tasks: number }
   /** 每条来源事件的下场：converted / skipped / blocked。 */
   disposition: { teamId: string; seq: number; type: string; outcome: 'converted' | 'skipped' | 'blocked' }[]
 }
@@ -113,6 +113,98 @@ export function convertV1Analysis(options: ConvertOptions): ConversionResult {
   const memberMapping: Record<string, string> = {}
   const members = new Map<string, Member>()
   const disposition: ConversionResult['disposition'] = []
+  let convertedTasks = 0
+
+  /*
+   * 任务状态折叠：旧账本里一个任务的状态散在 created/claimed/progress/completed…
+   * 多个事件里。v2 迁移不为每条执行细节重建事件，而是**一次**写出终态任务，
+   * 并在报告里说明「执行细节未逐条重放」。这样既保住当前事实，也不伪造 Attempt。
+   */
+  const taskIds = new Map<string, string>()
+  const taskSeen = new Map<string, { order: number; event: V1LedgerEvent; teamLabel: string }>()
+  const taskFinal = new Map<string, { status: TaskStatus; completedAt: string | null; touched: boolean }>()
+
+  for (const planned of options.plan.events) {
+    const event = planned.event
+    const legacyTaskId =
+      event.type.startsWith('task.') && typeof event.payload.taskId === 'string' ? event.payload.taskId : null
+    if (legacyTaskId === null) continue
+
+    if (event.type === 'task.created') {
+      if (!taskIds.has(legacyTaskId)) taskIds.set(legacyTaskId, options.ids('task'))
+      if (!taskSeen.has(legacyTaskId)) taskSeen.set(legacyTaskId, { order: planned.order, event, teamLabel: planned.teamId })
+      taskFinal.set(legacyTaskId, { status: 'planned', completedAt: null, touched: false })
+      continue
+    }
+
+    const current = taskFinal.get(legacyTaskId)
+    if (current === undefined) continue
+    switch (event.type) {
+      case 'task.claimed':
+        current.status = 'claimed'
+        break
+      case 'task.progress':
+        current.status = 'in_progress'
+        break
+      case 'task.blocked':
+      case 'task.paused':
+        current.status = 'blocked'
+        break
+      case 'task.failed':
+        current.status = 'ready'
+        break
+      case 'task.completed':
+        current.status = 'done'
+        current.completedAt = new Date(event.ts).toISOString()
+        break
+      case 'task.cancelled':
+        current.status = 'cancelled'
+        break
+      default:
+        break
+    }
+    current.touched = true
+  }
+
+  /** 只影响执行细节、不改变 v2 需要表达的事实：跳过并计数。 */
+  const SKIPPED_TYPES = new Set([
+    'plan.clarify',
+    'plan.staged',
+    'plan.revised',
+    'plan.approved',
+    'plan.discarded',
+    'task.claimed',
+    'task.assigned',
+    'task.attempt.revoked',
+    'task.progress',
+    'task.evidence',
+    'task.completed',
+    'task.failed',
+    'task.blocked',
+    'task.paused',
+    'task.escalated',
+    'task.rescoped',
+    'task.updated',
+    'task.cancelled',
+    'task.deleted',
+    'task.rewired',
+    'task.proposal',
+    'task.proposal.resolved',
+    'task.deliverable',
+    'task.gate.result',
+    'task.participate',
+    'task.participation.released',
+    'message.sent',
+    'message.consumed',
+    'session.read',
+    'memory.audit',
+    'team.updated',
+    'team.disbanded',
+    'member.released',
+    'member.archived',
+    'member.restored',
+    'member.interrupted',
+  ])
 
   const skip = (teamId: string, event: V1LedgerEvent, reason: string) => {
     const current = skipped.get(event.type) ?? { count: 0, reason }
@@ -130,6 +222,125 @@ export function convertV1Analysis(options: ConvertOptions): ConversionResult {
 
     if (event.type === 'rules.version.adopted') {
       skip(teamLabel, event, '规则版本只初始化一次，保留旧行作为来源证据')
+      continue
+    }
+
+    if (SKIPPED_TYPES.has(event.type)) {
+      skip(teamLabel, event, '执行细节/历史产物不逐条重放，保留旧行作为来源证据')
+      continue
+    }
+
+    if (event.type === 'task.created') {
+      const legacyTaskId = asString(event.payload.taskId)
+      const seen = legacyTaskId === null ? undefined : taskSeen.get(legacyTaskId)
+      if (legacyTaskId === null || seen === undefined) {
+        block('MISSING_FIELD', 'task.created 缺少 taskId')
+        continue
+      }
+      if (seen.order !== planned.order) {
+        skip(teamLabel, event, '任务状态已折叠进首次 task.created')
+        continue
+      }
+      const raw = event.payload.task
+      if (typeof raw !== 'object' || raw === null) {
+        block('MISSING_FIELD', `task.created 缺少 task 对象（${legacyTaskId}）`)
+        continue
+      }
+      const input = raw as Record<string, unknown>
+      const title = asString(input.title)
+      const acceptance = Array.isArray(input.acceptanceCriteria)
+        ? input.acceptanceCriteria.filter((item): item is string => typeof item === 'string' && item.trim().length > 0)
+        : []
+      if (title === null || acceptance.length === 0) {
+        block('MISSING_FIELD', `任务 ${legacyTaskId} 缺少 title 或 acceptanceCriteria`)
+        continue
+      }
+      const mappedTeamId = teamMapping[teamLabel]
+      if (mappedTeamId === undefined) {
+        block('MISSING_FIELD', `任务 ${legacyTaskId} 的主责团队没有迁移成功`)
+        continue
+      }
+
+      const final = taskFinal.get(legacyTaskId)!
+      let status = final.status
+      if (status === 'claimed' || status === 'in_progress') {
+        issues.push({
+          code: 'UNKNOWN_TEAM_STATUS',
+          severity: 'warning',
+          message: `任务 ${legacyTaskId} 迁移时仍在执行，已回落为 ready（旧 Attempt 不迁移）`,
+          detail: { legacyTaskId },
+        })
+        status = 'ready'
+      }
+
+      const depsLegacy = Array.isArray(input.deps)
+        ? input.deps.filter((item): item is string => typeof item === 'string')
+        : []
+      const dependencies: string[] = []
+      for (const dependency of depsLegacy) {
+        const mapped = taskIds.get(dependency)
+        if (mapped === undefined) {
+          issues.push({
+            code: 'MISSING_FIELD',
+            severity: 'warning',
+            message: `任务 ${legacyTaskId} 的依赖 ${dependency} 没有迁移，依赖边已丢弃`,
+            detail: { legacyTaskId, dependency },
+          })
+          continue
+        }
+        dependencies.push(mapped)
+      }
+
+      const deliverableSpec = input.deliverableSpec
+      const deliverablePath =
+        typeof deliverableSpec === 'object' && deliverableSpec !== null && typeof (deliverableSpec as { path?: unknown }).path === 'string'
+          ? (deliverableSpec as { path: string }).path
+          : null
+      const verifyCommand = input.verifyCommand
+      const verifyArgv =
+        typeof verifyCommand === 'object' && verifyCommand !== null && Array.isArray((verifyCommand as { argv?: unknown }).argv)
+          ? ((verifyCommand as { argv: unknown[] }).argv.filter((item): item is string => typeof item === 'string'))
+          : null
+
+      const task: Task = {
+        id: taskIds.get(legacyTaskId)!,
+        title,
+        description: asString(input.description) ?? '',
+        acceptance,
+        status,
+        ownerTeamId: mappedTeamId,
+        collaborators: [],
+        dependencies,
+        runId: null,
+        templateKey: null,
+        requiredRoleId: asString(input.requiredRole),
+        gate: {
+          commands: verifyArgv === null || verifyArgv.length === 0 ? [] : [verifyArgv.join(' ')],
+          requireEvidence: true,
+          requireArtifacts: deliverablePath !== null,
+        },
+        deliverable: deliverablePath === null ? null : { paths: [deliverablePath], description: '' },
+        attemptId: null,
+        revision: 1,
+        createdAt: new Date(event.ts).toISOString(),
+        updatedAt: options.now,
+        completedAt: final.completedAt,
+      }
+
+      records.push({
+        order: planned.order,
+        type: 'task.created',
+        entity: { kind: 'task', id: task.id, teamId: mappedTeamId },
+        payload: { task, graphRevision: 1 },
+        legacy: planned.legacyOrigin,
+      })
+      convertedTasks += 1
+      disposition.push({ teamId: teamLabel, seq: event.seq, type: event.type, outcome: 'converted' })
+      continue
+    }
+
+    if (event.type.startsWith('knowledge.')) {
+      block('UNSUPPORTED_FOR_IMPORT', '知识条目的 payload 语义尚未确认，先阻断（避免丢正文与证据）')
       continue
     }
 
@@ -216,7 +427,7 @@ export function convertV1Analysis(options: ConvertOptions): ConversionResult {
     records,
     skipped: [...skipped.entries()].map(([type, value]) => ({ type, count: value.count, reason: value.reason })),
     mappings: { teams: teamMapping, members: memberMapping },
-    counts: { teams: teams.size, members: members.size },
+    counts: { teams: teams.size, members: members.size, tasks: convertedTasks },
     disposition,
   }
 }
@@ -239,8 +450,10 @@ export interface CandidateWriteResult {
     ok: boolean
     teams: number
     members: number
+    tasks: number
     expectedTeams: number
     expectedMembers: number
+    expectedTasks: number
     problems: string[]
   }
 }
@@ -309,6 +522,9 @@ export function writeCandidateProject(conversion: ConversionResult, options: Can
   if (rebuilt.members.size !== conversion.counts.members) {
     problems.push(`成员数量不符：投影 ${rebuilt.members.size}，转换 ${conversion.counts.members}`)
   }
+  if (rebuilt.tasks.size !== conversion.counts.tasks) {
+    problems.push(`任务数量不符：投影 ${rebuilt.tasks.size}，转换 ${conversion.counts.tasks}`)
+  }
   for (const record of conversion.records) {
     if (record.type === 'team.created' && !rebuilt.teams.has((record.payload as { team: Team }).team.id)) {
       problems.push(`投影缺少团队 ${(record.payload as { team: Team }).team.id}`)
@@ -324,8 +540,10 @@ export function writeCandidateProject(conversion: ConversionResult, options: Can
       ok: problems.length === 0,
       teams: rebuilt.teams.size,
       members: rebuilt.members.size,
+      tasks: rebuilt.tasks.size,
       expectedTeams: conversion.counts.teams,
       expectedMembers: conversion.counts.members,
+      expectedTasks: conversion.counts.tasks,
       problems,
     },
   }
