@@ -42,6 +42,10 @@
     - id: myteam-panel
       name: 'dsh-plugin-myteam/panel'
       inject: ['agents', 'workingDirectory']
+    # 人类动作命令（斜杠命令）：只在 UI 提交路径执行，模型无法伪造。
+    - id: myteam-commands
+      name: 'dsh-plugin-myteam/commands'
+      inject: ['commands', 'agents', 'workingDirectory']
     - id: myteam-preset-captain
       name: '@deepseek-ai/dsh-agent-preset'
       config:
