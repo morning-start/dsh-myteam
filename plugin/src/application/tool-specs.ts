@@ -24,6 +24,7 @@ import { completeTaskCommand, recordEvidenceCommand, recordProgressCommand, reco
 import { startWorkflowRunCommand } from './run-commands.ts'
 import { adoptKnowledgeCommand, proposeKnowledgeCommand } from './knowledge-commands.ts'
 import { boardView, taskDetail, teamView } from './queries.ts'
+import { previewCaptainTakeover, previewTeamDisband } from './human-actions.ts'
 import type { ProjectRuntime } from './project-runtime.ts'
 
 export interface ToolRuntimeContext {
@@ -205,6 +206,47 @@ export function leadToolSpecs(): MyTeamToolSpec[] {
         const record = asRecord(args)
         const actor = actorOf(context)
         return jsonSafe({ ok: true, data: teamView(context.runtime.state, defaultTeamId(actor, record)) })
+      },
+    },
+    {
+      name: 'myteam_preview_disband',
+      description:
+        '预览解散团队的影响面（只读，不写事件）。把返回的 targetHash 交给人类确认；人类侧确认后才真正执行。',
+      parameters: {
+        type: 'object',
+        properties: { teamId: { type: 'string', description: '团队 id' } },
+        required: ['teamId'],
+        additionalProperties: false,
+      },
+      outputSchema: OUTPUT_SCHEMA,
+      execute(args, context) {
+        const record = asRecord(args)
+        return jsonSafe({ ok: true, data: previewTeamDisband(context.runtime, { teamId: requireString(record, 'teamId') }) })
+      },
+    },
+    {
+      name: 'myteam_preview_takeover',
+      description:
+        '预览队长接管的影响面（只读，不写事件）。把返回的 targetHash 交给人类确认；人类侧确认后才真正执行。',
+      parameters: {
+        type: 'object',
+        properties: {
+          teamId: { type: 'string', description: '团队 id' },
+          toSessionId: { type: 'string', description: '接任队长的会话 id' },
+        },
+        required: ['teamId', 'toSessionId'],
+        additionalProperties: false,
+      },
+      outputSchema: OUTPUT_SCHEMA,
+      execute(args, context) {
+        const record = asRecord(args)
+        return jsonSafe({
+          ok: true,
+          data: previewCaptainTakeover(context.runtime, {
+            teamId: requireString(record, 'teamId'),
+            toSessionId: requireString(record, 'toSessionId'),
+          }),
+        })
       },
     },
     {

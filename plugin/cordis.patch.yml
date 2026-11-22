@@ -46,6 +46,14 @@
     - id: myteam-commands
       name: 'dsh-plugin-myteam/commands'
       inject: ['commands', 'agents', 'workingDirectory']
+    # 随包 skill：动作卡片只能由「本会话加载了 kind 的 skill」后 propose_action 触发。
+    - id: myteam-human-skill
+      name: 'dsh-plugin-myteam/human-actions-skill'
+      inject: ['skills']
+    # 人类动作卡片：队长提议 → 人类点确认。
+    - id: myteam-human-cards
+      name: 'dsh-plugin-myteam/human-cards'
+      inject: ['actionCards', 'agents', 'workingDirectory']
     - id: myteam-preset-captain
       name: '@deepseek-ai/dsh-agent-preset'
       config:

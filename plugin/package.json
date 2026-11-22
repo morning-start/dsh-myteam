@@ -10,6 +10,8 @@
     "./member": "./lib/composition/member.mjs",
     "./panel": "./lib/composition/panel.mjs",
     "./commands": "./lib/composition/human-command.mjs",
+    "./human-actions-skill": "./lib/composition/human-actions-skill.mjs",
+    "./human-cards": "./lib/composition/human-card-kind.mjs",
     "./icon": "./icon.svg",
     "./icon.svg": "./icon.svg",
     "./package.json": "./package.json"
