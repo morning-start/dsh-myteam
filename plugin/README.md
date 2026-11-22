@@ -76,14 +76,15 @@ composition → infrastructure → application → domain → contracts
 | 候选写入后从磁盘重放对账，数量不符即失败 | `infrastructure/migration/v1/convert.ts` | `t18` |
 | 任务按终态折叠迁移；在途执行回落 ready，旧 Attempt 不迁移 | `infrastructure/migration/v1/convert.ts` | `t18` |
 | 知识保留「提案→采纳」链；被驳回的提案不迁移 | `infrastructure/migration/v1/convert.ts` | `t18` |
+| cutover 前必须证明候选未过期（来源 hash 对得上） | `infrastructure/migration/v1/cutover.ts` | `t19` |
 
 ## 运行
 
 ```bash
 cd plugin
-node --test test/*.test.ts        # 98 个测试
-node ../tools/check-architecture.mjs   # ARCH_OK files=43 violations=0
-node scripts/build-lib.mjs        # 43 个模块 → lib/（入口 lib/composition/host.mjs）
+node --test test/*.test.ts        # 102 个测试
+node ../tools/check-architecture.mjs   # ARCH_OK files=44 violations=0
+node scripts/build-lib.mjs        # 44 个模块 → lib/（入口 lib/composition/host.mjs）
 node ../tools/gen-panel-contract.mjs --check   # 面板契约文档与代码一致
 
 # v1 数据只读分析（不写旧文件、不迁移）
@@ -91,6 +92,8 @@ node ../tools/myteam-migrate.mjs analyze --root "E:\Workplace\extension\dsh-myte
 node ../tools/myteam-migrate.mjs plan    --root "E:\Workplace\extension\dsh-myteam" --json
 # 候选导入：写到一个独立目录，旧工作区不动；写完立即对账
 node ../tools/myteam-migrate.mjs candidate --root "E:\Workplace\extension\dsh-myteam" --candidate "<候选目录>"
+# cutover 计划：检查候选完整性、源是否变化、列出步骤与回滚边界（不执行切换）
+node ../tools/myteam-migrate.mjs cutover-plan --root "E:\Workplace\extension\dsh-myteam" --candidate "<候选目录>"
 ```
 
 不需要 `npm install`：Node ≥ 22.18 直接擦除类型运行 `.ts`，仓库保持零运行时依赖。

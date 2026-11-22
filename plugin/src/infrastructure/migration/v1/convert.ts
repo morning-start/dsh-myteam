@@ -15,6 +15,7 @@
  * 写入后立即做对账：重放候选事件，与转换时声明的计数逐项比较。
  */
 import { join } from 'node:path'
+import { writeFileSync } from 'node:fs'
 import type { EvidenceRef, KnowledgeEntry, Member, RoleDefinition, Task, TaskStatus, Team } from '../../../contracts/entities.ts'
 import { ERROR_CODES, fail, toErrorShape } from '../../../contracts/errors.ts'
 import type { ActorRef, EntityRef, EventType } from '../../../contracts/events.ts'
@@ -533,6 +534,8 @@ export interface CandidateWriteOptions {
   now: string
   ids: IdFactory
   clock: { now(): string }
+  /** 分析时的来源 hash；即使零业务事件也要落盘，cutover 靠它判断源是否变化。 */
+  sourceHashes?: { teamId: string; sourceHash: string }[]
 }
 
 export interface CandidateWriteResult {
@@ -573,6 +576,24 @@ export function writeCandidateProject(conversion: ConversionResult, options: Can
     name: options.projectName,
     createdAt: options.now,
   })
+
+  // 迁移证据单独落盘：rules-only 的候选没有任何带 legacy 的事件，
+  // cutover 仍需要来源 hash 才能证明「候选没有过期」。
+  writeFileSync(
+    join(options.candidateRoot, '.dsh-myteam', 'migration.json'),
+    JSON.stringify(
+      {
+        schemaVersion: 1,
+        generatedAt: options.now,
+        projectId: manifest.projectId,
+        sourceHashes: options.sourceHashes ?? [],
+        counts: conversion.counts,
+        skipped: conversion.skipped,
+      },
+      null,
+      2,
+    ),
+  )
 
   const runtime = ProjectRuntime.open({
     projectId: manifest.projectId,

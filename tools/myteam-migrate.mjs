@@ -14,6 +14,7 @@ import { basename, resolve } from 'node:path'
 import { analyzeV1Project, planV1Import } from '../plugin/src/infrastructure/migration/v1/analyze.ts'
 import { buildMigrationReport } from '../plugin/src/infrastructure/migration/v1/report.ts'
 import { convertV1Analysis, writeCandidateProject } from '../plugin/src/infrastructure/migration/v1/convert.ts'
+import { inspectCandidate, planCutover, sourceMatchesCandidate } from '../plugin/src/infrastructure/migration/v1/cutover.ts'
 import { newId } from '../plugin/src/contracts/ids.ts'
 
 function parseArgs(argv) {
@@ -134,6 +135,7 @@ if (parsed.command === 'candidate') {
     now,
     ids: newId,
     clock: { now: () => new Date().toISOString() },
+    sourceHashes: plan.sourceHashes.map((item) => ({ teamId: item.teamId, sourceHash: item.sourceHash })),
   })
 
   console.log(
@@ -153,6 +155,52 @@ if (parsed.command === 'candidate') {
     ),
   )
   process.exit(result.verification.ok ? 0 : 1)
+}
+
+if (parsed.command === 'cutover-plan') {
+  if (parsed.candidate.length === 0) {
+    console.error('cutover-plan 需要 --candidate <候选目录>')
+    process.exit(2)
+  }
+  const inspection = inspectCandidate(parsed.candidate)
+  const sourceUnchanged = sourceMatchesCandidate(analysis, parsed.candidate)
+  const candidateReport = {
+    rootDir: parsed.candidate,
+    projectId: inspection.projectId ?? '',
+    written: inspection.events,
+    seq: inspection.seq,
+    verification: {
+      ok: inspection.ok,
+      teams: inspection.teams,
+      members: inspection.members,
+      tasks: inspection.tasks,
+      knowledge: inspection.knowledge,
+      expectedTeams: inspection.teams,
+      expectedMembers: inspection.members,
+      expectedTasks: inspection.tasks,
+      expectedKnowledge: inspection.knowledge,
+      problems: inspection.problems,
+    },
+  }
+  const plan = planCutover({ analysis, candidate: candidateReport, candidateInspection: inspection, sourceUnchanged })
+
+  if (parsed.json) {
+    console.log(JSON.stringify(plan, null, 2))
+  } else {
+    console.log(`# cutover 计划\n\n- 结论：**${plan.ready ? '可以切换' : '阻断'}**`)
+    if (plan.blockers.length > 0) {
+      console.log('\n## 阻断\n')
+      for (const blocker of plan.blockers) console.log(`- ${blocker}`)
+    }
+    if (plan.requiresConfirmation.length > 0) {
+      console.log('\n## 需要确认\n')
+      for (const item of plan.requiresConfirmation) console.log(`- ${item}`)
+    }
+    console.log('\n## 步骤\n')
+    plan.steps.forEach((step, index) => console.log(`${index + 1}. **${step.title}** — ${step.detail}`))
+    console.log(`\n## 回滚\n\n- 首次 v2 写入前：允许切回。\n- ${plan.rollback.afterBoundary}`)
+  }
+  process.exit(plan.ready ? 0 : 1)
 }
 
 console.error(`未知命令：${parsed.command}`)
