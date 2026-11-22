@@ -135,10 +135,21 @@ node ../tools/rehearse-cutover.mjs --root "E:\Workplace\extension\dsh-myteam"
 - 两个进程同时写同一项目——未取得租约只读或转发；
 - 新旧存储长期双写。
 
-## 下一阶段
+## 排障关键字
 
-1. **R3 应用用例**：Workflow Run、依赖重接、门禁裁决、知识、配置 rebase、Effect 请求/对账；
-2. **R4 DSH 适配器**：Root Runtime、Captain/Member preset、工具注册、SessionRef、HumanAuthorizer；
-3. **R5 v2 面板**：只消费 RPC 的统一投影（设计稿见 `design-v2/`）；
-4. **R6 迁移**：`.team-workplace/`、两处旧账本、SQLite、memory.md 的一次性候选导入与对账；
-5. **R7 验收与清理**：真机链路、文档替换、历史资料删除。
+宿主日志里按这些 key 搜，能直接定位到对应子系统：
+
+| 日志键 | 含义 / 处置 |
+|---|---|
+| `writer.lease.renew.failed` | 续租失败；写入前还会再 assert，最终报 `WRITER_LEASE_LOST`。检查是否有第二个进程持有同一项目 |
+| `project.state.refreshed` | 检测到外部写入并按 seq 重建投影（正常日志；频繁出现说明有多个实例轮流写） |
+| `myteam.panel.registered` | 面板门面已在 root 级注册；缺失说明 typert 协议包没解析到（看 `DSH_INSTALL_DIR`） |
+| `myteam.panel.protocol-import-failed` | 同上，带具体 import 错误 |
+| `MANIFEST_INVALID`（工具返回） | 工作区还是 v1 布局；先跑 cutover，不要手工改 manifest |
+
+只读体检：`node tools/myteam-inspect.mjs --root <项目目录>`，不拿租约、不写文件。
+
+## 当前阶段与剩余
+
+- R0–R7 的主链路已完成并在真实 DSH Web 验收（隔离工作区 + 真实工作区各一轮，见 `docs/delivery/验收记录-v2-代码侧.md`）；
+- 剩余：人类动作的 `actionCards` 卡体（处理器已实现并有测试，缺 zod schema、随包 skill 与卡体渲染），以及发布前的版本策略收口。
