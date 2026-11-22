@@ -41,7 +41,7 @@
     # 面板 RPC 门面：必须挂在 **root**（preset 内会被 isolate，网关看不到）。
     - id: myteam-panel
       name: 'dsh-plugin-myteam/panel'
-      inject: ['agents', 'workingDirectory']
+      inject: ['agents', 'workingDirectory', 'webServer', 'connection']
     # 人类动作命令（斜杠命令）：只在 UI 提交路径执行，模型无法伪造。
     - id: myteam-commands
       name: 'dsh-plugin-myteam/commands'

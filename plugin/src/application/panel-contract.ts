@@ -19,10 +19,32 @@ export const PANEL_METHODS = [
   'task',
   'team',
   'definitions',
+  'runs',
+  'run',
+  'knowledge',
+  'effects',
+  'audit',
+  'settings',
+  'memory',
+  'globalLibrary',
+  'globalAudit',
   'migration',
 ] as const
 
 export type PanelMethod = (typeof PANEL_METHODS)[number]
+
+/**
+ * 不属任何项目的只读方法：它们读 `$DSH_HOME/myteam`，不需要会话身份。
+ * 路由对这批方法**不要求 sessionId**，其余方法仍然强制。
+ */
+export const GLOBAL_PANEL_METHODS = ['globalLibrary', 'globalAudit'] as const
+
+export type GlobalPanelMethod = (typeof GLOBAL_PANEL_METHODS)[number]
+
+/** 判断一个方法是否为全局库读取（不需要会话）。 */
+export function isGlobalPanelMethod(method: string): method is GlobalPanelMethod {
+  return (GLOBAL_PANEL_METHODS as readonly string[]).includes(method)
+}
 
 /** 每个方法的一句话说明；由 `tools/gen-panel-contract.mjs` 生成契约文档。 */
 export const PANEL_METHOD_DOCS: Readonly<Record<PanelMethod, string>> = {
@@ -32,6 +54,15 @@ export const PANEL_METHOD_DOCS: Readonly<Record<PanelMethod, string>> = {
   task: '单任务详情：正文、验收标准、依赖状态、Attempt、门禁裁决与证据。',
   team: '团队概览：队长世代、成员、任务与生效配置快照。',
   definitions: '项目内角色/工作流/蓝图清单，含 lineage 与发布状态。',
+  runs: '工作流运行清单：状态、定义 revision、完成规则 revision 与任务数。',
+  run: '单个运行详情：完成规则、templateKey → taskId 映射与各任务当前状态。',
+  knowledge: '项目知识条目：正文、证据引用、修订与取代关系。',
+  effects: 'Effect 清单与三态计数：requested / accepted / completed，另列 failed、cancelled、outcome-unknown。',
+  audit: '已提交事件流（新→旧分页）：seq、时间、类型、actor 与实体引用。',
+  settings: '配置面只读视图：项目默认值、configRevision 与各团队的生效配置快照。',
+  memory: '项目长期记忆（SQLite）：bank 汇总与条目（含已遗忘标记），可按 bankId 过滤。',
+  globalLibrary: '全局库只读视图：$DSH_HOME/myteam 下的角色/工作流/蓝图（含 v1 teams 兼容）与读不懂的文件清单。',
+  globalAudit: '全局操作审计（audit/global-operations.jsonl）：新→旧、坏行跳过并记 warning。',
   migration: 'v1 旧数据的只读迁移影响面报告（需要装配迁移分析器）。',
 }
 

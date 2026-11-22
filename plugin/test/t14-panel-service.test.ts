@@ -208,3 +208,110 @@ test('面板：迁移分析未装配时明确报错，装配后返回注入结�
     rmSync(dir, { recursive: true, force: true })
   }
 })
+test('面板：知识、Effect 与配置面的只读形状', async () => {
+  const dir = mkdtempSync(join(tmpdir(), 'myteam-panel-'))
+  const { service, hosts } = makeService(dir)
+  try {
+    seed(dir)
+
+    const knowledge = await service.invoke(dir, { method: 'knowledge' })
+    assert.equal(knowledge.ok, true)
+    const knowledgeData = (knowledge as { ok: true; data: { items: { title: string; body: string; evidence: unknown[] }[] } }).data
+    assert.equal(knowledgeData.items.length, 1)
+    assert.equal(typeof knowledgeData.items[0]!.title, 'string')
+    assert.ok(Array.isArray(knowledgeData.items[0]!.evidence), '知识条目必须带证据引用数组')
+
+    const effects = await service.invoke(dir, { method: 'effects' })
+    assert.equal(effects.ok, true)
+    const effectsData = (effects as { ok: true; data: { items: unknown[]; counts: Record<string, number> } }).data
+    assert.ok(Array.isArray(effectsData.items))
+    for (const key of ['requested', 'accepted', 'completed', 'failed', 'cancelled', 'outcome-unknown']) {
+      assert.equal(typeof effectsData.counts[key], 'number', `effects.counts 缺 ${key}`)
+    }
+
+    const settings = await service.invoke(dir, { method: 'settings' })
+    assert.equal(settings.ok, true)
+    const settingsData = (settings as { ok: true; data: { configRevision: number; teams: unknown[] } }).data
+    assert.equal(typeof settingsData.configRevision, 'number')
+    assert.ok(Array.isArray(settingsData.teams))
+  } finally {
+    await hosts.closeAll()
+    rmSync(dir, { recursive: true, force: true })
+  }
+})
+
+test('面板：审计是新→旧分页，beforeSeq 往前翻，limit 有边界', async () => {
+  const dir = mkdtempSync(join(tmpdir(), 'myteam-panel-'))
+  const { service, hosts } = makeService(dir)
+  try {
+    seed(dir)
+
+    const first = await service.invoke(dir, { method: 'audit', params: { limit: 3 } })
+    assert.equal(first.ok, true)
+    const firstData = (first as { ok: true; data: { items: { seq: number }[]; nextBeforeSeq: number | null } }).data
+    assert.equal(firstData.items.length, 3)
+    assert.ok(firstData.items[0]!.seq > firstData.items[2]!.seq, '必须是新→旧')
+    assert.equal(typeof firstData.nextBeforeSeq, 'number')
+
+    const second = await service.invoke(dir, {
+      method: 'audit',
+      params: { limit: 3, beforeSeq: firstData.nextBeforeSeq },
+    })
+    assert.equal(second.ok, true)
+    const secondData = (second as { ok: true; data: { items: { seq: number }[] } }).data
+    assert.ok(secondData.items[0]!.seq < firstData.nextBeforeSeq!, '第二页要比第一页更旧')
+
+    const bad = await service.invoke(dir, { method: 'audit', params: { limit: 0 } })
+    assert.equal(bad.ok, false)
+    assert.equal((bad as { error: { code: string } }).error.code, 'INVALID_PAYLOAD')
+  } finally {
+    await hosts.closeAll()
+    rmSync(dir, { recursive: true, force: true })
+  }
+})
+
+test('面板：运行清单与运行详情（缺 runId / 不存在都结构化拒绝）', async () => {
+  const dir = mkdtempSync(join(tmpdir(), 'myteam-panel-'))
+  const { service, hosts } = makeService(dir)
+  try {
+    seed(dir)
+
+    const runs = await service.invoke(dir, { method: 'runs' })
+    assert.equal(runs.ok, true)
+    assert.deepEqual((runs as { ok: true; data: { items: unknown[] } }).data.items, [])
+
+    const missing = await service.invoke(dir, { method: 'run', params: {} })
+    assert.equal(missing.ok, false)
+    assert.equal((missing as { error: { code: string } }).error.code, 'INVALID_PAYLOAD')
+
+    const notFound = await service.invoke(dir, { method: 'run', params: { runId: 'run_99999999' } })
+    assert.equal(notFound.ok, false)
+    assert.equal((notFound as { error: { code: string } }).error.code, 'NOT_FOUND')
+  } finally {
+    await hosts.closeAll()
+    rmSync(dir, { recursive: true, force: true })
+  }
+})
+
+test('面板：全局库方法不打开项目，走注入的全局根', async () => {
+  const dir = mkdtempSync(join(tmpdir(), 'myteam-panel-'))
+  const globalDir = mkdtempSync(join(tmpdir(), 'myteam-global-'))
+  const hosts = new ProjectHosts()
+  const service = new PanelService({ hosts, globalLibrary: { library: () => ({ exists: false, entries: [], counts: {} }), audit: (limit: number) => ({ items: [], limit }) } })
+  try {
+    const lib = await service.invokeGlobal('globalLibrary', {})
+    assert.equal(lib.ok, true)
+    assert.equal((lib as { ok: true; data: { exists: boolean } }).data.exists, false, '没有全局库时如实返回 exists: false')
+
+    const bad = await service.invokeGlobal('globalAudit', { limit: 0 })
+    assert.equal(bad.ok, false)
+    assert.equal((bad as { error: { code: string } }).error.code, 'INVALID_PAYLOAD')
+
+    const unknown = await service.invokeGlobal('board', {})
+    assert.equal(unknown.ok, false, '项目方法不能走全局入口')
+  } finally {
+    await hosts.closeAll()
+    rmSync(dir, { recursive: true, force: true })
+    rmSync(globalDir, { recursive: true, force: true })
+  }
+})

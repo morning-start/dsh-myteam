@@ -8,7 +8,10 @@
 - 响应：`{ ok: true, data: object }` 或 `{ ok: false, error: { code, message, retryable, details? } }`
 
 协议版本显式不匹配时返回 `UNSUPPORTED_PROTOCOL_VERSION`；未知方法返回 `INVALID_COMMAND`。
-面板只读方法不写项目；人类专属写操作走确认令牌通道，不在此命名空间内。
+面板只读方法不写项目。写操作不走这个命名空间，而是单独一条通道：
+`POST /__myteam/write/<method>`，必须带 `sessionId`，按确认方式分两类——
+`token` 先预览影响面换一次性令牌、再凭令牌执行；`direct` 直接带 `confirm: true` 执行
+（由域内状态校验兜底）。
 
 ## 方法
 
@@ -20,7 +23,25 @@
 | `task` | 单任务详情：正文、验收标准、依赖状态、Attempt、门禁裁决与证据。 |
 | `team` | 团队概览：队长世代、成员、任务与生效配置快照。 |
 | `definitions` | 项目内角色/工作流/蓝图清单，含 lineage 与发布状态。 |
+| `runs` | 工作流运行清单：状态、定义 revision、完成规则 revision 与任务数。 |
+| `run` | 单个运行详情：完成规则、templateKey → taskId 映射与各任务当前状态。 |
+| `knowledge` | 项目知识条目：正文、证据引用、修订与取代关系。 |
+| `effects` | Effect 清单与三态计数：requested / accepted / completed，另列 failed、cancelled、outcome-unknown。 |
+| `audit` | 已提交事件流（新→旧分页）：seq、时间、类型、actor 与实体引用。 |
+| `settings` | 配置面只读视图：项目默认值、configRevision 与各团队的生效配置快照。 |
+| `memory` | 项目长期记忆（SQLite）：bank 汇总与条目（含已遗忘标记），可按 bankId 过滤。 |
+| `globalLibrary` | 全局库只读视图：$DSH_HOME/myteam 下的角色/工作流/蓝图（含 v1 teams 兼容）与读不懂的文件清单。 |
+| `globalAudit` | 全局操作审计（audit/global-operations.jsonl）：新→旧、坏行跳过并记 warning。 |
 | `migration` | v1 旧数据的只读迁移影响面报告（需要装配迁移分析器）。 |
+
+## 写方法
+
+| 方法 | 确认方式 | 说明 |
+|---|---|---|
+| `teamDisband` | `token` | 解散团队：预览成员与任务影响面，凭一次性令牌执行。动作 `team.disband`（人类专属）。 |
+| `captainTakeover` | `token` | 队长接管：预览世代递增与生效成员，凭一次性令牌执行。动作 `captain.takeover`（人类专属）。 |
+| `gateVerdict` | `direct` | 门禁裁决：对评审中的任务写入 pass / fail / blocked 与检查结果，需 `confirm: true`。 |
+| `taskCreate` | `direct` | 新建任务：标题、验收标准、依赖与所需角色，建在指定团队下，需 `confirm: true`。 |
 
 ## 参数
 

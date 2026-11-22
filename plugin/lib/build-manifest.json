@@ -1,12 +1,12 @@
 {
   "schema": 1,
-  "builtAt": "2026-11-22T12:41:02.604Z",
+  "builtAt": "2026-11-22T14:13:29.773Z",
   "node": "v24.21.0",
   "entry": "./lib/composition/host.mjs",
-  "modules": 55,
-  "sourceHash": "c316bbe3074cff61c23ecaa3c20a6d67e904266f09ad9539967d0fd076ebd91f",
+  "modules": 59,
+  "sourceHash": "e3fb71698a241c70e4b01dfcc1997b2d02b7add7e64318a195c4bd6d70909060",
   "clientFile": "client/client.js",
-  "clientHash": "b8b7e75a3d1438743893bbce3bd478947b6490799c82386a359386a766bbfc1a",
+  "clientHash": "550b8f9f3cb3f6a1dd6a3da4cd3e28811bcbd21392ae64301953f282b823e2a8",
   "files": [
     "application/actor-resolution.ts",
     "application/bootstrap.ts",
@@ -18,6 +18,7 @@
     "application/panel-contract.ts",
     "application/panel-gateway.ts",
     "application/panel-service.ts",
+    "application/panel-writes.ts",
     "application/ports.ts",
     "application/project-runtime.ts",
     "application/projections/project-state.ts",
@@ -58,10 +59,13 @@
     "infrastructure/event-store/log-scan.ts",
     "infrastructure/event-store/writer-lease.ts",
     "infrastructure/fs/project-manifest.ts",
+    "infrastructure/global-library/library.ts",
+    "infrastructure/memory-store/read.ts",
     "infrastructure/memory-store/sqlite-memory.ts",
     "infrastructure/migration/v1/analyze.ts",
     "infrastructure/migration/v1/convert.ts",
     "infrastructure/migration/v1/cutover.ts",
+    "infrastructure/migration/v1/panel-summary.ts",
     "infrastructure/migration/v1/report.ts"
   ]
 }

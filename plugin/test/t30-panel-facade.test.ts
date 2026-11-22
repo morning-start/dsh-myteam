@@ -52,3 +52,31 @@ test('面板门面：按会话解析工作区后转发给服务（空项目返�
     rmSync(dir, { recursive: true, force: true })
   }
 })
+
+test('写通道：门禁裁决走直接确认，缺 confirm 时由域拒绝（不签发预览令牌）', async () => {
+  const dir = mkdtempSync(join(tmpdir(), 'myteam-panel-write-'))
+  const facade = createPanelFacade({
+    agents: { get: (id) => (id === 'ses_1' ? { id: 'ses_1' } : undefined) },
+    workingDirectory: { ensure: async () => dir },
+  })
+  try {
+    const rejected = (await facade.write('gateVerdict', 'ses_1', {
+      sessionId: 'ses_1',
+      confirm: false,
+      params: {
+        taskId: 'task_missing',
+        attemptId: 'attempt_missing',
+        outcome: 'pass',
+        checks: [],
+        evidence: [],
+      },
+    })) as { ok: boolean; data?: unknown; error?: { code: string; message: string } }
+    assert.equal(rejected.ok, false, '缺 confirm 不能执行')
+    assert.equal(rejected.error!.code, 'INVALID_PAYLOAD')
+    assert.equal(rejected.data, undefined, '也不该回预览数据')
+    assert.match(rejected.error!.message, /confirm/)
+  } finally {
+    await facade.close()
+    rmSync(dir, { recursive: true, force: true })
+  }
+})

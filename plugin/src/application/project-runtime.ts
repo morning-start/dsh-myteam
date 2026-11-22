@@ -116,6 +116,17 @@ export class ProjectRuntime {
   }
 
   /**
+   * 已提交事件的只读视图（按 `projectSeq` 升序）。
+   *
+   * 审计页与 CLI 需要「事件本身」，而投影只保留折叠结果；这里把账本读口暴露出来，
+   * 不额外缓存 —— 每次调用都读已提交字节，避免第二份真源。
+   * @returns 已提交事件数组；不可信状态（poisoned）下仍返回账本能读到的部分。
+   */
+  readEvents(): readonly EventEnvelope[] {
+    return this.eventStore.readCommitted().events
+  }
+
+  /**
    * 外部进程写入后，本实例的投影会陈旧（单写者租约只挡并发写，不挡陈旧读）。
    *
    * 写前与读取身份前都要调用：否则会拿旧状态算队长身份或任务状态，

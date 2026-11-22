@@ -20,7 +20,15 @@ import {
   previewTeamDisband,
 } from '../src/application/human-actions.ts'
 import { HumanAuthorizer } from '../src/domain/permissions/human-authorizer.ts'
+import {
+  applyDirectPanelWrite,
+  applyPanelWrite,
+  createPanelWriteAuthorizer,
+  panelWriteKind,
+  previewPanelWrite,
+} from '../src/application/panel-writes.ts'
 import { newId } from '../src/contracts/ids.ts'
+import { createReviewTaskFixture } from './fixtures/review-task.ts'
 import type { ActorRef } from '../src/contracts/events.ts'
 import { MyTeamError } from '../src/contracts/errors.ts'
 import { EVENTS_FILE, WRITER_LOCK_FILE } from '../src/contracts/versions.ts'
@@ -263,5 +271,247 @@ test('人类专属动作：agent 既不能签发也不能执行', () => {
     }
   } finally {
     rmSync(dir, { recursive: true, force: true })
+  }
+})
+
+test('面板写通道：预览签发令牌 → 凭令牌执行 → 同一令牌不可复用', () => {
+  const dir = mkdtempSync(join(tmpdir(), 'myteam-human-'))
+  try {
+    const runtime = openRuntime(dir)
+    try {
+      const { teamId } = seed(runtime)
+      const authorizer = createPanelWriteAuthorizer()
+
+      const preview = previewPanelWrite(runtime, authorizer, 'teamDisband', { teamId })
+      assert.match(preview.summary, /解散团队/, '预览要说清这是解散')
+      assert.equal(preview.confirmation.action, 'team.disband')
+      assert.equal(typeof preview.confirmation.nonce, 'string')
+
+      const applied = applyPanelWrite(runtime, authorizer, 'teamDisband', {
+        params: { teamId },
+        confirmation: preview.confirmation,
+        reason: '项目结束',
+      })
+      assert.equal(applied.method, 'teamDisband')
+      assert.equal(applied.operationId, preview.operationId)
+      assert.equal(runtime.state.teams.get(teamId)!.status, 'disbanded')
+
+      // 令牌是一次性的：再确认一次必须失败（消费或状态冲突，二者都不执行写入）
+      assert.throws(() =>
+        applyPanelWrite(runtime, authorizer, 'teamDisband', {
+          params: { teamId },
+          confirmation: preview.confirmation,
+          reason: '重复确认',
+        }),
+      )
+    } finally {
+      runtime.close()
+    }
+  } finally {
+    rmSync(dir, { recursive: true, force: true })
+  }
+})
+
+test('面板写通道：队长接管也要令牌，接管后 generation 递增', () => {
+  const dir = mkdtempSync(join(tmpdir(), 'myteam-human-'))
+  try {
+    const runtime = openRuntime(dir)
+    try {
+      const { teamId } = seed(runtime)
+      const authorizer = createPanelWriteAuthorizer()
+      const before = runtime.state.captains.get(teamId)?.generation ?? 0
+
+      const preview = previewPanelWrite(runtime, authorizer, 'captainTakeover', {
+        teamId,
+        toSessionId: 'ses_next_captain',
+      })
+      assert.equal(preview.confirmation.action, 'captain.takeover')
+      assert.match(preview.summary, /队长/, '预览要说明这是队长变更')
+
+      applyPanelWrite(runtime, authorizer, 'captainTakeover', {
+        params: { teamId, toSessionId: 'ses_next_captain' },
+        confirmation: preview.confirmation,
+        reason: '会话切换',
+      })
+      assert.equal(runtime.state.captains.get(teamId)?.generation, before + 1)
+    } finally {
+      runtime.close()
+    }
+  } finally {
+    rmSync(dir, { recursive: true, force: true })
+  }
+})
+
+test('写方法分两种确认方式：解散/接管要令牌，门禁裁决直接带 confirm', () => {
+  assert.equal(panelWriteKind('teamDisband'), 'token')
+  assert.equal(panelWriteKind('captainTakeover'), 'token')
+  assert.equal(panelWriteKind('gateVerdict'), 'direct')
+})
+
+test('门禁裁决：带 confirm 才落账，verdict 绑定当前 Attempt，任务仍停在 review', () => {
+  const fx = createReviewTaskFixture({ prefix: 'myteam-verdict-' })
+  try {
+    const applied = applyDirectPanelWrite(fx.runtime, 'gateVerdict', {
+      confirm: true,
+      params: {
+        taskId: fx.taskId,
+        attemptId: fx.attemptId,
+        outcome: 'pass',
+        checks: [{ command: 'node --test', exitCode: 0, summary: '12 passed' }],
+        evidence: [{ kind: 'command', ref: 'node --test' }],
+      },
+    })
+    const committed = applied.committed as { verdict: { id: string; outcome: string }; taskStatus: string }
+    assert.equal(applied.operationId, committed.verdict.id, 'operationId 就是这次裁决的 id')
+    assert.equal(committed.verdict.outcome, 'pass')
+    assert.equal(committed.taskStatus, 'review', '裁决只落账，不改任务状态（完成是另一步）')
+
+    const verdict = fx.runtime.state.verdicts.get(fx.taskId)!
+    assert.equal(verdict.attemptId, fx.attemptId)
+    assert.equal(verdict.checks.length, 1)
+    assert.equal(verdict.checks[0]!.exitCode, 0, '缺省字段要被归一化，不能留 undefined 进事件')
+    assert.equal(verdict.checks[0]!.stdoutHash, null)
+  } finally {
+    fx.dispose()
+  }
+})
+
+test('门禁裁决：缺 confirm: true 拒绝，且账本不动', () => {
+  const fx = createReviewTaskFixture({ prefix: 'myteam-verdict-' })
+  try {
+    const params = {
+      taskId: fx.taskId,
+      attemptId: fx.attemptId,
+      outcome: 'pass',
+      checks: [{ command: 'node --test', exitCode: 0, summary: 'ok' }],
+      evidence: [{ kind: 'command', ref: 'node --test' }],
+    }
+    expectCode(() => applyDirectPanelWrite(fx.runtime, 'gateVerdict', { confirm: false, params }), 'INVALID_PAYLOAD')
+    assert.equal(fx.runtime.state.verdicts.get(fx.taskId), undefined, '被拒绝的裁决不能留下痕迹')
+  } finally {
+    fx.dispose()
+  }
+})
+
+test('门禁裁决：Attempt 过期 → ATTEMPT_STALE；非法 outcome → INVALID_PAYLOAD', () => {
+  const fx = createReviewTaskFixture({ prefix: 'myteam-verdict-' })
+  try {
+    const base = {
+      taskId: fx.taskId,
+      outcome: 'pass',
+      checks: [{ command: 'node --test', exitCode: 0, summary: 'ok' }],
+      evidence: [{ kind: 'command', ref: 'node --test' }],
+    }
+    expectCode(
+      () => applyDirectPanelWrite(fx.runtime, 'gateVerdict', { confirm: true, params: { ...base, attemptId: 'attempt_stale' } }),
+      'ATTEMPT_STALE',
+    )
+    expectCode(
+      () => applyDirectPanelWrite(fx.runtime, 'gateVerdict', { confirm: true, params: { ...base, attemptId: fx.attemptId, outcome: '大概行?' } }),
+      'INVALID_PAYLOAD',
+    )
+    expectCode(
+      () =>
+        applyDirectPanelWrite(fx.runtime, 'gateVerdict', {
+          confirm: true,
+          params: { ...base, attemptId: fx.attemptId, evidence: [{ kind: 'feeling', ref: 'x' }] },
+        }),
+      'INVALID_PAYLOAD',
+    )
+    assert.equal(fx.runtime.state.verdicts.get(fx.taskId), undefined)
+  } finally {
+    fx.dispose()
+  }
+})
+
+test('两种确认方式不能互相串用：令牌方法不走直接写，直接写方法不签发令牌', () => {
+  const fx = createReviewTaskFixture({ prefix: 'myteam-verdict-' })
+  try {
+    const authorizer = createPanelWriteAuthorizer()
+    expectCode(
+      () =>
+        previewPanelWrite(fx.runtime, authorizer, 'gateVerdict', {
+          taskId: fx.taskId,
+          attemptId: fx.attemptId,
+          outcome: 'pass',
+        }),
+      'INVALID_COMMAND',
+    )
+    expectCode(
+      () => applyDirectPanelWrite(fx.runtime, 'teamDisband', { confirm: true, params: { teamId: fx.teamId } }),
+      'INVALID_COMMAND',
+    )
+  } finally {
+    fx.dispose()
+  }
+})
+
+test('新建任务：带 confirm 落账，无依赖直接 ready', () => {
+  const fx = createReviewTaskFixture({ prefix: 'myteam-task-create-' })
+  try {
+    const applied = applyDirectPanelWrite(fx.runtime, 'taskCreate', {
+      confirm: true,
+      params: {
+        teamId: fx.teamId,
+        title: '面板建的任务',
+        description: '从团队视图新建',
+        acceptance: ['能看见'],
+      },
+    })
+    const committed = applied.committed as { task: { id: string; status: string; title: string } }
+    assert.equal(applied.operationId, committed.task.id, 'operationId 就是新任务 id')
+    assert.equal(committed.task.status, 'ready', '没有依赖的任务建完就能认领')
+    assert.equal(fx.runtime.state.tasks.get(committed.task.id)!.title, '面板建的任务')
+  } finally {
+    fx.dispose()
+  }
+})
+
+test('新建任务：缺 confirm / 团队不存在 / 依赖不存在 / 参数类型不对，全部拒绝且不落账', () => {
+  const fx = createReviewTaskFixture({ prefix: 'myteam-task-create-' })
+  try {
+    const before = fx.runtime.state.tasks.size
+    const base = { teamId: fx.teamId, title: 't', acceptance: ['a'] }
+
+    expectCode(() => applyDirectPanelWrite(fx.runtime, 'taskCreate', { confirm: false, params: base }), 'INVALID_PAYLOAD')
+    expectCode(
+      () => applyDirectPanelWrite(fx.runtime, 'taskCreate', { confirm: true, params: { ...base, teamId: 'team_missing' } }),
+      'NOT_FOUND',
+    )
+    expectCode(
+      () =>
+        applyDirectPanelWrite(fx.runtime, 'taskCreate', {
+          confirm: true,
+          params: { ...base, dependencies: ['task_missing'] },
+        }),
+      'NOT_FOUND',
+    )
+    expectCode(
+      () => applyDirectPanelWrite(fx.runtime, 'taskCreate', { confirm: true, params: { ...base, acceptance: '不是数组' } }),
+      'INVALID_PAYLOAD',
+    )
+    assert.equal(fx.runtime.state.tasks.size, before, '被拒绝的新建不能留下任务')
+  } finally {
+    fx.dispose()
+  }
+})
+
+test('新建任务：有依赖时先停在 planned', () => {
+  const fx = createReviewTaskFixture({ prefix: 'myteam-task-create-' })
+  try {
+    const applied = applyDirectPanelWrite(fx.runtime, 'taskCreate', {
+      confirm: true,
+      params: {
+        teamId: fx.teamId,
+        title: '下游任务',
+        acceptance: ['依赖上游'],
+        dependencies: [fx.taskId],
+      },
+    })
+    const committed = applied.committed as { task: { status: string; dependencies: string[] } }
+    assert.equal(committed.task.status, 'planned')
+    assert.deepEqual(committed.task.dependencies, [fx.taskId])
+  } finally {
+    fx.dispose()
   }
 })
