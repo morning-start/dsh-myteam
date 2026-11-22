@@ -62,6 +62,16 @@ export function registerHumanCommands(ctx: HumanCommandContext): (() => void)[] 
   const disposers: (() => void)[] = []
   const hosts = new ProjectHosts()
 
+  /**
+   * 待确认的预览（按会话记住 10 分钟）。
+   *
+   * 之前确认要手工抄 targetHash，实际几乎没人这么用——人类动作等于没有入口。
+   * 现在预览把结果留在这个会话里，确认时只补 --yes；执行前仍重算并比对
+   * targetHash，状态变了就拒绝，避免「预览是旧的、执行是新的」。
+   */
+  const pending = new Map<string, { action: 'disband' | 'takeover'; teamId: string; toSessionId: string; targetHash: string; expiresAt: number }>()
+  const PENDING_TTL_MS = 10 * 60 * 1000
+
   const run = async (invocation: CommandInvocationLike, action: 'disband' | 'takeover') => {
     const { positional, yes } = parseInput(invocation.rawInput)
     const teamId = positional[0]
@@ -83,10 +93,33 @@ export function registerHumanCommands(ctx: HumanCommandContext): (() => void)[] 
     ].join('\n')
 
     if (!yes) {
+      pending.set(invocation.agent.id, {
+        action,
+        teamId,
+        toSessionId: positional[1] ?? '',
+        targetHash: preview.targetHash,
+        expiresAt: Date.now() + PENDING_TTL_MS,
+      })
       return {
         kind: 'success' as const,
-        text: `${summary}\n\n这是预览，未写入。确认无误后在同一条命令末尾加 --yes。`,
+        text: `${summary}\n\n这是预览，未写入。确认无误后在同一会话发送：\n${action === 'disband' ? `/myteam-disband ${teamId} --yes` : `/myteam-takeover ${teamId} ${positional[1] ?? ''} --yes`}\n（预览 10 分钟内有效；状态变了会要求重新预览。）`,
       }
+    }
+
+    const remembered = pending.get(invocation.agent.id)
+    pending.delete(invocation.agent.id)
+    if (remembered === undefined || remembered.expiresAt < Date.now()) {
+      return { kind: 'error' as const, text: '没有可用的预览（或已过期）。请先不带 --yes 执行一次，确认影响面后再加 --yes。' }
+    }
+    if (remembered.action !== action || remembered.teamId !== teamId) {
+      return { kind: 'error' as const, text: '这次参数与预览时不同。请重新预览后再确认。' }
+    }
+    // 只有接管才需要比对目标会话；解散的第二段是 reason，不参与比对。
+    if (action === 'takeover' && remembered.toSessionId !== (positional[1] ?? '')) {
+      return { kind: 'error' as const, text: '目标会话与预览时不同。请重新预览后再确认。' }
+    }
+    if (remembered.targetHash !== preview.targetHash) {
+      return { kind: 'error' as const, text: '预览后项目状态已变化，影响面不再一致。请重新预览。' }
     }
 
     const actor = humanActor()
