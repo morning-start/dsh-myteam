@@ -1,8 +1,7 @@
 {
-  "schemaVersion": 1,
-  "layoutVersion": 1,
-  "layout": ".dsh-myteam/v1",
-  "projectName": "dsh-myteam",
-  "createdAt": "2026-11-07T15:02:53.918Z",
-  "defaultTeamId": "default"
+  "projectId": "prj_291ab0095c77404aa4631894ab30198d",
+  "name": "dsh-myteam-cutover",
+  "layoutVersion": 2,
+  "schemaVersion": 2,
+  "createdAt": "2026-11-22T10:43:46.449Z"
 }
