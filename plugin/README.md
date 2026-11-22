@@ -78,6 +78,7 @@ composition → infrastructure → application → domain → contracts
 | 知识保留「提案→采纳」链；被驳回的提案不迁移 | `infrastructure/migration/v1/convert.ts` | `t18` |
 | cutover 前必须证明候选未过期（来源 hash 对得上） | `infrastructure/migration/v1/cutover.ts` | `t19` |
 | 记忆属于 bank 不属于会话；跨 bank 读取视为不存在；硬删除仅人类 | `infrastructure/memory-store/sqlite-memory.ts` | `t20` |
+| 人类动作（解散/接管）走 CLI：预览只读、执行前重算影响面、令牌一次性 | `tools/myteam-human.mjs` | `t31` |
 | 演练在临时副本上完成切换与回滚，不触碰真实工作区 | `tools/rehearse-cutover.mjs` | `t21` |
 | 面板视图模型只做排序/分组/标签，不重算业务；未知状态显示为未知 | `client/panel-model.js` | `t22` |
 | 面板渲染纯字符串；所有数据文本必须转义（防 XSS） | `client/panel-render.js` | `t23` |
