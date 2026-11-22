@@ -69,7 +69,32 @@ export function renderTask(model) {
 </article>`
 }
 
-/** 概览：关注项为 0 时也显示，避免「没有」和「没算」分不清。 */
+/** 定义清单：本地已改 / 上游未知 / 已归档 三类状态必须能同时看见。 */
+export function renderDefinitions(rows) {
+  if (rows.length === 0) return '<p class="mt-empty">项目还没有角色、工作流或蓝图定义</p>'
+  const body = rows
+    .map(
+      (row) => `<tr data-archived="${row.archived}">
+  <td>${escapeHtml(row.name)}</td>
+  <td>${escapeHtml(row.kind)}</td>
+  <td>r${row.revision}</td>
+  <td>${row.localChanged ? chip('本地已改', 'mt-chip-warn') : '<span class="mt-muted">与基准一致</span>'}</td>
+  <td>${escapeHtml(row.upstreamLabel)}</td>
+  <td>${row.archived ? '已归档' : row.published ? '已发布' : '未发布'}</td>
+</tr>`,
+    )
+    .join('')
+  return `<table class="mt-table mt-defs"><thead><tr><th>名称</th><th>类型</th><th>版本</th><th>本地</th><th>上游</th><th>状态</th></tr></thead><tbody>${body}</tbody></table>`
+}
+
+/** 迁移审查：报告正文按纯文本渲染（不执行 markdown 里的任何标记）。 */
+export function renderMigration(model) {
+  return `<section class="mt-migration">
+  <h2 class="mt-migration-head">迁移审查 <span class="mt-chip ${model.verdict === 'ready' ? '' : 'mt-chip-warn'}">${escapeHtml(model.verdictLabel)}</span></h2>
+  <p class="mt-meta">${escapeHtml(model.headline)}</p>
+  <pre class="mt-report">${escapeHtml(model.markdown)}</pre>
+</section>`
+}
 export function renderOverview(model) {
   const attention = model.attention
     .map(

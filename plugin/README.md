@@ -81,13 +81,13 @@ composition → infrastructure → application → domain → contracts
 | 演练在临时副本上完成切换与回滚，不触碰真实工作区 | `tools/rehearse-cutover.mjs` | `t21` |
 | 面板视图模型只做排序/分组/标签，不重算业务；未知状态显示为未知 | `client/panel-model.js` | `t22` |
 | 面板渲染纯字符串；所有数据文本必须转义（防 XSS） | `client/panel-render.js` | `t23` |
-| 静态演示页用同一套模型/渲染，可直接在浏览器看效果 | `client/panel-demo.html` | 人工预览 |
+| 静态演示页用同一套模型/渲染，可直接在浏览器看效果 | `client/panel-demo.html`、`panel-definitions.html`、`panel-migration.html` | 人工预览 |
 
 ## 运行
 
 ```bash
 cd plugin
-node --test test/*.test.ts        # 114 个测试
+node --test test/*.test.ts        # 115 个测试
 node ../tools/check-architecture.mjs   # ARCH_OK files=47 violations=0
 node scripts/build-lib.mjs        # 47 个模块 → lib/（入口 lib/composition/host.mjs）
 node ../tools/gen-panel-contract.mjs --check   # 面板契约文档与代码一致
