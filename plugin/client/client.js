@@ -978,7 +978,7 @@ window.__ModuleLoader__.load({
     }
 
     function DefinitionsScreen(props) {
-      const { data } = props
+      const { data, sessionId, onChanged } = props
       const items = Array.isArray(data.items) ? data.items : []
       return h(
         'div',
@@ -1001,7 +1001,17 @@ window.__ModuleLoader__.load({
                       h('span', { className: 'mono' }, `base ${String(item.baseHash).slice(0, 8)}`),
                       h('span', { className: 'mono' }, `head ${String(item.contentHash).slice(0, 8)}`)),
                   ),
-                  h('div', { className: 'r' }, definitionChips(item).map((chip) => h('span', { key: chip, className: 'st-chip' }, chip))),
+                  h('div', { className: 'r' },
+                    definitionChips(item).map((chip) => h('span', { key: chip, className: 'st-chip' }, chip)),
+                    item.archived === true
+                      ? null
+                      : h(TokenAction, {
+                          label: '发布',
+                          method: 'definitionPublish',
+                          sessionId,
+                          params: { kind: item.kind, id: item.id },
+                          onDone: onChanged,
+                        })),
                 ),
               ),
             ),
@@ -1309,7 +1319,8 @@ window.__ModuleLoader__.load({
         body = h(Data, { data: overview, what: '团队' }, () =>
           h(TeamsScreen, { overview, sessionId, onChanged: () => void overview.reload() }))
       } else if (tab === 'definitions') {
-        body = h(Data, { data: definitions, what: '项目定义副本' }, (data) => h(DefinitionsScreen, { data }))
+        body = h(Data, { data: definitions, what: '项目定义副本' }, (data) =>
+          h(DefinitionsScreen, { data, sessionId, onChanged: () => void definitions.reload() }))
       } else if (tab === 'migration') {
         body = h(Data, { data: migration, what: '迁移' }, (data) => h(MigrationScreen, { data }))
       } else if (tab === 'runs') {

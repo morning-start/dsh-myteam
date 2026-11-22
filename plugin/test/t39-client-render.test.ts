@@ -352,6 +352,24 @@ const FILLED: Record<string, unknown> = {
       { id: 'run_1', workflowId: 'wf_1', workflowRevision: 2, teamId: 'team_1', status: 'active', completionRevision: 1, revision: 3, taskCount: 4, createdAt: 'x', updatedAt: 'y' },
     ],
   },
+  definitions: {
+    items: [
+      {
+        kind: 'role',
+        id: 'role_1',
+        name: '实现者',
+        revision: 3,
+        contentHash: 'abcdef123456',
+        baseHash: 'abcdef123456',
+        origin: null,
+        archived: false,
+        published: null,
+        localChanged: true,
+        upstreamChanged: null,
+        updateAvailable: null,
+      },
+    ],
+  },
   knowledge: {
     items: [
       { id: 'k_1', title: '门禁要留证据', body: '证据链', status: 'adopted', revision: 2, evidence: [{ kind: 'command', ref: 'npm test' }], supersedes: null, createdAt: 'x', updatedAt: 'y' },
@@ -434,6 +452,7 @@ const PROJECT_TABS: [string, string][] = [
 const PROJECT_TABS_FILLED: [string, string][] = [
   ['任务', '评审中的任务'],
   ['流程', 'run_1'],
+  ['定义', '实现者'],
   ['知识', '门禁要留证据'],
   ['记忆', '成员提交前先跑测试'],
   ['审计', 'task.verdict'],
@@ -617,6 +636,39 @@ test('团队栏：解散团队走两段确认（先预览拿令牌，再带 acti
     assert.deepEqual(harness.writes, ['teamDisband', 'teamDisband'])
     assert.equal(harness.writeBody?.action, 'confirm', '第二段必须带 action=confirm')
     assert.ok(harness.writeBody?.confirmation !== undefined, '第二段必须带一次性令牌')
+  } finally {
+    harness.restore()
+  }
+})
+
+test('定义栏：发布到全局库也走两段确认，且 params 带 kind/id', async () => {
+  const harness = loadClient(FILLED)
+  try {
+    let tree = await mount(harness.view, { sessionId: 'ses_1' })
+
+    const definitionsTab = findTab(tree, '定义')
+    assert.ok(definitionsTab !== null)
+    ;(definitionsTab!.props.onClick as () => void)()
+    tree = await mount(harness.view, { sessionId: 'ses_1' })
+
+    const publish = findButton(tree, '发布')
+    assert.ok(publish !== null, '定义条目缺「发布」入口')
+    ;(publish!.props.onClick as () => void)()
+    tree = await mount(harness.view, { sessionId: 'ses_1' })
+
+    assert.deepEqual(harness.writes, ['definitionPublish'], '第一段只预览')
+    assert.equal(harness.writeBody?.action, undefined)
+    const params = harness.writeBody?.params as Record<string, unknown>
+    assert.equal(params.kind, 'role')
+    assert.equal(params.id, 'role_1')
+    assert.ok(textOf(tree).includes('待确认'), '预览后要等确认')
+
+    const commit = findButton(tree, '确认执行')
+    assert.ok(commit !== null)
+    ;(commit!.props.onClick as () => void)()
+    await mount(harness.view, { sessionId: 'ses_1' })
+    assert.deepEqual(harness.writes, ['definitionPublish', 'definitionPublish'])
+    assert.equal(harness.writeBody?.action, 'confirm')
   } finally {
     harness.restore()
   }

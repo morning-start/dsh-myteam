@@ -14,6 +14,7 @@ import { fileURLToPath } from 'node:url'
 import { PanelService } from '../application/panel-service.ts'
 import { migrationSummaryFor } from '../infrastructure/migration/v1/panel-summary.ts'
 import { globalLibraryRoot, readGlobalAudit, readGlobalLibrary } from '../infrastructure/global-library/library.ts'
+import { createGlobalPublisher } from '../infrastructure/global-library/write.ts'
 import { readMemoryStore } from '../infrastructure/memory-store/read.ts'
 import { PANEL_METHODS, isGlobalPanelMethod } from '../application/panel-contract.ts'
 import {
@@ -116,6 +117,8 @@ export function createPanelFacade(ctx: PanelHostContext): PanelFacade {
   }
 
   const writeAuthorizer = createPanelWriteAuthorizer()
+  // 全局发布的写入器：文件系统细节留在 infrastructure，用例只认端口。
+  const globalPublisher = createGlobalPublisher(globalLibraryRoot())
 
   /**
    * 写通道：按 `panelWriteKind` 分两种确认方式——
@@ -152,10 +155,10 @@ export function createPanelFacade(ctx: PanelHostContext): PanelFacade {
           params,
           reason,
           confirmation: record.confirmation as never,
-        })
+        }, { publisher: globalPublisher })
         return { ok: true, data: JSON.parse(JSON.stringify(applied)) }
       }
-      const preview = previewPanelWrite(runtime, writeAuthorizer, name, params)
+      const preview = previewPanelWrite(runtime, writeAuthorizer, name, params, { publisher: globalPublisher })
       return { ok: true, data: JSON.parse(JSON.stringify(preview)) }
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error)

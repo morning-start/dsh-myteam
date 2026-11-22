@@ -17,15 +17,17 @@ import { randomUUID } from 'node:crypto'
 import type { ActorRef } from '../contracts/events.ts'
 import type { EvidenceRef, GateCheckResult, GateVerdict, Task, VerdictOutcome } from '../contracts/entities.ts'
 import { ERROR_CODES, fail } from '../contracts/errors.ts'
+import type { GlobalPublicationPort, PublicationKind } from '../contracts/publication.ts'
 import { HumanAuthorizer } from '../domain/permissions/human-authorizer.ts'
 import type { HumanConfirmation } from '../domain/permissions/human-authorizer.ts'
 import { createTaskCommand } from './commands.ts'
+import { confirmDefinitionPublication, requestDefinitionPublication } from './publication.ts'
 import { confirmCaptainTakeover, confirmTeamDisband, previewCaptainTakeover, previewTeamDisband } from './human-actions.ts'
 import type { ProjectRuntime } from './project-runtime.ts'
 import { recordVerdictCommand } from './task-commands.ts'
 
 /** 面板写方法白名单。新增写能力必须同时在这里登记并补测试。 */
-export const PANEL_WRITE_METHODS = ['teamDisband', 'captainTakeover', 'gateVerdict', 'taskCreate'] as const
+export const PANEL_WRITE_METHODS = ['teamDisband', 'captainTakeover', 'gateVerdict', 'taskCreate', 'definitionPublish'] as const
 
 export type PanelWriteMethod = (typeof PANEL_WRITE_METHODS)[number]
 
@@ -45,6 +47,7 @@ export const PANEL_WRITE_KINDS: Readonly<Record<PanelWriteMethod, PanelWriteKind
   captainTakeover: 'token',
   gateVerdict: 'direct',
   taskCreate: 'direct',
+  definitionPublish: 'token',
 }
 
 /** 判断一个名字是否为已登记的面板写方法。 */
@@ -63,6 +66,7 @@ export const PANEL_WRITE_DOCS: Readonly<Record<PanelWriteMethod, string>> = {
   captainTakeover: '队长接管：预览世代递增与生效成员，凭一次性令牌执行。动作 `captain.takeover`（人类专属）。',
   gateVerdict: '门禁裁决：对评审中的任务写入 pass / fail / blocked 与检查结果，需 `confirm: true`。',
   taskCreate: '新建任务：标题、验收标准、依赖与所需角色，建在指定团队下，需 `confirm: true`。',
+  definitionPublish: '发布定义到全局库：预览引用与覆盖影响面，凭一次性令牌执行。动作 `definition.publish.confirm`（人类专属）。',
 }
 
 /** 面板动作的 actor：单属主部署下的人类入口。 */
@@ -189,18 +193,42 @@ export interface PanelWriteApplied {
   committed: unknown
 }
 
+/** 写通道的外部依赖：只有全局发布需要额外装配（端口注入，不 import infrastructure）。 */
+export interface PanelWriteDeps {
+  publisher?: GlobalPublicationPort
+}
+
+function requirePublisher(deps: PanelWriteDeps): GlobalPublicationPort {
+  if (deps.publisher === undefined) {
+    fail(ERROR_CODES.INTERNAL, '全局发布器未装配')
+  }
+  return deps.publisher
+}
+
+const PUBLICATION_KINDS = ['role', 'workflow', 'blueprint'] as const
+
+function requirePublicationKind(params: Record<string, unknown>): PublicationKind {
+  const value = params.kind
+  if (typeof value !== 'string' || !(PUBLICATION_KINDS as readonly string[]).includes(value)) {
+    fail(ERROR_CODES.INVALID_PAYLOAD, `kind 必须是 ${PUBLICATION_KINDS.join(' / ')} 之一`)
+  }
+  return value as PublicationKind
+}
+
 /**
  * 第一步：预览影响面并签发确认令牌。
  * @param runtime - 项目运行时（已打开）。
  * @param authorizer - 令牌签发器（与确认共用同一实例）。
  * @param method - 白名单方法名。
  * @param params - 方法参数。
+ * @param deps - 额外端口（全局发布用）。
  */
 export function previewPanelWrite(
   runtime: ProjectRuntime,
   authorizer: HumanAuthorizer,
   method: PanelWriteMethod,
   params: Record<string, unknown>,
+  deps: PanelWriteDeps = {},
 ): PanelWritePreview {
   switch (method) {
     case 'teamDisband': {
@@ -233,6 +261,25 @@ export function previewPanelWrite(
     }
     case 'gateVerdict':
       fail(ERROR_CODES.INVALID_COMMAND, 'gateVerdict 不走确认令牌：直接带 confirm: true 提交（见 applyDirectPanelWrite）')
+    case 'taskCreate':
+      fail(ERROR_CODES.INVALID_COMMAND, 'taskCreate 不走确认令牌：直接带 confirm: true 提交（见 applyDirectPanelWrite）')
+    case 'definitionPublish': {
+      const preview = requestDefinitionPublication(runtime, { publisher: requirePublisher(deps) }, {
+        actor: PANEL_HUMAN,
+        kind: requirePublicationKind(params),
+        id: requireString(params, 'id'),
+      })
+      const confirmation = authorizer.issue(
+        {
+          operationId: preview.operationId,
+          action: 'definition.publish.confirm',
+          targetHash: preview.targetHash,
+          impactHash: preview.impactHash,
+        },
+        PANEL_HUMAN,
+      )
+      return { method, operationId: preview.operationId, summary: preview.summary, impact: preview.impact, confirmation }
+    }
     default: {
       const exhaustive: never = method
       fail(ERROR_CODES.INVALID_COMMAND, `未实现的写方法：${String(exhaustive)}`)
@@ -246,12 +293,14 @@ export function previewPanelWrite(
  * @param authorizer - 与预览同一实例（令牌登记在它里面）。
  * @param method - 白名单方法名。
  * @param input - 令牌、参数与人类填写的理由。
+ * @param deps - 额外端口（全局发布用）。
  */
 export function applyPanelWrite(
   runtime: ProjectRuntime,
   authorizer: HumanAuthorizer,
   method: PanelWriteMethod,
   input: { params: Record<string, unknown>; confirmation: HumanConfirmation; reason: string },
+  deps: PanelWriteDeps = {},
 ): PanelWriteApplied {
   switch (method) {
     case 'teamDisband': {
@@ -279,6 +328,22 @@ export function applyPanelWrite(
     }
     case 'gateVerdict':
       fail(ERROR_CODES.INVALID_COMMAND, 'gateVerdict 不使用确认令牌，请走 applyDirectPanelWrite')
+    case 'taskCreate':
+      fail(ERROR_CODES.INVALID_COMMAND, 'taskCreate 不使用确认令牌，请走 applyDirectPanelWrite')
+    case 'definitionPublish': {
+      const result = confirmDefinitionPublication(runtime, { authorizer, publisher: requirePublisher(deps) }, {
+        actor: PANEL_HUMAN,
+        operationId: input.confirmation.operationId,
+        kind: requirePublicationKind(input.params),
+        id: requireString(input.params, 'id'),
+        confirmation: input.confirmation,
+      })
+      return {
+        method,
+        operationId: input.confirmation.operationId,
+        committed: { file: result.file, globalHash: result.globalHash },
+      }
+    }
     default: {
       const exhaustive: never = method
       fail(ERROR_CODES.INVALID_COMMAND, `未实现的写方法：${String(exhaustive)}`)
@@ -342,6 +407,7 @@ export function applyDirectPanelWrite(
     }
     case 'teamDisband':
     case 'captainTakeover':
+    case 'definitionPublish':
       fail(ERROR_CODES.INVALID_COMMAND, `${method} 走确认令牌通道（先预览再确认），不能直接执行`)
     case 'taskCreate': {
       if (input.confirm !== true) {
