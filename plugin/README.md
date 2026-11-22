@@ -92,6 +92,7 @@ node --test test/*.test.ts        # 118 个测试
 node ../tools/check-architecture.mjs   # ARCH_OK files=47 violations=0
 node scripts/build-lib.mjs        # 47 个模块 → lib/（入口 lib/composition/host.mjs）
 node ../tools/gen-panel-contract.mjs --check   # 面板契约文档与代码一致
+node ../tools/gen-tool-contract.mjs --check    # 工具面契约文档与代码一致
 
 # v1 数据只读分析（不写旧文件、不迁移）
 node ../tools/myteam-migrate.mjs analyze --root "E:\Workplace\extension\dsh-myteam"
