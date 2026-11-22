@@ -81,6 +81,8 @@ const CAPTAIN_ACTIONS: ReadonlySet<Action> = new Set<Action>([
   'task.update',
   'task.dependencies.change',
   'task.claim',
+  'task.review',
+  'task.complete',
   'task.reopen',
   'task.cancel',
   'knowledge.propose',

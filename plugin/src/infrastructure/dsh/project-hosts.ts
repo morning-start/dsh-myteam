@@ -23,22 +23,42 @@ export interface ProjectHostsOptions {
   leaseTtlMs?: number
 }
 
+interface SharedEntry {
+  promise: Promise<ProjectRuntime>
+  refs: number
+}
+
+/**
+ * 进程级共享：同一工作区只能有一个运行时（写者租约按进程判活）。
+ *
+ * 队长与成员是两个装配入口，各建一个 ProjectHosts；如果各开各的运行时，
+ * 第二个会被自己的租约挡住。按 root 共享 + 引用计数，最后一次释放才 close。
+ */
+const shared = new Map<string, SharedEntry>()
+
 export class ProjectHosts {
-  private readonly hosts = new Map<string, Promise<ProjectRuntime>>()
+  private readonly keys = new Set<string>()
   private readonly options: ProjectHostsOptions
 
   constructor(options: ProjectHostsOptions = {}) {
     this.options = options
   }
 
-  /** 打开（或复用）某个工作区的项目运行时。同一 root 只打开一次。 */
+  /** 打开（或复用）某个工作区的项目运行时。同一 root 进程内只打开一次。 */
   open(rootDir: string): Promise<ProjectRuntime> {
     const key = resolve(rootDir)
-    const existing = this.hosts.get(key)
-    if (existing !== undefined) return existing
+    const existing = shared.get(key)
+    if (existing !== undefined) {
+      if (!this.keys.has(key)) {
+        existing.refs += 1
+        this.keys.add(key)
+      }
+      return existing.promise
+    }
 
     const clock = this.options.clock ?? systemClock
     const ids = this.options.ids ?? newId
+    this.keys.add(key)
     const opening = (async () => {
       const manifest = ensureProjectManifest(key, {
         projectId: ids('project'),
@@ -56,25 +76,31 @@ export class ProjectHosts {
       })
     })()
 
-    this.hosts.set(key, opening)
+    const entry: SharedEntry = { promise: opening, refs: 1 }
+    shared.set(key, entry)
     // 打开失败必须从注册表移除，否则之后每次调用都会拿到同一个拒绝。
     opening.catch(() => {
-      this.hosts.delete(key)
+      shared.delete(key)
     })
     return opening
   }
 
   /** 当前已打开的项目根（供诊断/面板列出）。 */
   openedRoots(): string[] {
-    return [...this.hosts.keys()].sort()
+    return [...this.keys].sort()
   }
 
   async closeAll(): Promise<void> {
-    const entries = [...this.hosts.values()]
-    this.hosts.clear()
-    for (const entry of entries) {
+    const keys = [...this.keys]
+    this.keys.clear()
+    for (const key of keys) {
+      const entry = shared.get(key)
+      if (entry === undefined) continue
+      entry.refs -= 1
+      if (entry.refs > 0) continue
+      shared.delete(key)
       try {
-        const runtime = await entry
+        const runtime = await entry.promise
         runtime.close()
       } catch {
         // 打开失败的项目没有租约需要释放。

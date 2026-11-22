@@ -233,3 +233,64 @@ test('队长装配：项目根取会话工作目录，而不是进程 cwd', asyn
     rmSync(sessionDir, { recursive: true, force: true })
   }
 })
+
+test('队长与成员装配共享同一个项目运行时，任务闭环可跨两个工具面完成', async () => {
+  const dir = mkdtempSync(join(tmpdir(), 'myteam-loop-'))
+  const captain = fakeContext()
+  const member = fakeContext()
+
+  try {
+    const { taskId, attemptId } = seedProject(dir)
+    applyCaptainHost(captain.ctx, { projectRoot: dir })
+    applyMemberHost(member.ctx, { projectRoot: dir })
+
+    const memberExec = { agent: { id: MEMBER_SESSION } }
+    const captainExec = { agent: { id: CAPTAIN_SESSION } }
+    const call = async (
+      tools: Map<string, FakeTool>,
+      name: string,
+      args: unknown,
+      exec: { agent: { id: string } },
+    ) => (await tools.get(name)!.execute(args, exec)) as { ok: boolean; data?: never; error?: { code: string } }
+
+    const evidenceResult = await call(member.tools, 'myteam_evidence', {
+        taskId,
+        attemptId,
+        evidence: [{ kind: 'command', ref: 'npm test', excerpt: '124 passed' }],
+      }, memberExec)
+    assert.equal(evidenceResult.ok, true, JSON.stringify(evidenceResult))
+
+    // 提交评审要求任务已进入执行态：先报一次进度。
+    const progressResult = await call(member.tools, 'myteam_progress', { taskId, attemptId, note: '实现完成', percent: 100 }, memberExec)
+    assert.equal(progressResult.ok, true, JSON.stringify(progressResult))
+
+    const submitResult = await call(member.tools, 'myteam_submit_review', { taskId, attemptId }, memberExec)
+    assert.equal(submitResult.ok, true, JSON.stringify(submitResult))
+
+    const verdict = await call(captain.tools, 'myteam_review_task', {
+      taskId,
+      attemptId,
+      outcome: 'pass',
+      checks: [{ command: 'npm test', exitCode: 0, summary: '124 passed' }],
+      evidence: [{ kind: 'command', ref: 'npm test', excerpt: '124 passed' }],
+    }, captainExec)
+    assert.equal(verdict.ok, true, JSON.stringify(verdict))
+
+    const completed = (await captain.tools.get('myteam_complete_task')!.execute(
+      { taskId, attemptId, artifacts: [{ path: 'src/a.ts', exists: true }] },
+      captainExec,
+    )) as { ok: boolean; data?: { status: string }; error?: { code: string } }
+    assert.equal(completed.ok, true, JSON.stringify(completed))
+    assert.equal(completed.data!.status, 'done')
+
+    const board = (await captain.tools.get('myteam_read_board')!.execute({}, captainExec)) as {
+      ok: boolean
+      data: { totals: { done: number } }
+    }
+    assert.equal(board.data.totals.done, 1)
+  } finally {
+    for (const cleanup of captain.cleanups) cleanup()
+    for (const cleanup of member.cleanups) cleanup()
+    rmSync(dir, { recursive: true, force: true })
+  }
+})
