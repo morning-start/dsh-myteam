@@ -29,6 +29,11 @@ import type { ProjectRuntime } from './project-runtime.ts'
 export interface ToolRuntimeContext {
   runtime: ProjectRuntime
   sessionId: string
+  /**
+   * 宿主能力：为成员创建一个子会话，并在该会话作用域内注册成员工具。
+   * 返回成员会话 id；宿主不支持（或本地脚本）时返回 null，成员保持「待绑定」。
+   */
+  spawnMember?: (input: { teamId: string; roleId: string; parentMemberId: string | null }) => Promise<string | null>
 }
 
 export interface MyTeamToolSpec {
@@ -363,18 +368,28 @@ export function leadToolSpecs(): MyTeamToolSpec[] {
         additionalProperties: false,
       },
       outputSchema: OUTPUT_SCHEMA,
-      execute(args, context) {
+      async execute(args, context) {
         const record = asRecord(args)
         const actor = actorOf(context)
+        const teamId = defaultTeamId(actor, record)
+        const roleId = requireString(record, 'roleId')
+        const parentMemberId = optionalString(record, 'parentMemberId') ?? null
+
+        // 没给会话就请宿主现开一个成员会话：先有会话，才能把 sessionId 记进成员。
+        let sessionId = optionalString(record, 'sessionId') ?? null
+        if (sessionId === null && context.spawnMember !== undefined) {
+          sessionId = await context.spawnMember({ teamId, roleId, parentMemberId })
+        }
+
         const result = appointMemberCommand(context.runtime, {
           actor,
-          teamId: defaultTeamId(actor, record),
-          roleId: requireString(record, 'roleId'),
-          parentMemberId: optionalString(record, 'parentMemberId') ?? null,
-          sessionId: optionalString(record, 'sessionId') ?? null,
+          teamId,
+          roleId,
+          parentMemberId,
+          sessionId,
         })
         const memberId = (result.events[0]!.payload as { member: { id: string } }).member.id
-        return jsonSafe({ ok: true, data: { memberId } })
+        return jsonSafe({ ok: true, data: { memberId, sessionId, bound: sessionId !== null } })
       },
     },
     {

@@ -8,8 +8,9 @@
  * `composition/member.ts`，因此成员会话看不到 `myteam_create_task` 这类
  * Lead 工具（也看不到任何「构造一个人工 human」的入口）。
  */
+import { randomUUID } from 'node:crypto'
 import { resolve } from 'node:path'
-import { leadToolSpecs } from '../application/tool-specs.ts'
+import { leadToolSpecs, memberToolSpecs } from '../application/tool-specs.ts'
 import { ProjectHosts } from '../infrastructure/dsh/project-hosts.ts'
 import { toDshTool } from '../infrastructure/dsh/tool-adapter.ts'
 
@@ -24,12 +25,48 @@ export interface CaptainHostConfig {
 interface HostContext {
   tools: { register(definition: unknown, options?: unknown): () => void }
   effect?: (execute: () => () => string | void) => unknown
-  agents?: { get(id: string): { id: string } | undefined }
+  agents?: {
+    get(id: string): { id: string } | undefined
+    create(options: unknown): Promise<unknown>
+  }
   workingDirectory?: { ensure(agent: { id: string }): Promise<string> }
+}
+
+/** 成员会话的默认模型：与宿主一致；取不到就让宿主自己决定。 */
+interface MemberSpawnResult {
+  agent?: { session?: { id?: string } }
+  session?: { id?: string }
 }
 
 export function apply(ctx: HostContext, config: CaptainHostConfig = {}): (() => void) | undefined {
   const hosts = new ProjectHosts()
+
+  /**
+   * 为成员开一个子会话，并在该会话作用域内注册三个成员工具。
+   *
+   * 顺序很关键：先有会话，才能把 sessionId 写进成员记录；先记成员再开会话，
+   * 成员就永远是「待绑定」，成员工具也没人用得上。
+   */
+  const spawnMember = async (input: { teamId: string; roleId: string; parentMemberId: string | null }): Promise<string | null> => {
+    if (ctx.agents?.create === undefined) return null
+    const sessionId = `mt-member-${randomUUID()}`
+    const created = (await ctx.agents.create({
+      sessionId,
+      setup(agentCtx: { tools: { register(definition: unknown, options?: unknown): unknown } }) {
+        for (const spec of memberToolSpecs()) {
+          agentCtx.tools.register(
+            toDshTool(spec, async () => ({
+              runtime: await hosts.open(await rootFor(sessionId)),
+              sessionId,
+            })),
+            {},
+          )
+        }
+      },
+    })) as MemberSpawnResult
+    void input
+    return created.agent?.session?.id ?? created.session?.id ?? sessionId
+  }
 
   /**
    * 项目根 = **会话**的工作目录，不是进程 cwd。
@@ -50,7 +87,7 @@ export function apply(ctx: HostContext, config: CaptainHostConfig = {}): (() => 
     ctx.tools.register(
       toDshTool(spec, async (sessionId) => {
         const runtime = await hosts.open(await rootFor(sessionId))
-        return { runtime, sessionId }
+        return { runtime, sessionId, spawnMember }
       }),
     ),
   )
