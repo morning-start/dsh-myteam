@@ -56,6 +56,17 @@ if not exist "%ISO%\profiles\iso-myteam\package.json" (
 echo.
 echo [iso] DSH_HOME=%ISO%
 echo [iso] profile=iso-myteam port=%PORT%
+
+rem Screenshot / manual-check workspace: a copy of this repo's dogfood project, so the
+rem panel has real teams and tasks without touching the repo itself. Pick this folder in
+rem the workspace picker; the writer lock of the original is removed in the copy.
+if not exist "%ROOT%\tmp\shot-ws\.dsh-myteam\events\project.jsonl" (
+  if not exist "%ROOT%\tmp\shot-ws" mkdir "%ROOT%\tmp\shot-ws"
+  echo [iso] seeding workspace copy: tmp\shot-ws
+  xcopy /e /i /y "%ROOT%\.dsh-myteam" "%ROOT%\tmp\shot-ws\.dsh-myteam" >nul
+  del "%ROOT%\tmp\shot-ws\.dsh-myteam\state\writer.lock" >nul 2>&1
+)
+
 echo [iso] open the printed ?token= URL in a browser; Ctrl+C stops only this instance.
 echo.
 rem Optional extra CLI flags, e.g. for a cookie-injecting preview proxy:
