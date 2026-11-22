@@ -88,9 +88,9 @@ composition → infrastructure → application → domain → contracts
 
 ```bash
 cd plugin
-node --test test/*.test.ts        # 118 个测试
-node ../tools/check-architecture.mjs   # ARCH_OK files=47 violations=0
-node scripts/build-lib.mjs        # 47 个模块 → lib/（入口 lib/composition/host.mjs）
+node --test test/*.test.ts        # 120 个测试
+node ../tools/check-architecture.mjs   # ARCH_OK files=48 violations=0
+node scripts/build-lib.mjs        # 48 个模块 → lib/（入口 lib/composition/host.mjs）
 node ../tools/gen-panel-contract.mjs --check   # 面板契约文档与代码一致
 node ../tools/gen-tool-contract.mjs --check    # 工具面契约文档与代码一致
 node ../tools/gen-config-contract.mjs --check  # 配置字段契约文档与代码一致
