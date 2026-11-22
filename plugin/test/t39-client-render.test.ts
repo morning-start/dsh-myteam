@@ -262,7 +262,17 @@ function loadClient(data: Record<string, unknown>): Harness {
       return {
         status: 200,
         text: async () =>
-          JSON.stringify({ ok: true, data: { method: name, operationId: 'op_new', committed: { task: { id: 'task_new', status: 'ready' } } } }),
+          JSON.stringify({
+            ok: true,
+            data: {
+              method: name,
+              operationId: 'op_1',
+              summary: `预览 ${name}：影响 1 名成员`,
+              impact: { members: ['member_1'], activeAttempts: [], unfinishedTasks: [], unsettledEffects: [] },
+              confirmation: { operationId: 'op_1', action: 'team.disband', nonce: 'n1', targetHash: 't', impactHash: 'i', expiresAt: '2026-01-01T00:00:00.000Z' },
+              committed: { task: { id: 'task_new', status: 'ready' } },
+            },
+          }),
       }
     }
     calls.push(method)
@@ -366,6 +376,33 @@ const FILLED: Record<string, unknown> = {
     configRevision: 3,
     defaults: { maxMembers: 8 },
     teams: [{ teamId: 'team_1', configRevision: 3, contentHash: 'abcdef123456', mergeAlgorithmVersion: 'v1', safetyLimitsVersion: 'v1', clamped: false }],
+  },
+  task: {
+    task: {
+      id: 'task_1',
+      title: '评审中的任务',
+      status: 'review',
+      attemptId: 'attempt_1',
+      ownerTeamId: 'team_1',
+      dependencies: [],
+      acceptance: ['返回 ok'],
+      description: '',
+    },
+    team: { id: 'team_1', name: '甲队' },
+    run: null,
+    attempt: { id: 'attempt_1', status: 'active', memberId: 'member_1' },
+    verdict: null,
+    evidence: [],
+    dependencies: [],
+    dependents: [],
+  },
+  team: {
+    team: { id: 'team_1', name: '甲队', status: 'active' },
+    captain: { sessionId: 'ses_captain_1', generation: 1 },
+    members: [{ id: 'member_1', roleId: 'role_1', status: 'active', parentMemberId: null }],
+    tasks: [{ id: 'task_1', title: '评审中的任务', status: 'review' }],
+    roles: [{ id: 'role_1', name: '实现者' }],
+    config: null,
   },
   globalLibrary: {
     root: '/tmp/.dsh/myteam',
@@ -505,6 +542,81 @@ test('任务栏「新任务」：填标题提交 → 只发一次 taskCreate，�
     assert.equal(params.title, '面板建的任务')
     assert.equal(params.teamId, 'team_1', '默认选第一个团队')
     assert.ok(textOf(tree).includes('共 1 个任务'), '提交成功后表单收起、看板回到列表')
+  } finally {
+    harness.restore()
+  }
+})
+
+test('任务详情：评审中的任务能提交门禁裁决（gateVerdict + confirm: true）', async () => {
+  const harness = loadClient(FILLED)
+  try {
+    let tree = await mount(harness.view, { sessionId: 'ses_1' })
+
+    const tasksTab = findTab(tree, '任务')
+    assert.ok(tasksTab !== null)
+    ;(tasksTab!.props.onClick as () => void)()
+    tree = await mount(harness.view, { sessionId: 'ses_1' })
+
+    const card = findButton(tree, '评审中的任务')
+    assert.ok(card !== null, '看板卡片应能点开任务详情')
+    ;(card!.props.onClick as () => void)()
+    tree = await mount(harness.view, { sessionId: 'ses_1' })
+
+    const command = findByPlaceholder(tree, '检查命令（必填，例如 node --test）')
+    assert.ok(command !== null, '评审中的任务详情应出现裁决表单')
+    ;(command!.props.onChange as (event: unknown) => void)({ target: { value: 'node --test' } })
+    tree = await mount(harness.view, { sessionId: 'ses_1' })
+
+    const submit = findButton(tree, '提交裁决')
+    assert.ok(submit !== null, '缺「提交裁决」按钮')
+    ;(submit!.props.onClick as () => void)()
+    tree = await mount(harness.view, { sessionId: 'ses_1' })
+
+    assert.deepEqual(harness.writes, ['gateVerdict'], '一次提交只发一次裁决')
+    assert.equal(harness.writeBody?.confirm, true, 'direct 类写动作必须带 confirm: true')
+    const params = harness.writeBody?.params as Record<string, unknown>
+    assert.equal(params.attemptId, 'attempt_1', '裁决必须绑定当前 Attempt')
+    const checks = params.checks as { command: string; exitCode: number | null }[]
+    assert.equal(checks[0]!.command, 'node --test')
+    assert.equal(checks[0]!.exitCode, 0)
+  } finally {
+    harness.restore()
+  }
+})
+
+test('团队栏：解散团队走两段确认（先预览拿令牌，再带 action=confirm 执行）', async () => {
+  const harness = loadClient(FILLED)
+  try {
+    let tree = await mount(harness.view, { sessionId: 'ses_1' })
+
+    const teamsTab = findTab(tree, '团队')
+    assert.ok(teamsTab !== null)
+    ;(teamsTab!.props.onClick as () => void)()
+    tree = await mount(harness.view, { sessionId: 'ses_1' })
+
+    const teamButton = findButton(tree, '甲队')
+    assert.ok(teamButton !== null, '应能选中团队')
+    ;(teamButton!.props.onClick as () => void)()
+    tree = await mount(harness.view, { sessionId: 'ses_1' })
+
+    const dissolve = findButton(tree, '解散团队')
+    assert.ok(dissolve !== null, '团队详情缺「解散团队」入口')
+    ;(dissolve!.props.onClick as () => void)()
+    tree = await mount(harness.view, { sessionId: 'ses_1' })
+
+    assert.deepEqual(harness.writes, ['teamDisband'], '第一段只预览，不能直接执行')
+    assert.equal(harness.writeBody?.action, undefined, '预览请求不能带 action')
+    assert.ok(textOf(tree).includes('待确认'), '预览要显示影响面与「待确认」')
+    assert.ok(textOf(tree).includes('影响 1 名成员'), '预览要显示服务端给的 summary')
+
+    const commit = findButton(tree, '确认执行')
+    assert.ok(commit !== null, '预览后缺「确认执行」')
+    ;(commit!.props.onClick as () => void)()
+    tree = await mount(harness.view, { sessionId: 'ses_1' })
+
+    assert.deepEqual(harness.writes, ['teamDisband', 'teamDisband'])
+    assert.equal(harness.writeBody?.action, 'confirm', '第二段必须带 action=confirm')
+    assert.ok(harness.writeBody?.confirmation !== undefined, '第二段必须带一次性令牌')
   } finally {
     harness.restore()
   }

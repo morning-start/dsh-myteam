@@ -336,7 +336,7 @@ window.__ModuleLoader__.load({
       { status: 'cancelled', label: '已取消', tone: 'idle' },
     ]
 
-    const TEAM_STATUS = { active: '进行中', draft: '草稿', archived: '已归档' }
+    const TEAM_STATUS = { active: '进行中', draft: '草稿', archived: '已归档', disbanded: '已解散' }
 
     function counter(label, value, hint) {
       return h(
@@ -601,6 +601,268 @@ window.__ModuleLoader__.load({
       )
     }
 
+    // ───────────────────── 写交互：两段确认 / 门禁裁决 ─────────────────────
+
+    function messageOf(error) {
+      return error instanceof Error ? error.message : String(error)
+    }
+
+    /** 预览返回的 impact 是各动作自己的形状；这里只翻成人话，不假设字段齐全。 */
+    function impactLines(impact) {
+      if (impact === null || typeof impact !== 'object') return []
+      const list = (value) => (Array.isArray(value) ? value : [])
+      const lines = []
+      if (list(impact.members).length > 0) lines.push(`成员 ${list(impact.members).length} 名：${list(impact.members).join('、')}`)
+      if (list(impact.activeAttempts).length > 0) lines.push(`在途 Attempt ${list(impact.activeAttempts).length} 个`)
+      if (list(impact.unfinishedTasks).length > 0) lines.push(`未完成任务 ${list(impact.unfinishedTasks).length} 个`)
+      if (list(impact.unsettledEffects).length > 0) lines.push(`未结算 Effect ${list(impact.unsettledEffects).length} 个`)
+      if (impact.fromSessionId !== undefined || impact.toSessionId !== undefined) {
+        lines.push(`队长会话 ${impact.fromSessionId ?? '（无）'} → ${impact.toSessionId ?? '—'}`)
+      }
+      if (impact.nextGeneration !== undefined) lines.push(`generation → ${impact.nextGeneration}`)
+      lines.push('确认后不可撤销；令牌只认这一次，影响面变了会要求重新看')
+      return lines
+    }
+
+    /**
+     * 两段确认动作（`token` 类写方法）。
+     *
+     * 第一次点击只**预览**，拿回影响面与一次性令牌；确认按钮才会执行。
+     * 这不是啰嗦：预览和确认各是一次请求，中间任何状态变化都会让服务端拒绝，
+     * 才有「你确认的就是你看到的那件事」。
+     */
+    function TokenAction(props) {
+      const { label, method, sessionId, params, onDone } = props
+      const [stage, setStage] = useState('idle')
+      const [preview, setPreview] = useState(null)
+      const [problem, setProblem] = useState(null)
+
+      const begin = async () => {
+        setStage('busy')
+        setProblem(null)
+        try {
+          const result = await callWrite(method, sessionId, { params })
+          setPreview(result)
+          setStage('preview')
+        } catch (error) {
+          setProblem(messageOf(error))
+          setStage('failed')
+        }
+      }
+
+      const commit = async () => {
+        setStage('busy')
+        setProblem(null)
+        try {
+          await callWrite(method, sessionId, {
+            params,
+            action: 'confirm',
+            confirmation: preview.confirmation,
+            reason: '面板确认',
+          })
+          setPreview(null)
+          setStage('idle')
+          if (onDone !== undefined) onDone()
+        } catch (error) {
+          setProblem(messageOf(error))
+          setStage('failed')
+        }
+      }
+
+      const busy = stage === 'busy'
+      return h(
+        'div',
+        { style: { marginTop: 10 } },
+        preview === null
+          ? h(
+              'button',
+              { type: 'button', className: 'btn', disabled: busy, onClick: () => void begin() },
+              busy ? '读影响面…' : label,
+            )
+          : h(
+              'div',
+              { className: 'box', style: { padding: '12px 14px' } },
+              h(
+                'div',
+                { className: 'rc-h' },
+                h(Dot, { tone: 'gate' }),
+                h('span', { className: 'nm' }, preview.summary ?? label),
+                h('span', { className: 'tag' }, '待确认'),
+              ),
+              impactLines(preview.impact).map((line) =>
+                h('p', { key: line, className: 'muted', style: { margin: '6px 0 0', fontSize: 12 } }, line),
+              ),
+              h(
+                'div',
+                { className: 'acts', style: { marginTop: 10 } },
+                h(
+                  'button',
+                  { type: 'button', className: 'btn primary', disabled: busy, onClick: () => void commit() },
+                  busy ? '提交中…' : '确认执行',
+                ),
+                h(
+                  'button',
+                  {
+                    type: 'button',
+                    className: 'btn',
+                    style: { marginLeft: 8 },
+                    onClick: () => {
+                      setPreview(null)
+                      setStage('idle')
+                    },
+                  },
+                  '取消',
+                ),
+              ),
+            ),
+        problem === null
+          ? null
+          : h('p', { className: 'muted', style: { margin: '8px 0 0', fontSize: 12 } }, `没成功：${problem}`),
+      )
+    }
+
+    /** 队长接管：先填目标会话，再走两段确认。 */
+    function TakeoverBox(props) {
+      const { teamId, sessionId, onDone } = props
+      const [toSessionId, setToSessionId] = useState('')
+      return h(
+        'div',
+        { style: { marginTop: 8 } },
+        h('input', {
+          type: 'text',
+          className: 'box',
+          placeholder: '新队长会话 id',
+          value: toSessionId,
+          style: { display: 'block', width: '100%', padding: '8px 10px', fontSize: 13 },
+          onChange: (event) => setToSessionId(event.target.value),
+        }),
+        toSessionId.trim().length === 0
+          ? h(
+              'p',
+              { className: 'muted', style: { margin: '6px 0 0', fontSize: 12 } },
+              '填一个会话 id 才能预览接管：接管会把队长世代 +1，旧会话失去发令权。',
+            )
+          : h(TokenAction, {
+              label: '预览接管',
+              method: 'captainTakeover',
+              sessionId,
+              params: { teamId, toSessionId: toSessionId.trim() },
+              onDone,
+            }),
+      )
+    }
+
+    /**
+     * 门禁裁决（`gateVerdict`，直接确认类）。
+     *
+     * 只在任务处于 `review` 时出现：裁决绑定当前 Attempt，别的状态下提交会被域拒绝，
+     * 与其让用户点了才知道，不如不显示。
+     */
+    function VerdictForm(props) {
+      const { taskId, attemptId, sessionId, onDone } = props
+      const [outcome, setOutcome] = useState('pass')
+      const [command, setCommand] = useState('')
+      const [exitCode, setExitCode] = useState('0')
+      const [summary, setSummary] = useState('')
+      const [busy, setBusy] = useState(false)
+      const [problem, setProblem] = useState(null)
+
+      const submit = async () => {
+        if (busy) return
+        if (attemptId === null || attemptId === undefined) {
+          setProblem('这个任务还没有活跃尝试：先认领再裁决')
+          return
+        }
+        if (command.trim().length === 0) {
+          setProblem('至少写一条检查命令：裁决必须能复查')
+          return
+        }
+        const code = exitCode.trim() === '' ? null : Number(exitCode)
+        if (code !== null && !Number.isFinite(code)) {
+          setProblem('退出码要填数字，或留空')
+          return
+        }
+        setBusy(true)
+        setProblem(null)
+        try {
+          await callWrite('gateVerdict', sessionId, {
+            confirm: true,
+            params: {
+              taskId,
+              attemptId,
+              outcome,
+              checks: [{ command: command.trim(), exitCode: code, summary: summary.trim() }],
+              evidence: [{ kind: 'command', ref: command.trim() }],
+            },
+          })
+          onDone()
+        } catch (error) {
+          setProblem(messageOf(error))
+        } finally {
+          setBusy(false)
+        }
+      }
+
+      return h(
+        'div',
+        { className: 'box', style: { padding: '12px 14px', marginTop: 12 } },
+        h('div', { className: 'rc-h' }, h(Dot, { tone: 'gate' }), h('span', { className: 'nm' }, '门禁裁决'), h('span', { className: 'tag' }, '写进账本 · 不可撤销')),
+        h(
+          'div',
+          { className: 'kws', style: { marginTop: 10 } },
+          ['pass', 'fail', 'blocked'].map((value) =>
+            h(
+              'button',
+              {
+                key: value,
+                type: 'button',
+                className: joinClass('btn', value === outcome ? 'primary' : ''),
+                style: { marginRight: 6 },
+                onClick: () => setOutcome(value),
+              },
+              value === 'pass' ? '通过' : value === 'fail' ? '不通过' : '受阻',
+            ),
+          ),
+        ),
+        h('input', {
+          type: 'text',
+          className: 'box mono',
+          placeholder: '检查命令（必填，例如 node --test）',
+          value: command,
+          style: { display: 'block', width: '100%', marginTop: 10, padding: '8px 10px', fontSize: 12 },
+          onChange: (event) => setCommand(event.target.value),
+        }),
+        h('input', {
+          type: 'text',
+          className: 'box mono',
+          placeholder: '退出码（留空表示未知）',
+          value: exitCode,
+          style: { display: 'block', width: '100%', marginTop: 8, padding: '8px 10px', fontSize: 12 },
+          onChange: (event) => setExitCode(event.target.value),
+        }),
+        h('input', {
+          type: 'text',
+          className: 'box',
+          placeholder: '一句结论（可选）',
+          value: summary,
+          style: { display: 'block', width: '100%', marginTop: 8, padding: '8px 10px', fontSize: 13 },
+          onChange: (event) => setSummary(event.target.value),
+        }),
+        problem === null
+          ? null
+          : h('p', { className: 'muted', style: { margin: '8px 0 0', fontSize: 12 } }, `没提交：${problem}`),
+        h(
+          'div',
+          { className: 'acts', style: { marginTop: 10 } },
+          h(
+            'button',
+            { type: 'button', className: 'btn primary', disabled: busy === true, onClick: () => void submit() },
+            busy === true ? '提交中…' : '提交裁决',
+          ),
+        ),
+      )
+    }
+
     function TaskDetail(props) {
       const { taskId, sessionId, onBack } = props
       const detail = usePanelData(sessionId, 'task', { taskId })
@@ -628,6 +890,15 @@ window.__ModuleLoader__.load({
               ? null
               : h('div', { className: 'kws', style: { marginTop: 10 } },
                   data.dependencies.map((dependency) => h('span', { key: dependency.taskId, className: 'kw' }, `${dependency.taskId} ${dependency.status ?? '缺失'}`))),
+            data.task.status === 'review'
+              ? h(VerdictForm, {
+                  taskId,
+                  attemptId: data.attempt === null || data.attempt === undefined ? null : data.attempt.id,
+                  sessionId,
+                  onDone: () => void detail.reload(),
+                })
+              : h('p', { className: 'muted', style: { margin: '10px 0 0', fontSize: 12 } },
+                  `裁决只在任务处于「待评审」时可用（当前 ${data.task.status}）。`),
           ),
         ),
       )
@@ -660,6 +931,31 @@ window.__ModuleLoader__.load({
                     `任务 ${data.tasks.length} 个 · 可用角色 ${data.roles.length} 个 · 配置 ${data.config === null ? '未落盘' : `revision ${data.config.revision ?? '—'}`}`),
                 ),
               ),
+            ),
+        selected === null
+          ? null
+          : h(
+              'div',
+              { style: { marginTop: 12 } },
+              h('p', { className: 'muted', style: { margin: '0 0 4px', fontSize: 12 } }, '人类专属动作（先看影响面，再凭一次性令牌确认）'),
+              h(TokenAction, {
+                label: '解散团队',
+                method: 'teamDisband',
+                sessionId,
+                params: { teamId: selected },
+                onDone: () => {
+                  void detail.reload()
+                  if (props.onChanged !== undefined) props.onChanged()
+                },
+              }),
+              h(TakeoverBox, {
+                teamId: selected,
+                sessionId,
+                onDone: () => {
+                  void detail.reload()
+                  if (props.onChanged !== undefined) props.onChanged()
+                },
+              }),
             ),
         teams.map((team) =>
           h(
@@ -1010,7 +1306,8 @@ window.__ModuleLoader__.load({
             onCreated: () => void board.reload(),
           }))
       } else if (tab === 'teams') {
-        body = h(Data, { data: overview, what: '团队' }, () => h(TeamsScreen, { overview, sessionId }))
+        body = h(Data, { data: overview, what: '团队' }, () =>
+          h(TeamsScreen, { overview, sessionId, onChanged: () => void overview.reload() }))
       } else if (tab === 'definitions') {
         body = h(Data, { data: definitions, what: '项目定义副本' }, (data) => h(DefinitionsScreen, { data }))
       } else if (tab === 'migration') {
