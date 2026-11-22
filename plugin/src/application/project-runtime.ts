@@ -115,6 +115,25 @@ export class ProjectRuntime {
     return this.current
   }
 
+  /**
+   * 外部进程写入后，本实例的投影会陈旧（单写者租约只挡并发写，不挡陈旧读）。
+   *
+   * 写前与读取身份前都要调用：否则会拿旧状态算队长身份或任务状态，
+   * 表现为「明明是队长却被判 FORBIDDEN」。
+   */
+  refresh(): void {
+    if (this.poisoned) return
+    let committed
+    try {
+      committed = this.eventStore.readCommitted()
+    } catch {
+      return
+    }
+    if (committed.events.length <= this.current.seq) return
+    this.current = rebuildProjectState(this.projectId, committed.events)
+    this.logger.warn('project.state.refreshed', { to: this.current.seq })
+  }
+
   get observedProjectSeq(): number {
     return this.current.seq
   }
@@ -137,6 +156,8 @@ export class ProjectRuntime {
     if (this.poisoned) {
       fail(ERROR_CODES.PROJECT_WRITE_BLOCKED, '项目运行时状态不可信，拒绝继续写入')
     }
+    // 先对齐外部写入，避免基于旧投影分配序号与算事件。
+    this.refresh()
     if (this.lease === null) {
       fail(ERROR_CODES.WRITER_LEASE_LOST, '运行时已关闭，不能提交')
     }

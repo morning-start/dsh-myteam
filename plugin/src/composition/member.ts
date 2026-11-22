@@ -39,6 +39,7 @@ export function apply(ctx: HostContext, config: MemberHostConfig = {}): (() => v
     ctx.tools.register(
       toDshTool(spec, async (sessionId) => {
         const runtime = await hosts.open(await rootFor(sessionId))
+        runtime.refresh()
         return { runtime, sessionId }
       }),
     ),

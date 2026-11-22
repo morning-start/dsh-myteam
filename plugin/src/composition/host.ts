@@ -150,6 +150,8 @@ export function apply(ctx: HostContext, config: CaptainHostConfig = {}): (() => 
     ctx.tools.register(
       toDshTool(spec, async (sessionId) => {
         const runtime = await hosts.open(await rootFor(sessionId))
+        // 身份判断发生在工具层，读之前先对齐外部写入，避免陈旧投影误判队长。
+        runtime.refresh()
         return { runtime, sessionId, spawnMember: makeSpawner(sessionId), dispatchMember: makeDispatcher(sessionId) }
       }),
     ),
