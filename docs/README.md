@@ -16,9 +16,10 @@
 | 6 | [architecture/02](architecture/02-文档重构与迁移蓝图.md) | 文档治理、旧数据迁移、cutover、实施批次与验收矩阵 |
 
 这些文档当前按 **as-is（现行实现）+ roadmap（尚未实施）** 两种口径写：
-v2 代码已落地并验收（62 模块、46 个测试文件、面板 16 个只读方法、隔离实例 46/46，见
-[25-隔离验收记录](delivery/25-隔离验收记录.md)），`proposed` 只用于**还没做**的路线项。
-哪一条断言算成立、哪些过期，逐条对账见 [architecture/07](architecture/07-文档现状对账-2.0.0.md)。
+v2 代码已落地并验收（体量、测试、方法数等可数事实统一写在
+[architecture/07 §2](architecture/07-文档现状对账-2.0.0.md)，由 `tools/check-doc-facts.mjs` 对着代码查，
+这里不再重复数字以免漂），`proposed` 只用于**还没做**的路线项。
+哪一条断言算成立、哪些过期，逐条对账见同一份 [architecture/07](architecture/07-文档现状对账-2.0.0.md)。
 
 ## 2. 文件夹职责
 
