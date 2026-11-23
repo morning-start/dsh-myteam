@@ -8,7 +8,7 @@
 | 文档 | 来源 | 管什么 |
 |---|---|---|
 | [panel-rpc](panel-rpc.md) | **生成**（`tools/gen-panel-contract.mjs`） | 面板 16 个只读方法、协议版本、写通道 `/__myteam/write/<method>` 与错误信封 |
-| [tool-surface](tool-surface.md) | **生成**（`tools/gen-tool-contract.mjs`） | 队长 15 个 + 成员 13 个工具、身份规则、错误码表 |
+| [tool-surface](tool-surface.md) | **生成**（`tools/gen-tool-contract.mjs`） | 队长 15 个 + 成员 3 个工具、身份规则、错误码表 |
 | [config-schema](config-schema.md) | **生成**（`tools/gen-config-contract.mjs`） | 团队配置字段、默认值、合并与上限 |
 | [capabilities](capabilities.md) | 手工（数字来自代码） | 能力矩阵：动作集合、谁能做、当前有没有实现 |
 | [contribution](contribution.md) | 手工摘要 | 第三方 Role / 团队模板怎么贡献、安全边界在哪 |
