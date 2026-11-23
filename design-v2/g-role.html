@@ -1,0 +1,194 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=1280">
+<meta name="dsh-design" content="dshplugin 1280x800">
+<title>角色定义 · myteam</title>
+<link rel="stylesheet" href="dsh-shell.css">
+<link rel="stylesheet" href="tokens.css">
+<link rel="stylesheet" href="myteam.css">
+<!-- 外框（DSH 插件 · 左侧栏入口）：只改 data-slot 里面，别动外框的结构、文字和 dsh-shell.css -->
+</head>
+<body>
+<div class="dsh-app" data-frame="dsh/sidebar">
+  <aside class="dsh-side">
+    <div class="dsh-brand"><div class="dsh-logo">deepseek<span class="dsh-logo-tag">HARNESS</span></div><div class="dsh-iconbtn"><svg class="dsh-i" viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M9 3v18"/></svg></div></div>
+    <div class="dsh-new"><svg class="dsh-i" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 8v8M8 12h8"/></svg>新会话</div>
+    <nav class="dsh-nav">
+      <div class="dsh-row"><svg class="dsh-i" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2.5l3 3-3 3-3-3zM18.5 9l3 3-3 3-3-3zM5.5 9l3 3-3 3-3-3zM12 15.5l3 3-3 3-3-3z"/></svg>插件</div>
+      <div class="dsh-row"><svg class="dsh-i" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>自动化任务</div>
+      <div class="dsh-row on"><span data-slot="entry-icon"><svg class="dsh-i" viewBox="0 0 24 24" aria-hidden="true"><circle cx="9" cy="8" r="3"/><path d="M3.5 19a5.5 5.5 0 0 1 11 0"/><path d="M15.5 5.8a3 3 0 0 1 0 5.4"/><path d="M17 14a4.5 4.5 0 0 1 3.5 5"/></svg></span><span data-slot="entry-label">myteam</span></div>
+      <div class="dsh-row"><svg class="dsh-i" viewBox="0 0 24 24" aria-hidden="true"><rect x="4" y="4" width="6" height="6" rx="1.5"/><rect x="14" y="4" width="6" height="6" rx="3"/><rect x="4" y="14" width="6" height="6" rx="1.5"/><rect x="14" y="14" width="6" height="6" rx="1.5"/></svg>更多</div>
+    </nav>
+    <div class="dsh-sec">工作区<div class="dsh-sec-acts"><div class="dsh-iconbtn"><svg class="dsh-i" viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="M20 20l-4-4"/></svg></div><div class="dsh-iconbtn"><svg class="dsh-i" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 8h10M18 8h2M4 16h2M10 16h10"/><circle cx="16" cy="8" r="2"/><circle cx="8" cy="16" r="2"/></svg></div><div class="dsh-iconbtn"><svg class="dsh-i" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><path d="M12 11v5M9.5 13.5h5"/></svg></div></div></div>
+    <div class="dsh-row"><span class="dsh-folder"><svg class="dsh-i" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></svg></span>我的项目</div>
+    <div class="dsh-sess">整理会议记录<span class="dsh-time">2 小时</span></div>
+    <div class="dsh-sess">新会话</div>
+    <div class="dsh-acct"><div class="dsh-avatar">我</div>我的账号</div>
+  </aside>
+  <main class="dsh-main">
+    <div class="dsh-bar"><div class="dsh-iconbtn dsh-corner"><svg class="dsh-i" viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M15 3v18"/></svg></div></div>
+    <div data-slot="main">
+      <div class="wt">
+        <aside class="ir">
+          <a class="team" href="g-overview.html" title="全局库 · $DSH_HOME/myteam" style="font-family:var(--dsh-font-code);font-size:12px">my</a>
+          <div class="line"></div>
+          <nav class="ir-nav">
+            <a class="ri " href="g-overview.html" title="概览"><svg class="ic" viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/></svg><span>概览</span></a>
+            <a class="ri on" href="g-roles.html" title="全局角色"><svg class="ic" viewBox="0 0 24 24"><circle cx="9" cy="8" r="3"/><path d="M3 20a6 6 0 0 1 12 0"/><path d="M16 5.5a3 3 0 0 1 0 5M17 14a6 6 0 0 1 4 6"/></svg><span>角色</span></a>
+            <a class="ri " href="g-workflows.html" title="全局工作流"><svg class="ic" viewBox="0 0 24 24"><circle cx="6" cy="6" r="2.5"/><circle cx="18" cy="6" r="2.5"/><circle cx="12" cy="18" r="2.5"/><path d="M8.5 6h7M7 8.4l4 7.2M17 8.4l-4 7.2"/></svg><span>工作流</span></a>
+            <a class="ri " href="g-blueprints.html" title="团队蓝图"><svg class="ic" viewBox="0 0 24 24"><path d="M12 3l8 4-8 4-8-4z"/><path d="M4 12l8 4 8-4"/><path d="M4 17l8 4 8-4"/></svg><span>蓝图</span></a>
+            <a class="ri " href="g-publish.html" title="发布与全局审计"><svg class="ic" viewBox="0 0 24 24"><path d="M12 16V4M8 8l4-4 4 4"/><path d="M4 16v3a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-3"/></svg><span>发布</span><i class="bdg"></i></a>
+          </nav>
+        </aside>
+
+        <div class="pane">
+<div class="bc">
+  <a href="g-roles.html">全局库</a><span class="sep2">/</span>
+  <a href="g-roles.html">角色</a><span class="sep2">/</span>
+  <span class="cur">实现者</span>
+  <span class="grow"></span>
+  <a href="g-roles.html">← 返回角色库</a>
+</div>
+
+<div class="hd">
+  <div class="hd-l">
+    <h2>实现者<span class="scope"><b>全局</b> · RoleDefinition</span></h2>
+    <p class="sub">
+      <span class="l">用户维护 · v5</span><i class="sep"></i>
+      <span class="l">被 2 个工作流、2 个蓝图引用</span><i class="sep"></i>
+      <span class="l">3 个项目有副本</span>
+      <span class="tr">角色 = 角色设定 + 能力集合；不含流程、任务、成员或会话</span>
+    </p>
+  </div>
+  <div class="hd-r">
+    <button class="btn">编辑</button>
+    <button class="btn primary">发布新版本</button>
+    <button class="ibtn" title="更多"><svg class="ic" viewBox="0 0 24 24"><circle cx="5" cy="12" r="1"/><circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/></svg></button>
+  </div>
+</div>
+
+<div class="bar">
+  <span class="st-chip ok"><span class="dot run"></span>可发布</span>
+  <span class="st-chip">用户维护</span>
+  <span class="st-chip">v5</span>
+  <span class="st-chip">hash 9f3c1a…8b2e</span>
+  <span class="st-chip">3 个项目副本</span>
+  <span class="grow"></span>
+  <span class="muted" style="font-size:12px">最近修改 09-18 14:22</span>
+</div>
+
+<div class="body pad">
+  <div class="cols">
+    <div class="col-main">
+      <div class="sec" style="margin-top:0">
+        <div class="sec-h">角色设定<span class="n">RoleProfile</span></div>
+        <div class="box" style="padding:10px 12px">
+          <div class="meta-grid">
+            <span class="k">身份</span><span class="v">实现者 · 非队长 · 领域执行</span>
+            <span class="k">职责</span><span class="v">按 AC 交付代码与文档，提交可复现证据</span>
+            <span class="k">长期设定</span><span class="v">先读证据再动手；不代替审查者下结论</span>
+            <span class="k">执行偏好</span><span class="v">V4.1 Flash · 兴趣词 结算、TypeScript</span>
+            <span class="k">组织授权</span><span class="v">可派生 1 层 · 每人最多 2 个子成员</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="sec">
+        <div class="sec-h">能力集合<span class="n">召唤时只能收窄</span><span class="r">工具 5 · SkillRef 2 · MCP 2</span></div>
+        <div class="box" style="padding:10px 12px">
+          <div class="meta-grid">
+            <span class="k">允许</span><span class="v"><span class="kws"><span class="kw">read</span><span class="kw">write</span><span class="kw">edit</span><span class="kw">pwsh</span><span class="kw">grep</span></span></span>
+            <span class="k">禁止</span><span class="v"><span class="kws"><span class="kw">task.complete</span><span class="kw">team.disband</span></span></span>
+            <span class="k">MCP</span><span class="v"><span class="kws"><span class="kw">filesystem</span><span class="kw">git</span></span></span>
+          </div>
+          <div style="margin-top:8px">
+            <div class="skillrow"><span class="nm">结算改造</span><span class="r">v3 · SkillRef</span></div>
+            <div class="skillrow"><span class="nm">TypeScript 规范</span><span class="r">v1 · SkillRef</span></div>
+          </div>
+        </div>
+        <p class="note">成员可以再收窄（比如去掉 write），但不能把这里没给的能力加回去。</p>
+      </div>
+
+      <div class="sec">
+        <div class="sec-h">被引用<span class="n">改这里不会自动改项目副本</span></div>
+        <div class="list">
+          <a class="item" href="g-workflows.html">
+            <div class="l"><div class="t">工作流 · 结算单点审查</div><div class="s"><span>T2 · T3 用这个角色</span></div></div>
+            <div class="r">v4</div>
+          </a>
+          <a class="item" href="g-workflows.html">
+            <div class="l"><div class="t">工作流 · 发版检查</div><div class="s"><span>T1 用这个角色</span></div></div>
+            <div class="r">v4</div>
+          </a>
+          <a class="item" href="g-blueprints.html">
+            <div class="l"><div class="t">蓝图 · 结算改造三人组</div><div class="s"><span>实现者 ×2</span></div></div>
+            <div class="r">v3</div>
+          </a>
+          <a class="item" href="g-blueprints.html" style="border-bottom:0">
+            <div class="l"><div class="t">蓝图 · 发版检查小队</div><div class="s"><span>实现者 ×1</span></div></div>
+            <div class="r">v2</div>
+          </a>
+        </div>
+      </div>
+
+      <div class="sec">
+        <div class="sec-h">版本历史<span class="n">每次发布都是新版本</span><span class="r"><a class="link" href="g-publish.html">全局操作记录</a></span></div>
+        <div class="box" style="padding:8px 12px">
+          <div class="skillrow"><span class="nm">v5 · 工具 +pwsh</span><span class="r">09-18 14:22</span></div>
+          <div class="skillrow"><span class="nm">v4 · 技能更新（结算改造 v3）</span><span class="r">09-10 09:05</span></div>
+          <div class="skillrow"><span class="nm">v3 · 初版（从内置实现者 fork）</span><span class="r">08-28 16:40</span></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="col-side">
+      <div class="sec">
+        <div class="sec-h">存储</div>
+        <div class="box" style="padding:8px 12px">
+          <div class="kv"><span class="k">路径</span><span class="v mono-sm">roles/impl.json</span></div>
+          <div class="kv"><span class="k">hash</span><span class="v mono-sm">9f3c1a…8b2e</span></div>
+          <div class="kv"><span class="k">写入</span><span class="v">人类确认后写，记入 global-operations.jsonl</span></div>
+        </div>
+        <p class="note">全局库只对外只读；编辑器里保存也只算提案。</p>
+      </div>
+
+      <div class="sec">
+        <div class="sec-h">项目副本<span class="n">3</span></div>
+        <div class="box" style="padding:8px 12px">
+          <div class="skillrow"><span class="nm">storefront</span><span class="r">v5 · 本地已改</span></div>
+          <div class="skillrow"><span class="nm">结算后台</span><span class="r">v5 · 未改</span></div>
+          <div class="skillrow"><span class="nm">发版线</span><span class="r">v4 · 落后</span></div>
+        </div>
+        <p class="note"><a class="link" href="p-defs.html">打开项目定义副本</a> · 副本要项目里再发布一次才会更新</p>
+      </div>
+
+      <div class="sec">
+        <div class="sec-h">在团队里看实例</div>
+        <div class="box" style="padding:10px 12px">
+          <div class="kv"><span class="k">就在用</span><span class="v">结算页模块化 · 林、周</span></div>
+          <div class="kv"><span class="k">在跑</span><span class="v">t7 · Attempt #2</span></div>
+          <a class="link" href="p-role.html" style="display:inline-block;margin-top:6px">看成员实例 →</a>
+        </div>
+      </div>
+
+      <div class="sec">
+        <div class="sec-h">操作</div>
+        <div style="display:flex;gap:8px">
+          <button class="btn primary" style="flex:1">发布新版本</button>
+          <button class="btn" style="flex:1">复制到项目</button>
+        </div>
+        <button class="btn" style="width:100%;margin-top:8px;color:var(--mt-fail);border-color:color-mix(in srgb, var(--mt-fail) 45%, transparent)">下架角色</button>
+        <p class="note">下架只是不再出现在目录里；已被引用的工作流与蓝图仍能读到这一版。需要人类确认。</p>
+      </div>
+    </div>
+  </div>
+</div>
+        </div>
+      </div>
+    </div>
+  </main>
+</div>
+</body>
+</html>

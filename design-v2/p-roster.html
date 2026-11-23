@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=1280">
 <meta name="dsh-design" content="dshplugin 1280x800">
-<title>名册树 · myteam</title>
+<title>名册 · myteam</title>
 <link rel="stylesheet" href="dsh-shell.css">
 <link rel="stylesheet" href="tokens.css">
 <link rel="stylesheet" href="myteam.css">
@@ -53,113 +53,131 @@
 
         <div class="pane">
 <div class="hd">
-            <div class="hd-l">
-              <h2>storefront<span class="scope"><b>团队视图</b> · 名册树</span></h2>
-              <p class="sub">
-                <span class="l">结算页模块化</span><i class="sep"></i>
-                <span class="l">6 名成员</span><i class="sep"></i>
-                <span class="l">深度上限 2</span><i class="sep"></i>
-                <span class="l">1 个子成员</span>
-                <span class="tr">父子是聘任结构，不是会话嵌套；子成员的能力必须是父成员工具集的子集</span>
-              </p>
-            </div>
-            <div class="hd-r">
-              <button class="btn"><svg class="ic s" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg>召唤成员</button>
-              <button class="ibtn" title="更多"><svg class="ic" viewBox="0 0 24 24"><circle cx="5" cy="12" r="1"/><circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/></svg></button>
-            </div>
-          </div>
+  <div class="hd-l">
+    <h2>storefront<span class="scope"><b>团队视图</b> · 名册</span></h2>
+    <p class="sub">
+      <span class="l">结算页模块化</span><i class="sep"></i>
+      <span class="l">6 名成员 + 1 名子成员</span><i class="sep"></i>
+      <span class="l">1 名队长</span><i class="sep"></i>
+      <span class="l">深度上限 2</span>
+      <span class="tr">一张卡一个角色实例；点卡片看它在做什么、能力和组织关系</span>
+    </p>
+  </div>
+  <div class="hd-r">
+    <button class="btn"><svg class="ic s" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg>召唤成员</button>
+    <button class="ibtn" title="更多"><svg class="ic" viewBox="0 0 24 24"><circle cx="5" cy="12" r="1"/><circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/></svg></button>
+  </div>
+</div>
 
-          <div class="bar">
-            <div class="seg">
-              <a href="p-roster.html" class="on">名册树</a>
-              <a href="p-teams.html">成员列表</a>
-              <a href="p-teams.html">队长任期</a>
-            </div>
-            <span class="grow"></span>
-            <span class="muted" style="font-size:12px">深度 0–2 · 子成员受硬上限</span>
-          </div>
+<div class="bar">
+  <div class="seg">
+    <a href="p-roster.html" class="on">名册卡</a>
+    <a href="p-roster-tree.html">名册树</a>
+    <a href="p-teams.html">成员列表</a>
+  </div>
+  <span class="grow"></span>
+  <span class="muted" style="font-size:12px">深度 0–2 · 子成员受硬上限 · 移除/归档走两段确认</span>
+</div>
 
-          <div class="body pad">
-            <div class="box" style="padding:2px 14px">
-              <div class="tree">
-                <div class="tr-wrap">
-                  <div class="tr">
-                    <span class="av sm">何</span><span class="nm">何</span><span class="role">队长</span><span class="dchip">d0</span>
-                    <span class="meta">generation 1 · 在线 · 6 名成员</span>
-                  </div>
-                </div>
+<div class="body pad">
+  <div class="layer"><b>名册</b><span>7 个 · 队长在前，子成员排在父亲后面</span><i class="rule"></i><a class="link" href="p-roster-tree.html">看结构</a></div>
 
-                <div class="tr-wrap">
-                  <div class="tr d1">
-                    <span class="av sm">林</span><span class="nm">林</span><span class="role">实现者</span><span class="dchip">d1</span>
-                    <span class="meta"><span class="dot run"></span> t7 · Attempt #2</span>
-                  </div>
-                </div>
+  <div class="grid c3">
+    <a class="rcard" href="p-role.html">
+      <div class="rcard-h">
+        <span class="av sm">何</span><span class="nm">何</span>
+        <span class="tag">队长</span><span class="dchip">d0</span>
+        <span class="rp"><svg class="ic s" viewBox="0 0 24 24"><circle cx="5" cy="12" r="1"/><circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/></svg></span>
+      </div>
+      <div class="doing"><span class="dot run"></span><span class="nm">主持 Run 1 · 分配任务</span><span class="tk">gen 1</span></div>
+      <div class="kws"><span class="kw">队长</span><span class="kw">协调</span><span class="kw">V4.1 Flash</span></div>
+      <div class="rcard-foot"><span>6 名成员</span><span>1 个在跑</span><span class="go">查看<svg class="ic s" viewBox="0 0 24 24"><path d="M9 6l6 6-6 6"/></svg></span></div>
+    </a>
 
-                <div class="tr-wrap">
-                  <div class="tr d1">
-                    <span class="av sm">周</span><span class="nm">周</span><span class="role">实现者</span><span class="dchip">d1</span>
-                    <span class="meta"><span class="dot run"></span> t6 · 1 个子成员</span>
-                  </div>
-                </div>
+    <a class="rcard" href="p-role.html">
+      <div class="rcard-h">
+        <span class="av sm">林</span><span class="nm">林</span>
+        <span class="tag">实现者</span><span class="dchip">d1</span>
+        <span class="rp"><svg class="ic s" viewBox="0 0 24 24"><circle cx="5" cy="12" r="1"/><circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/></svg></span>
+      </div>
+      <div class="doing"><span class="dot run"></span><span class="nm">t7 · 替换调用点跑通冒烟</span><span class="tk">#2</span></div>
+      <div class="kws"><span class="kw">TypeScript</span><span class="kw">结算改造 v3</span><span class="kw">+pwsh</span></div>
+      <div class="rcard-foot"><span>0 子成员</span><span>gen 2</span><span class="go">查看<svg class="ic s" viewBox="0 0 24 24"><path d="M9 6l6 6-6 6"/></svg></span></div>
+    </a>
 
-                <div class="tr-wrap">
-                  <div class="tr d2">
-                    <span class="branch"></span>
-                    <span class="av sm">辅</span><span class="nm">周-辅</span><span class="role">实现者</span><span class="dchip max">d2 · 硬上限</span>
-                    <span class="meta">空闲 · 不能继续派生</span>
-                  </div>
-                </div>
+    <a class="rcard" href="p-role.html">
+      <div class="rcard-h">
+        <span class="av sm">周</span><span class="nm">周</span>
+        <span class="tag">实现者</span><span class="dchip">d1</span>
+        <span class="rp"><svg class="ic s" viewBox="0 0 24 24"><circle cx="5" cy="12" r="1"/><circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/></svg></span>
+      </div>
+      <div class="doing"><span class="dot run"></span><span class="nm">t6 · 替换调用点</span><span class="tk">#1</span></div>
+      <div class="kws"><span class="kw">TypeScript</span><span class="kw">结算改造 v3</span><span class="kw">1 个子成员</span></div>
+      <div class="rcard-foot"><span>1 子成员</span><span>gen 1</span><span class="go">查看<svg class="ic s" viewBox="0 0 24 24"><path d="M9 6l6 6-6 6"/></svg></span></div>
+    </a>
 
-                <div class="tr-wrap">
-                  <div class="tr d1" style="background:var(--dsh-hover);margin:0 -14px;padding-left:34px;padding-right:14px">
-                    <span class="av sm">陈</span><span class="nm">陈</span><span class="role">审查者</span><span class="dchip">d1</span>
-                    <span class="meta">2 条待裁决 · 0 个子成员</span>
-                  </div>
-                  <div class="menu" role="menu" aria-label="成员管理" style="top:40px;right:8px">
-                    <div class="mh">陈 · 审查者 · 深度 1</div>
-                    <div class="mi"><svg class="ic s" viewBox="0 0 24 24"><path d="M21 12a8 8 0 0 1-8 8H7l-4 3v-7a8 8 0 0 1 8-8h2a8 8 0 0 1 8 4z"/></svg>指导一下</div>
-                    <div class="mi"><svg class="ic s" viewBox="0 0 24 24"><rect x="7" y="5" width="4" height="14" rx="1"/><rect x="14" y="5" width="4" height="14" rx="1"/></svg>暂停 <span class="muted" style="margin-left:auto;font-size:12px">保留上下文</span></div>
-                    <div class="mi"><svg class="ic s" viewBox="0 0 24 24"><path d="M4 7h16M9 7V5h6v2M6 7l1 13h10l1-13"/></svg>归档 <span class="muted" style="margin-left:auto;font-size:12px">先排空</span></div>
-                    <div class="msep"></div>
-                    <div class="mi danger"><svg class="ic s" viewBox="0 0 24 24"><path d="M6 6l12 12M18 6L6 18"/></svg>移除成员</div>
-                    <div class="mh">影响面：2 条待裁决转回队长；0 个子成员；移除后不保留上下文</div>
-                  </div>
-                </div>
+    <a class="rcard" href="p-role.html">
+      <div class="rcard-h">
+        <span class="av sm">辅</span><span class="nm">周-辅</span>
+        <span class="tag">实现者</span><span class="dchip max">d2 硬上限</span>
+        <span class="rp"><svg class="ic s" viewBox="0 0 24 24"><circle cx="5" cy="12" r="1"/><circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/></svg></span>
+      </div>
+      <div class="doing"><span class="dot idle"></span><span class="nm">空闲 · 不能继续派生</span><span class="tk">子</span></div>
+      <div class="kws"><span class="kw">TypeScript</span><span class="kw">收窄：-write</span></div>
+      <div class="rcard-foot"><span>上级 周</span><span>gen 1</span><span class="go">查看<svg class="ic s" viewBox="0 0 24 24"><path d="M9 6l6 6-6 6"/></svg></span></div>
+    </a>
 
-                <div class="tr-wrap">
-                  <div class="tr d1">
-                    <span class="av sm">苏</span><span class="nm">苏</span><span class="role">需求验证</span><span class="dchip">d1</span>
-                    <span class="meta">空闲</span>
-                  </div>
-                </div>
+    <a class="rcard" href="p-role.html">
+      <div class="rcard-h">
+        <span class="av sm">陈</span><span class="nm">陈</span>
+        <span class="tag">审查者</span><span class="dchip">d1</span>
+        <span class="rp"><svg class="ic s" viewBox="0 0 24 24"><circle cx="5" cy="12" r="1"/><circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/></svg></span>
+      </div>
+      <div class="doing"><span class="dot gate"></span><span class="nm">2 条裁决等你确认</span><span class="tk">gate</span></div>
+      <div class="kws"><span class="kw">审查</span><span class="kw">结算改造 v3</span><span class="kw">V4.1 Flash</span></div>
+      <div class="rcard-foot"><span>0 子成员</span><span>gen 1</span><span class="go">查看<svg class="ic s" viewBox="0 0 24 24"><path d="M9 6l6 6-6 6"/></svg></span></div>
+    </a>
 
-                <div class="tr-wrap" style="border-bottom:0">
-                  <div class="tr d1">
-                    <span class="av sm">赵</span><span class="nm">赵</span><span class="role">api-reviewer</span><span class="dchip">d1</span>
-                    <span class="meta"><span class="dot run"></span> v2</span>
-                  </div>
-                </div>
-              </div>
-            </div>
+    <a class="rcard" href="p-role.html">
+      <div class="rcard-h">
+        <span class="av sm">苏</span><span class="nm">苏</span>
+        <span class="tag">需求验证</span><span class="dchip">d1</span>
+        <span class="rp"><svg class="ic s" viewBox="0 0 24 24"><circle cx="5" cy="12" r="1"/><circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/></svg></span>
+      </div>
+      <div class="doing"><span class="dot idle"></span><span class="nm">空闲 · 等 t8 验收</span><span class="tk">—</span></div>
+      <div class="kws"><span class="kw">AC 核对</span><span class="kw">证据</span></div>
+      <div class="rcard-foot"><span>0 子成员</span><span>gen 1</span><span class="go">查看<svg class="ic s" viewBox="0 0 24 24"><path d="M9 6l6 6-6 6"/></svg></span></div>
+    </a>
 
-            <div class="layer"><b>委派授权</b><span>只收窄，不放宽</span><i class="rule"></i></div>
-            <div class="box">
-              <div class="meta-grid">
-                <span class="k">可派生</span><span class="v">是 · 仅深度 1 成员可派生</span>
-                <span class="k">允许角色</span><span class="v">实现者、审查者</span>
-                <span class="k">深度上限</span><span class="v">2 <span class="tag line">平台硬上限 2</span></span>
-                <span class="k">子成员上限</span><span class="v">每人 2 个</span>
-              </div>
-            </div>
+    <a class="rcard" href="p-role.html">
+      <div class="rcard-h">
+        <span class="av sm">赵</span><span class="nm">赵</span>
+        <span class="tag">api-reviewer</span><span class="dchip">d1</span>
+        <span class="rp"><svg class="ic s" viewBox="0 0 24 24"><circle cx="5" cy="12" r="1"/><circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/></svg></span>
+      </div>
+      <div class="doing"><span class="dot run"></span><span class="nm">v2 · 接口评审</span><span class="tk">#1</span></div>
+      <div class="kws"><span class="kw">插件贡献</span><span class="kw">只读</span></div>
+      <div class="rcard-foot"><span>定义不可改</span><span>gen 1</span><span class="go">查看<svg class="ic s" viewBox="0 0 24 24"><path d="M9 6l6 6-6 6"/></svg></span></div>
+    </a>
 
-            <div class="layer"><b>释放影响面</b><span>有的能直接释放，有的要先处理子成员</span><i class="rule"></i></div>
-            <div class="box">
-              <div class="kv"><span class="v">陈 · 0 个子成员</span><span class="muted" style="margin-left:auto;font-size:12px">可直接归档或移除；2 条待裁决转回队长</span></div>
-              <div class="kv"><span class="v">周 · 1 个子成员（周-辅）</span><span class="muted" style="margin-left:auto;font-size:12px">需先释放子成员，级联释放要二次确认</span></div>
-              <div class="confirm-note" style="margin-top:6px">释放成员不删除记忆 bank 与已提交证据；成员会话只是执行载体，可以重新建会话恢复同名成员，但旧 attemptId 的写入一律拒绝。</div>
-            </div>
-          </div>
+    <a class="rcard add" href="p-roster-tree.html">
+      <svg class="ic" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg>
+      <span>召唤成员</span>
+      <span class="muted" style="font-size:12px">从角色库挑一个角色，能力只能收窄</span>
+    </a>
+  </div>
+
+  <div class="layer"><b>召唤与委派</b><span>只收窄，不放宽</span><i class="rule"></i><a class="link" href="p-roster-tree.html">打开名册树</a></div>
+  <div class="box">
+    <div class="meta-grid">
+      <span class="k">可派生</span><span class="v">是 · 仅深度 1 成员可派生</span>
+      <span class="k">允许角色</span><span class="v">实现者、审查者</span>
+      <span class="k">深度上限</span><span class="v">2 <span class="tag line">平台硬上限</span></span>
+      <span class="k">子成员上限</span><span class="v">每人 2 个</span>
+    </div>
+    <div class="confirm-note" style="margin-top:8px">暂停保留上下文；归档要先排空；移除不删除记忆 bank 与已提交证据。三个动作都要两段确认，影响面在确认前先摊开。</div>
+  </div>
+</div>
         </div>
       </div>
     </div>
