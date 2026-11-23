@@ -1,0 +1,170 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=1280">
+<meta name="dsh-design" content="dshplugin 1280x800">
+<title>从蓝图建团队 · myteam</title>
+<link rel="stylesheet" href="dsh-shell.css">
+<link rel="stylesheet" href="tokens.css">
+<link rel="stylesheet" href="myteam.css">
+<!-- 外框（DSH 插件 · 会话标签页）：只改 data-slot 里面，别动外框的结构、文字和 dsh-shell.css -->
+</head>
+<body>
+<div class="dsh-app" data-frame="dsh/view">
+  <aside class="dsh-side">
+    <div class="dsh-brand"><div class="dsh-logo">deepseek<span class="dsh-logo-tag">HARNESS</span></div><div class="dsh-iconbtn"><svg class="dsh-i" viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M9 3v18"/></svg></div></div>
+    <div class="dsh-new"><svg class="dsh-i" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 8v8M8 12h8"/></svg>新会话</div>
+    <nav class="dsh-nav">
+      <div class="dsh-row"><svg class="dsh-i" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2.5l3 3-3 3-3-3zM18.5 9l3 3-3 3-3-3zM5.5 9l3 3-3 3-3-3zM12 15.5l3 3-3 3-3-3z"/></svg>插件</div>
+      <div class="dsh-row"><svg class="dsh-i" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>自动化任务</div>
+      <div class="dsh-row"><svg class="dsh-i" viewBox="0 0 24 24" aria-hidden="true"><rect x="4" y="4" width="6" height="6" rx="1.5"/><rect x="14" y="4" width="6" height="6" rx="3"/><rect x="4" y="14" width="6" height="6" rx="1.5"/><rect x="14" y="14" width="6" height="6" rx="1.5"/></svg>更多</div>
+    </nav>
+    <div class="dsh-sec">工作区<div class="dsh-sec-acts"><div class="dsh-iconbtn"><svg class="dsh-i" viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="M20 20l-4-4"/></svg></div><div class="dsh-iconbtn"><svg class="dsh-i" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 8h10M18 8h2M4 16h2M10 16h10"/><circle cx="16" cy="8" r="2"/><circle cx="8" cy="16" r="2"/></svg></div><div class="dsh-iconbtn"><svg class="dsh-i" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><path d="M12 11v5M9.5 13.5h5"/></svg></div></div></div>
+    <div class="dsh-row"><span class="dsh-folder"><svg class="dsh-i" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></svg></span>我的项目</div>
+    <div class="dsh-sess on">整理会议记录<span class="dsh-time">2 小时</span></div>
+    <div class="dsh-sess">新会话</div>
+    <div class="dsh-acct"><div class="dsh-avatar">我</div>我的账号</div>
+  </aside>
+  <main class="dsh-main">
+    <header class="dsh-head">
+      <div class="dsh-crumbs">整理会议记录<span class="dsh-mode">标准模式<svg class="dsh-i" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg></span></div>
+      <div class="dsh-utils"><div class="dsh-split"><svg class="dsh-i" viewBox="0 0 24 24" aria-hidden="true"><path d="M9 8l-4 4 4 4M15 8l4 4-4 4"/></svg><svg class="dsh-i" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg></div><div class="dsh-iconbtn"><svg class="dsh-i" viewBox="0 0 24 24" aria-hidden="true"><circle cx="5" cy="12" r="1"/><circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/></svg></div></div>
+      <div class="dsh-iconbtn dsh-corner"><svg class="dsh-i" viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M15 3v18"/></svg></div>
+      <div class="dsh-tabs" role="tablist"><div class="dsh-tab">对话</div><div class="dsh-tab">轨迹</div><div class="dsh-tab on"><span data-slot="tab-label">团队视图</span></div></div>
+    </header>
+    <div data-slot="main">
+      <div class="wt">
+        <aside class="ir">
+          <a class="team" href="p-overview.html" title="项目 storefront · 切换项目" style="font-family:var(--dsh-font-code);font-size:12px">st</a>
+          <div class="line"></div>
+          <nav class="ir-nav">
+            <a class="ri on" href="p-overview.html" title="概览"><svg class="ic" viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/></svg><span>概览</span></a>
+            <a class="ri " href="p-tasks.html" title="任务与看板"><svg class="ic" viewBox="0 0 24 24"><rect x="3" y="4" width="5" height="16" rx="1.5"/><rect x="10" y="4" width="5" height="11" rx="1.5"/><rect x="17" y="4" width="4" height="7" rx="1.5"/></svg><span>任务</span><i class="bdg"></i></a>
+            <a class="ri " href="p-teams.html" title="团队与成员"><svg class="ic" viewBox="0 0 24 24"><circle cx="9" cy="8" r="3"/><path d="M3 20a6 6 0 0 1 12 0"/><path d="M16 5.5a3 3 0 0 1 0 5M17 14a6 6 0 0 1 4 6"/></svg><span>团队</span></a>
+            <a class="ri " href="p-runs.html" title="工作流运行"><svg class="ic" viewBox="0 0 24 24"><circle cx="6" cy="6" r="2.5"/><circle cx="18" cy="6" r="2.5"/><circle cx="12" cy="18" r="2.5"/><path d="M8.5 6h7M7 8.4l4 7.2M17 8.4l-4 7.2"/></svg><span>流程</span></a>
+            <a class="ri " href="p-defs.html" title="项目定义"><svg class="ic" viewBox="0 0 24 24"><path d="M12 3l8 4-8 4-8-4z"/><path d="M4 12l8 4 8-4"/><path d="M4 17l8 4 8-4"/></svg><span>定义</span></a>
+            <a class="ri " href="p-knowledge.html" title="项目知识"><svg class="ic" viewBox="0 0 24 24"><path d="M4 5.5A2.5 2.5 0 0 1 6.5 3H19v16H6.5A2.5 2.5 0 0 0 4 21.5z"/><path d="M8 7h7M8 11h5"/></svg><span>知识</span></a>
+            <a class="ri " href="p-memory.html" title="长期记忆"><svg class="ic" viewBox="0 0 24 24"><ellipse cx="12" cy="6" rx="7" ry="3"/><path d="M5 6v6c0 1.7 3.1 3 7 3s7-1.3 7-3V6"/><path d="M5 12v6c0 1.7 3.1 3 7 3s7-1.3 7-3v-6"/></svg><span>记忆</span></a>
+            <a class="ri " href="p-audit.html" title="审计"><svg class="ic" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg><span>审计</span></a>
+            <a class="ri " href="p-settings.html" title="项目设置"><svg class="ic" viewBox="0 0 24 24"><path d="M4 8h10M18 8h2M4 16h2M10 16h10"/><circle cx="16" cy="8" r="2"/><circle cx="8" cy="16" r="2"/></svg><span>设置</span></a>
+          </nav>
+        </aside>
+
+        <div class="pane">
+<div class="bc">
+  <a href="p-teams.html">团队</a><span class="sep2">/</span>
+  <span class="cur">从蓝图建团队</span>
+  <span class="grow"></span>
+  <a href="p-teams.html">← 返回团队</a>
+</div>
+
+<div class="hd">
+  <div class="hd-l">
+    <h2>从蓝图建团队<span class="scope"><b>团队视图</b> · 建团向导</span></h2>
+    <p class="sub">
+      <span class="l">步骤 2 / 3</span><i class="sep"></i>
+      <span class="l">蓝图 结算改造三人组 v3</span><i class="sep"></i>
+      <span class="l">将创建 5 名成员</span>
+      <span class="tr">先落一份计划；你批准之后才建会话与开 Run</span>
+    </p>
+  </div>
+  <div class="hd-r">
+    <a class="btn primary" href="p-approval.html" style="text-decoration:none">下一步：确认计划</a>
+    <a class="btn" href="p-teams.html" style="text-decoration:none">取消</a>
+  </div>
+</div>
+
+<div class="bar">
+  <div class="seg">
+    <a href="g-blueprints.html">1 选蓝图</a>
+    <a href="p-team-new.html" class="on">2 队形与角色</a>
+    <a href="p-approval.html">3 确认开跑</a>
+  </div>
+  <span class="grow"></span>
+  <span class="muted" style="font-size:12px">影响面先看后确认 · 批准前不产生会话与花费</span>
+</div>
+
+<div class="body pad">
+  <div class="cols">
+    <div class="col-main">
+      <div class="sec" style="margin-top:0">
+        <div class="sec-h">队形<span class="n">来自蓝图，可改</span><span class="r">改的是团队的副本</span></div>
+        <div class="box" style="padding:10px 12px">
+          <div class="kv"><span class="v">队长 <span class="mono-sm">captain</span></span><span style="margin-left:auto;display:flex;gap:6px;align-items:center"><button class="btn" type="button">−</button><b class="mono-sm">×1</b><button class="btn" type="button" disabled>+</button></span></div>
+          <div class="kv"><span class="v">实现者 <span class="mono-sm">impl</span></span><span style="margin-left:auto;display:flex;gap:6px;align-items:center"><button class="btn" type="button">−</button><b class="mono-sm">×2</b><button class="btn" type="button">+</button></span></div>
+          <div class="kv"><span class="v">审查者 <span class="mono-sm">reviewer</span></span><span style="margin-left:auto;display:flex;gap:6px;align-items:center"><button class="btn" type="button">−</button><b class="mono-sm">×1</b><button class="btn" type="button">+</button></span></div>
+          <div class="kv"><span class="v">需求验证 <span class="mono-sm">verifier</span></span><span style="margin-left:auto;display:flex;gap:6px;align-items:center"><button class="btn" type="button">−</button><b class="mono-sm">×1</b><button class="btn" type="button">+</button></span></div>
+        </div>
+        <p class="note">队长不可减、不可加（每队一个任期）；子成员不在这一步建，由队长后续派生，深度上限 2。</p>
+      </div>
+
+      <div class="sec">
+        <div class="sec-h">默认工作流<span class="n">第一次开 Run 用</span></div>
+        <div style="display:flex;flex-direction:column;gap:8px">
+          <div class="pick on">
+            <span class="radio"></span>
+            <div>
+              <div class="t">结算单点审查 <span class="st-chip ok">v2</span></div>
+              <div class="d">4 个 TaskTemplate · 门禁 3 道 · 蓝图默认</div>
+            </div>
+          </div>
+          <div class="pick">
+            <span class="radio"></span>
+            <div>
+              <div class="t">发版检查 <span class="st-chip">v3</span></div>
+              <div class="d">5 个 TaskTemplate · 门禁 2 道 · 可选</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="sec">
+        <div class="sec-h">默认配置<span class="n">来自蓝图</span></div>
+        <div class="box" style="padding:10px 12px">
+          <div class="meta-grid">
+            <span class="k">看板</span><span class="v">待规划 · 待认领 · 进行中 · 待评审 · 已完成</span>
+            <span class="k">泳道</span><span class="v">按成员</span>
+            <span class="k">门禁链</span><span class="v">命令验证 → 审查 → 存档</span>
+            <span class="k">并发</span><span class="v">3 个成员（硬上限 4）</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="col-side">
+      <div class="sec">
+        <div class="sec-h">会发生什么</div>
+        <div class="act-card">
+          <ul class="imp">
+            <li><svg class="ic s" viewBox="0 0 24 24"><path d="M12 3l9 16H3z"/><path d="M12 9v4M12 16v.5"/></svg>生成团队计划与 5 个成员占位</li>
+            <li><svg class="ic s" viewBox="0 0 24 24"><path d="M12 3l9 16H3z"/><path d="M12 9v4M12 16v.5"/></svg>进入「待你确认」；批准后才建 5 个会话</li>
+            <li><svg class="ic s" viewBox="0 0 24 24"><path d="M12 3l9 16H3z"/><path d="M12 9v4M12 16v.5"/></svg>批准后开 Run 1，按模板落第一批任务</li>
+            <li><svg class="ic s" viewBox="0 0 24 24"><path d="M12 3l9 16H3z"/><path d="M12 9v4M12 16v.5"/></svg>不批准：不产生会话，也不花钱</li>
+          </ul>
+        </div>
+      </div>
+
+      <div class="sec">
+        <div class="sec-h">下一步</div>
+        <div class="box" style="padding:10px 12px">
+          <div class="kv"><span class="k">3 确认</span><span class="v">计划批准（人类专属）</span></div>
+          <div class="kv"><span class="k">之后</span><span class="v">队长接手，按工作流派第一批任务</span></div>
+          <a class="link" href="p-approval.html" style="display:inline-block;margin-top:6px">先去待确认 →</a>
+        </div>
+      </div>
+
+      <div class="sec">
+        <div class="sec-h">想改蓝图？</div>
+        <p class="note">这里改的是团队副本；要改默认值，去<a class="link" href="g-blueprint.html">蓝图详情</a>编辑并发布。插件贡献的蓝图不能改，只能复制。</p>
+      </div>
+    </div>
+  </div>
+</div>
+        </div>
+      </div>
+    </div>
+  </main>
+</div>
+</body>
+</html>

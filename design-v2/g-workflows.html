@@ -45,111 +45,95 @@
 
         <div class="pane">
 <div class="hd">
-            <div class="hd-l">
-              <h2>工作流<span class="scope"><b>全局</b> · WorkflowDefinition</span></h2>
-              <p class="sub">
-                <span class="l">4 个</span><i class="sep"></i>
-                <span class="l">被 3 个蓝图引用</span><i class="sep"></i>
-                <span class="l">定义不含真实任务</span>
-                <span class="tr">定义只有 TaskTemplate、初始依赖与完成条件；实例化后才会在项目里生成 Run 与任务</span>
-              </p>
-            </div>
-            <div class="hd-r">
-              <button class="btn"><svg class="ic s" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg>新建工作流</button>
-              <button class="ibtn" title="更多"><svg class="ic" viewBox="0 0 24 24"><circle cx="5" cy="12" r="1"/><circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/></svg></button>
-            </div>
-          </div>
+  <div class="hd-l">
+    <h2>工作流<span class="scope"><b>全局</b> · WorkflowDefinition</span></h2>
+    <p class="sub">
+      <span class="l">4 个</span><i class="sep"></i>
+      <span class="l">用户 3 · 内置 1</span><i class="sep"></i>
+      <span class="l">被 3 个蓝图引用</span>
+      <span class="tr">定义只有 TaskTemplate、初始依赖与完成条件；实例化后才在项目里生成 Run 与任务</span>
+    </p>
+  </div>
+  <div class="hd-r">
+    <button class="btn"><svg class="ic s" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg>新建工作流</button>
+    <button class="ibtn" title="更多"><svg class="ic" viewBox="0 0 24 24"><circle cx="5" cy="12" r="1"/><circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/></svg></button>
+  </div>
+</div>
 
-          <div class="bar">
-            <div class="seg">
-              <a href="g-workflows.html" class="on">全部 4</a>
-              <a href="g-workflows.html">用户 3</a>
-              <a href="g-workflows.html">内置 1</a>
-              <a href="g-publish.html">发布 1</a>
-            </div>
-            <span class="grow"></span>
-            <label class="field w"><svg class="ic s" viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="M20 20l-4-4"/></svg><input placeholder="搜索工作流、模板键" aria-label="搜索工作流"></label>
-          </div>
+<div class="bar">
+  <div class="seg">
+    <a href="g-workflows.html" class="on">全部 4</a>
+    <a href="g-workflows.html">用户 3</a>
+    <a href="g-workflows.html">内置 1</a>
+    <a href="g-publish.html">发布 1</a>
+  </div>
+  <span class="grow"></span>
+  <label class="field w"><svg class="ic s" viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="M20 20l-4-4"/></svg><input placeholder="搜索工作流、模板键" aria-label="搜索工作流"></label>
+</div>
 
-          <div class="md">
-            <div class="md-list">
-              <a class="md-item on" href="g-workflows.html">
-                <div class="t">结算单点审查<span class="tag line">用户</span><span class="st-chip" style="margin-left:auto">v2</span></div>
-                <div class="s"><span>4 个 TaskTemplate</span><span>门禁 3 道</span><span>被 1 个蓝图引用</span></div>
-              </a>
-              <a class="md-item" href="g-workflows.html">
-                <div class="t">发版检查<span class="tag line">用户</span><span class="st-chip" style="margin-left:auto">v3</span></div>
-                <div class="s"><span>5 个 TaskTemplate</span><span>门禁 2 道</span><span>被 2 个蓝图引用</span></div>
-              </a>
-              <a class="md-item" href="g-workflows.html">
-                <div class="t">文档整理<span class="tag line">用户</span><span class="st-chip" style="margin-left:auto">v1</span></div>
-                <div class="s"><span>3 个 TaskTemplate</span><span>门禁 2 道</span><span>未被引用</span></div>
-              </a>
-              <a class="md-item" href="g-workflows.html">
-                <div class="t">极简任务<span class="tag line">内置</span><span class="st-chip" style="margin-left:auto">v1</span></div>
-                <div class="s"><span>1 个 TaskTemplate</span><span>门禁 1 道</span><span>蓝图固定引用</span></div>
-              </a>
-            </div>
+<div class="body pad">
+  <div class="layer"><b>工作流库</b><span>4 张卡 · 点卡片看定义</span><i class="rule"></i><a class="link" href="g-publish.html">最近写入</a></div>
 
-            <div class="md-detail">
-              <div class="md-h">
-                <span class="nm">结算单点审查</span>
-                <span class="st-chip">用户维护</span>
-                <span class="st-chip ok">v2</span>
-                <span class="grow"></span>
-                <button class="btn">编辑</button>
-              </div>
-              <p class="md-sub">最近修改 09-16 10:05 · 被 1 个蓝图引用 · 2 个项目有副本</p>
+  <div class="grid c3">
+    <a class="rcard" href="g-workflow.html">
+      <div class="rcard-h">
+        <span class="av sm">审</span><span class="nm">结算单点审查</span>
+        <span class="tag line">用户</span><span class="st-chip">v2</span>
+        <span class="rp"><svg class="ic s" viewBox="0 0 24 24"><circle cx="5" cy="12" r="1"/><circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/></svg></span>
+      </div>
+      <div class="id">settlement-review</div>
+      <div class="kws"><span class="kw">4 个 TaskTemplate</span><span class="kw">门禁 3 道</span><span class="kw">4 个角色</span></div>
+      <div class="rcard-foot"><span>蓝图 1 · 副本 2</span><span>1 个本地已改</span><span class="go">定义<svg class="ic s" viewBox="0 0 24 24"><path d="M9 6l6 6-6 6"/></svg></span></div>
+    </a>
 
-              <div class="sec" style="margin-top:14px">
-                <div class="sec-h">目标与完成条件</div>
-                <div class="meta-grid">
-                  <span class="k">目标</span><span class="v">一次改造：先把边界写成契约，再实现，最后独立审查并存档</span>
-                  <span class="k">完成条件</span><span class="v">全部 TaskTemplate 实例化后的 AC 均有证据，且门禁链存档完成</span>
-                  <span class="k">门禁链</span><span class="v">命令验证 › 审查 › 存档</span>
-                </div>
-              </div>
+    <a class="rcard" href="g-workflow.html">
+      <div class="rcard-h">
+        <span class="av sm">版</span><span class="nm">发版检查</span>
+        <span class="tag line">用户</span><span class="st-chip">v3</span>
+        <span class="rp"><svg class="ic s" viewBox="0 0 24 24"><circle cx="5" cy="12" r="1"/><circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/></svg></span>
+      </div>
+      <div class="id">release-check</div>
+      <div class="kws"><span class="kw">5 个 TaskTemplate</span><span class="kw">门禁 2 道</span><span class="kw">3 个角色</span></div>
+      <div class="rcard-foot"><span>蓝图 2 · 副本 1</span><span>未改</span><span class="go">定义<svg class="ic s" viewBox="0 0 24 24"><path d="M9 6l6 6-6 6"/></svg></span></div>
+    </a>
 
-              <div class="sec">
-                <div class="sec-h">TaskTemplate<span class="n">4 个 · 不含真实任务</span></div>
-                <div class="list">
-                  <div class="item">
-                    <div class="l"><div class="t"><span class="mono-sm">T1</span> 定契约</div><div class="s"><span>实现者</span><span>无前置</span><span>门禁 命令验证</span></div></div>
-                    <div class="r">1 AC</div>
-                  </div>
-                  <div class="item">
-                    <div class="l"><div class="t"><span class="mono-sm">T2</span> 实现</div><div class="s"><span>实现者 ×2</span><span>依赖 T1</span><span>门禁 命令验证 › 审查</span></div></div>
-                    <div class="r">3 AC</div>
-                  </div>
-                  <div class="item">
-                    <div class="l"><div class="t"><span class="mono-sm">T3</span> 独立审查</div><div class="s"><span>审查者</span><span>依赖 T2</span><span>门禁 交叉审查</span></div></div>
-                    <div class="r">2 AC</div>
-                  </div>
-                  <div class="item">
-                    <div class="l"><div class="t"><span class="mono-sm">T4</span> 存档</div><div class="s"><span>需求验证</span><span>依赖 T3</span><span>门禁 存档</span></div></div>
-                    <div class="r">1 AC</div>
-                  </div>
-                </div>
-              </div>
+    <a class="rcard" href="g-workflow.html">
+      <div class="rcard-h">
+        <span class="av sm">档</span><span class="nm">文档整理</span>
+        <span class="tag line">用户</span><span class="st-chip">v1</span>
+        <span class="rp"><svg class="ic s" viewBox="0 0 24 24"><circle cx="5" cy="12" r="1"/><circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/></svg></span>
+      </div>
+      <div class="id">doc-sweep</div>
+      <div class="kws"><span class="kw">3 个 TaskTemplate</span><span class="kw">门禁 2 道</span><span class="kw">2 个角色</span></div>
+      <div class="rcard-foot"><span>未被引用</span><span>副本 0</span><span class="go">定义<svg class="ic s" viewBox="0 0 24 24"><path d="M9 6l6 6-6 6"/></svg></span></div>
+    </a>
 
-              <div class="sec">
-                <div class="sec-h">角色要求</div>
-                <div class="kws">
-                  <span class="kw">实现者 ×2</span><span class="kw">审查者</span><span class="kw">需求验证</span>
-                </div>
-                <div class="confirm-note" style="margin-top:6px">角色只保存引用；角色定义改了不会自动改这个工作流，也不会改已实例化的 Run。</div>
-              </div>
+    <a class="rcard" href="g-workflow.html">
+      <div class="rcard-h">
+        <span class="av sm">简</span><span class="nm">极简任务</span>
+        <span class="tag line">内置</span><span class="st-chip">v1</span>
+        <span class="rp"><svg class="ic s" viewBox="0 0 24 24"><circle cx="5" cy="12" r="1"/><circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/></svg></span>
+      </div>
+      <div class="id">single-task</div>
+      <div class="kws"><span class="kw">1 个 TaskTemplate</span><span class="kw">门禁 1 道</span><span class="kw">1 个角色</span></div>
+      <div class="rcard-foot"><span>蓝图固定引用</span><span>不可改</span><span class="go">定义<svg class="ic s" viewBox="0 0 24 24"><path d="M9 6l6 6-6 6"/></svg></span></div>
+    </a>
 
-              <div class="sec">
-                <div class="sec-h">存储</div>
-                <div class="meta-grid">
-                  <span class="k">路径</span><span class="v mono-sm">workflows/结算单点审查.json</span>
-                  <span class="k">内容 hash</span><span class="v mono-sm">41be07…c9d4</span>
-                  <span class="k">项目副本</span><span class="v">storefront（本地已改，可发布）· 另 1 个未改</span>
-                </div>
-              </div>
-            </div>
-          </div>
+    <a class="rcard add" href="g-workflows.html">
+      <svg class="ic" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg>
+      <span>新建工作流</span>
+      <span class="muted" style="font-size:12px">从空白或复制现成的工作流；保存算提案</span>
+    </a>
+  </div>
+
+  <div class="box" style="margin-top:14px">
+    <div class="meta-grid">
+      <span class="k">定义里有什么</span><span class="v">TaskTemplate（标题、角色要求、初始依赖、门禁、AC）+ 完成条件；不含真实任务、不含 Run</span>
+      <span class="k">实例化</span><span class="v">蓝图或项目里开 Run 时，才按模板生成任务；之后改定义不会改已在跑的 Run</span>
+      <span class="k">写入</span><span class="v">全部对外只读；发布到 <span class="mono-sm">$DSH_HOME/myteam</span> 要人类确认</span>
+    </div>
+  </div>
+</div>
         </div>
       </div>
     </div>
