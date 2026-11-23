@@ -150,6 +150,20 @@ function collectText(node: unknown, out: string[] = []): string[] {
   return out
 }
 
+/** 把渲染树里每个元素的 className 收集出来（拼好的字符串，含三元分支）。 */
+function collectClassNames(node: unknown, out: string[] = []): string[] {
+  if (Array.isArray(node)) {
+    for (const item of node) collectClassNames(item, out)
+    return out
+  }
+  if (node === null || typeof node !== 'object') return out
+  const element = node as ElementLike
+  const className = element.props?.className
+  if (typeof className === 'string') out.push(className)
+  if (element.props !== undefined) collectClassNames(element.props.children, out)
+  if (element.children !== undefined) collectClassNames(element.children, out)
+  return out
+}
 function textOf(node: unknown): string {
   return collectText(node).join('')
 }
@@ -1119,4 +1133,64 @@ test('L2-H 蓝图详情：解析不到的引用要标缺失（不是照样列 id
   } finally {
     harness.restore()
   }
+})
+
+test('样式来源守卫：渲染出来的每个类名都定义在仓库 design-v2 里（不是打包副本）', async () => {
+  // 这条是踩过坑才加的：包内 plugin/design-v2 是 build 从仓库 design-v2 **拷出来**的生成物，
+  // 每次 build 都会 rmSync 重建。把新样式写进包内副本，下一次 build 就静默丢了 ——
+  // t39 只看文本照样全绿，真机上面板少一条样式也没人发现。所以直接守源文件。
+  const cssSource =
+    readFileSync(join(ROOT, '..', 'design-v2', 'myteam.css'), 'utf8') +
+    readFileSync(join(ROOT, '..', 'design-v2', 'tokens.css'), 'utf8')
+  // 从**渲染结果**里取类名：三元/拼接出来的修饰类（'kw miss'）只有这样才看得见。
+  const fixtures = JSON.parse(JSON.stringify(FILLED)) as Record<string, unknown>
+  fixtures.globalLibrary = {
+    root: '/g/myteam',
+    exists: true,
+    counts: { role: 1, workflow: 1, blueprint: 1, team: 0 },
+    warnings: [],
+    entries: [
+      { kind: 'role', id: 'role_1', name: '实现者', revision: 1, file: 'roles/role_1.json', legacy: false, content: {} },
+      {
+        kind: 'blueprint',
+        id: 'bp_1',
+        name: '两人小队',
+        revision: 1,
+        file: 'team-blueprints/bp_1.json',
+        legacy: false,
+        content: { formation: [{ roleId: 'role_gone' }], workflows: ['wf_gone'], defaults: {} },
+      },
+    ],
+  }
+  const harness = loadClient(fixtures)
+  const tokens = new Set<string>()
+  const soak = (node: unknown): void => {
+    for (const name of collectClassNames(node)) {
+      for (const token of name.split(/\s+/)) if (token !== '') tokens.add(token)
+    }
+  }
+  try {
+    soak(await mount(harness.view, { sessionId: 'ses_1' }))
+    let panelTree = await mount(harness.panel, { ctx: { slots: { register: () => () => undefined } } })
+    soak(panelTree)
+    // 走到「蓝图详情 + 引用缺失」这条路上：`kw miss` 只在这里出现。
+    const bpTab = findTab(panelTree, '蓝图')
+    ;(bpTab!.props.onClick as () => void)()
+    panelTree = await mount(harness.panel, { ctx: { slots: { register: () => () => undefined } } })
+    const row = findByClass(panelTree, 'item pick')
+    ;(row!.props.onClick as () => void)()
+    for (let round = 0; round < 6; round += 1) {
+      panelTree = await mount(harness.panel, { ctx: { slots: { register: () => () => undefined } } })
+      soak(panelTree)
+      if (textOf(panelTree).includes('缺失')) break
+    }
+    assert.ok(tokens.has('miss'), `应渲染出缺失标记的修饰类（实际类名里没有 miss）：${[...tokens].sort().join(' ')}`)
+  } finally {
+    harness.restore()
+  }
+  assert.ok(tokens.size > 40, `应收集到足够的类名（实际 ${tokens.size}）`)
+  const missing = [...tokens]
+    .filter((token) => !new RegExp('\\.' + token.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '(?![\\w-])').test(cssSource))
+    .sort()
+  assert.deepEqual(missing, [], `这些类名在 design-v2 里没有规则（样式会静默丢失）：${missing.join(', ')}`)
 })
