@@ -23,7 +23,7 @@ import { assertBlueprintResolvable } from '../domain/definitions/blueprint.ts'
 import { authorize } from '../domain/permissions/policy.ts'
 import { cycleIfEdgesChanged, graphOf } from '../domain/tasks/dag.ts'
 import { assertCurrentAttempt, createPlannedTask, isClaimable } from '../domain/tasks/task.ts'
-import { appointMember, assertMemberActive, assertMemberLimits, memberDepth } from '../domain/teams/member.ts'
+import { appointMember, assertMemberActive, assertMemberLimits, assertMemberStatusChange, memberDepth } from '../domain/teams/member.ts'
 import { assertGraphRevision, assertTeamActive, assertTeamStatusChange, createTeam } from '../domain/teams/team.ts'
 import type { CommitResult, DraftEvent, ProjectRuntime } from './project-runtime.ts'
 
@@ -403,6 +403,51 @@ export function appointMemberCommand(
     entityRevision: 1,
     configRevision: team.configRevision,
     payload: { member, roleRevision: role.revision, parentMemberId: member.parentMemberId },
+  }
+  return runtime.commit([draft])
+}
+
+/**
+ * 释放成员（`released` 是终态，释放后不能再变）。
+ *
+ * 为什么要有这个命令：`MemberStatus` 里一直有 `released`、事件类型里也有
+ * `member.released`，但没有任何命令能把它写出来 —— 释放/归档成员的屏因此只能看不能动。
+ *
+ * 前置：团队 active；成员属于该团队；成员**没有进行中的尝试**（先收尾再释放，
+ * 否则释放后尝试会挂在一个已经不存在的任期上）；状态迁移按 MEMBER_TRANSITIONS 走。
+ */
+export function releaseMemberCommand(
+  runtime: ProjectRuntime,
+  input: { actor: ActorRef; teamId: string; memberId: string },
+): CommitResult {
+  const state = runtime.state
+  const team = state.teams.get(input.teamId)
+  if (team === undefined) fail(ERROR_CODES.NOT_FOUND, '团队不存在', { details: { teamId: input.teamId } })
+  authorize('member.release', input.actor, { teamId: input.teamId })
+  assertTeamActive(team)
+
+  const member = state.members.get(input.memberId)
+  if (member === undefined || member.teamId !== input.teamId) {
+    fail(ERROR_CODES.NOT_FOUND, '成员不存在', { details: { memberId: input.memberId, teamId: input.teamId } })
+  }
+  assertMemberStatusChange(member.status, 'released')
+
+  const activeAttempts = [...state.attempts.values()].filter(
+    (attempt) => attempt.memberId === member.id && attempt.status === 'active',
+  )
+  if (activeAttempts.length > 0) {
+    fail(ERROR_CODES.CONFLICT, '成员还有进行中的尝试，先收尾或取消再释放', {
+      details: { memberId: member.id, attemptIds: activeAttempts.map((attempt) => attempt.id) },
+    })
+  }
+
+  const revision = member.revision + 1
+  const draft: DraftEvent = {
+    type: 'member.released',
+    actor: input.actor,
+    entity: { kind: 'member', id: member.id, teamId: team.id },
+    entityRevision: revision,
+    payload: { teamId: team.id, memberId: member.id, revision },
   }
   return runtime.commit([draft])
 }

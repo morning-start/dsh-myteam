@@ -20,7 +20,7 @@ import { ERROR_CODES, fail } from '../contracts/errors.ts'
 import type { GlobalPublicationPort, PublicationKind } from '../contracts/publication.ts'
 import { HumanAuthorizer } from '../domain/permissions/human-authorizer.ts'
 import type { HumanConfirmation } from '../domain/permissions/human-authorizer.ts'
-import { createTaskCommand } from './commands.ts'
+import { createTaskCommand, releaseMemberCommand } from './commands.ts'
 import { forgetMemory, rememberMemory } from './memory-commands.ts'
 import type { MemoryPort } from './ports.ts'
 import { confirmDefinitionPublication, requestDefinitionPublication } from './publication.ts'
@@ -34,6 +34,7 @@ export const PANEL_WRITE_METHODS = [
   'captainTakeover',
   'gateVerdict',
   'taskCreate',
+  'memberRelease',
   'definitionPublish',
   'memoryRemember',
   'memoryForget',
@@ -57,6 +58,7 @@ export const PANEL_WRITE_KINDS: Readonly<Record<PanelWriteMethod, PanelWriteKind
   captainTakeover: 'token',
   gateVerdict: 'direct',
   taskCreate: 'direct',
+  memberRelease: 'direct',
   definitionPublish: 'token',
   memoryRemember: 'direct',
   memoryForget: 'direct',
@@ -78,6 +80,7 @@ export const PANEL_WRITE_DOCS: Readonly<Record<PanelWriteMethod, string>> = {
   captainTakeover: '队长接管：预览世代递增与生效成员，凭一次性令牌执行。动作 `captain.takeover`（人类专属）。',
   gateVerdict: '门禁裁决：对评审中的任务写入 pass / fail / blocked 与检查结果，需 `confirm: true`。',
   taskCreate: '新建任务：标题、验收标准、依赖与所需角色，建在指定团队下，需 `confirm: true`。',
+  memberRelease: '释放成员（终态）：成员不能有进行中的尝试；释放后不再接活，需 `confirm: true`。',
   definitionPublish: '发布定义到全局库：预览引用与覆盖影响面，凭一次性令牌执行。动作 `definition.publish.confirm`（人类专属）。',
   memoryRemember: '写一条长期记忆到团队 bank 或某个成员 bank，需 `confirm: true`。',
   memoryForget: '遗忘一条记忆（默认软删留痕，`hard` 才真删），需 `confirm: true`。',
@@ -288,6 +291,8 @@ export function previewPanelWrite(
       fail(ERROR_CODES.INVALID_COMMAND, 'gateVerdict 不走确认令牌：直接带 confirm: true 提交（见 applyDirectPanelWrite）')
     case 'taskCreate':
       fail(ERROR_CODES.INVALID_COMMAND, 'taskCreate 不走确认令牌：直接带 confirm: true 提交（见 applyDirectPanelWrite）')
+    case 'memberRelease':
+      fail(ERROR_CODES.INVALID_COMMAND, 'memberRelease 不走确认令牌：直接带 confirm: true 提交（见 applyDirectPanelWrite）')
     case 'memoryRemember':
     case 'memoryForget':
       fail(ERROR_CODES.INVALID_COMMAND, `${method} 不走确认令牌：直接带 confirm: true 提交（见 applyDirectPanelWrite）`)
@@ -358,6 +363,8 @@ export function applyPanelWrite(
       fail(ERROR_CODES.INVALID_COMMAND, 'gateVerdict 不使用确认令牌，请走 applyDirectPanelWrite')
     case 'taskCreate':
       fail(ERROR_CODES.INVALID_COMMAND, 'taskCreate 不使用确认令牌，请走 applyDirectPanelWrite')
+    case 'memberRelease':
+      fail(ERROR_CODES.INVALID_COMMAND, 'memberRelease 不使用确认令牌，请走 applyDirectPanelWrite')
     case 'memoryRemember':
     case 'memoryForget':
       fail(ERROR_CODES.INVALID_COMMAND, `${method} 不使用确认令牌，请走 applyDirectPanelWrite`)
@@ -530,6 +537,19 @@ export function applyDirectPanelWrite(
           },
         },
       }
+    }
+    case 'memberRelease': {
+      if (input.confirm !== true) {
+        fail(ERROR_CODES.INVALID_PAYLOAD, '释放成员需要 confirm: true')
+      }
+      const teamId = requireString(input.params, 'teamId')
+      const memberId = requireString(input.params, 'memberId')
+      const result = releaseMemberCommand(runtime, { actor: PANEL_HUMAN, teamId, memberId })
+      const released = result.events.find((event) => event.type === 'member.released')
+      if (released === undefined) {
+        fail(ERROR_CODES.INTERNAL, '释放成员没有产生 member.released 事件', { details: { memberId } })
+      }
+      return { method, operationId: memberId, committed: { memberId, teamId, status: 'released' } }
     }
     default: {
       const exhaustive: never = method
