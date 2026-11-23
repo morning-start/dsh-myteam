@@ -1390,6 +1390,86 @@ window.__ModuleLoader__.load({
       )
     }
 
+    /**
+     * 任务状态流转（`taskMove`）：面板只开两个人类方向——
+     * 取消（`cancelled`）与重开（`ready`）。
+     *
+     * 认领（`claimed`）不在这里：它要求 `memberId`，而认领是**成员自己的事**
+     * （成员会话用 `myteam_claim_task`）。完成（`done`）不在这里：必须走门禁裁决，
+     * 面板直连 done 是不存在的路径，所以也不做按钮。
+     */
+    function TaskMoveBox(props) {
+      const { taskId, status, sessionId, onDone } = props
+      const [reason, setReason] = useState('')
+      const [busy, setBusy] = useState(false)
+      const [problem, setProblem] = useState(null)
+
+      const move = async (targetStatus) => {
+        if (busy) return
+        setBusy(true)
+        setProblem(null)
+        try {
+          await callWrite('taskMove', sessionId, {
+            confirm: true,
+            params: {
+              taskId,
+              targetStatus,
+              ...(reason.trim().length === 0 ? {} : { reason: reason.trim() }),
+            },
+          })
+          onDone()
+        } catch (error) {
+          setProblem(messageOf(error))
+        } finally {
+          setBusy(false)
+        }
+      }
+
+      if (status === 'done') {
+        return h(
+          'p',
+          { className: 'muted', style: { margin: '10px 0 0', fontSize: 12 } },
+          '已完成的任务不在面板上移动：完成与撤销都走门禁裁决与账本，面板不直连。',
+        )
+      }
+
+      const reopening = status === 'cancelled'
+      return h(
+        'div',
+        { style: { marginTop: 12 } },
+        h(Field, {
+          label: reopening ? '重开理由（可选，会进账本）' : '取消理由（可选，会进账本）',
+          hint: reopening ? '重开回到「待认领」。' : '取消是不可逆终态，之后只能重开。',
+        }, h('input', {
+          type: 'text',
+          className: 'box',
+          placeholder: reopening ? '重开理由' : '取消理由',
+          value: reason,
+          style: { display: 'block', width: '100%', marginTop: 2, padding: '8px 10px', fontSize: 13 },
+          onChange: (event) => setReason(event.target.value),
+        })),
+        problem === null
+          ? null
+          : h('p', { className: 'muted', style: { fontSize: 12, margin: '8px 0 0' } }, `没动成：${problem}`),
+        h(
+          'div',
+          { className: 'acts', style: { marginTop: 10 } },
+          h(
+            'button',
+            {
+              type: 'button',
+              className: joinClass('btn', reopening ? 'primary' : ''),
+              disabled: busy === true,
+              onClick: () => void move(reopening ? 'ready' : 'cancelled'),
+            },
+            busy === true ? '提交中…' : reopening ? '重开任务' : '取消任务',
+          ),
+          h('span', { className: 'grow' }),
+          h('span', { className: 'muted', style: { fontSize: 12 } }, '认领由成员在自己会话里做；完成走门禁裁决'),
+        ),
+      )
+    }
+
     function TaskDetail(props) {
       const { taskId, sessionId, onBack } = props
       const detail = usePanelData(sessionId, 'task', { taskId })
@@ -1426,8 +1506,246 @@ window.__ModuleLoader__.load({
                 })
               : h('p', { className: 'muted', style: { margin: '10px 0 0', fontSize: 12 } },
                   `裁决只在任务处于「待评审」时可用（当前 ${data.task.status}）。`),
+            h(TaskMoveBox, {
+              taskId,
+              status: data.task.status,
+              sessionId,
+              onDone: () => void detail.reload(),
+            }),
           ),
         ),
+      )
+    }
+
+    /** 建团队（`teamCreate`，`p-team-new`）：名字 + 目标 + 队长会话，可选蓝图。 */
+    function TeamCreateForm(props) {
+      const { sessionId, blueprints, onDone, onCancel } = props
+      const [name, setName] = useState('')
+      const [goal, setGoal] = useState('')
+      const [captainSessionId, setCaptainSessionId] = useState(sessionId ?? '')
+      const [blueprintId, setBlueprintId] = useState('')
+      const [busy, setBusy] = useState(false)
+      const [problem, setProblem] = useState(null)
+      const list = Array.isArray(blueprints) ? blueprints : []
+
+      const submit = async () => {
+        if (busy) return
+        if (name.trim().length === 0) {
+          setProblem('团队名字不能为空')
+          return
+        }
+        if (goal.trim().length === 0) {
+          setProblem('目标不能为空：没有目标的团队没法验收')
+          return
+        }
+        if (captainSessionId.trim().length === 0) {
+          setProblem('队长会话不能为空：团队必须绑一个队长会话')
+          return
+        }
+        setBusy(true)
+        setProblem(null)
+        try {
+          await callWrite('teamCreate', sessionId, {
+            confirm: true,
+            params: {
+              name: name.trim(),
+              goal: goal.trim(),
+              captainSessionId: captainSessionId.trim(),
+              ...(blueprintId.length === 0 ? {} : { blueprintId }),
+            },
+          })
+          onDone()
+        } catch (error) {
+          setProblem(messageOf(error))
+        } finally {
+          setBusy(false)
+        }
+      }
+
+      return h(
+        'div',
+        { className: 'box', style: { padding: '14px 16px', margin: '0 0 12px' } },
+        h(Field, { label: '团队名字' }, h('input', {
+          type: 'text',
+          className: 'box',
+          placeholder: '团队名字',
+          value: name,
+          style: { display: 'block', width: '100%', marginTop: 2, padding: '8px 10px', fontSize: 13 },
+          onChange: (event) => setName(event.target.value),
+        })),
+        h(Field, { label: '目标', hint: '一句话说清这支团队要交付什么。' }, h('textarea', {
+          className: 'box',
+          placeholder: '团队目标',
+          value: goal,
+          rows: 2,
+          style: { display: 'block', width: '100%', marginTop: 2, padding: '8px 10px', fontSize: 13 },
+          onChange: (event) => setGoal(event.target.value),
+        })),
+        h(
+          Field,
+          { label: '队长会话', hint: '默认用当前会话；换的话要填一个已经能跑队长预设的会话 id。' },
+          h('input', {
+            type: 'text',
+            className: 'box mono',
+            placeholder: '队长会话 id',
+            value: captainSessionId,
+            style: { display: 'block', width: '100%', marginTop: 2, padding: '8px 10px', fontSize: 12 },
+            onChange: (event) => setCaptainSessionId(event.target.value),
+          }),
+        ),
+        list.length === 0
+          ? null
+          : h(
+              'div',
+              { className: 'kws', style: { marginTop: 8 } },
+              h('span', { className: 'muted', style: { fontSize: 12, marginRight: 6 } }, '蓝图'),
+              h(
+                'button',
+                { type: 'button', className: joinClass('btn', blueprintId === '' ? 'primary' : ''), style: { marginRight: 6 }, onClick: () => setBlueprintId('') },
+                '不套蓝图',
+              ),
+              list.map((blueprint) =>
+                h(
+                  'button',
+                  {
+                    key: blueprint.id,
+                    type: 'button',
+                    className: joinClass('btn', blueprintId === blueprint.id ? 'primary' : ''),
+                    style: { marginRight: 6 },
+                    onClick: () => setBlueprintId(blueprint.id),
+                  },
+                  blueprint.name ?? blueprint.id,
+                ),
+              ),
+            ),
+        problem === null
+          ? null
+          : h('p', { className: 'muted', style: { fontSize: 12, margin: '8px 0 0' } }, `没建成：${problem}`),
+        h(
+          'div',
+          { className: 'acts', style: { marginTop: 10 } },
+          h('button', { type: 'button', className: 'btn primary', disabled: busy === true, onClick: () => void submit() }, busy === true ? '创建中…' : '建团队'),
+          h('button', { type: 'button', className: 'btn', style: { marginLeft: 8 }, onClick: onCancel }, '取消'),
+        ),
+      )
+    }
+
+    /**
+     * 团队名册上的两个人事写动作（`memberAppoint` / `memberRelease`）：
+     * 召唤按角色开一个成员，释放把成员推到终态。两者都只由人类在面板发起，
+     * 所以走 `direct` + `confirm: true`，不套令牌（令牌用于「影响面会变」的解散/接管/发布）。
+     */
+    function TeamAdminBox(props) {
+      const { teamId, sessionId, members, roles, onDone } = props
+      const roster = Array.isArray(members) ? members : []
+      const roleList = Array.isArray(roles) ? roles : []
+      const [roleId, setRoleId] = useState(roleList.length > 0 ? roleList[0].id : '')
+      const [busy, setBusy] = useState(null)
+      const [problem, setProblem] = useState(null)
+
+      const appoint = async () => {
+        if (busy !== null) return
+        if (roleId.length === 0) {
+          setProblem('先选一个角色：成员必须带角色快照')
+          return
+        }
+        setBusy('appoint')
+        setProblem(null)
+        try {
+          await callWrite('memberAppoint', sessionId, { confirm: true, params: { teamId, roleId } })
+          onDone()
+        } catch (error) {
+          setProblem(messageOf(error))
+        } finally {
+          setBusy(null)
+        }
+      }
+
+      const release = async (memberId) => {
+        if (busy !== null) return
+        setBusy(memberId)
+        setProblem(null)
+        try {
+          await callWrite('memberRelease', sessionId, { confirm: true, params: { teamId, memberId } })
+          onDone()
+        } catch (error) {
+          setProblem(messageOf(error))
+        } finally {
+          setBusy(null)
+        }
+      }
+
+      const releasable = roster.filter((member) => member.status !== 'released')
+
+      return h(
+        'div',
+        { style: { marginTop: 12 } },
+        h('p', { className: 'muted', style: { margin: '0 0 4px', fontSize: 12 } }, '人事（召唤按角色固化能力快照；释放是终态）'),
+        roleList.length === 0
+          ? h('p', { className: 'muted', style: { fontSize: 12, margin: '4px 0 0' } }, '这支团队还没有可用角色，先给团队加角色再召唤。')
+          : h(
+              'div',
+              { className: 'kws' },
+              roleList.map((role) =>
+                h(
+                  'button',
+                  {
+                    key: role.id,
+                    type: 'button',
+                    className: joinClass('btn', role.id === roleId ? 'primary' : ''),
+                    style: { marginRight: 6 },
+                    onClick: () => setRoleId(role.id),
+                  },
+                  role.name ?? role.id,
+                ),
+              ),
+              h(
+                'button',
+                {
+                  type: 'button',
+                  className: 'btn primary',
+                  disabled: busy !== null,
+                  style: { marginLeft: 6 },
+                  onClick: () => void appoint(),
+                },
+                busy === 'appoint' ? '召唤中…' : '召唤成员',
+              ),
+            ),
+        problem === null
+          ? null
+          : h('p', { className: 'muted', style: { fontSize: 12, margin: '8px 0 0' } }, `没成功：${problem}`),
+        releasable.length === 0
+          ? null
+          : h(
+              'div',
+              { style: { marginTop: 8 } },
+              releasable.map((member) =>
+                h(
+                  'div',
+                  { key: member.id, className: 'item' },
+                  h(
+                    'div',
+                    { className: 'l' },
+                    h('div', { className: 't' }, member.id),
+                    h('div', { className: 's' }, h('span', { className: 'mono' }, member.status)),
+                  ),
+                  h(
+                    'div',
+                    { className: 'r' },
+                    h(
+                      'button',
+                      {
+                        type: 'button',
+                        className: 'btn',
+                        disabled: busy !== null,
+                        onClick: () => void release(member.id),
+                      },
+                      busy === member.id ? '释放中…' : '释放',
+                    ),
+                  ),
+                ),
+              ),
+            ),
       )
     }
 
@@ -1435,10 +1753,36 @@ window.__ModuleLoader__.load({
       const { overview, sessionId } = props
       const teams = overview.data?.teams ?? []
       const [selected, setSelected] = useState(null)
+      const [creating, setCreating] = useState(false)
       const detail = usePanelData(selected === null ? undefined : sessionId, 'team', selected === null ? {} : { teamId: selected })
       return h(
         'div',
         { className: 'body pad' },
+        h(
+          'div',
+          { className: 'bar', style: { padding: '0 0 10px' } },
+          h(
+            'button',
+            {
+              type: 'button',
+              className: joinClass('btn', creating === true ? 'primary' : ''),
+              onClick: () => setCreating(creating !== true),
+            },
+            creating === true ? '收起' : '建团队',
+          ),
+          h('span', { className: 'grow' }),
+          h('span', { className: 'muted', style: { fontSize: 12 } }, `${teams.length} 个团队`),
+        ),
+        creating === true
+          ? h(TeamCreateForm, {
+              sessionId,
+              onDone: () => {
+                setCreating(false)
+                if (props.onChanged !== undefined) props.onChanged()
+              },
+              onCancel: () => setCreating(false),
+            })
+          : null,
         h(TeamCards, { teams }),
         selected === null
           ? h('p', { className: 'muted', style: { margin: '12px 0 0', fontSize: 12 } }, '点一个团队查看名册与角色。')
@@ -1453,6 +1797,16 @@ window.__ModuleLoader__.load({
                   h(RosterTree, { members: data.members, roles: data.roles }),
                   h('p', { className: 'muted', style: { margin: '10px 0 0', fontSize: 12 } },
                     `任务 ${data.tasks.length} 个 · 可用角色 ${data.roles.length} 个 · 配置 ${data.config === null ? '未落盘' : `revision ${data.config.revision ?? '—'}`}`),
+                  h(TeamAdminBox, {
+                    teamId: selected,
+                    sessionId,
+                    members: data.members,
+                    roles: data.roles,
+                    onDone: () => {
+                      void detail.reload()
+                      if (props.onChanged !== undefined) props.onChanged()
+                    },
+                  }),
                 ),
               ),
             ),
@@ -1501,11 +1855,122 @@ window.__ModuleLoader__.load({
       return chips
     }
 
+    /**
+     * 编辑角色定义（`definitionSave`，`g-role-edit` 的项目副本版）：
+     * 只改 profile 的文本字段，能力集**原样带回去**——面板不该顺手改权限。
+     * 工作流与蓝图不在这一版：前者的 templates 是结构化图，后者还没有保存命令。
+     */
+    function RoleEditBox(props) {
+      const { item, sessionId, onChanged } = props
+      const detail = item.detail ?? {}
+      const profile = detail.profile ?? {}
+      const [name, setName] = useState(String(profile.name ?? item.name ?? ''))
+      const [purpose, setPurpose] = useState(String(profile.purpose ?? ''))
+      const [instructions, setInstructions] = useState(String(profile.instructions ?? ''))
+      const [specialties, setSpecialties] = useState(Array.isArray(profile.specialties) ? profile.specialties.join(', ') : '')
+      const [busy, setBusy] = useState(false)
+      const [problem, setProblem] = useState(null)
+      const [saved, setSaved] = useState(false)
+
+      const submit = async () => {
+        if (busy) return
+        if (name.trim().length === 0) {
+          setProblem('角色名不能为空')
+          return
+        }
+        setBusy(true)
+        setProblem(null)
+        setSaved(false)
+        try {
+          await callWrite('definitionSave', sessionId, {
+            confirm: true,
+            params: {
+              kind: 'role',
+              id: item.id,
+              profile: {
+                ...profile,
+                name: name.trim(),
+                purpose: purpose.trim(),
+                instructions: instructions.trim(),
+                specialties: specialties
+                  .split(/[,，\s]+/)
+                  .map((entry) => entry.trim())
+                  .filter((entry) => entry.length > 0),
+              },
+              // 能力集原样回传：这个表单不负责改权限。
+              ...(detail.capabilities === undefined ? {} : { capabilities: detail.capabilities }),
+            },
+          })
+          setSaved(true)
+          if (onChanged !== undefined) onChanged()
+        } catch (error) {
+          setProblem(messageOf(error))
+        } finally {
+          setBusy(false)
+        }
+      }
+
+      return h(
+        'div',
+        { className: 'box', style: { padding: '12px 16px', marginTop: 12 } },
+        h('p', { className: 'muted', style: { margin: '0 0 6px', fontSize: 12 } },
+          `编辑这份项目副本（rev ${item.revision}；保存后 revision 递增、记 previousHash）`),
+        h(Field, { label: '角色名' }, h('input', {
+          type: 'text',
+          className: 'box',
+          placeholder: '角色名',
+          value: name,
+          style: { display: 'block', width: '100%', marginTop: 2, padding: '8px 10px', fontSize: 13 },
+          onChange: (event) => setName(event.target.value),
+        })),
+        h(Field, { label: '用途', hint: '一句话：这个角色解决什么问题。' }, h('input', {
+          type: 'text',
+          className: 'box',
+          placeholder: '用途',
+          value: purpose,
+          style: { display: 'block', width: '100%', marginTop: 2, padding: '8px 10px', fontSize: 13 },
+          onChange: (event) => setPurpose(event.target.value),
+        })),
+        h(Field, { label: '工作说明', hint: '写清楚怎么做、边界在哪。' }, h('textarea', {
+          className: 'box',
+          placeholder: '工作说明',
+          value: instructions,
+          rows: 3,
+          style: { display: 'block', width: '100%', marginTop: 2, padding: '8px 10px', fontSize: 13 },
+          onChange: (event) => setInstructions(event.target.value),
+        })),
+        h(Field, { label: '专长', hint: '可选；逗号或空格分隔。' }, h('input', {
+          type: 'text',
+          className: 'box',
+          placeholder: '专长',
+          value: specialties,
+          style: { display: 'block', width: '100%', marginTop: 2, padding: '8px 10px', fontSize: 13 },
+          onChange: (event) => setSpecialties(event.target.value),
+        })),
+        problem === null
+          ? null
+          : h('p', { className: 'muted', style: { fontSize: 12, margin: '8px 0 0' } }, `没存上：${problem}`),
+        saved === true
+          ? h('p', { className: 'muted', style: { fontSize: 12, margin: '8px 0 0' } }, '已保存：revision 已递增。')
+          : null,
+        h(
+          'div',
+          { className: 'acts', style: { marginTop: 10 } },
+          h('button', { type: 'button', className: 'btn primary', disabled: busy === true, onClick: () => void submit() },
+            busy === true ? '保存中…' : '保存定义'),
+          h('span', { className: 'grow' }),
+          h('span', { className: 'muted', style: { fontSize: 12 } }, '能力集不在这里改（保存时原样带回）'),
+        ),
+      )
+    }
+
     function DefinitionsScreen(props) {
       const { data, sessionId, onChanged } = props
       const items = Array.isArray(data.items) ? data.items : []
       const [opened, setOpened] = useState(null)
-      const openedItem = items.find((item) => `:` === opened) ?? null
+      // 注意：这里必须是 `${kind}:${id}` 与 opened 比。写成 `':' === opened` 会让
+      // openedItem 恒为 null —— 点定义行看起来「有反应」（状态变了）但什么都不渲染。
+      const openedItem = items.find((item) => `${item.kind}:${item.id}` === opened) ?? null
       return h(
         'div',
         { className: 'body pad' },
@@ -1543,7 +2008,12 @@ window.__ModuleLoader__.load({
             ),
         openedItem === null || openedItem.kind !== 'role'
           ? null
-          : h('div', { className: 'box', style: { padding: '12px 16px', marginTop: 12 } }, h(RoleDetailBox, { item: openedItem, members: props.members })),
+          : h(
+              'div',
+              null,
+              h('div', { className: 'box', style: { padding: '12px 16px', marginTop: 12 } }, h(RoleDetailBox, { item: openedItem, members: props.members })),
+              h(RoleEditBox, { item: openedItem, sessionId, onChanged }),
+            ),
       )
     }
 
@@ -1758,11 +2228,143 @@ window.__ModuleLoader__.load({
       )
     }
 
+    /**
+     * 从记忆 bank id 解析归属，规则与 `plugin/src/contracts/memory.ts` 的 `parseBankId` 一致：
+     * `team:<teamId>` 是团队公开 bank，`team:<teamId>:member:<memberId>` 是成员私有 bank。
+     * 客户端只用它**推导写记忆要带哪个 teamId**，解析不出来就拒绝而不是猜一个。
+     */
+    function parseMemoryBankId(bankId) {
+      if (typeof bankId !== 'string') return null
+      if (!bankId.startsWith('team:')) return null
+      const rest = bankId.slice('team:'.length)
+      const marker = ':member:'
+      const index = rest.indexOf(marker)
+      if (index === -1) return rest.length === 0 ? null : { teamId: rest, memberId: null }
+      const teamId = rest.slice(0, index)
+      const memberId = rest.slice(index + marker.length)
+      if (teamId.length === 0 || memberId.length === 0) return null
+      return { teamId, memberId }
+    }
+
+    /** 记一条长期记忆：写团队 bank（成员私有 bank 归 agent 自己用，面板不碰）。 */
+    function MemoryForm(props) {
+      const { sessionId, teams, onDone, onCancel } = props
+      const [text, setText] = useState('')
+      const [tags, setTags] = useState('')
+      const [teamId, setTeamId] = useState(teams.length > 0 ? teams[0].id : '')
+      const [busy, setBusy] = useState(false)
+      const [problem, setProblem] = useState(null)
+
+      const submit = async () => {
+        if (busy) return
+        if (text.trim().length === 0) {
+          setProblem('记忆正文不能为空')
+          return
+        }
+        if (teamId.length === 0) {
+          setProblem('先选一个团队：记忆按团队 bank 存')
+          return
+        }
+        setBusy(true)
+        setProblem(null)
+        try {
+          await callWrite('memoryRemember', sessionId, {
+            confirm: true,
+            params: {
+              teamId,
+              text: text.trim(),
+              tags: tags
+                .split(/[,，\s]+/)
+                .map((tag) => tag.trim())
+                .filter((tag) => tag.length > 0),
+            },
+          })
+          onDone()
+        } catch (error) {
+          setProblem(messageOf(error))
+        } finally {
+          setBusy(false)
+        }
+      }
+
+      return h(
+        'div',
+        { className: 'box', style: { padding: '14px 16px', margin: '0 16px 12px' } },
+        h(
+          'div',
+          { className: 'kws' },
+          teams.map((team) =>
+            h(
+              'button',
+              {
+                key: team.id,
+                type: 'button',
+                className: joinClass('btn', team.id === teamId ? 'primary' : ''),
+                style: { marginRight: 6 },
+                onClick: () => setTeamId(team.id),
+              },
+              team.name,
+            ),
+          ),
+        ),
+        teams.length === 0
+          ? h(
+              'p',
+              { className: 'muted', style: { fontSize: 12, margin: '6px 0 0' } },
+              '这个项目还没有团队：记忆按团队 bank 存，先在会话里让队长建队。',
+            )
+          : null,
+        h(
+          Field,
+          { label: '记忆正文', hint: '一句能被后来的人直接使用的事实，不要写「待补充」。' },
+          h('textarea', {
+            className: 'box',
+            placeholder: '要记住的事实',
+            value: text,
+            rows: 3,
+            style: { display: 'block', width: '100%', marginTop: 2, padding: '8px 10px', fontSize: 13 },
+            onChange: (event) => setText(event.target.value),
+          }),
+        ),
+        h(
+          Field,
+          { label: '标签', hint: '可选；逗号或空格分隔。' },
+          h('input', {
+            type: 'text',
+            className: 'box',
+            placeholder: 'gate, testing',
+            value: tags,
+            style: { display: 'block', width: '100%', marginTop: 2, padding: '8px 10px', fontSize: 13 },
+            onChange: (event) => setTags(event.target.value),
+          }),
+        ),
+        problem === null
+          ? null
+          : h('p', { className: 'muted', style: { fontSize: 12, margin: '8px 0 0' } }, `没记上：${problem}`),
+        h(
+          'div',
+          { className: 'acts', style: { marginTop: 10 } },
+          h(
+            'button',
+            { type: 'button', className: 'btn primary', disabled: busy === true, onClick: () => void submit() },
+            busy === true ? '写入中…' : '记住',
+          ),
+          h('button', { type: 'button', className: 'btn', style: { marginLeft: 8 }, onClick: onCancel }, '取消'),
+        ),
+      )
+    }
+
     function MemoryScreen(props) {
       const data = props.data
+      const teams = Array.isArray(props.teams) ? props.teams : []
+      const sessionId = props.sessionId
+      const onChanged = props.onChanged
       const banks = Array.isArray(data.banks) ? data.banks : []
       const entries = Array.isArray(data.entries) ? data.entries : []
       const warnings = Array.isArray(data.warnings) ? data.warnings : []
+      const [adding, setAdding] = useState(false)
+      const [forgetting, setForgetting] = useState(null)
+
       if (data.exists !== true) {
         return h(
           'div',
@@ -1774,46 +2376,133 @@ window.__ModuleLoader__.load({
           ),
         )
       }
+
+      /** 遗忘一条：团队从 bankId 推出来，解析不出就拒绝（不猜归属）。 */
+      const forget = async (entry, hard) => {
+        const owner = parseMemoryBankId(entry.bankId)
+        if (owner === null) {
+          setForgetting({ id: entry.id, problem: `bank ${entry.bankId} 归属解析不出来，不敢删` })
+          return
+        }
+        setForgetting({ id: entry.id, problem: null })
+        try {
+          await callWrite('memoryForget', sessionId, {
+            confirm: true,
+            params: {
+              teamId: owner.teamId,
+              ...(owner.memberId === null ? {} : { memberId: owner.memberId }),
+              id: entry.id,
+              ...(hard ? { hard: true } : {}),
+            },
+          })
+          setForgetting(null)
+          if (onChanged !== undefined) onChanged()
+        } catch (error) {
+          setForgetting({ id: entry.id, problem: messageOf(error) })
+        }
+      }
+
       return h(
-        ListPane,
-        {
-          items: entries,
-          empty: '记忆库是空的。',
-          footer:
-            warnings.length === 0
-              ? null
-              : h('p', { className: 'muted', style: { margin: '10px 0 0', fontSize: 12 } }, `读取告警：${warnings.join(' · ')}`),
-        },
-        [
+        'div',
+        { className: 'body flat' },
+        h(
+          'div',
+          { className: 'bar', style: { padding: '0 16px' } },
           h(
-            'div',
-            { key: 'banks', className: 'kws', style: { marginBottom: 10 } },
-            banks.length === 0
-              ? h('span', { className: 'kw' }, '没有 bank')
-              : banks.map((bank) =>
-                  h('span', { key: bank.bankId, className: 'kw' }, `${bank.bankId} · ${bank.live}/${bank.total}`),
-                ),
+            'button',
+            { type: 'button', className: joinClass('btn', adding === true ? 'primary' : ''), onClick: () => setAdding(adding !== true) },
+            adding === true ? '收起' : '记一条',
           ),
-          ...entries.map((entry) =>
+          h('span', { className: 'grow' }),
+          h('span', { className: 'muted', style: { fontSize: 12 } }, `共 ${entries.length} 条`),
+        ),
+        adding === true
+          ? h(MemoryForm, {
+              sessionId,
+              teams,
+              onDone: () => {
+                setAdding(false)
+                if (onChanged !== undefined) onChanged()
+              },
+              onCancel: () => setAdding(false),
+            })
+          : null,
+        h(
+          ListPane,
+          {
+            items: entries,
+            empty: '记忆库是空的。',
+            footer:
+              warnings.length === 0
+                ? null
+                : h('p', { className: 'muted', style: { margin: '10px 0 0', fontSize: 12 } }, `读取告警：${warnings.join(' · ')}`),
+          },
+          [
             h(
               'div',
-              { key: entry.id, className: 'item' },
+              { key: 'banks', className: 'kws', style: { marginBottom: 10 } },
+              banks.length === 0
+                ? h('span', { className: 'kw' }, '没有 bank')
+                : banks.map((bank) =>
+                    h('span', { key: bank.bankId, className: 'kw' }, `${bank.bankId} · ${bank.live}/${bank.total}`),
+                  ),
+            ),
+            ...entries.map((entry) =>
               h(
                 'div',
-                { className: 'l' },
-                h('div', { className: 't' }, String(entry.text ?? '').slice(0, 120)),
+                { key: entry.id, className: 'item' },
                 h(
                   'div',
-                  { className: 's' },
-                  h('span', { className: 'mono' }, entry.bankId),
-                  h('span', { className: 'mono' }, `rev ${entry.revision}`),
-                  (Array.isArray(entry.tags) ? entry.tags : []).map((tag) => h('span', { key: tag, className: 'mono' }, `#${tag}`)),
+                  { className: 'l' },
+                  h('div', { className: 't' }, String(entry.text ?? '').slice(0, 120)),
+                  h(
+                    'div',
+                    { className: 's' },
+                    h('span', { className: 'mono' }, entry.bankId),
+                    h('span', { className: 'mono' }, `rev ${entry.revision}`),
+                    (Array.isArray(entry.tags) ? entry.tags : []).map((tag) => h('span', { key: tag, className: 'mono' }, `#${tag}`)),
+                  ),
+                  forgetting !== null && forgetting.id === entry.id && forgetting.problem !== null
+                    ? h('div', { className: 's' }, h('span', { className: 'mono' }, `没删成：${forgetting.problem}`))
+                    : null,
+                ),
+                h(
+                  'div',
+                  { className: 'r' },
+                  entry.forgotten === true
+                    ? h('span', { className: 'st-chip' }, '已遗忘')
+                    : [
+                        h(
+                          'button',
+                          {
+                            key: 'soft',
+                            type: 'button',
+                            className: 'btn',
+                            style: { marginLeft: 6 },
+                            disabled: sessionId === undefined,
+                            onClick: () => void forget(entry, false),
+                          },
+                          '遗忘',
+                        ),
+                        h(
+                          'button',
+                          {
+                            key: 'hard',
+                            type: 'button',
+                            className: 'btn',
+                            style: { marginLeft: 6 },
+                            disabled: sessionId === undefined,
+                            title: '硬删除不可恢复：库里直接删行，只剩审计记录',
+                            onClick: () => void forget(entry, true),
+                          },
+                          '彻底删除',
+                        ),
+                      ],
                 ),
               ),
-              h('div', { className: 'r' }, entry.forgotten === true ? h('span', { className: 'st-chip' }, '已遗忘') : null),
             ),
-          ),
-        ],
+          ],
+        ),
       )
     }
 
@@ -2004,7 +2693,13 @@ window.__ModuleLoader__.load({
       } else if (tab === 'knowledge') {
         body = h(Data, { data: knowledge, what: '项目知识' }, (data) => h(KnowledgeScreen, { data }))
       } else if (tab === 'memory') {
-        body = h(Data, { data: memory, what: '长期记忆' }, (data) => h(MemoryScreen, { data }))
+        body = h(Data, { data: memory, what: '长期记忆' }, (data) =>
+          h(MemoryScreen, {
+            data,
+            teams: overview.data?.teams ?? [],
+            sessionId,
+            onChanged: () => void memory.reload(),
+          }))
       } else if (tab === 'audit') {
         body = h(Data, { data: audit, what: '审计' }, (data) => h(AuditScreen, { data }))
       } else if (tab === 'settings') {

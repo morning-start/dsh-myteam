@@ -200,6 +200,23 @@ function findButton(node: unknown, label: string): ElementLike | null {
   return findButton(element.children ?? element.props.children ?? null, label)
 }
 
+/** 找「带 onClick 且文本含 label」的任意元素（列表行是 div 不是 button）。 */
+function findClickable(node: unknown, label: string): ElementLike | null {
+  if (Array.isArray(node)) {
+    for (const item of node) {
+      const found = findClickable(item, label)
+      if (found !== null) return found
+    }
+    return null
+  }
+  if (node === null || typeof node !== 'object') return null
+  const element = node as ElementLike
+  if (typeof element.props?.onClick === 'function' && textOf(element.children ?? element.props.children).includes(label)) {
+    return element
+  }
+  return findClickable(element.children ?? element.props.children ?? null, label)
+}
+
 /** 按 placeholder 找输入框。 */
 function findByPlaceholder(node: unknown, placeholder: string): ElementLike | null {
   if (Array.isArray(node)) {
@@ -1130,6 +1147,427 @@ test('L2-H 蓝图详情：解析不到的引用要标缺失（不是照样列 id
     assert.ok(text.includes('role_gone · 缺失'), '缺角色应标缺失：' + text.slice(0, 300))
     assert.ok(text.includes('wf_gone · 缺失'), '缺工作流应标缺失')
     assert.ok(!text.includes('role_1 · 缺失'), '存在的引用不该被标缺失')
+  } finally {
+    harness.restore()
+  }
+})
+
+test('记忆栏「记一条」：填正文提交 → 只发一次 memoryRemember，且带 confirm 与 teamId', async () => {
+  const harness = loadClient(FILLED)
+  try {
+    let tree = await mount(harness.view, { sessionId: 'ses_1' })
+
+    const memoryTab = findTab(tree, '记忆')
+    assert.ok(memoryTab !== null, '缺「记忆」栏')
+    ;(memoryTab!.props.onClick as () => void)()
+    tree = await mount(harness.view, { sessionId: 'ses_1' })
+
+    const openForm = findButton(tree, '记一条')
+    assert.ok(openForm !== null, '记忆栏缺「记一条」按钮（这一栏以前是纯只读的）')
+    ;(openForm!.props.onClick as () => void)()
+    tree = await mount(harness.view, { sessionId: 'ses_1' })
+
+    const text = findByPlaceholder(tree, '要记住的事实')
+    assert.ok(text !== null, '表单缺记忆正文输入框')
+    ;(text!.props.onChange as (event: unknown) => void)({ target: { value: '面板记的一条' } })
+    tree = await mount(harness.view, { sessionId: 'ses_1' })
+
+    const tags = findByPlaceholder(tree, 'gate, testing')
+    assert.ok(tags !== null, '表单缺标签输入框')
+    ;(tags!.props.onChange as (event: unknown) => void)({ target: { value: 'gate, testing' } })
+    tree = await mount(harness.view, { sessionId: 'ses_1' })
+
+    const submit = findButton(tree, '记住')
+    assert.ok(submit !== null, '表单缺「记住」按钮')
+    ;(submit!.props.onClick as () => void)()
+    tree = await mount(harness.view, { sessionId: 'ses_1' })
+
+    assert.deepEqual(harness.writes, ['memoryRemember'], '一次点击只能发一次写请求')
+    assert.equal(harness.writeBody?.confirm, true, 'direct 类写动作必须带 confirm: true')
+    const params = harness.writeBody?.params as Record<string, unknown>
+    assert.equal(params.text, '面板记的一条')
+    assert.equal(params.teamId, 'team_1', '默认选第一个团队（记忆按团队 bank 存）')
+    assert.deepEqual(params.tags, ['gate', 'testing'], '标签按逗号/空格切开')
+    assert.ok(textOf(tree).includes('共 1 条'), '提交成功后表单收起、回到列表')
+  } finally {
+    harness.restore()
+  }
+})
+
+test('记忆栏「遗忘」：teamId 从 bankId 解析出来，不靠界面猜', async () => {
+  const harness = loadClient({
+    ...FILLED,
+    memory: {
+      file: 'memory/myteam.db',
+      exists: true,
+      banks: [{ bankId: 'team:team_1', live: 1, total: 1, lastUpdated: 'y' }],
+      entries: [
+        {
+          id: 'm_1',
+          bankId: 'team:team_1',
+          text: '成员提交前先跑测试',
+          tags: ['gate'],
+          evidence: [],
+          revision: 1,
+          createdAt: 'x',
+          updatedAt: 'y',
+          forgotten: false,
+        },
+      ],
+      warnings: [],
+    },
+  })
+  try {
+    let tree = await mount(harness.view, { sessionId: 'ses_1' })
+
+    const memoryTab = findTab(tree, '记忆')
+    assert.ok(memoryTab !== null)
+    ;(memoryTab!.props.onClick as () => void)()
+    tree = await mount(harness.view, { sessionId: 'ses_1' })
+
+    const soft = findButton(tree, '遗忘')
+    assert.ok(soft !== null, '未遗忘的条目应能点「遗忘」')
+    ;(soft!.props.onClick as () => void)()
+    tree = await mount(harness.view, { sessionId: 'ses_1' })
+
+    assert.deepEqual(harness.writes, ['memoryForget'], '一次点击只能发一次写请求')
+    assert.equal(harness.writeBody?.confirm, true)
+    const params = harness.writeBody?.params as Record<string, unknown>
+    assert.equal(params.teamId, 'team_1', 'teamId 必须从 bankId 解析，不能编一个')
+    assert.equal(params.id, 'm_1')
+    assert.equal(params.hard, undefined, '默认软删留痕，不带 hard')
+    assert.ok(findButton(tree, '彻底删除') !== null, '还要有硬删入口（同一处但不能默认）')
+  } finally {
+    harness.restore()
+  }
+})
+
+test('记忆栏「彻底删除」：显式点才带 hard: true', async () => {
+  const harness = loadClient({
+    ...FILLED,
+    memory: {
+      file: 'memory/myteam.db',
+      exists: true,
+      banks: [],
+      entries: [
+        {
+          id: 'm_2',
+          bankId: 'team:team_1:member:mem_1',
+          text: '成员私有的一条',
+          tags: [],
+          evidence: [],
+          revision: 1,
+          createdAt: 'x',
+          updatedAt: 'y',
+          forgotten: false,
+        },
+      ],
+      warnings: [],
+    },
+  })
+  try {
+    let tree = await mount(harness.view, { sessionId: 'ses_1' })
+
+    const memoryTab = findTab(tree, '记忆')
+    assert.ok(memoryTab !== null)
+    ;(memoryTab!.props.onClick as () => void)()
+    tree = await mount(harness.view, { sessionId: 'ses_1' })
+
+    const hard = findButton(tree, '彻底删除')
+    assert.ok(hard !== null, '缺「彻底删除」入口')
+    ;(hard!.props.onClick as () => void)()
+    tree = await mount(harness.view, { sessionId: 'ses_1' })
+
+    assert.deepEqual(harness.writes, ['memoryForget'])
+    const params = harness.writeBody?.params as Record<string, unknown>
+    assert.equal(params.hard, true, '硬删必须显式带 hard: true')
+    assert.equal(params.teamId, 'team_1')
+    assert.equal(params.memberId, 'mem_1', '成员私有 bank 要把 memberId 一起带上')
+  } finally {
+    harness.restore()
+  }
+})
+
+test('记忆栏：bank 归属解析不出来时拒绝删除，不猜 teamId', async () => {
+  const harness = loadClient(FILLED)
+  try {
+    let tree = await mount(harness.view, { sessionId: 'ses_1' })
+
+    const memoryTab = findTab(tree, '记忆')
+    assert.ok(memoryTab !== null)
+    ;(memoryTab!.props.onClick as () => void)()
+    tree = await mount(harness.view, { sessionId: 'ses_1' })
+
+    // FILLED 的 bankId 是 'default'（不是 team:<id> 形状）。
+    const soft = findButton(tree, '遗忘')
+    assert.ok(soft !== null)
+    ;(soft!.props.onClick as () => void)()
+    tree = await mount(harness.view, { sessionId: 'ses_1' })
+
+    assert.deepEqual(harness.writes, [], '解析不出归属就不该发写请求')
+    assert.ok(textOf(tree).includes('归属解析不出来'), '要说清为什么没删')
+  } finally {
+    harness.restore()
+  }
+})
+
+test('任务详情「取消任务」：发一次 taskMove，targetStatus=cancelled 且带 confirm', async () => {
+  const harness = loadClient(FILLED)
+  try {
+    let tree = await mount(harness.view, { sessionId: 'ses_1' })
+
+    const tasksTab = findTab(tree, '任务')
+    assert.ok(tasksTab !== null)
+    ;(tasksTab!.props.onClick as () => void)()
+    tree = await mount(harness.view, { sessionId: 'ses_1' })
+
+    const card = findButton(tree, '评审中的任务')
+    assert.ok(card !== null)
+    ;(card!.props.onClick as () => void)()
+    tree = await mount(harness.view, { sessionId: 'ses_1' })
+
+    const move = findButton(tree, '取消任务')
+    assert.ok(move !== null, '任务详情缺「取消任务」（taskMove 以前没有 UI）')
+    ;(move!.props.onClick as () => void)()
+    tree = await mount(harness.view, { sessionId: 'ses_1' })
+
+    assert.deepEqual(harness.writes, ['taskMove'], '一次点击只能发一次写请求')
+    assert.equal(harness.writeBody?.confirm, true)
+    const params = harness.writeBody?.params as Record<string, unknown>
+    assert.equal(params.taskId, 'task_1')
+    assert.equal(params.targetStatus, 'cancelled')
+    assert.equal(params.reason, undefined, '没填理由就不该带空字符串进账本')
+  } finally {
+    harness.restore()
+  }
+})
+
+test('任务详情：已取消的任务给「重开任务」，targetStatus=ready', async () => {
+  const cancelled = { ...FILLED.task as Record<string, unknown> }
+  cancelled.task = { ...(cancelled.task as Record<string, unknown>), status: 'cancelled', attemptId: null }
+  cancelled.attempt = null
+  cancelled.verdict = { status: 'pass', verdict: 'pass' }
+
+  const harness = loadClient({ ...FILLED, task: cancelled })
+  try {
+    let tree = await mount(harness.view, { sessionId: 'ses_1' })
+
+    const tasksTab = findTab(tree, '任务')
+    assert.ok(tasksTab !== null)
+    ;(tasksTab!.props.onClick as () => void)()
+    tree = await mount(harness.view, { sessionId: 'ses_1' })
+
+    const card = findButton(tree, '评审中的任务')
+    assert.ok(card !== null)
+    ;(card!.props.onClick as () => void)()
+    tree = await mount(harness.view, { sessionId: 'ses_1' })
+
+    const reopen = findButton(tree, '重开任务')
+    assert.ok(reopen !== null, '已取消的任务应能重开')
+    ;(reopen!.props.onClick as () => void)()
+    tree = await mount(harness.view, { sessionId: 'ses_1' })
+
+    assert.deepEqual(harness.writes, ['taskMove'])
+    const params = harness.writeBody?.params as Record<string, unknown>
+    assert.equal(params.targetStatus, 'ready')
+  } finally {
+    harness.restore()
+  }
+})
+
+test('任务详情：已完成的任务不给移动按钮（完成/撤销走门禁裁决）', async () => {
+  const done = { ...FILLED.task as Record<string, unknown> }
+  done.task = { ...(done.task as Record<string, unknown>), status: 'done', attemptId: null }
+  done.attempt = null
+
+  const harness = loadClient({ ...FILLED, task: done })
+  try {
+    let tree = await mount(harness.view, { sessionId: 'ses_1' })
+
+    const tasksTab = findTab(tree, '任务')
+    assert.ok(tasksTab !== null)
+    ;(tasksTab!.props.onClick as () => void)()
+    tree = await mount(harness.view, { sessionId: 'ses_1' })
+
+    const card = findButton(tree, '评审中的任务')
+    assert.ok(card !== null)
+    ;(card!.props.onClick as () => void)()
+    tree = await mount(harness.view, { sessionId: 'ses_1' })
+
+    assert.equal(findButton(tree, '取消任务'), null, '已完成的任务不该有「取消任务」')
+    assert.equal(findButton(tree, '重开任务'), null, '已完成的任务不该直接「重开」')
+    assert.ok(textOf(tree).includes('不在面板上移动'), '要说清为什么没有按钮')
+  } finally {
+    harness.restore()
+  }
+})
+
+test('团队栏「建团队」：填名字/目标/队长会话 → 只发一次 teamCreate', async () => {
+  const harness = loadClient(FILLED)
+  try {
+    let tree = await mount(harness.view, { sessionId: 'ses_1' })
+
+    const teamsTab = findTab(tree, '团队')
+    assert.ok(teamsTab !== null, '缺「团队」栏')
+    ;(teamsTab!.props.onClick as () => void)()
+    tree = await mount(harness.view, { sessionId: 'ses_1' })
+
+    const openForm = findButton(tree, '建团队')
+    assert.ok(openForm !== null, '团队栏缺「建团队」（teamCreate 以前没有 UI）')
+    ;(openForm!.props.onClick as () => void)()
+    tree = await mount(harness.view, { sessionId: 'ses_1' })
+
+    const name = findByPlaceholder(tree, '团队名字')
+    assert.ok(name !== null, '表单缺团队名字输入框')
+    ;(name!.props.onChange as (event: unknown) => void)({ target: { value: '乙队' } })
+    tree = await mount(harness.view, { sessionId: 'ses_1' })
+
+    const goal = findByPlaceholder(tree, '团队目标')
+    assert.ok(goal !== null, '表单缺目标输入框')
+    ;(goal!.props.onChange as (event: unknown) => void)({ target: { value: '把发版流程跑通' } })
+    tree = await mount(harness.view, { sessionId: 'ses_1' })
+
+    const submit = findButton(tree, '建团队')
+    assert.ok(submit !== null)
+    ;(submit!.props.onClick as () => void)()
+    tree = await mount(harness.view, { sessionId: 'ses_1' })
+
+    assert.deepEqual(harness.writes, ['teamCreate'], '一次点击只能发一次写请求')
+    assert.equal(harness.writeBody?.confirm, true, 'direct 类写动作必须带 confirm: true')
+    const params = harness.writeBody?.params as Record<string, unknown>
+    assert.equal(params.name, '乙队')
+    assert.equal(params.goal, '把发版流程跑通')
+    assert.equal(params.captainSessionId, 'ses_1', '默认拿当前会话当队长会话')
+    assert.equal(params.blueprintId, undefined, '没选蓝图就不该带字段')
+  } finally {
+    harness.restore()
+  }
+})
+
+test('团队栏「召唤成员」：按角色发一次 memberAppoint', async () => {
+  const harness = loadClient(FILLED)
+  try {
+    let tree = await mount(harness.view, { sessionId: 'ses_1' })
+
+    const teamsTab = findTab(tree, '团队')
+    assert.ok(teamsTab !== null)
+    ;(teamsTab!.props.onClick as () => void)()
+    tree = await mount(harness.view, { sessionId: 'ses_1' })
+
+    const pick = findButton(tree, '甲队')
+    assert.ok(pick !== null, '应能点选一个团队看名册')
+    ;(pick!.props.onClick as () => void)()
+    tree = await mount(harness.view, { sessionId: 'ses_1' })
+
+    const appoint = findButton(tree, '召唤成员')
+    assert.ok(appoint !== null, '名册缺「召唤成员」（memberAppoint 以前没有 UI）')
+    ;(appoint!.props.onClick as () => void)()
+    tree = await mount(harness.view, { sessionId: 'ses_1' })
+
+    assert.deepEqual(harness.writes, ['memberAppoint'], '一次点击只能发一次写请求')
+    assert.equal(harness.writeBody?.confirm, true)
+    const params = harness.writeBody?.params as Record<string, unknown>
+    assert.equal(params.teamId, 'team_1')
+    assert.equal(params.roleId, 'role_1', '默认选第一个角色')
+  } finally {
+    harness.restore()
+  }
+})
+
+test('团队栏「释放」：发一次 memberRelease，带 teamId 与 memberId', async () => {
+  const harness = loadClient(FILLED)
+  try {
+    let tree = await mount(harness.view, { sessionId: 'ses_1' })
+
+    const teamsTab = findTab(tree, '团队')
+    assert.ok(teamsTab !== null)
+    ;(teamsTab!.props.onClick as () => void)()
+    tree = await mount(harness.view, { sessionId: 'ses_1' })
+
+    const pick = findButton(tree, '甲队')
+    assert.ok(pick !== null)
+    ;(pick!.props.onClick as () => void)()
+    tree = await mount(harness.view, { sessionId: 'ses_1' })
+
+    const release = findButton(tree, '释放')
+    assert.ok(release !== null, '名册缺「释放」（memberRelease 以前没有 UI）')
+    ;(release!.props.onClick as () => void)()
+    tree = await mount(harness.view, { sessionId: 'ses_1' })
+
+    assert.deepEqual(harness.writes, ['memberRelease'])
+    assert.equal(harness.writeBody?.confirm, true)
+    const params = harness.writeBody?.params as Record<string, unknown>
+    assert.equal(params.teamId, 'team_1')
+    assert.equal(params.memberId, 'member_1')
+  } finally {
+    harness.restore()
+  }
+})
+
+test('团队栏：已释放的成员不再出现「释放」按钮', async () => {
+  const team = { ...FILLED.team as Record<string, unknown> }
+  team.members = [{ id: 'member_1', roleId: 'role_1', status: 'released', parentMemberId: null }]
+
+  const harness = loadClient({ ...FILLED, team })
+  try {
+    let tree = await mount(harness.view, { sessionId: 'ses_1' })
+
+    const teamsTab = findTab(tree, '团队')
+    assert.ok(teamsTab !== null)
+    ;(teamsTab!.props.onClick as () => void)()
+    tree = await mount(harness.view, { sessionId: 'ses_1' })
+
+    const pick = findButton(tree, '甲队')
+    assert.ok(pick !== null)
+    ;(pick!.props.onClick as () => void)()
+    tree = await mount(harness.view, { sessionId: 'ses_1' })
+
+    assert.equal(findButton(tree, '释放'), null, '终态成员不该再给「释放」')
+  } finally {
+    harness.restore()
+  }
+})
+
+test('定义栏「保存定义」：改角色名 → 发一次 definitionSave，能力集原样带回', async () => {
+  const harness = loadClient(FILLED)
+  try {
+    let tree = await mount(harness.view, { sessionId: 'ses_1' })
+
+    const defsTab = findTab(tree, '定义')
+    assert.ok(defsTab !== null, '缺「定义」栏')
+    ;(defsTab!.props.onClick as () => void)()
+    tree = await mount(harness.view, { sessionId: 'ses_1' })
+
+    const open = findClickable(tree, '实现者')
+    assert.ok(open !== null, '定义行应能点开（role 才有编辑框）')
+    ;(open!.props.onClick as () => void)()
+    tree = await mount(harness.view, { sessionId: 'ses_1' })
+
+    const nameInput = findByPlaceholder(tree, '角色名')
+    assert.ok(nameInput !== null, '缺「保存定义」表单（definitionSave 以前没有 UI）')
+    assert.equal(nameInput!.props.value, '实现者', '表单要用现有 profile 预填')
+    ;(nameInput!.props.onChange as (event: unknown) => void)({ target: { value: '实现者（改）' } })
+    tree = await mount(harness.view, { sessionId: 'ses_1' })
+
+    const save = findButton(tree, '保存定义')
+    assert.ok(save !== null)
+    ;(save!.props.onClick as () => void)()
+    tree = await mount(harness.view, { sessionId: 'ses_1' })
+
+    assert.deepEqual(harness.writes, ['definitionSave'], '一次点击只能发一次写请求')
+    assert.equal(harness.writeBody?.confirm, true)
+    const params = harness.writeBody?.params as Record<string, unknown>
+    assert.equal(params.kind, 'role')
+    assert.equal(params.id, 'role_1')
+    const profile = params.profile as Record<string, unknown>
+    assert.equal(profile.name, '实现者（改）')
+    assert.equal(profile.purpose, '实现', '没改的字段要带原值，不能丢')
+    assert.deepEqual(profile.specialties, [], '空专长是空数组，不是空字符串')
+    assert.deepEqual(params.capabilities, {
+      tools: { allow: ['read'], deny: [] },
+      mcp: { allow: [], deny: [] },
+      skills: ['run-tests'],
+    }, '能力集必须原样带回：编辑文本不该顺手改权限')
   } finally {
     harness.restore()
   }
