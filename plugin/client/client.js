@@ -350,13 +350,68 @@ window.__ModuleLoader__.load({
 
     const TEAM_STATUS = { active: '进行中', draft: '草稿', archived: '已归档', disbanded: '已解散' }
 
-    function counter(label, value, hint) {
+    /** 指标卡（L1 共用件）：概览与全局库概览用同一份，别再各写一遍。 */
+    function MetricCard(props) {
       return h(
         'div',
         { className: 'rc', style: { gap: 4 } },
-        h('div', { className: 'desc' }, label),
-        h('div', { style: { fontWeight: 600, fontSize: 16, lineHeight: 1.2 } }, String(value)),
-        hint === undefined ? null : h('div', { className: 'desc' }, hint),
+        h('div', { className: 'desc' }, props.label),
+        h('div', { className: 'mval' }, String(props.value)),
+        props.hint === undefined ? null : h('div', { className: 'desc' }, props.hint),
+      )
+    }
+
+    /** 分节头（L1 共用件）：`标题 + 计数 + 分隔线 (+ 右侧动作)`；九栏里到处是这一行。 */
+    function SectionHeader(props) {
+      return h(
+        'div',
+        { className: 'layer' },
+        h('b', null, props.title),
+        props.note === undefined ? null : h('span', null, props.note),
+        h('i', { className: 'rule' }),
+        props.action === undefined ? null : props.action,
+      )
+    }
+
+    /**
+     * 列表行（L1 共用件）：左标题+副信息、右状态片；有 onClick 就自动带可点的视觉与手型。
+     * `sub` 里的字符串默认按等宽副信息渲染，要别的元素直接传节点。
+     */
+    function ListRow(props) {
+      const subs = Array.isArray(props.sub) ? props.sub.filter((item) => item !== undefined && item !== null && item !== '') : []
+      return h(
+        'div',
+        {
+          className: joinClass('item', props.onClick === undefined ? undefined : 'pick', props.className),
+          onClick: props.onClick,
+        },
+        h(
+          'div',
+          { className: 'l' },
+          h('div', { className: 't' }, props.title),
+          subs.length === 0
+            ? null
+            : h(
+                'div',
+                { className: 's' },
+                subs.map((item, index) =>
+                  typeof item === 'string' ? h('span', { key: index, className: 'mono' }, item) : h('span', { key: index }, item),
+                ),
+              ),
+          props.extra ?? null,
+        ),
+        props.right === undefined ? null : h('div', { className: 'r' }, props.right),
+      )
+    }
+
+    /**`n     * 表单域（L1 共用件）：标签 + 控件 + 提示，三者一起出现，别再各屏各写。`n     * 注意控件本体用既有的 `span.field`（28px 边框盒）——这里只做外层的标签与说明。`n     */
+    function Field(props) {
+      return h(
+        'label',
+        { className: 'fld' },
+        h('span', { className: 'fl' }, props.label),
+        props.children,
+        props.hint === undefined ? null : h('span', { className: 'fh' }, props.hint),
       )
     }
 
@@ -428,10 +483,10 @@ window.__ModuleLoader__.load({
         h(
           'div',
           { className: 'grid c4' },
-          counter('团队', teamList.length, `${teamList.filter((team) => team.status === 'active').length} 个进行中`),
-          counter('任务', totals.all, `已完成 ${totals.done}`),
-          counter('等你确认', attention.review, '门禁、计划等待你的结论'),
-          counter('受阻', attention.blocked, `未知副作用 ${attention.unknownEffects}`),
+          h(MetricCard, { label: '团队', value: teamList.length, hint: `${teamList.filter((team) => team.status === 'active').length} 个进行中` }),
+          h(MetricCard, { label: '任务', value: totals.all, hint: `已完成 ${totals.done}` }),
+          h(MetricCard, { label: '等你确认', value: attention.review, hint: '门禁、计划等待你的结论' }),
+          h(MetricCard, { label: '受阻', value: attention.blocked, hint: `未知副作用 ${attention.unknownEffects}` }),
         ),
         waiting === 0
           ? null
@@ -561,22 +616,30 @@ window.__ModuleLoader__.load({
               '这个项目还没有团队：任务必须属于一个团队，先在会话里让队长建队。',
             )
           : null,
-        h('input', {
-          type: 'text',
-          className: 'box',
-          placeholder: '任务标题',
-          value: title,
-          style: { display: 'block', width: '100%', marginTop: 10, padding: '8px 10px', fontSize: 13 },
-          onChange: (event) => setTitle(event.target.value),
-        }),
-        h('textarea', {
-          className: 'box mono',
-          placeholder: '一行一条验收标准',
-          value: acceptance,
-          rows: 3,
-          style: { display: 'block', width: '100%', marginTop: 8, padding: '8px 10px', fontSize: 12 },
-          onChange: (event) => setAcceptance(event.target.value),
-        }),
+        h(
+          Field,
+          { label: '任务标题' },
+          h('input', {
+            type: 'text',
+            className: 'box',
+            placeholder: '任务标题',
+            value: title,
+            style: { display: 'block', width: '100%', marginTop: 2, padding: '8px 10px', fontSize: 13 },
+            onChange: (event) => setTitle(event.target.value),
+          }),
+        ),
+        h(
+          Field,
+          { label: '验收标准', hint: '一行一条；至少一条，写成可验证的事实。' },
+          h('textarea', {
+            className: 'box mono',
+            placeholder: '一行一条验收标准',
+            value: acceptance,
+            rows: 3,
+            style: { display: 'block', width: '100%', marginTop: 2, padding: '8px 10px', fontSize: 12 },
+            onChange: (event) => setAcceptance(event.target.value),
+          }),
+        ),
         problem === null
           ? null
           : h('p', { className: 'muted', style: { fontSize: 12, margin: '8px 0 0' } }, `没建成：${problem}`),
@@ -1131,24 +1194,18 @@ window.__ModuleLoader__.load({
         ListPane,
         { items, tight: true, empty: '还没有工作流运行。实例化一个工作流后，Run 与它的任务图会一起写进账本。' },
         items.map((run) =>
-          h(
-            'div',
-            { key: run.id, className: onOpenRun === undefined ? 'item' : 'item pick', onClick: onOpenRun === undefined ? undefined : () => onOpenRun(run) },
-            h(
-              'div',
-              { className: 'l' },
-              h('div', { className: 't' }, run.workflowId, ' ', h('span', { className: 'muted' }, run.id)),
-              h(
-                'div',
-                { className: 's' },
-                h('span', { className: 'mono' }, `rev ${run.revision}`),
-                h('span', { className: 'mono' }, `定义 rev ${run.workflowRevision}`),
-                h('span', { className: 'mono' }, `完成规则 rev ${run.completionRevision}`),
-                h('span', { className: 'mono' }, `${run.taskCount} 个任务`),
-              ),
-            ),
-            h('div', { className: 'r' }, h('span', { className: 'st-chip' }, RUN_STATUS[run.status] ?? run.status)),
-          ),
+          h(ListRow, {
+            key: run.id,
+            title: h('span', null, run.workflowId, ' ', h('span', { className: 'muted' }, run.id)),
+            sub: [
+              `rev ${run.revision}`,
+              `定义 rev ${run.workflowRevision}`,
+              `完成规则 rev ${run.completionRevision}`,
+              `${run.taskCount} 个任务`,
+            ],
+            right: h('span', { className: 'st-chip' }, RUN_STATUS[run.status] ?? run.status),
+            ...(onOpenRun === undefined ? {} : { onClick: () => onOpenRun(run) }),
+          }),
         ),
       )
     }
@@ -1163,14 +1220,11 @@ window.__ModuleLoader__.load({
         return h(
           'div',
           { className: 'body pad' },
-          h(
-            'div',
-            { className: 'layer' },
-            h('b', null, '运行'),
-            h('span', null, String(run.id ?? props.runId)),
-            h('i', { className: 'rule' }),
-            h('button', { type: 'button', className: 'btn', onClick: props.onBack }, '返回流程'),
-          ),
+          h(SectionHeader, {
+            title: '运行',
+            note: String(run.id ?? props.runId),
+            action: h('button', { type: 'button', className: 'btn', onClick: props.onBack }, '返回流程'),
+          }),
           h(
             'div',
             { className: 'list', style: { marginTop: 8 } },
@@ -1253,7 +1307,7 @@ window.__ModuleLoader__.load({
       return h(
         'div',
         { className: 'body pad tight' },
-        h('div', { className: 'layer' }, h('b', null, '副作用'), h('span', null, `${items.length} 条`), h('i', { className: 'rule' })),
+        h(SectionHeader, { title: '副作用', note: `${items.length} 条` }),
         h(
           'div',
           { className: 'bar', style: { borderTop: 0, borderBottom: 0, paddingLeft: 0 } },

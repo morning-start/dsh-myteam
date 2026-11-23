@@ -201,6 +201,15 @@ function findByPlaceholder(node: unknown, placeholder: string): ElementLike | nu
   return findByPlaceholder(element.children ?? element.props?.children ?? null, placeholder)
 }
 
+/** 数一数渲染树里 match 到的节点（断言「同一份共用件被复用了几次」用）。 */
+function countNodes(node: unknown, match: (element: ElementLike) => boolean): number {
+  if (Array.isArray(node)) return node.reduce<number>((sum, item) => sum + countNodes(item, match), 0)
+  if (node === null || typeof node !== 'object') return 0
+  const element = node as ElementLike
+  const self = match(element) ? 1 : 0
+  return self + countNodes(element.children ?? element.props?.children ?? null, match)
+}
+
 /** 按 className 包含某个片段找元素（找「可点开的列表行」这类没有 role 的节点用）。 */
 function findByClass(node: unknown, fragment: string): ElementLike | null {
   if (Array.isArray(node)) {
@@ -564,6 +573,43 @@ test('设置栏：底部带 v1 迁移影响面（migration），空态也说清�
     tree = await mount(harness.view, { sessionId: 'ses_1' })
     assert.ok(harness.calls.includes('migration'), '切到「设置」应真的请求 migration')
     assert.ok(textOf(tree).includes('没有可迁移的 v1 数据'), '迁移影响面要渲染出来，不能留白')
+  } finally {
+    harness.restore()
+  }
+})
+
+test('L1 共用件：概览的四张指标卡、审计的列表行、任务的表单域都走同一份组件', async () => {
+  const harness = loadClient(FILLED)
+  try {
+    let tree = await mount(harness.view, { sessionId: 'ses_1' })
+    const text = textOf(tree)
+    // 指标卡（.rc）走同一个组件：四张各自的标签都要落在带 rc 的节点里。
+    for (const label of ['团队', '任务', '等你确认', '受阻']) {
+      const cards = countNodes(tree, (element) => {
+        const tokens = String(element.props?.className ?? '').split(/\s+/)
+        return tokens.includes('rc') && textOf(element.children ?? element.props?.children).includes(label)
+      })
+      assert.ok(cards >= 1, `指标卡缺「${label}」`)
+      assert.ok(text.includes(label), `概览文本缺「${label}」`)
+    }
+
+    const auditTab = findTab(tree, '审计')
+    assert.ok(auditTab !== null, '找不到「审计」栏')
+    ;(auditTab!.props.onClick as () => void)()
+    tree = await mount(harness.view, { sessionId: 'ses_1' })
+    const rows = countNodes(tree, (element) => String(element.props?.className ?? '').split(' ').includes('item'))
+    assert.equal(rows, (FILLED.audit as { items: unknown[] }).items.length, '审计栏每行都应是一个共用列表行')
+
+    const tasksTab = findTab(tree, '任务')
+    assert.ok(tasksTab !== null, '找不到「任务」栏')
+    ;(tasksTab!.props.onClick as () => void)()
+    tree = await mount(harness.view, { sessionId: 'ses_1' })
+    const newTask = findButton(tree, '新任务')
+    assert.ok(newTask !== null, '任务栏应有「新任务」按钮')
+    ;(newTask!.props.onClick as () => void)()
+    tree = await mount(harness.view, { sessionId: 'ses_1' })
+    const fields = countNodes(tree, (element) => String(element.props?.className ?? '').split(/\s+/).includes('fld'))
+    assert.ok(fields >= 2, `新任务表单应至少有两个表单域，实际 ${fields}`)
   } finally {
     harness.restore()
   }
