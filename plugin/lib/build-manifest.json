@@ -1,10 +1,10 @@
 {
   "schema": 1,
-  "builtAt": "2026-11-23T15:40:49.164Z",
+  "builtAt": "2026-11-23T15:43:20.135Z",
   "node": "v24.21.0",
   "entry": "./lib/composition/host.mjs",
   "modules": 62,
-  "sourceHash": "0a35716a1a1c38be85cebb8dc177a6ea5b2ae36d107341e1c5c489ca50ef712f",
+  "sourceHash": "a1c773c3904651c17aec3633531125250ef3948880979e24ef1d71dd868685d8",
   "clientFile": "client/client.js",
   "clientHash": "50e378c2ac173fa82a21ed03caf9534e342050d77e84c759f614733c62773372",
   "files": [

@@ -36,7 +36,10 @@ export interface BoardTask {
   ownerTeamId: string | null
   ownerTeamName: string | null
   runId: string | null
+  /** 未完成的前置（只用于「被谁卡住」的角标）。 */
   blockedBy: string[]
+  /** 全部前置边（含已完成的）：依赖图要用完整边，不能只看 blockedBy。 */
+  dependencies: string[]
   attemptId: string | null
   updatedAt: string
 }
@@ -69,6 +72,7 @@ export function boardView(state: ProjectState): BoardView {
       ownerTeamName: task.ownerTeamId === null ? null : (state.teams.get(task.ownerTeamId)?.name ?? null),
       runId: task.runId,
       blockedBy: task.dependencies.filter((dependency) => state.tasks.get(dependency)?.status !== 'done'),
+      dependencies: [...task.dependencies],
       attemptId: task.attemptId,
       updatedAt: task.updatedAt,
     })
