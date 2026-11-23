@@ -37,6 +37,7 @@ run('配置契约', process.execPath, ['tools/gen-config-contract.mjs', '--check
 run('文档替换', process.execPath, ['tools/check-doc-replacement.mjs', '--strict'])
 run('文档治理', process.execPath, ['tools/check-docs.mjs'])
 run('文档链接', process.execPath, ['tools/check-doc-links.mjs'])
+run('文档路径', process.execPath, ['tools/check-doc-paths.mjs'])
 run('文档事实', process.execPath, ['tools/check-doc-facts.mjs'])
 
 if (failures.length > 0) {
