@@ -360,6 +360,28 @@ window.__ModuleLoader__.load({
       )
     }
 
+    /** 事件行里只留 id 前 8 个字符（完整值去审计栏看），否则一行全是 uuid。 */
+    function shortId(id) {
+      const text = String(id ?? '')
+      return text.length <= 12 ? text : `${text.slice(0, 8)}…`
+    }
+
+    /** 实体写成 `task_43c…`：id 已经带类型前缀时不再重复写类型。 */
+    function entityText(entity) {
+      const kind = String(entity?.kind ?? '—')
+      const id = String(entity?.id ?? '')
+      if (id === '') return kind
+      return id.startsWith(kind) ? shortId(id) : `${kind} ${shortId(id)}`
+    }
+
+    /** 谁写的：会话型 actor（captain）只留 kind，成员类留短 id。 */
+    function actorText(actor) {
+      const kind = String(actor?.kind ?? '—')
+      const id = String(actor?.id ?? '')
+      if (id === '' || kind === 'captain') return kind
+      return `${kind}:${shortId(id)}`
+    }
+
     function TeamCards(props) {
       const { teams } = props
       if (teams.length === 0) {
@@ -385,7 +407,7 @@ window.__ModuleLoader__.load({
               { className: 'inst' },
               h('div', { className: 'i' },
                 h('span', { className: 'nm muted' },
-                  team.captain === null ? '暂无队长会话' : `队长会话 ${team.captain.sessionId.slice(0, 8)} · generation ${team.captain.generation}`)),
+                  team.captain === null ? '暂无队长会话' : `队长会话 · generation ${team.captain.generation}`)),
               h('div', { className: 'i' }, h(Dot, { tone: 'idle' }), h('span', { className: 'nm' }, `${team.tasks} 个任务`)),
             ),
           ),
@@ -394,10 +416,12 @@ window.__ModuleLoader__.load({
     }
 
     function OverviewScreen(props) {
-      const { data, teams } = props
+      const { data, events, onSelect } = props
       const totals = data.totals ?? { all: 0, done: 0, blocked: 0, review: 0 }
       const attention = data.attention ?? { review: 0, blocked: 0, unknownEffects: 0 }
-      const teamList = Array.isArray(data.teams) ? data.teams : teams
+      const teamList = Array.isArray(data.teams) ? data.teams : []
+      const waiting = (attention.review ?? 0) + (attention.blocked ?? 0)
+      const recent = Array.isArray(events) ? events.slice(0, 5) : []
       return h(
         'div',
         { className: 'body pad' },
@@ -405,24 +429,61 @@ window.__ModuleLoader__.load({
           'div',
           { className: 'grid c4' },
           counter('团队', teamList.length, `${teamList.filter((team) => team.status === 'active').length} 个进行中`),
-          counter('任务', totals.all, `完成 ${totals.done}`),
-          counter('待裁决', attention.review, '门禁或计划等人类结论'),
-          counter('受阻', attention.blocked, `unknown effect ${attention.unknownEffects}`),
+          counter('任务', totals.all, `已完成 ${totals.done}`),
+          counter('等你确认', attention.review, '门禁、计划等待你的结论'),
+          counter('受阻', attention.blocked, `未知副作用 ${attention.unknownEffects}`),
         ),
+        waiting === 0
+          ? null
+          : h(
+              'div',
+              { className: 'banner plan', style: { marginTop: 12 } },
+              h(Icon, { name: 'clock' }),
+              h(
+                'div',
+                { className: 'b-t' },
+                h('b', null, `${waiting} 件事等你处理`),
+                h('span', null,
+                  `待裁决 ${attention.review} · 受阻 ${attention.blocked}${(attention.unknownEffects ?? 0) > 0 ? ` · 未知副作用 ${attention.unknownEffects}` : ''}`),
+              ),
+              onSelect === undefined
+                ? null
+                : h('div', { className: 'acts' },
+                    h('button', { type: 'button', className: 'btn primary', onClick: () => onSelect('tasks') }, '去任务栏处理')),
+            ),
         h('div', { className: 'layer' }, h('b', null, '团队'), h('span', null, `${teamList.length} 个`), h('i', { className: 'rule' })),
         h(TeamCards, { teams: teamList }),
         h(
           'div',
           { className: 'layer' },
-          h('b', null, '投影'),
+          h('b', null, '最近事件'),
           h('span', null, `projectSeq ${data.observedProjectSeq ?? '—'}`),
           h('i', { className: 'rule' }),
         ),
+        recent.length === 0
+          ? h('p', { className: 'muted', style: { margin: '8px 0 0', fontSize: 12 } }, '还没有写进事件日志的动作。')
+          : h(
+              'div',
+              { className: 'box', style: { padding: '2px 14px' } },
+              recent.map((event, index) =>
+                h(
+                  'div',
+                  { key: event.seq, className: 'ev', style: index === recent.length - 1 ? { borderBottom: 0 } : undefined },
+                  h('span', { className: 'tm' }, String(event.seq)),
+                  h(
+                    'div',
+                    { className: 'tx' },
+                    h('b', null, String(event.type)),
+                    h('span', { className: 'm' },
+                      ` · ${entityText(event.entity)} · ${actorText(event.actor)}`),
+                  ),
+                ),
+              ),
+            ),
         h(
-          'div',
-          { className: 'box', style: { padding: '12px 14px' } },
-          h('p', { className: 'muted', style: { margin: 0, fontSize: 12 } },
-            `看板、审计、设置读的是同一份项目投影（graphRevision ${data.graphRevision ?? '—'}）；跨团队依赖还没有单独成图，这一页只画已投影的团队与计数。`),
+          'p',
+          { className: 'muted', style: { margin: '12px 0 0', fontSize: 12 } },
+          `看板、审计、设置读的是同一份项目投影（graphRevision ${data.graphRevision ?? '—'}）；跨团队依赖还没有单独成图。`,
         ),
       )
     }
@@ -1413,6 +1474,8 @@ window.__ModuleLoader__.load({
       const knowledge = usePanelData(tab === 'knowledge' ? sessionId : undefined, 'knowledge')
       const memory = usePanelData(tab === 'memory' ? sessionId : undefined, 'memory')
       const audit = usePanelData(tab === 'audit' ? sessionId : undefined, 'audit', { limit: 200 })
+      // 概览底部那 5 条「最近事件」：只在概览上拉，切走就停，不额外多打一枪。
+      const overviewEvents = usePanelData(tab === 'overview' ? sessionId : undefined, 'audit', { limit: 5 })
       const settings = usePanelData(tab === 'settings' ? sessionId : undefined, 'settings')
 
       const projectName = status.data?.name ?? overview.data?.name ?? '未命名'
@@ -1434,6 +1497,7 @@ window.__ModuleLoader__.load({
       const onRefresh = () => {
         void status.reload()
         void overview.reload()
+        void overviewEvents.reload()
         void board.reload()
         void definitions.reload()
         if (tab === 'runs') {
@@ -1449,11 +1513,19 @@ window.__ModuleLoader__.load({
         if (tab === 'audit') void audit.reload()
       }
 
+      // 栏内跳转（概览横幅的「去任务栏处理」用）：先收掉详情层，再切栏。
+      const go = (next) => {
+        setTaskId(null)
+        setRunId(null)
+        setTab(next)
+      }
+
       let body
       if (taskId !== null) {
         body = h(TaskDetail, { taskId, sessionId, onBack: () => setTaskId(null) })
       } else if (tab === 'overview') {
-        body = h(Data, { data: overview, what: '项目概览' }, (data) => h(OverviewScreen, { data }))
+        body = h(Data, { data: overview, what: '项目概览' }, (data) =>
+          h(OverviewScreen, { data, events: overviewEvents.data?.items, onSelect: go }))
       } else if (tab === 'tasks') {
         body = h(Data, { data: board, what: '任务看板' }, (data) =>
           h(TasksScreen, {
@@ -1499,14 +1571,10 @@ window.__ModuleLoader__.load({
         railTitle: `团队视图 ${projectName}`,
         nav: PROJECT_NAV,
         active: tab,
-        onSelect: (next) => {
-          setTaskId(null)
-          setRunId(null)
-          setTab(next)
-        },
+        onSelect: go,
         pane: [
           h(PaneHeader, { title: projectName, scope, summary, onRefresh, busy: status.status === 'loading' }),
-          h(StatusBar, { chips, note: '只读投影 · 同一份事件日志' }),
+          h(StatusBar, { chips, note: '只读 · 与看板、审计同源' }),
           body,
         ],
       })
@@ -1548,27 +1616,103 @@ window.__ModuleLoader__.load({
       )
     }
 
+    /** 计数卡上那行小字：写清这一类的文件落在哪个目录（与读目录的实现一一对应）。 */
+    const GLOBAL_KIND_DIR = {
+      role: 'roles/',
+      workflow: 'workflows/',
+      blueprint: 'team-blueprints/',
+      team: 'teams/ · v1 只读',
+    }
+
+    /** 状态条里只留根目录最后两段；完整路径仍可从头部的 title 看到。 */
+    function shortRoot(root) {
+      if (typeof root !== 'string' || root === '') return '$DSH_HOME/myteam'
+      const parts = root.split(/[\\/]+/).filter((part) => part !== '')
+      return parts.length <= 2 ? root : `…/${parts.slice(-2).join('/')}`
+    }
+
     function GlobalOverviewScreen(props) {
-      const data = props.data
+      const { data, operations } = props
       const counts = data.counts ?? {}
       const warnings = Array.isArray(data.warnings) ? data.warnings : []
+      const entries = Array.isArray(data.entries) ? data.entries : []
+      const ops = Array.isArray(operations) ? operations.slice(0, 5) : []
       return h(
         'div',
         { className: 'body pad' },
         h(
-          'p',
-          { className: 'muted', style: { margin: '0 0 10px', fontSize: 12 } },
-          `根目录 ${data.root ?? '—'}${data.exists === true ? '' : '（还不存在，第一次发布会创建）'}`,
-        ),
-        h(
           'div',
-          { className: 'kws' },
+          { className: 'grid c4' },
           ['role', 'workflow', 'blueprint', 'team'].map((kind) =>
-            h('span', { key: kind, className: 'kw' }, `${GLOBAL_KIND_LABEL[kind]} ${counts[kind] ?? 0}`),
+            h(
+              'div',
+              { key: kind, className: 'rc', style: { gap: 4 } },
+              h('div', { className: 'desc' }, GLOBAL_KIND_LABEL[kind]),
+              h('div', { style: { fontWeight: 600, fontSize: 16, lineHeight: 1.2 } }, String(counts[kind] ?? 0)),
+              h('div', { className: 'desc mono' }, GLOBAL_KIND_DIR[kind]),
+            ),
           ),
         ),
+        entries.length === 0
+          ? h(
+              'div',
+              { className: 'box', style: { padding: '16px', marginTop: 14 } },
+              h(
+                'div',
+                { className: 'rc-h' },
+                h(Dot, { tone: 'gate' }),
+                h('span', { className: 'nm' }, '全局库还是空的'),
+                h('span', { className: 'tag' }, data.exists === true ? '可写' : '第一次发布会创建'),
+              ),
+              h(
+                'p',
+                { className: 'muted', style: { margin: '8px 0 0', fontSize: 12 } },
+                '在项目的「定义」栏发起发布、走完人类确认，角色 / 工作流 / 蓝图就写进这里；别的项目复制它，就能复用同一份定义。',
+              ),
+            )
+          : [
+              h(
+                'div',
+                { className: 'layer' },
+                h('b', null, '定义清单'),
+                h('span', null, `${entries.length} 条`),
+                h('i', { className: 'rule' }),
+              ),
+              h('div', { className: 'list' }, globalEntryRows(entries.slice(0, 6))),
+              h(
+                'div',
+                { className: 'layer' },
+                h('b', null, '最近全局操作'),
+                h('span', null, ops.length === 0 ? '还没有' : `最近 ${ops.length} 条`),
+                h('i', { className: 'rule' }),
+              ),
+              ops.length === 0
+                ? h('p', { className: 'muted', style: { margin: '8px 0 0', fontSize: 12 } }, '还没有全局操作记录。发布、下架等人类确认动作会写进这里。')
+                : h(
+                    'div',
+                    { className: 'list' },
+                    ops.map((item) =>
+                      h(
+                        'div',
+                        { key: `${item.at ?? ''}:${item.operationId ?? ''}`, className: 'item' },
+                        h(
+                          'div',
+                          { className: 'l' },
+                          h('div', { className: 't' }, String(item.action ?? '未知操作'), ' ', h('span', { className: 'muted' }, String(item.target ?? ''))),
+                          h(
+                            'div',
+                            { className: 's' },
+                            h('span', { className: 'mono' }, String(item.at ?? '')),
+                            h('span', { className: 'mono' }, String(item.operationId ?? '')),
+                          ),
+                        ),
+                        h('div', { className: 'r' }, h('span', { className: 'st-chip' }, String(item.status ?? '—'))),
+                      ),
+                    ),
+                  ),
+            ],
         warnings.length === 0
-          ? h('p', { className: 'muted', style: { margin: '12px 0 0', fontSize: 12 } }, '所有文件都读得懂。')
+          ? h('p', { className: 'muted', style: { margin: '12px 0 0', fontSize: 12 } }, '读到的定义都是完整的。')
           : h(
               'div',
               { className: 'box', style: { padding: '12px 14px', marginTop: 12 } },
@@ -1653,7 +1797,8 @@ window.__ModuleLoader__.load({
       if (tab === 'publish') {
         body = h(Data, { data: globalAudit, what: '全局操作审计' }, (data) => h(GlobalAuditScreen, { data }))
       } else if (kindForTab === null) {
-        body = h(Data, { data: library, what: '全局库概览' }, (data) => h(GlobalOverviewScreen, { data }))
+        body = h(Data, { data: library, what: '全局库概览' }, (data) =>
+          h(GlobalOverviewScreen, { data, operations: globalAudit.data?.items }))
       } else {
         body = h(Data, { data: library, what: navItem.label }, () =>
           h(ListPane, { items: ofKind, empty: `${navItem.label}里还没有全局条目。` }, globalEntryRows(ofKind)),
@@ -1675,7 +1820,7 @@ window.__ModuleLoader__.load({
           h(PaneHeader, {
             title: '全局库',
             scope: { kind: '全局', detail: navItem.label },
-            summary: ['$DSH_HOME/myteam', '只有人类确认后写', '团队视图在会话标签上'],
+            summary: ['全局定义库', '只有人类确认才写入', '团队与任务都在各自项目'],
             onRefresh,
             busy: library.status === 'loading',
           }),
@@ -1683,9 +1828,9 @@ window.__ModuleLoader__.load({
             chips: [
               { text: '只读', tone: undefined },
               { text: `条目 ${entries.length}` },
-              { text: library.data?.root ?? '$DSH_HOME/myteam' },
+              { text: `根目录 ${shortRoot(library.data?.root)}` },
             ],
-            note: '全局资产与团队运行态分开',
+            note: '这些定义可被任何项目复制',
           }),
           body,
           h('div', { className: 'ft' }, h('button', { type: 'button', className: 'btn', onClick: back }, '回到对话')),

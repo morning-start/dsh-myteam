@@ -81,6 +81,8 @@
 [data-slot="main"] .ri.on { background: var(--dsh-hover); color: var(--dsh-fg); font-weight: 500; }
 [data-slot="main"] .ri .ic { width: 18px; height: 18px; }
 [data-slot="main"] .ri .bdg { position: absolute; top: 6px; right: 11px; width: 6px; height: 6px; border-radius: 50%; background: var(--mt-gate); }
+/* 轨上的标签是 2–3 个字（工作流 / 蓝图）：宿主的字族更宽时不许折成两行。 */
+[data-slot="main"] .ri span { white-space: nowrap; max-width: 100%; overflow: hidden; text-overflow: ellipsis; }
 [data-slot="main"] .ir-foot { margin-top: auto; }
 
 [data-slot="main"] .pane { flex: 1 1 auto; min-width: 0; min-height: 0; display: flex; flex-direction: column; }
@@ -261,8 +263,9 @@
 [data-slot="main"] .item .t { font-size: 13px; }
 [data-slot="main"] .item .s { margin-top: 3px; font-size: 12px; color: var(--mt-muted); display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
 [data-slot="main"] .item .r { flex: none; font-size: 12px; color: var(--mt-muted); text-align: right; }
-[data-slot="main"] .ev { display: grid; grid-template-columns: 96px 1fr; gap: 10px; padding: 8px 0; border-bottom: 1px solid var(--mt-line-soft); font-size: 12px; }
+[data-slot="main"] .ev { display: grid; grid-template-columns: max-content minmax(0, 1fr); gap: 10px; padding: 8px 0; border-bottom: 1px solid var(--mt-line-soft); font-size: 12px; }
 [data-slot="main"] .ev .tm { font-family: var(--dsh-font-code); color: var(--mt-muted); }
+[data-slot="main"] .ev .tx { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 [data-slot="main"] .ev .tx b { font-weight: 500; }
 [data-slot="main"] .ev .tx .m { color: var(--mt-muted); }
 [data-slot="main"] .form { max-width: 620px; }
@@ -502,4 +505,6 @@
   [data-slot="main"] .grid.c3, [data-slot="main"] .grid.c2 { grid-template-columns: minmax(0, 1fr); }
   [data-slot="main"] .rc-h { flex-wrap: wrap; row-gap: 2px; }
   [data-slot="main"] .rc-h .nm { overflow-wrap: anywhere; }
+  /* 窄屏的事件行：允许换两行，别把「谁写的」截成省略号。 */
+  [data-slot="main"] .ev .tx { white-space: normal; overflow: visible; text-overflow: clip; }
 }

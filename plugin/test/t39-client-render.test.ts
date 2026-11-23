@@ -581,7 +581,7 @@ test('团队视图九栏：有数据时列表行渲染出关键字段（不只�
 test('左栏全局库五栏：两种数据下都能渲染，且不带会话也发请求', async () => {
   const empty = loadClient(EMPTY)
   try {
-    await clickThrough(empty.panel, { ctx: {} }, GLOBAL_TABS, '所有文件都读得懂')
+    await clickThrough(empty.panel, { ctx: {} }, GLOBAL_TABS, '全局库还是空的')
     assert.ok(empty.calls.includes('globalLibrary'), '全局栏应请求 globalLibrary')
     assert.ok(empty.calls.includes('globalAudit'), '发布栏应请求 globalAudit')
   } finally {
@@ -590,7 +590,7 @@ test('左栏全局库五栏：两种数据下都能渲染，且不带会话也�
 
   const filled = loadClient(FILLED)
   try {
-    await clickThrough(filled.panel, { ctx: {} }, GLOBAL_TABS_FILLED, '所有文件都读得懂')
+    await clickThrough(filled.panel, { ctx: {} }, GLOBAL_TABS_FILLED, '读到的定义都是完整的')
   } finally {
     filled.restore()
   }
