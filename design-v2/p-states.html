@@ -64,8 +64,8 @@
     <h2>状态与空态<span class="scope"><b>团队视图</b> · 对照屏</span></h2>
     <p class="sub">
       <span class="l">4 种传输状态</span><i class="sep"></i>
-      <span class="l">3 种空态</span><i class="sep"></i>
-      <span class="l">文案与 client.js 一致</span>
+      <span class="l">2 种空态</span><i class="sep"></i>
+      <span class="l">2 种写入失败</span>
       <span class="tr">不是某一栏，是每一栏都要处理的样子</span>
     </p>
   </div>
@@ -79,6 +79,8 @@
   <span class="st-chip">Failure</span>
   <span class="st-chip">No session</span>
   <span class="st-chip">Unavailable</span>
+  <span class="st-chip">Stale</span>
+  <span class="st-chip">幂等命中</span>
   <span class="grow"></span>
   <span class="muted" style="font-size:12px">清空数据只在真的没数据时；加载中保留上一份，避免闪白</span>
 </div>
@@ -151,6 +153,31 @@
         <div class="muted" style="font-size:12px">这个项目还没有知识条目。知识来自任务里被确认的证据与人类提案，不会自动生成。</div>
       </div>
       <p class="note">说明「为什么空」；把产生第一条知识的路径写出来（去任务详情确认证据）。</p>
+    </div>
+
+    <div class="act-card warn">
+      <div class="act-h">
+        <svg class="ic" style="color:var(--mt-gate)" viewBox="0 0 24 24"><path d="M12 3l9 16H3z"/><path d="M12 9v4M12 16v.5"/></svg>
+        判定已作废 · 你看到的版本变了
+      </div>
+      <div class="banner plan" style="margin:8px 0 0">
+        <svg class="ic" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>
+        <div class="b-t"><b>提交被拒：任务内容已变</b><span>task hash 4c1a…9e → 7d02…41（有人改了 AC 或依赖）</span></div>
+        <div class="acts"><a class="btn primary" href="p-verdict.html" style="text-decoration:none">重新载入</a></div>
+      </div>
+      <p class="note">判定绑定按下时的 hash；内容一变就作废，不会写半份。</p>
+    </div>
+
+    <div class="act-card">
+      <div class="act-h">
+        <svg class="ic" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M8 12l3 3 5-6"/></svg>
+        重复提交 · 已经执行过
+      </div>
+      <div class="box" style="padding:12px;margin-top:8px">
+        <div class="rc-h"><span class="dot idle"></span><span class="nm">同一个操作已经执行过</span><span class="tag">幂等命中</span></div>
+        <p class="muted" style="margin:8px 0 0;font-size:12px">确认令牌一次性；重复提交返回第一次的结果，不会写第二条事件。</p>
+      </div>
+      <p class="note">结果里带原来的 operationId，回执据此去重。</p>
     </div>
   </div>
 
