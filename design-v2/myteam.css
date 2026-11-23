@@ -292,6 +292,17 @@
 [data-slot="main"] .tree a.tr { text-decoration: none; color: inherit; }
 [data-slot="main"] .tree a.nm { display: inline-flex; align-items: center; justify-content: center; min-height: 24px; min-width: 24px; padding: 0 6px; margin: 0 -6px; color: inherit; text-decoration: none; }
 [data-slot="main"] .tree a.nm:hover { text-decoration: underline; }
+
+/* ── 表单与差异（新建任务 / 召唤成员 / 裁决 / 编辑角色） ── */
+[data-slot="main"] .textarea { width: 100%; box-sizing: border-box; min-height: 84px; padding: 8px 10px; border: 1px solid var(--dsh-line); border-radius: var(--dsh-radius-sm); background: var(--dsh-card); color: var(--dsh-fg); font: 400 12px/1.6 var(--dsh-font); resize: vertical; }
+[data-slot="main"] .textarea:focus { outline: none; border-color: var(--dsh-accent); box-shadow: var(--mt-focus); }
+[data-slot="main"] .lbl { display: block; margin: 0 0 4px; font-size: 12px; color: var(--mt-muted); }
+[data-slot="main"] .form-row { margin: 0 0 14px; }
+[data-slot="main"] .diff { display: flex; flex-direction: column; gap: 5px; font-size: 12px; }
+[data-slot="main"] .diff .d { display: flex; gap: 6px; font-family: var(--dsh-font-code); }
+[data-slot="main"] .diff .d.add { color: color-mix(in srgb, var(--mt-run) 75%, var(--dsh-fg)); }
+[data-slot="main"] .diff .d.del { color: color-mix(in srgb, var(--mt-fail) 75%, var(--dsh-fg)); }
+[data-slot="main"] .menu a.mi { color: inherit; text-decoration: none; }
 [data-slot="main"] .layer { display: flex; align-items: center; gap: 8px; margin: 16px 0 10px; font-size: 12px; color: var(--mt-muted); }
 [data-slot="main"] .layer b { color: var(--dsh-fg); font-weight: 500; font-size: 13px; }
 [data-slot="main"] .layer .rule { flex: 1 1 auto; height: 1px; background: var(--dsh-line); }
