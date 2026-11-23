@@ -3,12 +3,15 @@
  *
  * 只查仓库内相对路径；`http(s)://` / `mailto:` 跳过（外链不做网络请求）。
  *
- * v2 重写期间有两类链接不计入断链：
- *   - 指向 v1 源码（`plugin/src/**`、`plugin/client/**`、`plugin/schema/**`）：
- *     v1 实现已移出工作树，完整保存在标签 `v1-backup`；
- *   - 指向运行期数据（`.dsh-myteam/**`）：本来就不入库，新检出里不存在。
- * 它们仍在文档里作为证据，单独计数；R7 文档替换时一并处理。
- * 除此之外的任何失效链接都是真断链，门禁失败。
+ * 只有一类链接不计入断链：指向运行期数据（`.dsh-myteam/**`）—— 本来就不入库，
+ * 新检出里不存在。
+ *
+ * 曾经还豁免过 `plugin/src/**`、`plugin/client/**`、`plugin/schema/**`，理由是「v1 实现
+ * 已移出工作树，保存在标签 v1-backup」。**这条理由已经过期**：v2 的源码就在
+ * `plugin/src/**`（contracts/domain/application/infrastructure/composition）。继续豁免的
+ * 后果是实测过的 —— 00 里 4 条、03 里 1 条指向 v1 死路径的链接全部静默通过，报告还说
+ * 「断链 0」。所以豁免收回到运行期数据一类，指向源码的链接一律当真链接查。
+ * `plugin/lib/**` 是构建产物（gitignore），仍单独豁免。
  */
 import { readdirSync, readFileSync, existsSync, statSync } from 'node:fs'
 import { dirname, join, relative, resolve } from 'node:path'
@@ -17,10 +20,6 @@ const ROOT = process.cwd()
 const SKIP_DIRS = new Set(['node_modules', '.git', '.debug', 'lib', 'refs', '.agents', '.tmp', 'tmp'])
 
 const NON_REPO_PATTERNS = [
-  /plugin\/src\//,
-  /plugin\/client\//,
-  /plugin\/schema\//,
-  /plugin\/locale\//,
   /plugin\/lib\//,
   /(^|\/)\.dsh-myteam\//,
 ]
