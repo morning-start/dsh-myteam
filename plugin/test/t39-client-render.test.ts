@@ -869,3 +869,108 @@ test('L2-B1 任务 / 团队 / 定义 / 流程四页：关键字段与空态都�
     harness.restore()
   }
 })
+
+test('L2-F 依赖图：有边时画层级与前置，没有边时说清空', async () => {
+  const empty = loadClient(FILLED)
+  try {
+    let tree = await mount(empty.view, { sessionId: 'ses_1' })
+    const tab = findTab(tree, '任务')
+    assert.ok(tab !== null, '找不到「任务」栏')
+    ;(tab!.props.onClick as () => void)()
+    tree = await mount(empty.view, { sessionId: 'ses_1' })
+    const text = textOf(tree)
+    assert.ok(text.includes('依赖图'), `任务栏应带依赖图分节：${text.slice(0, 240)}`)
+    assert.ok(text.includes('任务之间还没有依赖'), '无边时要有空态')
+  } finally {
+    empty.restore()
+  }
+
+  const cross = loadClient(CROSS)
+  try {
+    let tree = await mount(cross.view, { sessionId: 'ses_1' })
+    const tab = findTab(tree, '任务')
+    assert.ok(tab !== null, '找不到「任务」栏')
+    ;(tab!.props.onClick as () => void)()
+    tree = await mount(cross.view, { sessionId: 'ses_1' })
+    const text = textOf(tree)
+    assert.ok(text.includes('2 个任务 · 1 条依赖'), `依赖图计数不对：${text.slice(0, 260)}`)
+    assert.ok(text.includes('← 核对单点'), '依赖行要写出前置任务')
+    assert.ok(text.includes('L1'), '被依赖的任务应下沉一层')
+    assert.ok(!text.includes('任务之间还没有依赖'), '有边时不该显示空态')
+  } finally {
+    cross.restore()
+  }
+})
+
+/** 泳道样本：Run run_1 挂两个任务（一个 review、一个 done），另有一条空 Run。 */
+const LANES: Record<string, unknown> = {
+  ...FILLED,
+  runs: {
+    items: [
+      { id: 'run_1', workflowId: 'wf_1', workflowRevision: 2, teamId: 'team_1', status: 'active', completionRevision: 1, revision: 3, taskCount: 2, createdAt: 'x', updatedAt: 'y' },
+      { id: 'run_2', workflowId: 'wf_2', workflowRevision: 1, teamId: 'team_1', status: 'active', completionRevision: 1, revision: 1, taskCount: 1, createdAt: 'x', updatedAt: 'y' },
+    ],
+  },
+  board: {
+    columns: [
+      {
+        status: 'review',
+        count: 1,
+        tasks: [
+          { id: 'task_1', title: '实现结算', status: 'review', ownerTeamId: 'team_1', ownerTeamName: '甲队', runId: 'run_1', blockedBy: [], dependencies: [], attemptId: null, updatedAt: 'x' },
+        ],
+      },
+      {
+        status: 'done',
+        count: 1,
+        tasks: [
+          { id: 'task_2', title: '写单测', status: 'done', ownerTeamId: 'team_1', ownerTeamName: '甲队', runId: 'run_1', blockedBy: [], dependencies: [], attemptId: null, updatedAt: 'x' },
+        ],
+      },
+    ],
+    totals: { all: 2 },
+    graphRevision: 3,
+  },
+}
+
+test('L2-F 流程泳道：按 Run 分行，空 Run 说清「没挂任务」', async () => {
+  const harness = loadClient(LANES)
+  try {
+    let tree = await mount(harness.view, { sessionId: 'ses_1' })
+    const tab = findTab(tree, '流程')
+    assert.ok(tab !== null, '找不到「流程」栏')
+    ;(tab!.props.onClick as () => void)()
+    tree = await mount(harness.view, { sessionId: 'ses_1' })
+    const text = textOf(tree)
+    assert.ok(text.includes('流程泳道'), `流程栏应带泳道分节：${text.slice(0, 240)}`)
+    assert.ok(text.includes('2 条 Run'), '泳道分节要写 Run 数')
+    assert.ok(text.includes('实现结算') && text.includes('写单测'), '泳道里要列出该 Run 的任务')
+    assert.ok(text.includes('这条 Run 还没有挂任务'), '空的 Run 要说清，不要留白')
+  } finally {
+    harness.restore()
+  }
+})
+
+test('L2-F 待你确认：有 review/blocked 时列出，没有时说「没有等你确认的事」', async () => {
+  const empty = loadClient(EMPTY)
+  try {
+    const tree = await mount(empty.view, { sessionId: 'ses_1' })
+    const text = textOf(tree)
+    assert.ok(text.includes('待你确认'), `概览应带待确认分节：${text.slice(0, 200)}`)
+    assert.ok(text.includes('没有等你确认的事'), '0 件时要有空态')
+  } finally {
+    empty.restore()
+  }
+
+  const filled = loadClient(FILLED)
+  try {
+    const tree = await mount(filled.view, { sessionId: 'ses_1' })
+    const text = textOf(tree)
+    assert.ok(text.includes('待你确认'), '概览应带待确认分节')
+    assert.ok(text.includes('1 件'), `计数应反映 attention：${text.slice(0, 260)}`)
+    assert.ok(text.includes('评审中的任务'), '待确认里要列出 review 任务')
+    assert.ok(!text.includes('没有等你确认的事'), '有事项时不该显示空态')
+  } finally {
+    filled.restore()
+  }
+})

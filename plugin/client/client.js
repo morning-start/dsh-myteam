@@ -588,6 +588,198 @@ window.__ModuleLoader__.load({
       )
     }
 
+
+
+    /**
+     * 流程泳道（L2-F / `p-lanes`）：一条 Run 一条泳道，泳道内按 templateKey 排列任务。
+     *
+     * 数据不额外请求：`runs` 给 Run 清单，`board` 的卡片带 `runId`，两边一join 就是泳道。
+     * 没有 Run 时不画空泳道，直接说「还没有工作流运行」并指向流程栏。
+     */
+    function LanesSection(props) {
+      const runs = Array.isArray(props.runs?.items) ? props.runs.items : []
+      const columns = Array.isArray(props.board?.columns) ? props.board.columns : []
+      const tasks = columns.flatMap((column) => (Array.isArray(column.tasks) ? column.tasks : []))
+      const byRun = new Map()
+      for (const task of tasks) {
+        if (task.runId === null || task.runId === undefined) continue
+        const list = byRun.get(task.runId) ?? []
+        list.push(task)
+        byRun.set(task.runId, list)
+      }
+
+      return h(
+        'div',
+        { className: 'body pad tight' },
+        h(SectionHeader, { title: '流程泳道', note: `${runs.length} 条 Run` }),
+        runs.length === 0
+          ? h('p', { className: 'muted', style: { margin: '6px 0 0', fontSize: 12 } }, '还没有工作流运行，所以没有泳道。实例化一个工作流后，这里会按 Run 分行。')
+          : h(
+              'div',
+              { className: 'list', style: { marginTop: 6 } },
+              runs.map((run) => {
+                const laneTasks = (byRun.get(run.id) ?? []).slice().sort((left, right) => (left.id < right.id ? -1 : 1))
+                return h(
+                  'div',
+                  { key: run.id, className: 'item' },
+                  h(
+                    'div',
+                    { className: 'l' },
+                    h('div', { className: 't' }, run.workflowId, ' ', h('span', { className: 'muted' }, run.id)),
+                    laneTasks.length === 0
+                      ? h('div', { className: 's' }, h('span', null, '这条 Run 还没有挂任务'))
+                      : h(
+                          'div',
+                          { className: 's' },
+                          laneTasks.map((task) =>
+                            h(
+                              'span',
+                              { key: task.id, style: { display: 'inline-flex', alignItems: 'center', gap: 4 } },
+                              h('span', { className: 'mono' }, task.title),
+                              h('span', { className: 'st-chip' }, String(task.status)),
+                            ),
+                          ),
+                        ),
+                  ),
+                  h('div', { className: 'r' }, h('span', { className: 'mono' }, `${laneTasks.length}/${run.taskCount ?? 0}`)),
+                )
+              }),
+            ),
+      )
+    }
+
+    /**
+     * 待你确认（L2-F / `p-approval`）：把「人类专属、等结论」的事收在一处。
+     *
+     * 来源是两份现成数据：`overview.attention` 给计数，`board` 的 review 列给具体任务。
+     * 没有就直接说没有 —— 不要让用户从九栏里自己找。
+     */
+    function ApprovalSection(props) {
+      const attention = props.overview?.attention ?? { review: 0, blocked: 0, unknownEffects: 0 }
+      const columns = Array.isArray(props.board?.columns) ? props.board.columns : []
+      const reviewColumn = columns.find((column) => column.status === 'review')
+      const reviewTasks = Array.isArray(reviewColumn?.tasks) ? reviewColumn.tasks : []
+      const blockedColumn = columns.find((column) => column.status === 'blocked')
+      const blockedTasks = Array.isArray(blockedColumn?.tasks) ? blockedColumn.tasks : []
+      const total = (attention.review ?? 0) + (attention.blocked ?? 0) + (attention.unknownEffects ?? 0)
+
+      return h(
+        'div',
+        { className: 'body pad tight' },
+        h(SectionHeader, { title: '待你确认', note: `${total} 件` }),
+        total === 0
+          ? h('p', { className: 'muted', style: { margin: '6px 0 0', fontSize: 12 } }, '没有等你确认的事。门禁、计划与未知副作用都会出现在这里。')
+          : h(
+              'div',
+              { className: 'list', style: { marginTop: 6 } },
+              reviewTasks.map((task) =>
+                h(ListRow, {
+                  key: task.id,
+                  title: task.title,
+                  sub: ['门禁裁决', task.ownerTeamName ?? '未指派团队', task.id],
+                  right: h('span', { className: 'st-chip' }, '待评审'),
+                  onClick: props.onOpenTask === undefined ? undefined : () => props.onOpenTask(task),
+                }),
+              ),
+              blockedTasks.map((task) =>
+                h(ListRow, {
+                  key: `blocked-${task.id}`,
+                  title: task.title,
+                  sub: [`受阻 ${task.blockedBy?.length ?? 0} 项`, task.ownerTeamName ?? '未指派团队'],
+                  right: h('span', { className: 'st-chip' }, '受阻'),
+                  onClick: props.onOpenTask === undefined ? undefined : () => props.onOpenTask(task),
+                }),
+              ),
+            ),
+      )
+    }
+    /**
+     * 依赖图（L2-F / `p-dag`）：把看板里的完整依赖边画成「层级 + 前置清单」。
+     *
+     * 为什么不做画布：宿主只给我们一块面板，SVG 布局得自己算坐标、还得处理缩放；
+     * 先把**结构**表达清楚（层级、前置、环路）比先画得好看重要。层级 = 最长前置链，
+     * 有环时明确报出来，而不是悄悄画成一条线。
+     */
+    function DagSection(props) {
+      const columns = Array.isArray(props.board?.columns) ? props.board.columns : []
+      const tasks = columns.flatMap((column) => (Array.isArray(column.tasks) ? column.tasks : []))
+      const byId = new Map(tasks.map((task) => [task.id, task]))
+      const edges = []
+      for (const task of tasks) {
+        for (const dependencyId of Array.isArray(task.dependencies) ? task.dependencies : []) {
+          if (byId.has(dependencyId)) edges.push({ from: dependencyId, to: task.id })
+        }
+      }
+
+      // 最长前置链深度（同时检测环路：visiting 里再遇到就是环）。
+      const depth = new Map()
+      const visiting = new Set()
+      const cycle = []
+      const depthOf = (id) => {
+        if (depth.has(id)) return depth.get(id)
+        if (visiting.has(id)) {
+          cycle.push(id)
+          return 0
+        }
+        visiting.add(id)
+        const task = byId.get(id)
+        const deps = (Array.isArray(task?.dependencies) ? task.dependencies : []).filter((dep) => byId.has(dep))
+        const level = deps.length === 0 ? 0 : Math.max(...deps.map((dep) => depthOf(dep) + 1))
+        visiting.delete(id)
+        depth.set(id, level)
+        return level
+      }
+      for (const task of tasks) depthOf(task.id)
+
+      const rows = [...tasks].sort((left, right) => {
+        const byLevel = (depth.get(left.id) ?? 0) - (depth.get(right.id) ?? 0)
+        return byLevel !== 0 ? byLevel : left.id < right.id ? -1 : left.id > right.id ? 1 : 0
+      })
+
+      const titleOf = (id) => byId.get(id)?.title ?? id
+
+      return h(
+        'div',
+        { className: 'body pad tight' },
+        h(SectionHeader, { title: '依赖图', note: `${rows.length} 个任务 · ${edges.length} 条依赖` }),
+        cycle.length > 0
+          ? h('div', { className: 'banner plan', style: { marginTop: 8 } },
+              h(Icon, { name: 'alert' }),
+              h('div', { className: 'b-t' }, h('b', null, '检测到依赖环路'), h('span', null, `涉及 ${cycle.length} 个任务，图不完整`)))
+          : null,
+        edges.length === 0
+          ? h('p', { className: 'muted', style: { margin: '6px 0 0', fontSize: 12 } }, '任务之间还没有依赖。')
+          : h(
+              'div',
+              { className: 'list', style: { marginTop: 6 } },
+              rows.map((task) =>
+                h(
+                  'div',
+                  { key: task.id, className: 'item', style: { paddingLeft: 2 + (depth.get(task.id) ?? 0) * 18 } },
+                  h(
+                    'div',
+                    { className: 'l' },
+                    h(
+                      'div',
+                      { className: 't' },
+                      h('span', { className: 'mono', style: { marginRight: 8 } }, `L${depth.get(task.id) ?? 0}`),
+                      task.title,
+                    ),
+                    h(
+                      'div',
+                      { className: 's' },
+                      h('span', { className: 'mono' }, `前置 ${task.dependencies?.length ?? 0}`),
+                      ...[...(Array.isArray(task.dependencies) ? task.dependencies : [])].map((dependencyId) =>
+                        h('span', { key: dependencyId }, `← ${titleOf(dependencyId)}`),
+                      ),
+                    ),
+                  ),
+                  h('div', { className: 'r' }, h('span', { className: 'st-chip' }, String(task.status))),
+                ),
+              ),
+            ),
+      )
+    }
     /**
      * 新建任务表单（`taskCreate`，直接确认类写动作）。
      *
@@ -779,6 +971,7 @@ window.__ModuleLoader__.load({
             )
           }),
         ),
+        h(DagSection, { board: data }),
       )
     }
 
@@ -1624,7 +1817,10 @@ window.__ModuleLoader__.load({
         body = h(TaskDetail, { taskId, sessionId, onBack: () => setTaskId(null) })
       } else if (tab === 'overview') {
         body = h(Data, { data: overview, what: '项目概览' }, (data) =>
-          h(OverviewScreen, { data, events: overviewEvents.data?.items, board: board.data, onSelect: go }))
+          [
+          h(OverviewScreen, { data, events: overviewEvents.data?.items, board: board.data, onSelect: go }),
+          h(ApprovalSection, { overview: overview.data, board: board.data, onOpenTask: (task) => { setTaskId(task.id) } }),
+        ])
       } else if (tab === 'tasks') {
         body = h(Data, { data: board, what: '任务看板' }, (data) =>
           h(TasksScreen, {
@@ -1646,6 +1842,7 @@ window.__ModuleLoader__.load({
             ? [
                 h(Data, { data: runs, what: '工作流运行' }, (data) =>
                   h(RunsScreen, { data, onOpenRun: (run) => setRunId(run.id) })),
+                h(LanesSection, { runs: runs.data, board: board.data }),
                 h(Data, { data: effects, what: '副作用' }, (data) => h(EffectsSection, { data })),
               ]
             : h(RunDetail, { runId, sessionId, onBack: () => setRunId(null) })
