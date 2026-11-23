@@ -842,7 +842,12 @@ test('L2-B1 任务 / 团队 / 定义 / 流程四页：关键字段与空态都�
       const tab = findTab(tree, label)
       assert.ok(tab !== null, `找不到「${label}」栏`)
       ;(tab!.props.onClick as () => void)()
-      tree = await mount(harness.view, { sessionId: 'ses_1' })
+      // 条件请求的栏（知识/记忆/审计/设置）点开后要等异步数据落地，多挂几帧直到出现内容。
+      for (let round = 0; round < 8; round += 1) {
+        tree = await mount(harness.view, { sessionId: 'ses_1' })
+        const now = textOf(tree)
+        if (now.length > 400) return now
+      }
       return textOf(tree)
     }
 
