@@ -590,6 +590,98 @@ window.__ModuleLoader__.load({
 
 
 
+
+    /**
+     * 名册树（L2-C / `p-roster-tree`）：父成员 → 子成员按层级缩进。
+     *
+     * 数据就是 `team.members` 的 `parentMemberId`：父子关系是聘任时定的，不额外请求。
+     * 找不到父成员（父已释放/被删）的成员单列成「孤儿」，不要静默吞掉。
+     */
+    function RosterTree(props) {
+      const members = Array.isArray(props.members) ? props.members : []
+      const roleName = (roleId) => props.roles?.find((role) => role.id === roleId)?.name ?? roleId
+      if (members.length === 0) {
+        return h('p', { className: 'muted', style: { margin: '6px 0 0', fontSize: 12 } }, '这支团队还没有成员。在会话里让队长召唤，或从团队栏发起。')
+      }
+      const ids = new Set(members.map((member) => member.id))
+      const children = new Map()
+      const roots = []
+      for (const member of members) {
+        if (member.parentMemberId === null || member.parentMemberId === undefined || !ids.has(member.parentMemberId)) {
+          roots.push(member)
+        } else {
+          const list = children.get(member.parentMemberId) ?? []
+          list.push(member)
+          children.set(member.parentMemberId, list)
+        }
+      }
+      const rows = []
+      const walk = (member, depth) => {
+        rows.push({ member, depth, orphan: member.parentMemberId !== null && member.parentMemberId !== undefined && !ids.has(member.parentMemberId) })
+        for (const child of children.get(member.id) ?? []) walk(child, depth + 1)
+      }
+      for (const root of roots.sort((left, right) => (left.id < right.id ? -1 : 1))) walk(root, 0)
+
+      return h(
+        'div',
+        { style: { marginTop: 8 } },
+        rows.map((row) =>
+          h(
+            'div',
+            { key: row.member.id, className: 'item', style: { paddingLeft: 2 + row.depth * 18 } },
+            h(
+              'div',
+              { className: 'l' },
+              h('div', { className: 't' }, `${row.depth === 0 ? '●' : '└'} ${roleName(row.member.roleId)}`),
+              h(
+                'div',
+                { className: 's' },
+                h('span', { className: 'mono' }, row.member.id),
+                row.orphan ? h('span', null, '（父成员已不在名册）') : null,
+              ),
+            ),
+            h('div', { className: 'r' }, h('span', { className: 'st-chip' }, String(row.member.status))),
+          ),
+        ),
+      )
+    }
+
+    /** 角色详情（L2-C / `p-role`）：profile + 能力矩阵 + 谁在用。数据来自 definitions.detail。 */
+    function RoleDetailBox(props) {
+      const item = props.item
+      const detail = item?.detail
+      if (detail === null || detail === undefined) {
+        return h('p', { className: 'muted', style: { margin: '8px 0 0', fontSize: 12 } }, '这个角色定义的正文已经不在投影里（可能被归档）。')
+      }
+      const profile = detail.profile ?? {}
+      const caps = detail.capabilities ?? {}
+      const list = (value) => (Array.isArray(value) ? value : [])
+      const usedBy = Array.isArray(props.members) ? props.members.filter((member) => member.roleId === item.id) : []
+      return h(
+        'div',
+        { style: { marginTop: 8 } },
+        h(SectionHeader, { title: profile.name ?? item.id, note: `rev ${item.revision}` }),
+        h('div', { className: 's', style: { marginTop: 4 } }, h('span', null, profile.purpose ?? '')),
+        h('p', { className: 'muted', style: { margin: '6px 0 0', fontSize: 12 } }, String(profile.instructions ?? '')),
+        h(SectionHeader, { title: '能力', note: `${list(caps.tools?.allow).length} 工具 / ${list(caps.skills).length} 技能` }),
+        h(
+          'div',
+          { className: 'kws', style: { marginTop: 6 } },
+          list(caps.tools?.allow).length === 0
+            ? h('span', { className: 'kw' }, '未声明工具')
+            : list(caps.tools.allow).map((tool) => h('span', { key: `t-${tool}`, className: 'kw' }, String(tool))),
+          list(caps.skills).map((skill) => h('span', { key: `s-${skill}`, className: 'kw' }, String(skill))),
+        ),
+        h(SectionHeader, { title: '谁在用', note: `${usedBy.length} 个成员` }),
+        usedBy.length === 0
+          ? h('p', { className: 'muted', style: { margin: '6px 0 0', fontSize: 12 } }, '还没有成员用这个角色。')
+          : h(
+              'div',
+              { className: 's', style: { marginTop: 4 } },
+              usedBy.map((member) => h('span', { key: member.id, className: 'mono' }, member.id)),
+            ),
+      )
+    }
     /**
      * 流程泳道（L2-F / `p-lanes`）：一条 Run 一条泳道，泳道内按 templateKey 排列任务。
      *
@@ -1297,10 +1389,7 @@ window.__ModuleLoader__.load({
                   'div',
                   null,
                   h('div', { className: 'rc-h' }, h(Dot, { tone: 'run' }), h('span', { className: 'nm' }, data.team.name), h('span', { className: 'tag' }, TEAM_STATUS[data.team.status] ?? data.team.status)),
-                  h('div', { className: 'kws', style: { marginTop: 10 } },
-                    data.members.length === 0
-                      ? h('span', { className: 'kw' }, '暂无成员')
-                      : data.members.map((member) => h('span', { key: member.id, className: 'kw' }, `${member.roleId} · ${member.status}`))),
+                  h(RosterTree, { members: data.members, roles: data.roles }),
                   h('p', { className: 'muted', style: { margin: '10px 0 0', fontSize: 12 } },
                     `任务 ${data.tasks.length} 个 · 可用角色 ${data.roles.length} 个 · 配置 ${data.config === null ? '未落盘' : `revision ${data.config.revision ?? '—'}`}`),
                 ),
@@ -1354,6 +1443,8 @@ window.__ModuleLoader__.load({
     function DefinitionsScreen(props) {
       const { data, sessionId, onChanged } = props
       const items = Array.isArray(data.items) ? data.items : []
+      const [opened, setOpened] = useState(null)
+      const openedItem = items.find((item) => `:` === opened) ?? null
       return h(
         'div',
         { className: 'body pad' },
@@ -1365,7 +1456,7 @@ window.__ModuleLoader__.load({
               items.map((item) =>
                 h(
                   'div',
-                  { key: `${item.kind}:${item.id}`, className: 'item' },
+                  { key: `${item.kind}:${item.id}`, className: 'item pick', onClick: () => setOpened(opened === `${item.kind}:${item.id}` ? null : `${item.kind}:${item.id}`) },
                   h(
                     'div',
                     { className: 'l' },
@@ -1389,6 +1480,9 @@ window.__ModuleLoader__.load({
                 ),
               ),
             ),
+        openedItem === null || openedItem.kind !== 'role'
+          ? null
+          : h('div', { className: 'box', style: { padding: '12px 16px', marginTop: 12 } }, h(RoleDetailBox, { item: openedItem, members: props.members })),
       )
     }
 
@@ -1835,7 +1929,7 @@ window.__ModuleLoader__.load({
           h(TeamsScreen, { overview, sessionId, onChanged: () => void overview.reload() }))
       } else if (tab === 'definitions') {
         body = h(Data, { data: definitions, what: '项目定义副本' }, (data) =>
-          h(DefinitionsScreen, { data, sessionId, onChanged: () => void definitions.reload() }))
+          h(DefinitionsScreen, { data, sessionId, members: [], onChanged: () => void definitions.reload() }))
       } else if (tab === 'runs') {
         body =
           runId === null

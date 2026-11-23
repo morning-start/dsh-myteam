@@ -142,7 +142,7 @@ test('面板：定义清单带 lineage 字段，不猜上游状态', async () =>
     assert.equal(definitions.ok, true)
     const data = (definitions as {
       ok: true
-      data: { items: { kind: string; name: string; localChanged: boolean; upstreamChanged: null; updateAvailable: null }[] }
+      data: { items: { kind: string; name: string; localChanged: boolean; upstreamChanged: null; updateAvailable: null; detail: unknown }[] }
     }).data
     assert.equal(data.items.length, 1)
     assert.equal(data.items[0]!.kind, 'role')
@@ -150,6 +150,10 @@ test('面板：定义清单带 lineage 字段，不猜上游状态', async () =>
     assert.equal(data.items[0]!.localChanged, false)
     assert.equal(data.items[0]!.upstreamChanged, null)
     assert.equal(data.items[0]!.updateAvailable, null)
+    // 详情页要用的正文：角色给 profile + capabilities（缺了就只能显示一行名字）。
+    const roleDetail = data.items[0]!.detail as { profile: { name: string }; capabilities: { tools: { allow: string[] } } }
+    assert.equal(roleDetail.profile.name, '实现者')
+    assert.deepEqual(roleDetail.capabilities.tools.allow, ['read'])
   } finally {
     await hosts.closeAll()
     rmSync(dir, { recursive: true, force: true })

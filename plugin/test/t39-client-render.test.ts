@@ -393,6 +393,7 @@ const FILLED: Record<string, unknown> = {
         kind: 'role',
         id: 'role_1',
         name: '实现者',
+        detail: { profile: { name: '实现者', purpose: '实现', instructions: '按 AC 做', specialties: [] }, capabilities: { tools: { allow: ['read'], deny: [] }, mcp: { allow: [], deny: [] }, skills: ['run-tests'] } },
         revision: 3,
         contentHash: 'abcdef123456',
         baseHash: 'abcdef123456',
@@ -972,5 +973,45 @@ test('L2-F 待你确认：有 review/blocked 时列出，没有时说「没有�
     assert.ok(!text.includes('没有等你确认的事'), '有事项时不该显示空态')
   } finally {
     filled.restore()
+  }
+})
+
+test('L2-C 名册树：按父子层级渲染，孤儿成员也列出来', async () => {
+  const harness = loadClient(FILLED)
+  try {
+    let tree = await mount(harness.view, { sessionId: 'ses_1' })
+    const teamsTab = findTab(tree, '团队')
+    assert.ok(teamsTab !== null, '找不到「团队」栏')
+    ;(teamsTab!.props.onClick as () => void)()
+    tree = await mount(harness.view, { sessionId: 'ses_1' })
+    const pick = findButton(tree, '甲队')
+    assert.ok(pick !== null, '团队栏应有团队按钮')
+    ;(pick!.props.onClick as () => void)()
+    let teamsText = ''
+    for (let round = 0; round < 6; round += 1) {
+      tree = await mount(harness.view, { sessionId: 'ses_1' })
+      teamsText = textOf(tree)
+      if (teamsText.includes('member_1')) break
+    }
+    assert.ok(teamsText.includes('实现者'), '名册树应显示角色名：' + teamsText.slice(0, 260))
+    assert.ok(teamsText.includes('member_1'), '名册树应显示成员 id')
+  } finally {
+    harness.restore()
+  }
+})
+
+test('L2-C 角色详情：定义行可点开（交互契约；正文由 t14 的 detail 断言守着）', async () => {
+  const harness = loadClient(FILLED)
+  try {
+    let tree = await mount(harness.view, { sessionId: 'ses_1' })
+    const defTab = findTab(tree, '定义')
+    assert.ok(defTab !== null, '找不到「定义」栏')
+    ;(defTab!.props.onClick as () => void)()
+    tree = await mount(harness.view, { sessionId: 'ses_1' })
+    const row = findByClass(tree, 'item pick')
+    assert.ok(row !== null, '定义行应可点开（item pick）')
+    assert.equal(typeof row!.props.onClick, 'function', '可点开的定义行必须有 onClick')
+  } finally {
+    harness.restore()
   }
 })

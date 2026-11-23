@@ -76,6 +76,11 @@ interface DefinitionSummary {
   /** 需要全局库才能判断；未接入时保持 null，不猜。 */
   upstreamChanged: boolean | null
   updateAvailable: boolean | null
+  /**
+   * 定义正文（详情页要看的东西）：角色给 profile + capabilities，工作流给 templates + completion，
+   * 蓝图给 formation + workflows + defaults。定义已不存在时是 null —— 不补空壳。
+   */
+  detail: unknown
 }
 
 /**
@@ -103,6 +108,22 @@ function entitySummary(entity: unknown): { kind: string; id: string } {
   }
 }
 
+/** 定义正文：详情页要看的字段；定义已不在投影里就返回 null。 */
+function definitionDetail(state: ProjectState, kind: 'role' | 'workflow' | 'blueprint', id: string): unknown {
+  if (kind === 'role') {
+    const role = state.roles.get(id)
+    return role === undefined ? null : { profile: role.profile, capabilities: role.capabilities }
+  }
+  if (kind === 'workflow') {
+    const workflow = state.workflows.get(id)
+    return workflow === undefined ? null : { templates: workflow.templates, completion: workflow.completion }
+  }
+  const blueprint = state.blueprints.get(id)
+  return blueprint === undefined
+    ? null
+    : { formation: blueprint.formation, workflows: blueprint.workflows, defaults: blueprint.defaults, description: blueprint.description }
+}
+
 function definitionSummaries(state: ProjectState): DefinitionSummary[] {
   const result: DefinitionSummary[] = []
   for (const meta of state.definitionMeta.values()) {
@@ -125,6 +146,7 @@ function definitionSummaries(state: ProjectState): DefinitionSummary[] {
       localChanged: meta.contentHash !== meta.baseHash,
       upstreamChanged: null,
       updateAvailable: null,
+      detail: definitionDetail(state, meta.kind, meta.id),
     })
   }
   return result.sort((left, right) => (left.kind === right.kind ? left.id.localeCompare(right.id) : left.kind.localeCompare(right.kind)))
