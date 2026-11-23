@@ -8,11 +8,12 @@
  */
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
+import { existsSync, readFileSync } from 'node:fs'
 import { join, dirname } from 'node:path'
 import { fileURLToPath, pathToFileURL } from 'node:url'
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..')
-const { createPanelRouteHandler, PANEL_ROUTE_PREFIX, PANEL_ASSET_PATH, buildDesignCss } = (await import(
+const { createPanelRouteHandler, PANEL_ROUTE_PREFIX, PANEL_ASSET_PATH, buildDesignCss, resolveDesignDir } = (await import(
   pathToFileURL(join(ROOT, 'lib', 'composition', 'panel.mjs')).href
 )) as {
   createPanelRouteHandler: (
@@ -23,6 +24,7 @@ const { createPanelRouteHandler, PANEL_ROUTE_PREFIX, PANEL_ASSET_PATH, buildDesi
   PANEL_ROUTE_PREFIX: string
   PANEL_ASSET_PATH: string
   buildDesignCss: (read: (file: string) => string) => string
+  resolveDesignDir: () => string
 }
 
 interface Captured {
@@ -185,6 +187,21 @@ test('设计稿样式表：作用域换成 [data-myteam]，GET 回 text/css', as
   assert.equal(captured.status, 200)
   assert.match(captured.headers['content-type'], /text\/css/)
   assert.match(captured.body, /\[data-myteam\] \.wt/)
+})
+
+test('设计稿目录：仓库开发与打包安装两种形态都读得到样式表', () => {
+  // 为什么会漏：样式表目录原来只按「包根/../design-v2」推，仓库开发与 link: 安装都成立；
+  // 一旦打包装（= 真 npm 安装，包被复制到 node_modules/dsh-plugin-myteam），
+  // 那个路径指向 node_modules/design-v2 → 样式表 500、面板裸奔。
+  const designDir = resolveDesignDir()
+  assert.ok(existsSync(join(designDir, 'myteam.css')), `design 目录里没有 myteam.css：${designDir}`)
+  assert.ok(existsSync(join(designDir, 'tokens.css')), `design 目录里没有 tokens.css：${designDir}`)
+
+  const manifest = JSON.parse(readFileSync(join(ROOT, 'package.json'), 'utf8')) as { files: string[] }
+  assert.ok(manifest.files.includes('design-v2'), 'package.json 的 files 必须带 design-v2，否则包里没有样式表')
+
+  const build = readFileSync(join(ROOT, 'scripts', 'build-lib.mjs'), 'utf8')
+  assert.match(build, /copyDesignAssets\(\)/, '构建必须把仓库 design-v2 拷进包里（打包安装才读得到）')
 })
 
 test('样式表同样过准入：未认证 401，且不装配时 404', async () => {

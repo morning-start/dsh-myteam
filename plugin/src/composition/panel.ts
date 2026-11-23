@@ -8,6 +8,7 @@
  * 本文件只做三件事：把 7 个只读方法摊平、按会话解析工作区、把结果交给
  * `PanelService`。业务一律在服务里，这里不做判断。
  */
+import { existsSync } from 'node:fs'
 import { readFile } from 'node:fs/promises'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
@@ -414,14 +415,28 @@ export function createPanelRouteHandler(
 }
 
 /**
- * 设计稿目录。默认按插件位置推出仓库根的 `design-v2`（开发/`link:` 安装成立），
- * `MYTEAM_DESIGN_DIR` 可以覆盖（打包安装或想让两侧读到同一份设计稿时用）。
+ * 设计稿目录。
+ *
+ * 两种安装形态都要成立：
+ *   - **npm 安装/打包安装**：`<包根>/design-v2`（`scripts/build-lib.mjs` 在构建时把仓库的
+ *     `design-v2` 拷进包里，`package.json` 的 `files` 带上它）；
+ *   - **仓库开发 / `link:` 安装**：`<包根>/../design-v2`（设计稿在仓库根）。
+ *
+ * 早期只算了后者，结果是 `link:` 安装一切正常、复制安装（= 真正的 npm 安装）样式表 500、
+ * 面板裸奔 —— 隔离实例用的是 `link:`，一直没暴露。
+ * `MYTEAM_DESIGN_DIR` 仍然可以覆盖（调试或让两侧读同一份设计稿时用）。
  * @returns 绝对路径。
  */
 export function resolveDesignDir(): string {
   const fromEnv = process.env.MYTEAM_DESIGN_DIR
   if (typeof fromEnv === 'string' && fromEnv.trim() !== '') return fromEnv.trim()
-  return join(dirname(fileURLToPath(import.meta.url)), '../../..', 'design-v2')
+  const packageRoot = join(dirname(fileURLToPath(import.meta.url)), '../..')
+  // 先看仓库根（开发 / `link:` 安装：改 design-v2 立刻生效），再看包内副本（打包安装）。
+  const candidates = [join(packageRoot, '..', 'design-v2'), join(packageRoot, 'design-v2')]
+  for (const dir of candidates) {
+    if (existsSync(join(dir, 'myteam.css'))) return dir
+  }
+  return candidates[0]
 }
 
 /**

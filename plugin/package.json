@@ -43,6 +43,7 @@
     "src",
     "client",
     "scripts",
+    "design-v2",
     "cordis.patch.yml",
     "icon.svg"
   ],

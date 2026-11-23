@@ -8,6 +8,8 @@ node_modules/
 # v2 构建产物：可安装前由 `node scripts/build-lib.mjs` 生成，不入库
 lib/
 lib.__staging__/
+# 设计稿样式表的包内副本（构建时从仓库根 design-v2 拷入，随包分发 → 打包安装才读得到）
+design-v2/
 
 # 冒烟/本地运行可能在工作区内生成的运行期数据
 .dsh-myteam/

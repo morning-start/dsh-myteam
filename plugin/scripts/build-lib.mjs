@@ -40,6 +40,7 @@ import {
   renameSync,
   realpathSync,
   existsSync,
+  copyFileSync,
 } from 'node:fs'
 import { createHash } from 'node:crypto'
 import { spawnSync } from 'node:child_process'
@@ -288,6 +289,7 @@ async function main() {
     renameSync(stagingDir, libDir)
     swapped = true
     console.log(`[build] OK — ${files.length} module(s) → lib/；入口 ${ENTRY}`)
+    copyDesignAssets()
     console.log(
       `[build] manifest sourceHash=${manifest.sourceHash.slice(0, 12)}… clientHash=${clientHash === null ? 'n/a' : `${clientHash.slice(0, 12)}…`}`,
     )
@@ -295,6 +297,27 @@ async function main() {
     // 失败清理：留下半截暂存目录只会污染下一次构建（成功后 rename 已消费掉它）
     if (!swapped) rmSync(stagingDir, { recursive: true, force: true })
   }
+}
+
+/**
+ * 把仓库根的设计稿拷进包里：`<包根>/design-v2`。
+ *
+ * 为什么必须在包里有一份：面板样式表由宿主从 `/__myteam/assets/design.css` 供出，服务端读的是
+ * 「插件包里的 design-v2」。仓库开发与 `link:` 安装时包根就是 `<repo>/plugin`，`../design-v2`
+ * 找得到；但**打包装（= 真正的 npm 安装）**会把包复制到 `node_modules/dsh-plugin-myteam`，
+ * `../design-v2` 就指向 `node_modules/design-v2` —— 不存在，样式表 500、面板裸奔。
+ * 隔离实例一直用 `link:` 安装，所以这个坑没暴露出来。
+ */
+function copyDesignAssets() {
+  const repoDesign = join(root, '..', 'design-v2')
+  const packagedDesign = join(root, 'design-v2')
+  const files = ['tokens.css', 'myteam.css']
+  const missing = files.filter((file) => !existsSync(join(repoDesign, file)))
+  if (missing.length > 0) throw new Error(`仓库 design-v2 缺少 ${missing.join(', ')}，样式表会 500`)
+  rmSync(packagedDesign, { recursive: true, force: true })
+  mkdirSync(packagedDesign, { recursive: true })
+  for (const file of files) copyFileSync(join(repoDesign, file), join(packagedDesign, file))
+  console.log(`[build] design-v2 → 包内 ${files.length} 个 css（打包安装才找得到样式表）`)
 }
 
 /** 直接 `node scripts/build-lib.mjs` 才执行；被 tools/check-drift.mjs import 时只取 compileSource */
