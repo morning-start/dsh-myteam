@@ -20,13 +20,13 @@ import { ERROR_CODES, fail } from '../contracts/errors.ts'
 import type { GlobalPublicationPort, PublicationKind } from '../contracts/publication.ts'
 import { HumanAuthorizer } from '../domain/permissions/human-authorizer.ts'
 import type { HumanConfirmation } from '../domain/permissions/human-authorizer.ts'
-import { appointMemberCommand, createTaskCommand, createTeamCommand, releaseMemberCommand } from './commands.ts'
+import { appointMemberCommand, claimTaskCommand, createTaskCommand, createTeamCommand, releaseMemberCommand } from './commands.ts'
 import { forgetMemory, rememberMemory } from './memory-commands.ts'
 import type { MemoryPort } from './ports.ts'
 import { confirmDefinitionPublication, requestDefinitionPublication } from './publication.ts'
 import { confirmCaptainTakeover, confirmTeamDisband, previewCaptainTakeover, previewTeamDisband } from './human-actions.ts'
 import type { ProjectRuntime } from './project-runtime.ts'
-import { recordVerdictCommand } from './task-commands.ts'
+import { cancelTaskCommand, recordVerdictCommand, reopenTaskCommand } from './task-commands.ts'
 
 /** 面板写方法白名单。新增写能力必须同时在这里登记并补测试。 */
 export const PANEL_WRITE_METHODS = [
@@ -34,6 +34,7 @@ export const PANEL_WRITE_METHODS = [
   'captainTakeover',
   'gateVerdict',
   'taskCreate',
+  'taskMove',
   'teamCreate',
   'memberAppoint',
   'memberRelease',
@@ -60,6 +61,7 @@ export const PANEL_WRITE_KINDS: Readonly<Record<PanelWriteMethod, PanelWriteKind
   captainTakeover: 'token',
   gateVerdict: 'direct',
   taskCreate: 'direct',
+  taskMove: 'direct',
   teamCreate: 'direct',
   memberAppoint: 'direct',
   memberRelease: 'direct',
@@ -84,6 +86,7 @@ export const PANEL_WRITE_DOCS: Readonly<Record<PanelWriteMethod, string>> = {
   captainTakeover: '队长接管：预览世代递增与生效成员，凭一次性令牌执行。动作 `captain.takeover`（人类专属）。',
   gateVerdict: '门禁裁决：对评审中的任务写入 pass / fail / blocked 与检查结果，需 `confirm: true`。',
   taskCreate: '新建任务：标题、验收标准、依赖与所需角色，建在指定团队下，需 `confirm: true`。',
+  taskMove: '移动任务：只支持取消 / 重开 / 认领三个方向的合法迁移；完成必须走门禁裁决，需 `confirm: true`。',
   teamCreate: '建团队：名字、目标、队长会话（可选蓝图初始化角色与配置），需 `confirm: true`。',
   memberAppoint: '召唤成员：团队 + 角色（可选父成员与会话）→ 聘任并固化角色快照，需 `confirm: true`。',
   memberRelease: '释放成员（终态）：成员不能有进行中的尝试；释放后不再接活，需 `confirm: true`。',
@@ -297,6 +300,8 @@ export function previewPanelWrite(
       fail(ERROR_CODES.INVALID_COMMAND, 'gateVerdict 不走确认令牌：直接带 confirm: true 提交（见 applyDirectPanelWrite）')
     case 'taskCreate':
       fail(ERROR_CODES.INVALID_COMMAND, 'taskCreate 不走确认令牌：直接带 confirm: true 提交（见 applyDirectPanelWrite）')
+    case 'taskMove':
+      fail(ERROR_CODES.INVALID_COMMAND, 'taskMove 不走确认令牌：直接带 confirm: true 提交（见 applyDirectPanelWrite）')
     case 'teamCreate':
       fail(ERROR_CODES.INVALID_COMMAND, 'teamCreate 不走确认令牌：直接带 confirm: true 提交（见 applyDirectPanelWrite）')
     case 'memberAppoint':
@@ -373,6 +378,8 @@ export function applyPanelWrite(
       fail(ERROR_CODES.INVALID_COMMAND, 'gateVerdict 不使用确认令牌，请走 applyDirectPanelWrite')
     case 'taskCreate':
       fail(ERROR_CODES.INVALID_COMMAND, 'taskCreate 不使用确认令牌，请走 applyDirectPanelWrite')
+    case 'taskMove':
+      fail(ERROR_CODES.INVALID_COMMAND, 'taskMove 不使用确认令牌，请走 applyDirectPanelWrite')
     case 'teamCreate':
       fail(ERROR_CODES.INVALID_COMMAND, 'teamCreate 不使用确认令牌，请走 applyDirectPanelWrite')
     case 'memberAppoint':
@@ -551,6 +558,28 @@ export function applyDirectPanelWrite(
           },
         },
       }
+    }
+    case 'taskMove': {
+      if (input.confirm !== true) fail(ERROR_CODES.INVALID_PAYLOAD, '移动任务需要 confirm: true')
+      const taskId = requireString(input.params, 'taskId')
+      const targetStatus = requireString(input.params, 'targetStatus')
+      const reason = optionalString(input.params, 'reason') ?? '面板移动任务'
+      if (targetStatus === 'cancelled') {
+        cancelTaskCommand(runtime, { actor: PANEL_HUMAN, taskId, reason })
+        return { method, operationId: taskId, committed: { taskId, status: 'cancelled' } }
+      }
+      if (targetStatus === 'ready') {
+        reopenTaskCommand(runtime, { actor: PANEL_HUMAN, taskId, reason })
+        return { method, operationId: taskId, committed: { taskId, status: 'ready' } }
+      }
+      if (targetStatus === 'claimed') {
+        const memberId = requireString(input.params, 'memberId')
+        claimTaskCommand(runtime, { actor: PANEL_HUMAN, taskId, memberId })
+        return { method, operationId: taskId, committed: { taskId, status: 'claimed', memberId } }
+      }
+      fail(ERROR_CODES.INVALID_PAYLOAD, 'taskMove 只支持 targetStatus = cancelled / ready / claimed；完成（done）必须走门禁裁决', {
+        details: { targetStatus },
+      })
     }
     case 'teamCreate': {
       if (input.confirm !== true) fail(ERROR_CODES.INVALID_PAYLOAD, '建团队需要 confirm: true')

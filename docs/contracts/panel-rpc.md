@@ -42,6 +42,7 @@
 | `captainTakeover` | `token` | 队长接管：预览世代递增与生效成员，凭一次性令牌执行。动作 `captain.takeover`（人类专属）。 |
 | `gateVerdict` | `direct` | 门禁裁决：对评审中的任务写入 pass / fail / blocked 与检查结果，需 `confirm: true`。 |
 | `taskCreate` | `direct` | 新建任务：标题、验收标准、依赖与所需角色，建在指定团队下，需 `confirm: true`。 |
+| `taskMove` | `direct` | 移动任务：只支持取消 / 重开 / 认领三个方向的合法迁移；完成必须走门禁裁决，需 `confirm: true`。 |
 | `teamCreate` | `direct` | 建团队：名字、目标、队长会话（可选蓝图初始化角色与配置），需 `confirm: true`。 |
 | `memberAppoint` | `direct` | 召唤成员：团队 + 角色（可选父成员与会话）→ 聘任并固化角色快照，需 `confirm: true`。 |
 | `memberRelease` | `direct` | 释放成员（终态）：成员不能有进行中的尝试；释放后不再接活，需 `confirm: true`。 |
