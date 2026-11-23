@@ -363,6 +363,7 @@ const FILLED: Record<string, unknown> = {
             ownerTeamName: '甲队',
             runId: null,
             blockedBy: [],
+            dependencies: [],
             attemptId: 'attempt_1',
             updatedAt: '2026-01-01T00:00:00.000Z',
           },
@@ -781,6 +782,84 @@ test('定义栏：发布到全局库也走两段确认，且 params 带 kind/id'
     await mount(harness.view, { sessionId: 'ses_1' })
     assert.deepEqual(harness.writes, ['definitionPublish', 'definitionPublish'])
     assert.equal(harness.writeBody?.action, 'confirm')
+  } finally {
+    harness.restore()
+  }
+})
+
+/** 跨团队依赖的样本：甲队的 task_1 被乙队的 task_2 卡住（blockedBy 指向另一团队）。 */
+const CROSS: Record<string, unknown> = {
+  ...FILLED,
+  board: {
+    columns: [
+      {
+        status: 'in_progress',
+        count: 2,
+        tasks: [
+          { id: 'task_1', title: '结算接口', status: 'in_progress', ownerTeamId: 'team_1', ownerTeamName: '甲队', runId: null, blockedBy: ['task_2'], dependencies: ['task_2'], attemptId: null, updatedAt: 'x' },
+          { id: 'task_2', title: '核对单点', status: 'in_progress', ownerTeamId: 'team_2', ownerTeamName: '乙队', runId: null, blockedBy: [], dependencies: [], attemptId: null, updatedAt: 'x' },
+        ],
+      },
+    ],
+    totals: { all: 2 },
+    graphRevision: 5,
+  },
+}
+
+test('L2-B1 概览：四张卡 / 团队 / 跨团队依赖 / 最近事件四节都在，空态说清楚', async () => {
+  const harness = loadClient(FILLED)
+  try {
+    const tree = await mount(harness.view, { sessionId: 'ses_1' })
+    const text = textOf(tree)
+    for (const label of ['团队', '跨团队依赖', '最近事件']) {
+      assert.ok(text.includes(label), `概览缺「${label}」这一节`)
+    }
+    assert.ok(text.includes('任务之间还没有跨团队依赖'), `空态没说清：${text.slice(0, 200)}`)
+  } finally {
+    harness.restore()
+  }
+})
+
+test('L2-B1 概览：跨团队依赖能把两个团队和谁卡住谁列出来', async () => {
+  const harness = loadClient(CROSS)
+  try {
+    const tree = await mount(harness.view, { sessionId: 'ses_1' })
+    const text = textOf(tree)
+    assert.ok(text.includes('核对单点'), `依赖行缺前置任务：${text.slice(0, 240)}`)
+    assert.ok(text.includes('乙队'), '依赖行缺前置团队')
+    assert.ok(text.includes('被 核对单点 阻塞'), '依赖行缺阻塞说明')
+    assert.ok(!text.includes('任务之间还没有跨团队依赖'), '有边时不该再显示空态')
+  } finally {
+    harness.restore()
+  }
+})
+
+test('L2-B1 任务 / 团队 / 定义 / 流程四页：关键字段与空态都在', async () => {
+  const harness = loadClient(FILLED)
+  try {
+    let tree = await mount(harness.view, { sessionId: 'ses_1' })
+    const open = async (label: string) => {
+      const tab = findTab(tree, label)
+      assert.ok(tab !== null, `找不到「${label}」栏`)
+      ;(tab!.props.onClick as () => void)()
+      tree = await mount(harness.view, { sessionId: 'ses_1' })
+      return textOf(tree)
+    }
+
+    const tasks = await open('任务')
+    assert.ok(tasks.includes('共 1 个任务'), `任务栏缺总计：${tasks.slice(0, 200)}`)
+    for (const lane of ['待规划', '进行中', '待评审', '已完成']) {
+      assert.ok(tasks.includes(lane), `任务栏缺列「${lane}」`)
+    }
+
+    const teams = await open('团队')
+    assert.ok(teams.includes('甲队') && teams.includes('成员'), `团队栏缺关键字段：${teams.slice(0, 200)}`)
+
+    const defs = await open('定义')
+    assert.ok(defs.includes('实现者') && defs.includes('rev '), `定义栏缺关键字段：${defs.slice(0, 200)}`)
+
+    const runs = await open('流程')
+    assert.ok(runs.includes('wf_1') && runs.includes('副作用'), `流程栏缺关键字段：${runs.slice(0, 200)}`)
   } finally {
     harness.restore()
   }

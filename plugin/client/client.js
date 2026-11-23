@@ -471,12 +471,37 @@ window.__ModuleLoader__.load({
     }
 
     function OverviewScreen(props) {
-      const { data, events, onSelect } = props
+      const { data, events, onSelect, board } = props
       const totals = data.totals ?? { all: 0, done: 0, blocked: 0, review: 0 }
       const attention = data.attention ?? { review: 0, blocked: 0, unknownEffects: 0 }
       const teamList = Array.isArray(data.teams) ? data.teams : []
       const waiting = (attention.review ?? 0) + (attention.blocked ?? 0)
       const recent = Array.isArray(events) ? events.slice(0, 5) : []
+
+  // 跨团队依赖：看板卡片带完整 dependencies（G7），这里把「前置任务属于别的团队」挑出来。
+  // 只统计未完成的前置（blockedBy），因为已完成的边不影响「现在谁卡着谁」。
+  const boardTasks = (() => {
+    const columns = Array.isArray(board?.columns) ? board.columns : []
+    return columns.flatMap((column) => (Array.isArray(column.tasks) ? column.tasks : []))
+  })()
+  const taskById = new Map(boardTasks.map((task) => [task.id, task]))
+  const crossEdges = []
+  for (const task of boardTasks) {
+    for (const dependencyId of Array.isArray(task.blockedBy) ? task.blockedBy : []) {
+      const dependency = taskById.get(dependencyId)
+      if (dependency === undefined) continue
+      if (dependency.ownerTeamId === null || task.ownerTeamId === null) continue
+      if (dependency.ownerTeamId === task.ownerTeamId) continue
+      crossEdges.push({
+        from: dependency.id,
+        to: task.id,
+        fromTitle: dependency.title,
+        fromName: dependency.ownerTeamName ?? '未指定团队',
+        toTitle: task.title,
+        toName: task.ownerTeamName ?? '未指定团队',
+      })
+    }
+  }
       return h(
         'div',
         { className: 'body pad' },
@@ -506,8 +531,28 @@ window.__ModuleLoader__.load({
                 : h('div', { className: 'acts' },
                     h('button', { type: 'button', className: 'btn primary', onClick: () => onSelect('tasks') }, '去任务栏处理')),
             ),
-        h('div', { className: 'layer' }, h('b', null, '团队'), h('span', null, `${teamList.length} 个`), h('i', { className: 'rule' })),
+        h(SectionHeader, { title: '团队', note: `${teamList.length} 个` }),
         h(TeamCards, { teams: teamList }),
+        h(SectionHeader, { title: '跨团队依赖', note: `${crossEdges.length} 条` }),
+        crossEdges.length === 0
+          ? h('p', { className: 'muted', style: { margin: '6px 0 0', fontSize: 12 } }, '任务之间还没有跨团队依赖。')
+          : h(
+              'div',
+              { className: 'box', style: { padding: '2px 14px' } },
+              crossEdges.map((edge, index) =>
+                h(
+                  'div',
+                  { key: `${edge.from}-${edge.to}`, className: 'ev', style: index === crossEdges.length - 1 ? { borderBottom: 0 } : undefined },
+                  h('span', { className: 'tm' }, edge.fromName),
+                  h(
+                    'div',
+                    { className: 'tx' },
+                    h('b', null, edge.toTitle),
+                    h('span', { className: 'm' }, ` · ${edge.toName} · 被 ${edge.fromTitle} 阻塞`),
+                  ),
+                ),
+              ),
+            ),
         h(
           'div',
           { className: 'layer' },
@@ -1579,7 +1624,7 @@ window.__ModuleLoader__.load({
         body = h(TaskDetail, { taskId, sessionId, onBack: () => setTaskId(null) })
       } else if (tab === 'overview') {
         body = h(Data, { data: overview, what: '项目概览' }, (data) =>
-          h(OverviewScreen, { data, events: overviewEvents.data?.items, onSelect: go }))
+          h(OverviewScreen, { data, events: overviewEvents.data?.items, board: board.data, onSelect: go }))
       } else if (tab === 'tasks') {
         body = h(Data, { data: board, what: '任务看板' }, (data) =>
           h(TasksScreen, {
