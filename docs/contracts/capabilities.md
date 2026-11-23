@@ -30,7 +30,7 @@
 
 | 角色 | 工具数 | 说明 |
 |---|---|---|
-| 队长 | 13 | 建队、建/读任务、工作流、聘任、认领、裁决、完成、知识 |
+| 队长 | 15 | 建队、建/读任务、工作流、聘任、认领、裁决、完成、知识（清单以生成契约 [tool-surface](tool-surface.md) 为准） |
 | 成员 | 3 | `myteam_progress` / `myteam_evidence` / `myteam_submit_review` |
 
 两侧注册表物理分离：队长 preset 里没有成员工具，成员会话里没有队长工具（`t12` 断言）。
@@ -42,8 +42,9 @@
 | 实现者 | read / write / edit / pwsh / bash | — | 按验收标准实现 |
 | 审查者 | read / pwsh / bash | write / edit | 独立复核，不重写 |
 
-成员的能力只能**收窄**（`domain/permissions/narrowing.ts`）：父成员允许的并集之内，
-子成员再取子集；配置不能绕过收窄。
+成员的能力只能**收窄**：规则在 `plugin/src/domain/definitions/role.ts` 的 `narrowCapabilities()`
+（子集校验，越界报 `CAPABILITY_ESCALATION`），聘任时由 `plugin/src/domain/teams/member.ts`
+应用——收窄失败即拒绝聘任，不存在「先建了再说」；配置不能绕过收窄。
 
 ## 4. 能力五态（对某个具体动作）
 
