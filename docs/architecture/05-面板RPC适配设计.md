@@ -1,7 +1,9 @@
-# 面板 RPC 适配（待实现）
+# 面板 RPC 适配（已接通）
 
-> 状态：**已打通**。门面 src/composition/panel.ts（	30）+ 客户端会话页「团队」视图（client/client.js）在 Web profile 实测：tab 出现、myteam/board 返回真实看板（共 3 · 完成 1）。目标是把已完成的 `PanelService` 挂到 DSH 的
-> Remote 上，让 Web 客户端能 `ctx.remote.myteam.*` 调用。
+> 状态：**已完成**（2026-11-23 复核）。门面 `src/composition/panel.ts` + 客户端会话「团队视图」在隔离实例真机跑通：
+> 16 个只读方法全部返回真数据，写动作走 `/__myteam/write/<method>`（见
+> [contracts/panel-rpc](../contracts/panel-rpc.md) 与 [25-隔离验收记录](../delivery/25-隔离验收记录.md)）。
+> 历史背景：把这套 `PanelService` 挂到 DSH 的 Remote 上，让 Web 客户端能 `ctx.remote.myteam.*` 调用。
 
 ## 已具备
 
