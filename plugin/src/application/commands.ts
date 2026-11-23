@@ -17,8 +17,8 @@ import type {
 import { ERROR_CODES, fail } from '../contracts/errors.ts'
 import type { ActorRef } from '../contracts/events.ts'
 import { computeEffectiveConfig, DEFAULT_TEAM_CONFIG } from '../domain/config/merge.ts'
-import { normalizeRole, validateRole } from '../domain/definitions/role.ts'
-import { normalizeWorkflow, validateWorkflow } from '../domain/definitions/workflow.ts'
+import { normalizeRole, roleContentHash, validateRole } from '../domain/definitions/role.ts'
+import { normalizeWorkflow, validateWorkflow, workflowContentHash } from '../domain/definitions/workflow.ts'
 import { assertBlueprintResolvable } from '../domain/definitions/blueprint.ts'
 import { authorize } from '../domain/permissions/policy.ts'
 import { cycleIfEdgesChanged, graphOf } from '../domain/tasks/dag.ts'
@@ -76,6 +76,80 @@ export function createProjectRole(
     entity: { kind: 'role-definition', id },
     entityRevision: 1,
     payload: { role, origin: null },
+  }
+  return runtime.commit([draft])
+}
+
+/**
+ * 保存（修订）已存在的项目角色定义：revision 递增，`previousHash` 记旧内容哈希。
+ *
+ * 为什么要有：创建命令与 `definition.role.revised` 事件、投影都早就存在，但没有任何命令
+ * 能发出它 —— 设计稿的「编辑角色」屏因此没有可调的能力（只能新建，不能改）。
+ */
+export function saveProjectRole(
+  runtime: ProjectRuntime,
+  input: { actor: ActorRef; id: string; profile: RoleDefinition['profile']; capabilities: CapabilitySet },
+): CommitResult {
+  authorize('definition.write', input.actor)
+  const existing = runtime.state.roles.get(input.id)
+  if (existing === undefined) fail(ERROR_CODES.NOT_FOUND, '角色定义不存在', { details: { roleId: input.id } })
+  const role: RoleDefinition = normalizeRole({
+    id: existing.id,
+    revision: existing.revision + 1,
+    profile: input.profile,
+    capabilities: input.capabilities,
+    createdAt: existing.createdAt,
+    updatedAt: runtime.now(),
+  })
+  const problems = validateRole(role)
+  if (problems.length > 0) {
+    fail(ERROR_CODES.INVALID_PAYLOAD, '角色定义不合法', { details: { problems } })
+  }
+  const draft: DraftEvent = {
+    type: 'definition.role.revised',
+    actor: input.actor,
+    entity: { kind: 'role-definition', id: role.id },
+    entityRevision: role.revision,
+    payload: { role, previousHash: roleContentHash(existing) },
+  }
+  return runtime.commit([draft])
+}
+
+/** 保存（修订）已存在的工作流定义；语义同 {@link saveProjectRole}。 */
+export function saveProjectWorkflowCommand(
+  runtime: ProjectRuntime,
+  input: {
+    actor: ActorRef
+    id: string
+    name: string
+    description: string
+    templates: TaskTemplate[]
+    completion?: CompletionRule
+  },
+): CommitResult {
+  authorize('definition.write', input.actor)
+  const existing = runtime.state.workflows.get(input.id)
+  if (existing === undefined) fail(ERROR_CODES.NOT_FOUND, '工作流定义不存在', { details: { workflowId: input.id } })
+  const workflow: WorkflowDefinition = normalizeWorkflow({
+    id: existing.id,
+    revision: existing.revision + 1,
+    name: input.name,
+    description: input.description,
+    templates: input.templates,
+    completion: input.completion ?? existing.completion,
+    createdAt: existing.createdAt,
+    updatedAt: runtime.now(),
+  })
+  const problems = validateWorkflow(workflow)
+  if (problems.length > 0) {
+    fail(ERROR_CODES.INVALID_PAYLOAD, '工作流定义不合法', { details: { problems } })
+  }
+  const draft: DraftEvent = {
+    type: 'definition.workflow.revised',
+    actor: input.actor,
+    entity: { kind: 'workflow-definition', id: workflow.id },
+    entityRevision: workflow.revision,
+    payload: { workflow, previousHash: workflowContentHash(existing) },
   }
   return runtime.commit([draft])
 }

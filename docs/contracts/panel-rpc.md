@@ -47,6 +47,7 @@
 | `memberAppoint` | `direct` | 召唤成员：团队 + 角色（可选父成员与会话）→ 聘任并固化角色快照，需 `confirm: true`。 |
 | `memberRelease` | `direct` | 释放成员（终态）：成员不能有进行中的尝试；释放后不再接活，需 `confirm: true`。 |
 | `definitionPublish` | `token` | 发布定义到全局库：预览引用与覆盖影响面，凭一次性令牌执行。动作 `definition.publish.confirm`（人类专属）。 |
+| `definitionSave` | `direct` | 保存项目定义（角色 / 工作流）：revision 递增并记 previousHash，需 `confirm: true`。 |
 | `memoryRemember` | `direct` | 写一条长期记忆到团队 bank 或某个成员 bank，需 `confirm: true`。 |
 | `memoryForget` | `direct` | 遗忘一条记忆（默认软删留痕，`hard` 才真删），需 `confirm: true`。 |
 

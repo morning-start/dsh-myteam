@@ -20,7 +20,15 @@ import { ERROR_CODES, fail } from '../contracts/errors.ts'
 import type { GlobalPublicationPort, PublicationKind } from '../contracts/publication.ts'
 import { HumanAuthorizer } from '../domain/permissions/human-authorizer.ts'
 import type { HumanConfirmation } from '../domain/permissions/human-authorizer.ts'
-import { appointMemberCommand, claimTaskCommand, createTaskCommand, createTeamCommand, releaseMemberCommand } from './commands.ts'
+import {
+  appointMemberCommand,
+  claimTaskCommand,
+  createTaskCommand,
+  createTeamCommand,
+  releaseMemberCommand,
+  saveProjectRole,
+  saveProjectWorkflowCommand,
+} from './commands.ts'
 import { forgetMemory, rememberMemory } from './memory-commands.ts'
 import type { MemoryPort } from './ports.ts'
 import { confirmDefinitionPublication, requestDefinitionPublication } from './publication.ts'
@@ -39,6 +47,7 @@ export const PANEL_WRITE_METHODS = [
   'memberAppoint',
   'memberRelease',
   'definitionPublish',
+  'definitionSave',
   'memoryRemember',
   'memoryForget',
 ] as const
@@ -66,6 +75,7 @@ export const PANEL_WRITE_KINDS: Readonly<Record<PanelWriteMethod, PanelWriteKind
   memberAppoint: 'direct',
   memberRelease: 'direct',
   definitionPublish: 'token',
+  definitionSave: 'direct',
   memoryRemember: 'direct',
   memoryForget: 'direct',
 }
@@ -90,6 +100,7 @@ export const PANEL_WRITE_DOCS: Readonly<Record<PanelWriteMethod, string>> = {
   teamCreate: '建团队：名字、目标、队长会话（可选蓝图初始化角色与配置），需 `confirm: true`。',
   memberAppoint: '召唤成员：团队 + 角色（可选父成员与会话）→ 聘任并固化角色快照，需 `confirm: true`。',
   memberRelease: '释放成员（终态）：成员不能有进行中的尝试；释放后不再接活，需 `confirm: true`。',
+  definitionSave: '保存项目定义（角色 / 工作流）：revision 递增并记 previousHash，需 `confirm: true`。',
   definitionPublish: '发布定义到全局库：预览引用与覆盖影响面，凭一次性令牌执行。动作 `definition.publish.confirm`（人类专属）。',
   memoryRemember: '写一条长期记忆到团队 bank 或某个成员 bank，需 `confirm: true`。',
   memoryForget: '遗忘一条记忆（默认软删留痕，`hard` 才真删），需 `confirm: true`。',
@@ -311,6 +322,8 @@ export function previewPanelWrite(
     case 'memoryRemember':
     case 'memoryForget':
       fail(ERROR_CODES.INVALID_COMMAND, `${method} 不走确认令牌：直接带 confirm: true 提交（见 applyDirectPanelWrite）`)
+    case 'definitionSave':
+      fail(ERROR_CODES.INVALID_COMMAND, 'definitionSave 不走确认令牌：直接带 confirm: true 提交（见 applyDirectPanelWrite）')
     case 'definitionPublish': {
       const preview = requestDefinitionPublication(runtime, { publisher: requirePublisher(deps) }, {
         actor: PANEL_HUMAN,
@@ -389,6 +402,8 @@ export function applyPanelWrite(
     case 'memoryRemember':
     case 'memoryForget':
       fail(ERROR_CODES.INVALID_COMMAND, `${method} 不使用确认令牌，请走 applyDirectPanelWrite`)
+    case 'definitionSave':
+      fail(ERROR_CODES.INVALID_COMMAND, 'definitionSave 不使用确认令牌，请走 applyDirectPanelWrite')
     case 'definitionPublish': {
       const result = confirmDefinitionPublication(runtime, { authorizer, publisher: requirePublisher(deps) }, {
         actor: PANEL_HUMAN,
@@ -558,6 +573,42 @@ export function applyDirectPanelWrite(
           },
         },
       }
+    }
+    case 'definitionSave': {
+      if (input.confirm !== true) fail(ERROR_CODES.INVALID_PAYLOAD, '保存定义需要 confirm: true')
+      const kind = requireString(input.params, 'kind')
+      const id = requireString(input.params, 'id')
+      if (kind === 'role') {
+        const profile = input.params.profile
+        if (typeof profile !== 'object' || profile === null) {
+          fail(ERROR_CODES.INVALID_PAYLOAD, '角色 profile 必须是对象', { details: { kind, id } })
+        }
+        saveProjectRole(runtime, {
+          actor: PANEL_HUMAN,
+          id,
+          profile: profile as never,
+          capabilities: (input.params.capabilities ?? { tools: { allow: [], deny: [] }, mcp: { allow: [], deny: [] }, skills: [] }) as never,
+        })
+        return { method, operationId: id, committed: { kind, id } }
+      }
+      if (kind === 'workflow') {
+        const templates = input.params.templates
+        if (!Array.isArray(templates)) {
+          fail(ERROR_CODES.INVALID_PAYLOAD, '工作流 templates 必须是数组', { details: { kind, id } })
+        }
+        saveProjectWorkflowCommand(runtime, {
+          actor: PANEL_HUMAN,
+          id,
+          name: requireString(input.params, 'name'),
+          description: optionalString(input.params, 'description') ?? '',
+          templates: templates as never,
+          ...(input.params.completion === undefined ? {} : { completion: input.params.completion as never }),
+        })
+        return { method, operationId: id, committed: { kind, id } }
+      }
+      fail(ERROR_CODES.INVALID_PAYLOAD, 'definitionSave 只支持 kind = role / workflow；蓝图编辑还没有保存命令', {
+        details: { kind },
+      })
     }
     case 'taskMove': {
       if (input.confirm !== true) fail(ERROR_CODES.INVALID_PAYLOAD, '移动任务需要 confirm: true')
