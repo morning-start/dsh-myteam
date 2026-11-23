@@ -45,7 +45,7 @@
 |---|---|
 | `check-drift.mjs` | 源码 ↔ 产物漂移检查（R38、D9 的独立复算面）。直接复用 `plugin/scripts/build-lib.mjs` 的 `compileSource`，编译口径只有一个来源；`sourceURL` 行两边归一化。`MISMATCH: 0` 退 0，否则退 1（可当 CI 门禁） |
 | `diff-one.mjs` | 单文件差异对比（人工核查某一份产物用） |
-| `gen-error-docs.mjs` | 从 `plugin/src/core/errors.ts` **生成** `docs/04-API与数据契约.md` 的「错误码」一节。`--check` 只校验不写文件（CI / 测试用）。**手改文档会被下次生成覆盖，也会被 `t81` 判红** |
+| `gen-tool-contract.mjs` | 从 `plugin/src/application/tool-specs.ts` + `contracts/errors.ts` **生成** `docs/contracts/tool-surface.md`（工具清单 + 错误码表）。`--check` 只校验不写文件，已接进 `verify.mjs`。原 `gen-error-docs.mjs` 在 v2 里已废弃（它读的 `plugin/src/core/errors.ts` 与写的 `docs/04` 都不存在了），错误码表由本脚本覆盖 |
 | `smoke-commit-perf.mjs` | 提交性能冒烟（CHG-59）：真实 lib 产物上对比「增量提交」与「全量重放」的耗时，并验证两者投影一致 |
 
 ## 取证与探针

@@ -1,6 +1,6 @@
 # 产品目标与需求基线
 
-> 状态：`proposed`，随目标架构一起评审。
+> 状态：`accepted`（2026-11-23 复核：目标用户与需求基线仍成立，随 2.0.0 落地）。
 > 本文是 product 目录唯一入口，不再沿用旧需求池、旧目标重梳理和旧 PRD 的多重权威。
 > 系统边界见 [../architecture/01-系统架构.md](../architecture/01-系统架构.md)，Role/Workflow 见 [../architecture/03-角色能力与工作流.md](../architecture/03-角色能力与工作流.md)。
 

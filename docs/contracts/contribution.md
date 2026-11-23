@@ -1,6 +1,6 @@
 # 插件团队贡献契约（现行摘要）
 
-> 状态：**部分定稿**。可执行权威是
+> 状态：`draft`（可执行权威是下面的脚本；本文只是摘要）。
 > [`skills/myteam-plugin-team/tools/check-contribution.mjs`](../../skills/myteam-plugin-team/tools/check-contribution.mjs)
 > （`contractVersion = 1`）。v2 的插件 manifest 尚未最终定稿，因此本页只承诺
 > 「检查器会拒绝什么」，不另外发明字段。

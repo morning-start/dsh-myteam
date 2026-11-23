@@ -35,6 +35,7 @@ run('面板契约', process.execPath, ['tools/gen-panel-contract.mjs', '--check'
 run('工具契约', process.execPath, ['tools/gen-tool-contract.mjs', '--check'])
 run('配置契约', process.execPath, ['tools/gen-config-contract.mjs', '--check'])
 run('文档替换', process.execPath, ['tools/check-doc-replacement.mjs', '--strict'])
+run('文档治理', process.execPath, ['tools/check-docs.mjs'])
 run('文档链接', process.execPath, ['tools/check-doc-links.mjs'])
 
 if (failures.length > 0) {
