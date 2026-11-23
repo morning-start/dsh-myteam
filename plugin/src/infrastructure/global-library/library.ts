@@ -31,6 +31,11 @@ export interface GlobalEntry {
   file: string
   /** v1 发布格式留下的 `teams/*.json`：能读，但不当作蓝图使用。 */
   legacy: boolean
+  /**
+   * 文件正文（原样解析结果）。全局库的详情页要看角色 profile、工作流模板、蓝图组成；
+   * 不带上就只能显示一行名字，界面还得再请求一次。解析失败时文件不会成为条目。
+   */
+  content: unknown
 }
 
 export interface GlobalWarning {
@@ -114,6 +119,7 @@ function readEntry(
     revision: typeof revisionField === 'number' && Number.isFinite(revisionField) ? revisionField : null,
     file: relative,
     legacy,
+    content: parsed,
   }
 }
 

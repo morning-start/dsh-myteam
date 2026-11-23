@@ -462,7 +462,7 @@ const FILLED: Record<string, unknown> = {
     root: '/tmp/.dsh/myteam',
     exists: true,
     counts: { role: 1, workflow: 0, blueprint: 0, team: 0 },
-    entries: [{ kind: 'role', id: 'r1', name: '实现者', revision: 3, file: 'roles/r1.json', legacy: false }],
+    entries: [{ kind: 'role', id: 'r1', name: '实现者', revision: 3, file: 'roles/r1.json', legacy: false, content: { profile: { name: '实现者', purpose: '实现', instructions: '按 AC 做' }, capabilities: { tools: { allow: ['read'], deny: [] }, mcp: { allow: [], deny: [] }, skills: ['run-tests'] } } }],
     warnings: [],
   },
   globalAudit: {
@@ -1011,6 +1011,111 @@ test('L2-C 角色详情：定义行可点开（交互契约；正文由 t14 的 
     const row = findByClass(tree, 'item pick')
     assert.ok(row !== null, '定义行应可点开（item pick）')
     assert.equal(typeof row!.props.onClick, 'function', '可点开的定义行必须有 onClick')
+  } finally {
+    harness.restore()
+  }
+})
+
+test('L2-H 全局库：四类列表 + 条目可点开详情（正文来自文件 content）', async () => {
+  const harness = loadClient(FILLED)
+  try {
+    let tree = await mount(harness.panel, { ctx: { slots: { register: () => () => undefined } } })
+    const roleTab = findTab(tree, '角色')
+    assert.ok(roleTab !== null, '全局库应有「角色」栏')
+    ;(roleTab!.props.onClick as () => void)()
+    tree = await mount(harness.panel, { ctx: { slots: { register: () => () => undefined } } })
+    const text = textOf(tree)
+    assert.ok(text.includes('实现者'), '角色列表应显示条目名')
+    assert.ok(text.includes('roles/r1.json'), '列表应显示文件路径')
+
+    const row = findByClass(tree, 'item pick')
+    assert.ok(row !== null, '全局条目应可点开')
+    assert.equal(typeof row!.props.onClick, 'function', '可点开的条目必须有 onClick')
+  } finally {
+    harness.restore()
+  }
+})
+
+test('L2-H 全局库详情：角色正文渲染出职责与能力（不是一行名字）', async () => {
+  const harness = loadClient(FILLED)
+  try {
+    let tree = await mount(harness.panel, { ctx: { slots: { register: () => () => undefined } } })
+    const roleTab = findTab(tree, '角色')
+    ;(roleTab!.props.onClick as () => void)()
+    tree = await mount(harness.panel, { ctx: { slots: { register: () => () => undefined } } })
+    const row = findByClass(tree, 'item pick')
+    ;(row!.props.onClick as () => void)()
+    let detailText = ''
+    for (let round = 0; round < 6; round += 1) {
+      tree = await mount(harness.panel, { ctx: { slots: { register: () => () => undefined } } })
+      detailText = textOf(tree)
+      if (detailText.includes('能力')) break
+    }
+    assert.ok(detailText.includes('职责'), '详情应显示职责分节：' + detailText.slice(0, 240))
+    assert.ok(detailText.includes('run-tests'), '详情应列出技能')
+    assert.ok(detailText.includes('返回列表'), '详情应能返回列表')
+  } finally {
+    harness.restore()
+  }
+})
+
+test('L2-A 未初始化壳：状态读不到时整屏给说明与下一步，不是每栏各弹一条失败', async () => {
+  const broken: Record<string, unknown> = { ...EMPTY }
+  delete broken.status
+  const harness = loadClient(broken)
+  try {
+    const tree = await mount(harness.view, { sessionId: 'ses_1' })
+    const text = textOf(tree)
+    assert.ok(text.includes('未初始化'), '壳上应有「未初始化」标记：' + text.slice(0, 200))
+    assert.ok(text.includes('还没有可读的团队视图'), '壳应说清是什么状态')
+    assert.ok(text.includes('下一步'), '壳应给出下一步')
+    assert.ok(text.includes('让队长建队'), '下一步要能落地（在会话里建队）')
+    assert.ok(text.includes('重试'), '壳应留一个重试')
+  } finally {
+    harness.restore()
+  }
+})
+
+test('L2-H 蓝图详情：解析不到的引用要标缺失（不是照样列 id）', async () => {
+  const fixtures = JSON.parse(JSON.stringify(FILLED)) as Record<string, unknown>
+  fixtures.globalLibrary = {
+    root: '/g/myteam',
+    exists: true,
+    counts: { role: 1, workflow: 1, blueprint: 1, team: 0 },
+    warnings: [],
+    entries: [
+      { kind: 'role', id: 'role_1', name: '实现者', revision: 1, file: 'roles/role_1.json', legacy: false, content: {} },
+      { kind: 'workflow', id: 'wf_1', name: '标准流程', revision: 1, file: 'workflows/wf_1.json', legacy: false, content: {} },
+      {
+        kind: 'blueprint',
+        id: 'bp_1',
+        name: '两人小队',
+        revision: 1,
+        file: 'team-blueprints/bp_1.json',
+        legacy: false,
+        content: { formation: [{ roleId: 'role_1' }, { roleId: 'role_gone' }], workflows: ['wf_1', 'wf_gone'], defaults: {} },
+      },
+    ],
+  }
+  const harness = loadClient(fixtures)
+  try {
+    let tree = await mount(harness.panel, { ctx: { slots: { register: () => () => undefined } } })
+    const bpTab = findTab(tree, '蓝图')
+    assert.ok(bpTab !== null, '全局库应有「蓝图」栏')
+    ;(bpTab!.props.onClick as () => void)()
+    tree = await mount(harness.panel, { ctx: { slots: { register: () => () => undefined } } })
+    const row = findByClass(tree, 'item pick')
+    assert.ok(row !== null, '蓝图行应可点开')
+    ;(row!.props.onClick as () => void)()
+    let text = ''
+    for (let round = 0; round < 6; round += 1) {
+      tree = await mount(harness.panel, { ctx: { slots: { register: () => () => undefined } } })
+      text = textOf(tree)
+      if (text.includes('关联工作流')) break
+    }
+    assert.ok(text.includes('role_gone · 缺失'), '缺角色应标缺失：' + text.slice(0, 300))
+    assert.ok(text.includes('wf_gone · 缺失'), '缺工作流应标缺失')
+    assert.ok(!text.includes('role_1 · 缺失'), '存在的引用不该被标缺失')
   } finally {
     harness.restore()
   }

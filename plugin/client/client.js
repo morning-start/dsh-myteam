@@ -294,6 +294,67 @@ window.__ModuleLoader__.load({
       return h('div', { className: 'body pad' }, h('p', { className: 'muted', style: { fontSize: 12 } }, props.what ?? '加载中…'))
     }
 
+    /**
+     * 未初始化壳（L2-A / `p-unavailable`）。
+     *
+     * 什么时候出这一屏：整个视图的第一枪（`status`）就打不开 —— 工作区里没有可读的
+     * 团队视图状态。这时**不要**让每个标签各弹一条「读不到这份数据」：那会让人以为是
+     * 某一栏坏了，其实是这一整个视图都还没有。
+     *
+     * 这一屏只做三件事：说清是什么状态、给出下一步、留一个重试。
+     * 不猜「可能还没建队」这种细节 —— 状态读不到时连有没有队都不知道。
+     */
+    function NotInitializedShell(props) {
+      const steps = [
+        '在会话里让队长建队（发一条「建一支团队」即可）',
+        '确认当前工作区就是你要看的那一个',
+        '换一个工作区后再打开这个标签',
+      ]
+      return h(
+        'div',
+        { className: 'body pad' },
+        h(
+          'div',
+          { className: 'box', style: { padding: '18px 16px' } },
+          h(
+            'div',
+            { className: 'rc-h' },
+            h(Dot, { tone: 'gate' }),
+            h('span', { className: 'nm' }, '这个工作区还没有可读的团队视图'),
+            h('span', { className: 'tag' }, '未初始化'),
+          ),
+          h(
+            'p',
+            { className: 'muted', style: { margin: '8px 0 0', fontSize: 12 } },
+            '左侧这些栏都要读同一份项目状态；它现在读不出来，所以每一栏都会是空的。先把状态建起来，再回来看。',
+          ),
+          props.reason === undefined || props.reason === ''
+            ? null
+            : h(
+                'p',
+                { className: 'muted', style: { margin: '8px 0 0', fontSize: 12 } },
+                '读失败的原因：',
+                h('span', { className: 'mono' }, String(props.reason)),
+              ),
+          h(SectionHeader, { title: '下一步', note: `${steps.length} 条` }),
+          h(
+            'div',
+            { className: 'list', style: { marginTop: 6 } },
+            steps.map((step, index) =>
+              h(ListRow, { key: index, title: `${index + 1}. ${step}`, sub: [] }),
+            ),
+          ),
+          props.onRetry === undefined
+            ? null
+            : h(
+                'div',
+                { style: { marginTop: 12 } },
+                h('button', { type: 'button', className: 'btn primary', onClick: props.onRetry }, '重试'),
+              ),
+        ),
+      )
+    }
+
     function Failure(props) {
       return h(
         'div',
@@ -1956,6 +2017,20 @@ window.__ModuleLoader__.load({
         body = h(Unavailable, { ...missing, title: tab })
       }
 
+      // A 批（p-unavailable）：第一枪就失败时整屏交给未初始化壳。
+      // 放在这里（所有 hook 之后）是为了不改 hook 顺序；导航仍然可点，
+      // 但每一栏都读同一份状态，所以壳里明说「每栏都会是空的」。
+      if (status.status === 'error') {
+        return h(Shell, {
+          initials: 'mt',
+          railTitle: '团队视图 · 未初始化',
+          nav: PROJECT_NAV,
+          active: tab,
+          onSelect: go,
+          pane: [h(NotInitializedShell, { reason: status.reason, onRetry: () => void status.reload() })],
+        })
+      }
+
       return h(Shell, {
         initials: String(projectName).slice(0, 2),
         railTitle: `团队视图 ${projectName}`,
@@ -1984,11 +2059,15 @@ window.__ModuleLoader__.load({
 
     const GLOBAL_KIND_LABEL = { role: '角色', workflow: '工作流', blueprint: '蓝图', team: 'v1 团队（只读兼容）' }
 
-    function globalEntryRows(entries) {
+    function globalEntryRows(entries, onOpen) {
       return entries.map((entry) =>
         h(
           'div',
-          { key: `${entry.kind}:${entry.id}`, className: 'item' },
+          {
+            key: `${entry.kind}:${entry.id}`,
+            className: onOpen === undefined ? 'item' : 'item pick',
+            onClick: onOpen === undefined ? undefined : () => onOpen(entry),
+          },
           h(
             'div',
             { className: 'l' },
@@ -2003,6 +2082,123 @@ window.__ModuleLoader__.load({
           ),
           h('div', { className: 'r' }, entry.legacy === true ? h('span', { className: 'st-chip' }, 'v1 兼容') : null),
         ),
+      )
+    }
+
+    /**
+     * 全局定义详情（L2-H / `g-role` `g-workflow` `g-blueprint`）：直接渲染文件正文里认得的字段。
+     *
+     * 为什么按字段挑着渲染而不是把 JSON 全打出来：发布到全局的是「定义资产」，正文里有
+     * 时间戳、哈希这些过程字段，界面要看的是 profile / 模板 / 组成。认不出的字段不猜。
+     */
+    function GlobalEntryDetail(props) {
+      const entry = props.entry
+      const content = entry?.content
+      if (content === null || typeof content !== 'object') {
+        return h('p', { className: 'muted', style: { margin: '8px 0 0', fontSize: 12 } }, '这个文件解析不出正文（可能不是本工具写的定义）。')
+      }
+      const record = content
+      const list = (value) => (Array.isArray(value) ? value : [])
+      const sections = []
+      if (entry.kind === 'role') {
+        const profile = record.profile ?? {}
+        const caps = record.capabilities ?? {}
+        sections.push(h(SectionHeader, { key: 'p', title: '职责', note: String(profile.name ?? entry.name) }))
+        sections.push(
+          h(
+            'div',
+            { key: 'pb', className: 's', style: { marginTop: 4 } },
+            h('span', null, String(profile.purpose ?? '')),
+          ),
+        )
+        sections.push(h('p', { key: 'pi', className: 'muted', style: { margin: '6px 0 0', fontSize: 12 } }, String(profile.instructions ?? '')))
+        sections.push(h(SectionHeader, { key: 'c', title: '能力', note: `${list(caps.tools?.allow).length} 工具 / ${list(caps.skills).length} 技能` }))
+        sections.push(
+          h(
+            'div',
+            { key: 'ck', className: 'kws', style: { marginTop: 6 } },
+            list(caps.tools?.allow).map((tool) => h('span', { key: `t-${tool}`, className: 'kw' }, String(tool))),
+            list(caps.skills).map((skill) => h('span', { key: `s-${skill}`, className: 'kw' }, String(skill))),
+          ),
+        )
+        sections.push(h(SectionHeader, { key: 'ref', title: '被项目引用', note: '看各项目的「定义」栏' }))
+        sections.push(
+          h(
+            'p',
+            { key: 'refb', className: 'muted', style: { margin: '6px 0 0', fontSize: 12 } },
+            '全局库只记定义本身，不记哪个项目抄了副本；某个项目里有哪些定义，去那个项目的「定义」栏看。',
+          ),
+        )
+      } else if (entry.kind === 'workflow') {
+        const templates = list(record.templates)
+        sections.push(h(SectionHeader, { key: 't', title: '任务模板', note: `${templates.length} 个` }))
+        sections.push(
+          templates.length === 0
+            ? h('p', { key: 'te', className: 'muted', style: { margin: '6px 0 0', fontSize: 12 } }, '这份工作流没有任务模板。')
+            : h(
+                'div',
+                { key: 'tl', className: 'list', style: { marginTop: 6 } },
+                templates.map((template) =>
+                  h(ListRow, {
+                    key: String(template.key ?? template.title),
+                    title: String(template.title ?? template.key ?? '—'),
+                    sub: [
+                      `key ${String(template.key ?? '—')}`,
+                      template.requiredRoleId === null || template.requiredRoleId === undefined ? '不限角色' : String(template.requiredRoleId),
+                      `验收 ${list(template.acceptance).length} 条`,
+                    ],
+                    right: h('span', { className: 'st-chip' }, list(template.dependsOn).length === 0 ? '无前置' : `前置 ${list(template.dependsOn).length}`),
+                  }),
+                ),
+              ),
+        )
+        const completion = record.completion ?? null
+        sections.push(h(SectionHeader, { key: 'cp', title: '完成规则', note: completion === null ? '未声明' : String(completion.mode ?? '—') }))
+      } else {
+        // 引用解析：蓝图上写的是 id，但那份角色/工作流不一定真在全局库里。
+        // 解析不到的必须标出来 —— 否则这份蓝图装到别的机器上会缺件，而界面看起来一切正常。
+        const known = new Set((Array.isArray(props.entries) ? props.entries : []).map((item) => item.kind + ':' + item.id))
+        const refRow = (kind, ref) => {
+          const missing = !known.has(kind + ':' + String(ref))
+          return h(
+            'span',
+            { key: kind + ':' + String(ref), className: missing ? 'kw miss' : 'mono', title: missing ? '全局库里没有这份定义' : undefined },
+            missing ? String(ref) + ' · 缺失' : String(ref),
+          )
+        }
+        const formation = list(record.formation)
+        sections.push(h(SectionHeader, { key: 'f', title: '组建槽位', note: `${formation.length} 个` }))
+        sections.push(
+          formation.length === 0
+            ? h('p', { key: 'fe', className: 'muted', style: { margin: '6px 0 0', fontSize: 12 } }, '这份蓝图没有组建槽位。')
+            : h(
+                'div',
+                { key: 'fl', className: 's', style: { marginTop: 6 } },
+                formation.map((slot) => refRow('role', slot.roleId ?? '—')),
+              ),
+        )
+        const workflows = list(record.workflows)
+        sections.push(h(SectionHeader, { key: 'w', title: '关联工作流', note: `${workflows.length} 个` }))
+        sections.push(
+          workflows.length === 0
+            ? h('p', { key: 'we', className: 'muted', style: { margin: '6px 0 0', fontSize: 12 } }, '这份蓝图没有关联工作流。')
+            : h(
+                'div',
+                { key: 'wl', className: 's', style: { marginTop: 6 } },
+                workflows.map((workflowId) => refRow('workflow', workflowId)),
+              ),
+        )
+        sections.push(h(SectionHeader, { key: 'd', title: '默认配置', note: record.defaults === undefined ? '无覆盖' : '有覆盖' }))
+      }
+      return h(
+        'div',
+        { style: { marginTop: 8 } },
+        h(SectionHeader, {
+          title: entry.name,
+          note: entry.file,
+          action: props.onBack === undefined ? undefined : h('button', { type: 'button', className: 'btn', onClick: props.onBack }, '返回列表'),
+        }),
+        ...sections,
       )
     }
 
@@ -2161,6 +2357,7 @@ window.__ModuleLoader__.load({
     function GlobalPanel(props) {
       const { ctx } = props
       const [tab, setTab] = useState('overview')
+      const [opened, setOpened] = useState(null)
 
       useEffect(() => {
         return mountDesignStyle()
@@ -2182,6 +2379,7 @@ window.__ModuleLoader__.load({
       const kindForTab = tab === 'roles' ? 'role' : tab === 'workflows' ? 'workflow' : tab === 'blueprints' ? 'blueprint' : null
       const entries = Array.isArray(library.data?.entries) ? library.data.entries : []
       const ofKind = kindForTab === null ? [] : entries.filter((entry) => entry.kind === kindForTab)
+      const openedEntry = opened === null ? null : (entries.find((entry) => entry.kind + ':' + entry.id === opened) ?? null)
 
       let body
       if (tab === 'publish') {
@@ -2191,7 +2389,9 @@ window.__ModuleLoader__.load({
           h(GlobalOverviewScreen, { data, operations: globalAudit.data?.items }))
       } else {
         body = h(Data, { data: library, what: navItem.label }, () =>
-          h(ListPane, { items: ofKind, empty: `${navItem.label}里还没有全局条目。` }, globalEntryRows(ofKind)),
+          openedEntry === null
+            ? h(ListPane, { items: ofKind, empty: `${navItem.label}里还没有全局条目。` }, globalEntryRows(ofKind, (entry) => setOpened(entry.kind + ':' + entry.id)))
+            : h('div', { style: { padding: '12px 16px' } }, h(GlobalEntryDetail, { entry: openedEntry, entries, onBack: () => setOpened(null) })),
         )
       }
 
