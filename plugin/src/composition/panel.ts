@@ -221,7 +221,10 @@ const HOST_ADAPTER = `/* myteam · 宿主适配层（由 panel.ts 生成，不�
   --dsh-radius-sm: 8px;
   --dsh-radius-md: 12px;
   --dsh-radius-lg: 16px;
-  --dsh-font: inherit;
+  /* 字族必须是具体值：设计稿的 font 简写带 var(--dsh-font)，若这里给的是
+     inherit（CSS-wide 关键字），整条简写在计算值阶段失效，字号会回落成 16px
+     —— 会话「团队视图」导航轨、标题、输入框都被撑大。 */
+  --dsh-font: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Microsoft YaHei", "Hiragino Sans GB", "Microsoft YaHei", sans-serif;
   --dsh-font-code: var(--dsw-alias-font-code, ui-monospace, SFMono-Regular, Menlo, monospace);
   display: flex;
   height: 100%;

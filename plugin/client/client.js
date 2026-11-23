@@ -182,40 +182,52 @@ window.__ModuleLoader__.load({
       return parts.filter((part) => typeof part === 'string' && part.length > 0).join(' ')
     }
 
-    /** 页面骨架：左导航轨 + 右内容区。设计稿里 `[data-slot="main"]` 的作用域就是这里。 */
+    /**
+     * 页面骨架：左导航轨 + 右内容区。
+     *
+     * 两层根：外层带 `[data-myteam]`（样式作用域 + 主题变量落点），内层才是设计稿的
+     * `.wt`。设计稿的选择器都写成 `[data-slot="main"] x` → 服务时换成
+     * `[data-myteam] x`，**是后代选择器**：把 `data-myteam` 和 `.wt` 放在同一个节点上，
+     * `[data-myteam] .wt` 就选不到这个骨架，`.wt` 的字号、行高、字族全失效（回落到宿主
+     * 的 16px，导航轨和标题都被撑大）。所以必须是「作用域节点 > .wt」这个结构。
+     */
     function Shell(props) {
       const { icon, initials, railTitle, nav, active, onSelect, pane } = props
       return h(
         'div',
-        { className: 'wt', 'data-myteam': '' },
+        { 'data-myteam': '' },
         h(
-          'aside',
-          { className: 'ir' },
-          h('div', { className: 'team mono', title: railTitle }, initials),
-          h('div', { className: 'line' }),
+          'div',
+          { className: 'wt' },
           h(
-            'nav',
-            { className: 'ir-nav', role: 'tablist' },
-            nav.map((item) =>
-              h(
-                'button',
-                {
-                  key: item.id,
-                  type: 'button',
-                  role: 'tab',
-                  'aria-selected': item.id === active,
-                  className: joinClass('ri', item.id === active ? 'on' : ''),
-                  title: item.hint ?? item.label,
-                  onClick: () => onSelect(item.id),
-                },
-                h(Icon, { name: item.icon }),
-                h('span', null, item.label),
-                item.badge === undefined || item.badge === 0 ? null : h('i', { className: 'bdg' }),
+            'aside',
+            { className: 'ir' },
+            h('div', { className: 'team mono', title: railTitle }, initials),
+            h('div', { className: 'line' }),
+            h(
+              'nav',
+              { className: 'ir-nav', role: 'tablist' },
+              nav.map((item) =>
+                h(
+                  'button',
+                  {
+                    key: item.id,
+                    type: 'button',
+                    role: 'tab',
+                    'aria-selected': item.id === active,
+                    className: joinClass('ri', item.id === active ? 'on' : ''),
+                    title: item.hint ?? item.label,
+                    onClick: () => onSelect(item.id),
+                  },
+                  h(Icon, { name: item.icon }),
+                  h('span', null, item.label),
+                  item.badge === undefined || item.badge === 0 ? null : h('i', { className: 'bdg' }),
+                ),
               ),
             ),
           ),
+          h('div', { className: 'pane' }, pane),
         ),
-        h('div', { className: 'pane' }, pane),
       )
     }
 
@@ -391,7 +403,7 @@ window.__ModuleLoader__.load({
         { className: 'body pad' },
         h(
           'div',
-          { className: 'grid', style: { gridTemplateColumns: 'repeat(4,minmax(0,1fr))' } },
+          { className: 'grid c4' },
           counter('团队', teamList.length, `${teamList.filter((team) => team.status === 'active').length} 个进行中`),
           counter('任务', totals.all, `完成 ${totals.done}`),
           counter('待裁决', attention.review, '门禁或计划等人类结论'),

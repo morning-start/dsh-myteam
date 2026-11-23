@@ -104,7 +104,7 @@
 [data-slot="main"] .body.flat > .board { flex: 1 1 auto; min-height: 0; }
 
 /* ── 看板 ─────────────────────────────────────────────────── */
-[data-slot="main"] .board { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 10px; padding: 12px 20px 14px; }
+[data-slot="main"] .board { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 10px; padding: 12px 20px 14px; align-content: start; }
 [data-slot="main"] .col { min-width: 0; display: flex; flex-direction: column; min-height: 0; }
 [data-slot="main"] .col-h { flex: none; height: 28px; display: flex; align-items: center; gap: 6px; font-size: 12px; color: var(--mt-muted); }
 [data-slot="main"] .col-h .nm { font-weight: 500; color: var(--dsh-fg); font-size: 13px; }
@@ -227,6 +227,7 @@
 
 /* ── 角色与成员 ───────────────────────────────────────────── */
 [data-slot="main"] .grid { display: grid; gap: 10px; }
+[data-slot="main"] .grid.c4 { grid-template-columns: repeat(4, minmax(0, 1fr)); }
 [data-slot="main"] .grid.c3 { grid-template-columns: repeat(3, minmax(0, 1fr)); }
 [data-slot="main"] .grid.c2 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 [data-slot="main"] .rc { border: 1px solid var(--dsh-line); border-radius: 10px; background: var(--dsh-card); padding: 12px; display: flex; flex-direction: column; gap: 8px; text-decoration: none; color: inherit; }
@@ -489,4 +490,10 @@
   [data-slot="main"] .bar .st-chip { display: inline-block; line-height: 18px; max-width: 100%; min-width: 0; overflow: hidden; text-overflow: ellipsis; }
   [data-slot="main"] .bar > .muted { flex: 1 1 100%; white-space: normal; overflow: visible; }
   [data-slot="main"] .body { padding-left: 14px; padding-right: 14px; }
+  /* 计数卡四联在窄宽会挤成 85px 一列（「门禁或计划等人类结论」折成四行）→ 退两列；
+     团队卡 / 三列卡退单列，让团队名、状态、成员数各占一行。 */
+  [data-slot="main"] .grid.c4 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  [data-slot="main"] .grid.c3, [data-slot="main"] .grid.c2 { grid-template-columns: minmax(0, 1fr); }
+  [data-slot="main"] .rc-h { flex-wrap: wrap; row-gap: 2px; }
+  [data-slot="main"] .rc-h .nm { overflow-wrap: anywhere; }
 }
