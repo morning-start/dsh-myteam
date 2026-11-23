@@ -100,6 +100,9 @@
 [data-slot="main"] .bar { flex: none; height: 44px; margin-top: 8px; padding: 0 20px; display: flex; align-items: center; gap: 8px; border-bottom: 1px solid var(--dsh-line); }
 [data-slot="main"] .body { flex: 1 1 auto; min-height: 0; overflow: auto; }
 [data-slot="main"] .body.pad { padding: 16px 20px 24px; }
+/* 同一屏里叠两块只读内容时（流程 = 运行清单 + 副作用，设置 = 配置 + 迁移影响面）：
+   两块都别抢高度，按内容排，长了下由宿主滚动区接管。 */
+[data-slot="main"] .body.tight { flex: 0 0 auto; }
 [data-slot="main"] .body.flat { overflow: hidden; display: flex; flex-direction: column; }
 [data-slot="main"] .body.flat > .board { flex: 1 1 auto; min-height: 0; }
 
@@ -251,6 +254,9 @@
 [data-slot="main"] .list { display: flex; flex-direction: column; }
 [data-slot="main"] .item { display: flex; gap: 10px; padding: 10px 2px; border-bottom: 1px solid var(--mt-line-soft); text-decoration: none; color: inherit; }
 [data-slot="main"] .item:hover { background: var(--dsh-hover); }
+/* 可点开进详情的列表行（例：流程栏的运行行）：给个手型，并让键盘也能聚焦 */
+[data-slot="main"] .item.pick { cursor: pointer; }
+[data-slot="main"] .item.pick:hover .t { text-decoration: underline; }
 [data-slot="main"] .item .l { min-width: 0; flex: 1 1 auto; }
 [data-slot="main"] .item .t { font-size: 13px; }
 [data-slot="main"] .item .s { margin-top: 3px; font-size: 12px; color: var(--mt-muted); display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }

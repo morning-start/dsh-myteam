@@ -201,6 +201,21 @@ function findByPlaceholder(node: unknown, placeholder: string): ElementLike | nu
   return findByPlaceholder(element.children ?? element.props?.children ?? null, placeholder)
 }
 
+/** 按 className 包含某个片段找元素（找「可点开的列表行」这类没有 role 的节点用）。 */
+function findByClass(node: unknown, fragment: string): ElementLike | null {
+  if (Array.isArray(node)) {
+    for (const item of node) {
+      const found = findByClass(item, fragment)
+      if (found !== null) return found
+    }
+    return null
+  }
+  if (node === null || typeof node !== 'object') return null
+  const element = node as ElementLike
+  if (String(element.props?.className ?? '').includes(fragment)) return element
+  return findByClass(element.children ?? element.props?.children ?? null, fragment)
+}
+
 interface Harness {
   view: AnyComponent
   panel: AnyComponent
@@ -304,6 +319,7 @@ const EMPTY: Record<string, unknown> = {
   definitions: { items: [] },
   migration: { verdict: 'ready', headline: '没有可迁移的 v1 数据', markdown: '# 迁移\n无内容' },
   runs: { items: [] },
+  effects: { items: [], counts: { requested: 0, accepted: 0, completed: 0, failed: 0, cancelled: 0, 'outcome-unknown': 0 } },
   knowledge: { items: [] },
   memory: { file: 'memory/myteam.db', exists: true, banks: [], entries: [], warnings: [] },
   audit: { items: [], nextBeforeSeq: null },
@@ -351,6 +367,15 @@ const FILLED: Record<string, unknown> = {
     items: [
       { id: 'run_1', workflowId: 'wf_1', workflowRevision: 2, teamId: 'team_1', status: 'active', completionRevision: 1, revision: 3, taskCount: 4, createdAt: 'x', updatedAt: 'y' },
     ],
+  },
+  effects: {
+    items: [{ id: 'eff_1', kind: 'spawn-member', status: 'completed' }],
+    counts: { requested: 0, accepted: 1, completed: 1, failed: 0, cancelled: 0, 'outcome-unknown': 0 },
+  },
+  run: {
+    run: { id: 'run_1', workflowId: 'wf_1', workflowRevision: 2, completionRevision: 1, revision: 3, status: 'active', taskIds: ['task_1'] },
+    completion: { templateTasks: { impl: 'task_1' } },
+    tasks: [{ id: 'task_1', title: '评审中的任务', status: 'review', templateKey: 'impl' }],
   },
   definitions: {
     items: [
@@ -498,6 +523,47 @@ test('团队视图九栏：空数据下每栏都能渲染，且空态说清为�
     await clickThrough(harness.view, { sessionId: 'ses_1' }, PROJECT_TABS, '看板、审计、设置读的是同一份项目投影')
     assert.ok(harness.calls.includes('runs'), '切到「流程」应真的请求 runs')
     assert.ok(harness.calls.includes('audit'), '切到「审计」应真的请求 audit')
+  } finally {
+    harness.restore()
+  }
+})
+
+test('流程栏：运行行能点开详情（run），下方显示副作用计数（effects）', async () => {
+  const harness = loadClient(FILLED)
+  try {
+    let tree = await mount(harness.view, { sessionId: 'ses_1' })
+    const tab = findTab(tree, '流程')
+    assert.ok(tab !== null, '找不到「流程」栏')
+    ;(tab!.props.onClick as () => void)()
+    tree = await mount(harness.view, { sessionId: 'ses_1' })
+    let text = textOf(tree)
+    assert.ok(harness.calls.includes('effects'), '切到「流程」应真的请求 effects')
+    assert.ok(text.includes('副作用'), `流程栏应出现副作用区块：${text.slice(0, 240)}`)
+    assert.ok(text.includes('completed 1'), '副作用三态计数要渲染出来')
+
+    const row = findByClass(tree, 'item pick')
+    assert.ok(row !== null, '运行行应带可点开的 class（item pick）')
+    ;(row!.props.onClick as () => void)()
+    tree = await mount(harness.view, { sessionId: 'ses_1' })
+    text = textOf(tree)
+    assert.ok(harness.calls.includes('run'), '点运行行应真的请求 run 详情')
+    assert.ok(text.includes('完成规则'), `运行详情应显示完成规则：${text.slice(0, 240)}`)
+    assert.ok(text.includes('templateKey impl'), '详情要把 templateKey → task 映射渲染出来')
+  } finally {
+    harness.restore()
+  }
+})
+
+test('设置栏：底部带 v1 迁移影响面（migration），空态也说清为什么空', async () => {
+  const harness = loadClient(EMPTY)
+  try {
+    let tree = await mount(harness.view, { sessionId: 'ses_1' })
+    const tab = findTab(tree, '设置')
+    assert.ok(tab !== null, '找不到「设置」栏')
+    ;(tab!.props.onClick as () => void)()
+    tree = await mount(harness.view, { sessionId: 'ses_1' })
+    assert.ok(harness.calls.includes('migration'), '切到「设置」应真的请求 migration')
+    assert.ok(textOf(tree).includes('没有可迁移的 v1 数据'), '迁移影响面要渲染出来，不能留白')
   } finally {
     harness.restore()
   }

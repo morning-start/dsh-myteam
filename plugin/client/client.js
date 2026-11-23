@@ -1055,7 +1055,7 @@ window.__ModuleLoader__.load({
     function ListPane(props) {
       return h(
         'div',
-        { className: 'body pad' },
+        { className: props.tight === true ? 'body pad tight' : 'body pad' },
         props.items.length === 0
           ? h('p', { className: 'muted', style: { fontSize: 12, margin: 0 } }, props.empty)
           : h('div', { className: 'list' }, props.children),
@@ -1065,13 +1065,14 @@ window.__ModuleLoader__.load({
 
     function RunsScreen(props) {
       const items = Array.isArray(props.data.items) ? props.data.items : []
+      const onOpenRun = props.onOpenRun
       return h(
         ListPane,
-        { items, empty: '还没有工作流运行。实例化一个工作流后，Run 与它的任务图会一起写进账本。' },
+        { items, tight: true, empty: '还没有工作流运行。实例化一个工作流后，Run 与它的任务图会一起写进账本。' },
         items.map((run) =>
           h(
             'div',
-            { key: run.id, className: 'item' },
+            { key: run.id, className: onOpenRun === undefined ? 'item' : 'item pick', onClick: onOpenRun === undefined ? undefined : () => onOpenRun(run) },
             h(
               'div',
               { className: 'l' },
@@ -1088,6 +1089,134 @@ window.__ModuleLoader__.load({
             h('div', { className: 'r' }, h('span', { className: 'st-chip' }, RUN_STATUS[run.status] ?? run.status)),
           ),
         ),
+      )
+    }
+
+    /** 单个运行的详情：完成规则、templateKey → taskId 映射与各任务当前状态。 */
+    function RunDetail(props) {
+      const detail = usePanelData(props.sessionId, 'run', { runId: props.runId })
+      return h(Data, { data: detail, what: '运行详情', onRetry: detail.reload }, (data) => {
+        const run = data.run ?? {}
+        const completion = data.completion ?? null
+        const tasks = Array.isArray(data.tasks) ? data.tasks : []
+        return h(
+          'div',
+          { className: 'body pad' },
+          h(
+            'div',
+            { className: 'layer' },
+            h('b', null, '运行'),
+            h('span', null, String(run.id ?? props.runId)),
+            h('i', { className: 'rule' }),
+            h('button', { type: 'button', className: 'btn', onClick: props.onBack }, '返回流程'),
+          ),
+          h(
+            'div',
+            { className: 'list', style: { marginTop: 8 } },
+            h(
+              'div',
+              { className: 'item' },
+              h(
+                'div',
+                { className: 'l' },
+                h('div', { className: 't' }, String(run.workflowId ?? '—')),
+                h(
+                  'div',
+                  { className: 's' },
+                  h('span', { className: 'mono' }, `rev ${run.revision ?? '—'}`),
+                  h('span', { className: 'mono' }, `定义 rev ${run.workflowRevision ?? '—'}`),
+                  h('span', { className: 'mono' }, `完成规则 rev ${run.completionRevision ?? '—'}`),
+                  h('span', { className: 'mono' }, `${run.taskIds?.length ?? tasks.length} 个任务`),
+                ),
+              ),
+              h('div', { className: 'r' }, h('span', { className: 'st-chip' }, RUN_STATUS[run.status] ?? String(run.status ?? '—'))),
+            ),
+          ),
+          h(
+            'div',
+            { className: 'layer' },
+            h('b', null, '完成规则'),
+            h('span', null, completion === null ? '还没有完成规则' : `templateKey → task 映射 ${completion.templateTasks === undefined ? '' : Object.keys(completion.templateTasks).length} 条`),
+            h('i', { className: 'rule' }),
+          ),
+          completion === null
+            ? h('p', { className: 'muted', style: { fontSize: 12, margin: '0 0 8px' } }, '这个运行还没有写完成规则（实例化时缺 completion）。')
+            : h(
+                'div',
+                { className: 'box mono', style: { padding: '10px 12px', marginBottom: 10, fontSize: 12, whiteSpace: 'pre-wrap' } },
+                JSON.stringify(completion, null, 2),
+              ),
+          h(
+            'div',
+            { className: 'layer' },
+            h('b', null, '任务'),
+            h('span', null, `${tasks.length} 个`),
+            h('i', { className: 'rule' }),
+          ),
+          tasks.length === 0
+            ? h('p', { className: 'muted', style: { fontSize: 12, margin: 0 } }, '这个运行还没挂任务。')
+            : h(
+                'div',
+                { className: 'list' },
+                tasks.map((task, index) =>
+                  h(
+                    'div',
+                    { key: task.id ?? `task-${index}`, className: 'item' },
+                    h(
+                      'div',
+                      { className: 'l' },
+                      h('div', { className: 't' }, String(task.title ?? task.id ?? '—')),
+                      h(
+                        'div',
+                        { className: 's' },
+                        h('span', { className: 'mono' }, String(task.id ?? '')),
+                        task.templateKey === undefined || task.templateKey === null
+                          ? null
+                          : h('span', { className: 'mono' }, `templateKey ${String(task.templateKey)}`),
+                      ),
+                    ),
+                    h('div', { className: 'r' }, h('span', { className: 'st-chip' }, String(task.status ?? '—'))),
+                  ),
+                ),
+              ),
+        )
+      })
+    }
+
+    /** 副作用：三态计数 + 清单。数据面是项目级（`effects`），放在「流程」栏下看一眼就够。 */
+    function EffectsSection(props) {
+      const data = props.data
+      const counts = data.counts ?? {}
+      const items = Array.isArray(data.items) ? data.items : []
+      const order = ['requested', 'accepted', 'completed', 'failed', 'cancelled', 'outcome-unknown']
+      return h(
+        'div',
+        { className: 'body pad tight' },
+        h('div', { className: 'layer' }, h('b', null, '副作用'), h('span', null, `${items.length} 条`), h('i', { className: 'rule' })),
+        h(
+          'div',
+          { className: 'bar', style: { borderTop: 0, borderBottom: 0, paddingLeft: 0 } },
+          order.map((key) => h('span', { key, className: 'st-chip' }, `${key} ${counts[key] ?? 0}`)),
+        ),
+        items.length === 0
+          ? h('p', { className: 'muted', style: { fontSize: 12, margin: '6px 0 0' } }, '这个项目还没有副作用记录。')
+          : h(
+              'div',
+              { className: 'list', style: { marginTop: 6 } },
+              items.map((effect) =>
+                h(
+                  'div',
+                  { key: effect.id, className: 'item' },
+                  h(
+                    'div',
+                    { className: 'l' },
+                    h('div', { className: 't' }, String(effect.kind)),
+                    h('div', { className: 's' }, h('span', { className: 'mono' }, String(effect.id))),
+                  ),
+                  h('div', { className: 'r' }, h('span', { className: 'st-chip' }, String(effect.status))),
+                ),
+              ),
+            ),
       )
     }
 
@@ -1267,6 +1396,7 @@ window.__ModuleLoader__.load({
       const { sessionId } = props
       const [tab, setTab] = useState('overview')
       const [taskId, setTaskId] = useState(null)
+      const [runId, setRunId] = useState(null)
 
       useEffect(() => {
         return mountDesignStyle()
@@ -1276,9 +1406,10 @@ window.__ModuleLoader__.load({
       const overview = usePanelData(sessionId, METHOD_OVERVIEW)
       const board = usePanelData(sessionId, METHOD_BOARD)
       const definitions = usePanelData(sessionId, METHOD_DEFINITIONS)
-      const migration = usePanelData(tab === 'migration' ? sessionId : undefined, METHOD_MIGRATION)
+      const migration = usePanelData(tab === 'settings' ? sessionId : undefined, METHOD_MIGRATION)
       // 五个后接的只读面：只在切到那一栏时才请求，避免每次开面板打七枪。
       const runs = usePanelData(tab === 'runs' ? sessionId : undefined, 'runs')
+      const effects = usePanelData(tab === 'runs' ? sessionId : undefined, 'effects')
       const knowledge = usePanelData(tab === 'knowledge' ? sessionId : undefined, 'knowledge')
       const memory = usePanelData(tab === 'memory' ? sessionId : undefined, 'memory')
       const audit = usePanelData(tab === 'audit' ? sessionId : undefined, 'audit', { limit: 200 })
@@ -1305,12 +1436,17 @@ window.__ModuleLoader__.load({
         void overview.reload()
         void board.reload()
         void definitions.reload()
-        if (tab === 'migration') void migration.reload()
-        if (tab === 'runs') void runs.reload()
+        if (tab === 'runs') {
+          void runs.reload()
+          void effects.reload()
+        }
+        if (tab === 'settings') {
+          void settings.reload()
+          void migration.reload()
+        }
         if (tab === 'knowledge') void knowledge.reload()
         if (tab === 'memory') void memory.reload()
         if (tab === 'audit') void audit.reload()
-        if (tab === 'settings') void settings.reload()
       }
 
       let body
@@ -1333,10 +1469,15 @@ window.__ModuleLoader__.load({
       } else if (tab === 'definitions') {
         body = h(Data, { data: definitions, what: '项目定义副本' }, (data) =>
           h(DefinitionsScreen, { data, sessionId, onChanged: () => void definitions.reload() }))
-      } else if (tab === 'migration') {
-        body = h(Data, { data: migration, what: '迁移' }, (data) => h(MigrationScreen, { data }))
       } else if (tab === 'runs') {
-        body = h(Data, { data: runs, what: '工作流运行' }, (data) => h(RunsScreen, { data }))
+        body =
+          runId === null
+            ? [
+                h(Data, { data: runs, what: '工作流运行' }, (data) =>
+                  h(RunsScreen, { data, onOpenRun: (run) => setRunId(run.id) })),
+                h(Data, { data: effects, what: '副作用' }, (data) => h(EffectsSection, { data })),
+              ]
+            : h(RunDetail, { runId, sessionId, onBack: () => setRunId(null) })
       } else if (tab === 'knowledge') {
         body = h(Data, { data: knowledge, what: '项目知识' }, (data) => h(KnowledgeScreen, { data }))
       } else if (tab === 'memory') {
@@ -1344,7 +1485,10 @@ window.__ModuleLoader__.load({
       } else if (tab === 'audit') {
         body = h(Data, { data: audit, what: '审计' }, (data) => h(AuditScreen, { data }))
       } else if (tab === 'settings') {
-        body = h(Data, { data: settings, what: '项目设置' }, (data) => h(SettingsScreen, { data }))
+        body = [
+          h(Data, { data: settings, what: '项目设置' }, (data) => h(SettingsScreen, { data })),
+          h(Data, { data: migration, what: 'v1 迁移影响面' }, (data) => h(MigrationScreen, { data })),
+        ]
       } else {
         const missing = PROJECT_FALLBACK
         body = h(Unavailable, { ...missing, title: tab })
@@ -1357,6 +1501,7 @@ window.__ModuleLoader__.load({
         active: tab,
         onSelect: (next) => {
           setTaskId(null)
+          setRunId(null)
           setTab(next)
         },
         pane: [
