@@ -20,7 +20,7 @@ import { ERROR_CODES, fail } from '../contracts/errors.ts'
 import type { GlobalPublicationPort, PublicationKind } from '../contracts/publication.ts'
 import { HumanAuthorizer } from '../domain/permissions/human-authorizer.ts'
 import type { HumanConfirmation } from '../domain/permissions/human-authorizer.ts'
-import { createTaskCommand, releaseMemberCommand } from './commands.ts'
+import { appointMemberCommand, createTaskCommand, createTeamCommand, releaseMemberCommand } from './commands.ts'
 import { forgetMemory, rememberMemory } from './memory-commands.ts'
 import type { MemoryPort } from './ports.ts'
 import { confirmDefinitionPublication, requestDefinitionPublication } from './publication.ts'
@@ -34,6 +34,8 @@ export const PANEL_WRITE_METHODS = [
   'captainTakeover',
   'gateVerdict',
   'taskCreate',
+  'teamCreate',
+  'memberAppoint',
   'memberRelease',
   'definitionPublish',
   'memoryRemember',
@@ -58,6 +60,8 @@ export const PANEL_WRITE_KINDS: Readonly<Record<PanelWriteMethod, PanelWriteKind
   captainTakeover: 'token',
   gateVerdict: 'direct',
   taskCreate: 'direct',
+  teamCreate: 'direct',
+  memberAppoint: 'direct',
   memberRelease: 'direct',
   definitionPublish: 'token',
   memoryRemember: 'direct',
@@ -80,6 +84,8 @@ export const PANEL_WRITE_DOCS: Readonly<Record<PanelWriteMethod, string>> = {
   captainTakeover: '队长接管：预览世代递增与生效成员，凭一次性令牌执行。动作 `captain.takeover`（人类专属）。',
   gateVerdict: '门禁裁决：对评审中的任务写入 pass / fail / blocked 与检查结果，需 `confirm: true`。',
   taskCreate: '新建任务：标题、验收标准、依赖与所需角色，建在指定团队下，需 `confirm: true`。',
+  teamCreate: '建团队：名字、目标、队长会话（可选蓝图初始化角色与配置），需 `confirm: true`。',
+  memberAppoint: '召唤成员：团队 + 角色（可选父成员与会话）→ 聘任并固化角色快照，需 `confirm: true`。',
   memberRelease: '释放成员（终态）：成员不能有进行中的尝试；释放后不再接活，需 `confirm: true`。',
   definitionPublish: '发布定义到全局库：预览引用与覆盖影响面，凭一次性令牌执行。动作 `definition.publish.confirm`（人类专属）。',
   memoryRemember: '写一条长期记忆到团队 bank 或某个成员 bank，需 `confirm: true`。',
@@ -291,6 +297,10 @@ export function previewPanelWrite(
       fail(ERROR_CODES.INVALID_COMMAND, 'gateVerdict 不走确认令牌：直接带 confirm: true 提交（见 applyDirectPanelWrite）')
     case 'taskCreate':
       fail(ERROR_CODES.INVALID_COMMAND, 'taskCreate 不走确认令牌：直接带 confirm: true 提交（见 applyDirectPanelWrite）')
+    case 'teamCreate':
+      fail(ERROR_CODES.INVALID_COMMAND, 'teamCreate 不走确认令牌：直接带 confirm: true 提交（见 applyDirectPanelWrite）')
+    case 'memberAppoint':
+      fail(ERROR_CODES.INVALID_COMMAND, 'memberAppoint 不走确认令牌：直接带 confirm: true 提交（见 applyDirectPanelWrite）')
     case 'memberRelease':
       fail(ERROR_CODES.INVALID_COMMAND, 'memberRelease 不走确认令牌：直接带 confirm: true 提交（见 applyDirectPanelWrite）')
     case 'memoryRemember':
@@ -363,6 +373,10 @@ export function applyPanelWrite(
       fail(ERROR_CODES.INVALID_COMMAND, 'gateVerdict 不使用确认令牌，请走 applyDirectPanelWrite')
     case 'taskCreate':
       fail(ERROR_CODES.INVALID_COMMAND, 'taskCreate 不使用确认令牌，请走 applyDirectPanelWrite')
+    case 'teamCreate':
+      fail(ERROR_CODES.INVALID_COMMAND, 'teamCreate 不使用确认令牌，请走 applyDirectPanelWrite')
+    case 'memberAppoint':
+      fail(ERROR_CODES.INVALID_COMMAND, 'memberAppoint 不使用确认令牌，请走 applyDirectPanelWrite')
     case 'memberRelease':
       fail(ERROR_CODES.INVALID_COMMAND, 'memberRelease 不使用确认令牌，请走 applyDirectPanelWrite')
     case 'memoryRemember':
@@ -537,6 +551,42 @@ export function applyDirectPanelWrite(
           },
         },
       }
+    }
+    case 'teamCreate': {
+      if (input.confirm !== true) fail(ERROR_CODES.INVALID_PAYLOAD, '建团队需要 confirm: true')
+      const name = requireString(input.params, 'name')
+      const goal = requireString(input.params, 'goal')
+      const captainSessionId = requireString(input.params, 'captainSessionId')
+      const blueprintId = optionalString(input.params, 'blueprintId')
+      const result = createTeamCommand(runtime, {
+        actor: PANEL_HUMAN,
+        name,
+        goal,
+        captainSessionId,
+        ...(blueprintId === undefined ? {} : { blueprintId }),
+      })
+      const created = result.events.find((event) => event.type === 'team.created')
+      if (created === undefined) fail(ERROR_CODES.INTERNAL, '建团队没有产生 team.created 事件')
+      const team = (created.payload as { team: { id: string; name: string } }).team
+     return { method, operationId: team.id, committed: { teamId: team.id, name: team.name, captainSessionId } }
+    }
+    case 'memberAppoint': {
+      if (input.confirm !== true) fail(ERROR_CODES.INVALID_PAYLOAD, '召唤成员需要 confirm: true')
+      const teamId = requireString(input.params, 'teamId')
+      const roleId = requireString(input.params, 'roleId')
+      const parentMemberId = optionalString(input.params, 'parentMemberId')
+      const sessionId = optionalString(input.params, 'sessionId')
+      const result = appointMemberCommand(runtime, {
+        actor: PANEL_HUMAN,
+        teamId,
+        roleId,
+        ...(parentMemberId === undefined ? {} : { parentMemberId }),
+        ...(sessionId === undefined ? {} : { sessionId }),
+      })
+      const appointed = result.events.find((event) => event.type === 'member.appointed')
+      if (appointed === undefined) fail(ERROR_CODES.INTERNAL, '召唤成员没有产生 member.appointed 事件')
+      const member = (appointed.payload as { member: { id: string; status: string } }).member
+      return { method, operationId: member.id, committed: { memberId: member.id, teamId, roleId, status: member.status } }
     }
     case 'memberRelease': {
       if (input.confirm !== true) {
