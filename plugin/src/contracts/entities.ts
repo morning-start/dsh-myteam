@@ -210,7 +210,14 @@ export interface CaptainAssignment {
   assignedAt: string
 }
 
-export type MemberStatus = 'appointed' | 'active' | 'paused' | 'released'
+/**
+ * 成员状态。
+ *
+ * `archived` 与 `released` **不是一回事**（见 docs/decisions/成员归档语义.md）：
+ *   - archived：退役但可回放 —— 名册留痕、记忆 bank 与证据都保留、允许恢复；
+ *   - released：终态，成员彻底离开，不提供恢复。
+ */
+export type MemberStatus = 'appointed' | 'active' | 'paused' | 'archived' | 'released'
 
 export interface Member {
   id: MemberId

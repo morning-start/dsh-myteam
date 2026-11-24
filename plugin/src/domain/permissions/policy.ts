@@ -26,6 +26,7 @@ export type Action =
   | 'captain.handoff.confirm'
   | 'member.appoint'
   | 'member.release'
+  | 'member.archive'
   | 'member.pause'
   | 'run.create'
   | 'run.revise'
@@ -74,6 +75,7 @@ const CAPTAIN_ACTIONS: ReadonlySet<Action> = new Set<Action>([
   'captain.handoff.propose',
   'member.appoint',
   'member.release',
+  'member.archive',
   'member.pause',
   'run.create',
   'run.revise',

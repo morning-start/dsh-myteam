@@ -596,6 +596,81 @@ export function appointMemberCommand(
  * 前置：团队 active；成员属于该团队；成员**没有进行中的尝试**（先收尾再释放，
  * 否则释放后尝试会挂在一个已经不存在的任期上）；状态迁移按 MEMBER_TRANSITIONS 走。
  */
+/**
+ * 归档成员（`member.archived`）。
+ *
+ * 与 {@link releaseMemberCommand} 的区别（见 docs/decisions/成员归档语义.md）：
+ *   - 归档是「退役但可回放」：名册留痕、记忆 bank 与证据都保留，之后还能恢复成 active；
+ *   - 释放是终态，不提供恢复。
+ *
+ * 前置条件（照设计稿 p-member-archive 的「先排空、再归档」）：
+ *   1. 不能有进行中的 Attempt —— 有两种处理方式：\`drain: 'wait'\`（默认）直接拒绝，
+ *      让用户等这一轮结束；\`drain: 'pause'\` 先把成员落成 paused 再归档（同一批次两事件）。
+ *   2. 子成员必须已经归档或释放 —— 否则报 CONFLICT 并列出子成员 id，级联必须显式二次确认。
+ */
+export function archiveMemberCommand(
+  runtime: ProjectRuntime,
+  input: { actor: ActorRef; teamId: string; memberId: string; drain?: 'wait' | 'pause' },
+): CommitResult {
+  const state = runtime.state
+  const team = state.teams.get(input.teamId)
+  if (team === undefined) fail(ERROR_CODES.NOT_FOUND, '团队不存在', { details: { teamId: input.teamId } })
+  authorize('member.archive', input.actor, { teamId: input.teamId })
+  assertTeamActive(team)
+
+  const member = state.members.get(input.memberId)
+  if (member === undefined || member.teamId !== input.teamId) {
+    fail(ERROR_CODES.NOT_FOUND, '成员不存在', { details: { memberId: input.memberId, teamId: input.teamId } })
+  }
+  // archived → archived 是幂等拒绝：已经是归档态就别再写一条相同事件。
+  assertMemberStatusChange(member.status, 'archived')
+
+  // 子成员先处理：级联不静默发生。
+  const children = [...state.members.values()].filter(
+    (candidate) => candidate.parentMemberId === member.id
+      && candidate.status !== 'archived'
+      && candidate.status !== 'released',
+  )
+  if (children.length > 0) {
+    fail(ERROR_CODES.CONFLICT, '成员还有未归档/未释放的子成员，先处理子成员再归档', {
+      details: { memberId: member.id, childMemberIds: children.map((child) => child.id) },
+    })
+  }
+
+  const activeAttempts = [...state.attempts.values()].filter(
+    (attempt) => attempt.memberId === member.id && attempt.status === 'active',
+  )
+  const drain = input.drain ?? 'wait'
+  if (activeAttempts.length > 0 && drain === 'wait') {
+    fail(ERROR_CODES.CONFLICT, '成员还有进行中的尝试，等这一轮结束，或选择「先暂停再归档」', {
+      details: { memberId: member.id, attemptIds: activeAttempts.map((attempt) => attempt.id) },
+    })
+  }
+
+  const drafts: DraftEvent[] = []
+  let revision = member.revision
+  // 「先暂停再归档」是两条事件：先落 paused（可解释的中间态），再落 archived。
+  if (activeAttempts.length > 0 && drain === 'pause' && member.status !== 'paused') {
+    revision += 1
+    drafts.push({
+      type: 'member.status.changed',
+      actor: input.actor,
+      entity: { kind: 'member', id: member.id, teamId: team.id },
+      entityRevision: revision,
+      payload: { teamId: team.id, memberId: member.id, status: 'paused', revision },
+    })
+  }
+  revision += 1
+  drafts.push({
+    type: 'member.archived',
+    actor: input.actor,
+    entity: { kind: 'member', id: member.id, teamId: team.id },
+    entityRevision: revision,
+    payload: { teamId: team.id, memberId: member.id, revision, pausedFirst: drafts.length > 0 },
+  })
+  return runtime.commit(drafts)
+}
+
 export function releaseMemberCommand(
   runtime: ProjectRuntime,
   input: { actor: ActorRef; teamId: string; memberId: string },

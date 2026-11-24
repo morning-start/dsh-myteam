@@ -13,10 +13,15 @@ import type { CapabilitySet, Member, MemberStatus, RoleDefinition } from '../../
 import { ERROR_CODES, fail } from '../../contracts/errors.ts'
 import { narrowCapabilities, normalizeCapabilities } from '../definitions/role.ts'
 
+/**
+ * 成员状态迁移。`archived` 是「退役但可回放」：可恢复成 active，也可再走 released 彻底离开。
+ * 反过来 `released` 是终态，什么都不出（出边为空）。
+ */
 const MEMBER_TRANSITIONS: Readonly<Record<MemberStatus, readonly MemberStatus[]>> = {
-  appointed: ['active', 'released'],
-  active: ['paused', 'released'],
-  paused: ['active', 'released'],
+  appointed: ['active', 'archived', 'released'],
+  active: ['paused', 'archived', 'released'],
+  paused: ['active', 'archived', 'released'],
+  archived: ['active', 'released'],
   released: [],
 }
 
@@ -151,8 +156,13 @@ export function changeMemberStatus(member: Member, status: MemberStatus, now: st
 }
 
 /** 成员可接收新任务的条件：在册且未被暂停/释放。 */
+/**
+ * 成员能不能接新活。三个状态不能：已释放（终态）、已暂停、**已归档**（退役但可回放，
+ * 回放的是历史，不是派人接活）。`appointed`（聘任了还没绑会话）留在这里放行，
+ * 由会话绑定那层再拒——那是「还没上线」，不是「已退役」。
+ */
 export function assertMemberActive(member: Member): void {
-  if (member.status === 'released' || member.status === 'paused') {
+  if (member.status === 'released' || member.status === 'paused' || member.status === 'archived') {
     fail(ERROR_CODES.MEMBER_NOT_ACTIVE, `成员状态为 ${member.status}，不能接收新任务`, {
       details: { memberId: member.id, status: member.status },
     })

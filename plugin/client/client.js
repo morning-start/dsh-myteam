@@ -434,6 +434,14 @@ window.__ModuleLoader__.load({
     ]
 
     const TEAM_STATUS = { active: '进行中', draft: '草稿', archived: '已归档', disbanded: '已解散' }
+    /** 成员状态的中文名。`archived` 是「已归档（可回放）」，与 `released`「已释放」分开写。 */
+    const MEMBER_STATUS = {
+      appointed: '已聘任',
+      active: '在岗',
+      paused: '已暂停',
+      archived: '已归档',
+      released: '已释放',
+    }
 
     /** 指标卡（L1 共用件）：概览与全局库概览用同一份，别再各写一遍。 */
     function MetricCard(props) {
@@ -728,7 +736,7 @@ window.__ModuleLoader__.load({
                 row.orphan ? h('span', null, '（父成员已不在名册）') : null,
               ),
             ),
-            h('div', { className: 'r' }, h('span', { className: 'st-chip' }, String(row.member.status))),
+            h('div', { className: 'r' }, h('span', { className: 'st-chip' }, MEMBER_STATUS[row.member.status] ?? String(row.member.status))),
           ),
         ),
       )
@@ -1702,7 +1710,39 @@ window.__ModuleLoader__.load({
         }
       }
 
-      const releasable = roster.filter((member) => member.status !== 'released')
+      /**
+       * 归档 / 恢复。归档是「退役但可回放」，和释放是两件事；
+       * 有进行中尝试时后端会报 CONFLICT 并给出 attemptIds —— 这里原样显示，
+       * 并提示可以选「先暂停再归档」（drain=pause），不替用户决定。
+       */
+      const archive = async (memberId, drain) => {
+        if (busy !== null) return
+        setBusy(memberId)
+        setProblem(null)
+        try {
+          await callWrite('memberArchive', sessionId, {
+            confirm: true,
+            params: { teamId, memberId, ...(drain === undefined ? {} : { drain }) },
+          })
+          onDone()
+        } catch (error) {
+          setProblem(messageOf(error))
+        } finally {
+          setBusy(null)
+        }
+      }
+
+      /**
+       * 恢复归档成员。领域上 `archived → active` 合法（t54 守着），但**面板还没有对应的写方法** ——
+       * 这里如实说「暂不支持」，不偷偷拿 definitionSave 或别的通道去凑。
+       */
+      const restoreMember = async (memberId) => {
+        setProblem(`恢复需要一个新面板写（memberRestore），当前版本没有；领域已允许 archived → active，见 docs/decisions/成员归档语义.md`)
+        void memberId
+      }
+
+      const releasable = roster.filter((member) => member.status !== 'released' && member.status !== 'archived')
+      const archivedMembers = roster.filter((member) => member.status === 'archived')
 
       return h(
         'div',
@@ -1741,6 +1781,37 @@ window.__ModuleLoader__.load({
         problem === null
           ? null
           : h('p', { className: 'muted', style: { fontSize: 12, margin: '8px 0 0' } }, `没成功：${problem}`),
+        archivedMembers.length === 0
+          ? null
+          : h(
+              'div',
+              { style: { marginTop: 10 } },
+              h('p', { className: 'muted', style: { margin: '0 0 4px', fontSize: 12 } },
+                '已归档（退役但可回放：记录、记忆与证据都在；不再接新活）'),
+              archivedMembers.map((member) =>
+                h(
+                  'div',
+                  { key: member.id, className: 'item' },
+                  h(
+                    'div',
+                    { className: 'l' },
+                    h('div', { className: 't' }, member.id),
+                    h('div', { className: 's' }, h('span', { className: 'mono' }, MEMBER_STATUS.archived ?? '已归档')),
+                  ),
+                  h(
+                    'div',
+                    { className: 'r' },
+                    h('button', {
+                      type: 'button',
+                      className: 'btn',
+                      disabled: busy !== null,
+                      title: '恢复成在岗；归档时保留的记录与记忆继续可用',
+                      onClick: () => void restoreMember(member.id),
+                    }, busy === member.id ? '恢复中…' : '恢复'),
+                  ),
+                ),
+              ),
+            ),
         releasable.length === 0
           ? null
           : h(
@@ -1754,11 +1825,23 @@ window.__ModuleLoader__.load({
                     'div',
                     { className: 'l' },
                     h('div', { className: 't' }, member.id),
-                    h('div', { className: 's' }, h('span', { className: 'mono' }, member.status)),
+                    h('div', { className: 's' }, h('span', { className: 'mono' }, MEMBER_STATUS[member.status] ?? member.status)),
                   ),
                   h(
                     'div',
                     { className: 'r' },
+                    h(
+                      'button',
+                      {
+                        type: 'button',
+                        className: 'btn',
+                        style: { marginRight: 6 },
+                        disabled: busy !== null,
+                        title: '归档：名册留痕、记忆与证据保留，之后可恢复；与「释放（终态）」不同',
+                        onClick: () => void archive(member.id),
+                      },
+                      busy === member.id ? '归档中…' : '归档',
+                    ),
                     h(
                       'button',
                       {

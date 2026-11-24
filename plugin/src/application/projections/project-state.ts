@@ -133,6 +133,7 @@ export const HANDLED_EVENT_TYPES: readonly EventType[] = [
   'member.appointed',
   'member.session.bound',
   'member.status.changed',
+  'member.archived',
   'member.released',
   'run.created',
   'run.revised',
@@ -415,6 +416,18 @@ export function applyEvent(state: ProjectState, event: EventEnvelope): void {
       })
       return
     }
+    case 'member.archived': {
+      const payload = event.payload as { memberId: string; revision: number }
+      const member = requireMember(state, payload.memberId)
+      state.members.set(payload.memberId, {
+        ...member,
+        status: 'archived',
+        revision: payload.revision,
+        updatedAt: event.occurredAt,
+      })
+      return
+    }
+
     case 'member.released': {
       const payload = event.payload as { memberId: string; revision: number }
       const member = requireMember(state, payload.memberId)

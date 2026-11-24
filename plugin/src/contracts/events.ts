@@ -80,6 +80,7 @@ export type EventType =
   | 'member.appointed'
   | 'member.session.bound'
   | 'member.status.changed'
+  | 'member.archived'
   | 'member.released'
   | 'run.created'
   | 'run.revised'
@@ -284,6 +285,7 @@ export interface EventPayloads {
     status: Member['status']
     reason: string
   }
+  'member.archived': { teamId: TeamId; memberId: MemberId; revision: number }
   'member.released': { teamId: TeamId; memberId: MemberId; revision: number }
 
   'run.created': { run: WorkflowRun; completion: CompletionRule; graphRevision: number }
@@ -425,6 +427,7 @@ export const EVENT_TYPES: readonly EventType[] = [
   'member.appointed',
   'member.session.bound',
   'member.status.changed',
+  'member.archived',
   'member.released',
   'run.created',
   'run.revised',

@@ -1762,6 +1762,93 @@ test('空态纪律：实现里不许再出现"空"这类占位文案（源码级
   assert.ok(source.includes('function EmptyState('), '空态应走共用件 EmptyState')
   assert.ok(source.includes('h(EmptyState, { reason:'), 'ListPane 的字符串空态应转到 EmptyState')
 })
+test('团队栏「归档」：名册行带归档与释放两个动作，归档发 memberArchive（带 confirm）', async () => {
+  const harness = loadClient(FILLED)
+  try {
+    let tree = await mount(harness.view, { sessionId: 'ses_1' })
+
+    const teamsTab = findTab(tree, '团队')
+    assert.ok(teamsTab !== null, '缺「团队」栏')
+    ;(teamsTab!.props.onClick as () => void)()
+    tree = await mount(harness.view, { sessionId: 'ses_1' })
+
+    const pick = findButton(tree, '甲队')
+    assert.ok(pick !== null)
+    ;(pick!.props.onClick as () => void)()
+    tree = await mount(harness.view, { sessionId: 'ses_1' })
+
+    const archiveButton = findButton(tree, '归档')
+    assert.ok(archiveButton !== null, '名册行缺「归档」（归档是退役但可回放，与释放不同）')
+    assert.ok(findButton(tree, '释放') !== null, '「释放」仍在，两者并列不是一个东西')
+    ;(archiveButton!.props.onClick as () => void)()
+    tree = await mount(harness.view, { sessionId: 'ses_1' })
+
+    assert.deepEqual(harness.writes, ['memberArchive'], '归档走 memberArchive，不能复用 memberRelease')
+    assert.equal(harness.writeBody?.confirm, true, 'direct 类写动作必须带 confirm: true')
+    const params = harness.writeBody?.params as Record<string, unknown>
+    assert.equal(params.teamId, 'team_1')
+    assert.equal(params.memberId, 'member_1')
+    assert.equal(params.drain, undefined, '默认不传 drain（= wait：有进行中尝试就拒绝）')
+  } finally {
+    harness.restore()
+  }
+})
+
+test('团队栏：已归档成员不再出现在可操作行，改为单独一区并标注可回放', async () => {
+  const team = { ...FILLED.team as Record<string, unknown> }
+  team.members = [
+    { id: 'member_1', roleId: 'role_1', status: 'active', parentMemberId: null },
+    { id: 'member_2', roleId: 'role_2', status: 'archived', parentMemberId: null },
+  ]
+
+  const harness = loadClient({ ...FILLED, team })
+  try {
+    let tree = await mount(harness.view, { sessionId: 'ses_1' })
+
+    const teamsTab = findTab(tree, '团队')
+    assert.ok(teamsTab !== null)
+    ;(teamsTab!.props.onClick as () => void)()
+    tree = await mount(harness.view, { sessionId: 'ses_1' })
+
+    const pick = findButton(tree, '甲队')
+    assert.ok(pick !== null)
+    ;(pick!.props.onClick as () => void)()
+    tree = await mount(harness.view, { sessionId: 'ses_1' })
+
+    const text = textOf(tree)
+    assert.ok(text.includes('已归档'), '归档成员要有「已归档」标注')
+    assert.ok(text.includes('可回放'), '要说清归档是退役但可回放，不是死了')
+    // 「恢复」入口在，但当前版本没有对应写方法，点了要如实说，不能假装成功。
+    const restore = findButton(tree, '恢复')
+    assert.ok(restore !== null, '归档区应有「恢复」入口')
+    ;(restore!.props.onClick as () => void)()
+    tree = await mount(harness.view, { sessionId: 'ses_1' })
+    assert.deepEqual(harness.writes, [], '恢复当前没有写方法，不能乱发请求')
+    assert.ok(textOf(tree).includes('memberRestore'), '要如实说缺哪个写方法')
+  } finally {
+    harness.restore()
+  }
+})
+
+test('团队栏：成员状态用中文（archived → 已归档，released → 已释放），不直接露英文', async () => {
+  const team = { ...FILLED.team as Record<string, unknown> }
+  team.members = [{ id: 'member_1', roleId: 'role_1', status: 'archived', parentMemberId: null }]
+  const harness = loadClient({ ...FILLED, team })
+  try {
+    let tree = await mount(harness.view, { sessionId: 'ses_1' })
+    ;(findTab(tree, '团队')!.props.onClick as () => void)()
+    tree = await mount(harness.view, { sessionId: 'ses_1' })
+    ;(findButton(tree, '甲队')!.props.onClick as () => void)()
+    tree = await mount(harness.view, { sessionId: 'ses_1' })
+
+    const text = textOf(tree)
+    assert.ok(!text.includes('archived'), '界面上不该出现裸的 archived')
+    assert.ok(text.includes('已归档'))
+  } finally {
+    harness.restore()
+  }
+})
+
 test('样式来源守卫：渲染出来的每个类名都定义在仓库 design-v2 里（不是打包副本）', async () => {
   // 这条是踩过坑才加的：包内 plugin/design-v2 是 build 从仓库 design-v2 **拷出来**的生成物，
   // 每次 build 都会 rmSync 重建。把新样式写进包内副本，下一次 build 就静默丢了 ——

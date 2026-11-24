@@ -46,6 +46,7 @@
 | `teamCreate` | `direct` | 建团队：名字、目标、队长会话（可选蓝图初始化角色与配置），需 `confirm: true`。 |
 | `memberAppoint` | `direct` | 召唤成员：团队 + 角色（可选父成员与会话）→ 聘任并固化角色快照，需 `confirm: true`。 |
 | `memberRelease` | `direct` | 释放成员（终态）：成员不能有进行中的尝试；释放后不再接活，需 `confirm: true`。 |
+| `memberArchive` | `direct` | 归档成员（退役但可回放）：名册留痕、记忆与证据保留、可恢复；有进行中尝试时要么等结束（drain=wait），要么先暂停再归档（drain=pause）；子成员须先处理，需 `confirm: true`。 |
 | `definitionPublish` | `token` | 发布定义到全局库：预览引用与覆盖影响面，凭一次性令牌执行。动作 `definition.publish.confirm`（人类专属）。 |
 | `definitionSave` | `direct` | 保存项目定义（角色 / 工作流）：revision 递增并记 previousHash，需 `confirm: true`。 |
 | `memoryRemember` | `direct` | 写一条长期记忆到团队 bank 或某个成员 bank，需 `confirm: true`。 |
