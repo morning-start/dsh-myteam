@@ -11,6 +11,7 @@
 | 走完整链路（建队 → 派任务 → 审批） | `ki2-drive.mjs` |
 | **狗粮：让本仓库自己组一次队**（B5） | `dogfood-live.mjs`（机制面 21 项）+ `dogfood-collab.mjs`（真队长会话自己组队） |
 | 用浏览器按真实渲染查 UI | `cdp-debug.mjs`（配合 `.debug/scenario-*.mjs`） |
+| **起真宿主、真点一遍**（隔离 home/profile/端口 + CDP 真实鼠标键盘） | `verify-live.mjs`（`--reuse-home` 复用隔离 home）；启动器 `boot-iso-web.cmd` |
 | 造一份能点的演示数据 | `seed-demo-project.mjs` / `seed-demo-team.mjs` / `seed-panel-check.mjs` |
 | 核对 src 与 lib 是否一致 | `check-drift.mjs` / `diff-one.mjs` |
 | 守分层与写盘出口（违规即红） | `check-architecture.mjs`（A1–A5 五条硬红线） |
