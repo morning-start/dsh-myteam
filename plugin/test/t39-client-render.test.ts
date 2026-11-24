@@ -2123,6 +2123,56 @@ test('设置栏：删除项目数据 —— 两段式，输对项目名才能确
   }
 })
 
+
+test('L2-C 名册树：深度徽标 / 子成员数 / 硬上限；已归档成员仍在树里且位置正确', async () => {
+  // 设计稿 p-roster-tree：父子是聘任结构（不是会话嵌套），到深度上限要标「硬上限」，
+  // 已归档成员**仍在名册里**（保留记录），只是状态徽标不同。
+  const team = {
+    ...(FILLED.team as Record<string, unknown>),
+    config: { revision: 1, limits: { maxMembers: 8, maxMemberDepth: 2, maxChildrenPerMember: 4 } },
+    members: [
+      { id: 'm_cap', roleId: 'role_1', status: 'active', parentMemberId: null },
+      { id: 'm_child', roleId: 'role_1', status: 'active', parentMemberId: 'm_cap' },
+      { id: 'm_grand', roleId: 'role_1', status: 'active', parentMemberId: 'm_child' },
+      // 已归档的成员挂在 m_cap 下 —— 它必须留在树里、挂在正确层级，不能因为归档被挪到根层。
+      { id: 'm_archived_child', roleId: 'role_1', status: 'archived', parentMemberId: 'm_cap' },
+      // 孤儿：父成员不在名册里 → 挂根层并标注。
+      { id: 'm_orphan', roleId: 'role_1', status: 'active', parentMemberId: 'm_gone' },
+    ],
+  }
+  const harness = loadClient({ ...FILLED, team })
+  try {
+    let tree = await mount(harness.view, { sessionId: 'ses_1' })
+    ;(findTab(tree, '团队')!.props.onClick as () => void)()
+    tree = await mount(harness.view, { sessionId: 'ses_1' })
+    ;(findButton(tree, '甲队')!.props.onClick as () => void)()
+    tree = await mount(harness.view, { sessionId: 'ses_1' })
+
+    const text = textOf(tree)
+
+    // 1) 深度徽标：根 d0、子 d1、孙 d2
+    assert.ok(text.includes('d0'), '根成员要标 d0')
+    assert.ok(text.includes('d1'), '子成员要标 d1')
+    assert.ok(text.includes('d2'), '孙成员要标 d2')
+
+    // 2) 深度上限 2：d2 那层要标「硬上限」，d1 不该标
+    assert.ok(text.includes('硬上限'), '到深度上限那层要标「硬上限」')
+
+    // 3) 子成员数
+    assert.ok(text.includes('2 个子成员'), `m_cap 有 2 个孩子，应显示「2 个子成员」：${text.slice(0, 400)}`)
+    assert.ok(text.includes('无子成员'), '叶子成员要写「无子成员」')
+
+    // 4) 已归档成员在树里，且带归档标记
+    assert.ok(text.includes('m_archived_child'), '已归档成员必须留在名册树里')
+    assert.ok(text.includes('已归档'), '归档成员要带「已归档」标记')
+
+    // 5) 孤儿标注
+    assert.ok(text.includes('父成员已不在名册'), '孤儿要标注父成员不在名册')
+  } finally {
+    harness.restore()
+  }
+})
+
 test('样式来源守卫：渲染出来的每个类名都定义在仓库 design-v2 里（不是打包副本）', async () => {
   // 这条是踩过坑才加的：包内 plugin/design-v2 是 build 从仓库 design-v2 **拷出来**的生成物，
   // 每次 build 都会 rmSync 重建。把新样式写进包内副本，下一次 build 就静默丢了 ——

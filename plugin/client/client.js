@@ -724,9 +724,27 @@ window.__ModuleLoader__.load({
      * 数据就是 `team.members` 的 `parentMemberId`：父子关系是聘任时定的，不额外请求。
      * 找不到父成员（父已释放/被删）的成员单列成「孤儿」，不要静默吞掉。
      */
+    /**
+     * 名册树（`p-roster-tree`）。
+     *
+     * 设计稿的三条要求，逐条落在这里：
+     *   1. **深度徽标**（d0 / d1 / d2）：父子是聘任结构，不是会话嵌套；
+     *   2. **深度上限**：到上限的那层标「硬上限」，提示不能再派生 —— 上限取团队生效配置
+     *      的 `limits.maxMemberDepth`（平台还有更硬的 `SAFETY_LIMITS.maxMemberDepth`）；
+     *   3. **子成员数**：每个成员后面写「N 个子成员」，为 0 时写「无子成员」。
+     *
+     * 孤儿（父成员已不在名册）单独标出来：它在树里只能挂到根层，不标的话会被误读成「没爹」。
+     * 已归档成员**也在树里**（设计稿：名册保留这条记录），只是状态徽标不同。
+     */
     function RosterTree(props) {
       const members = Array.isArray(props.members) ? props.members : []
       const roleName = (roleId) => props.roles?.find((role) => role.id === roleId)?.name ?? roleId
+      // 深度上限：优先用团队生效配置，取不到就退回平台安全上限（宁严不宽）。
+      const maxDepth = (() => {
+        const fromConfig = props.config?.limits?.maxMemberDepth
+        if (typeof fromConfig === 'number' && Number.isFinite(fromConfig)) return fromConfig
+        return props.safetyMaxDepth ?? null
+      })()
       if (members.length === 0) {
         return h('p', { className: 'muted', style: { margin: '6px 0 0', fontSize: 12 } }, '这支团队还没有成员。在会话里让队长召唤，或从团队栏发起。')
       }
@@ -744,7 +762,8 @@ window.__ModuleLoader__.load({
       }
       const rows = []
       const walk = (member, depth) => {
-        rows.push({ member, depth, orphan: member.parentMemberId !== null && member.parentMemberId !== undefined && !ids.has(member.parentMemberId) })
+        const orphan = member.parentMemberId !== null && member.parentMemberId !== undefined && !ids.has(member.parentMemberId)
+        rows.push({ member, depth, orphan, childCount: (children.get(member.id) ?? []).length })
         for (const child of children.get(member.id) ?? []) walk(child, depth + 1)
       }
       for (const root of roots.sort((left, right) => (left.id < right.id ? -1 : 1))) walk(root, 0)
@@ -752,27 +771,37 @@ window.__ModuleLoader__.load({
       return h(
         'div',
         { style: { marginTop: 8 } },
-        rows.map((row) =>
-          h(
+        rows.map((row) => {
+          // 到上限那层：不能再派生。只有「确实有上限」时才标，避免 0/undefined 误报。
+          const atCap = maxDepth !== null && row.depth >= maxDepth
+          const archived = row.member.status === 'archived'
+          return h(
             'div',
             { key: row.member.id, className: 'item', style: { paddingLeft: 2 + row.depth * 18 } },
             h(
               'div',
               { className: 'l' },
-              h('div', { className: 't' }, `${row.depth === 0 ? '●' : '└'} ${roleName(row.member.roleId)}`),
+              h(
+                'div',
+                { className: 't' },
+                `${row.depth === 0 ? '●' : '└'} ${roleName(row.member.roleId)}`,
+                h('span', { className: 'tag', style: { marginLeft: 6 } }, `d${String(row.depth)}`),
+                atCap ? h('span', { className: 'tag', style: { marginLeft: 4 }, title: `深度上限 ${String(maxDepth)}：这一层不能再派生` }, '硬上限') : null,
+                archived ? h('span', { className: 'tag', style: { marginLeft: 4 } }, '已归档') : null,
+              ),
               h(
                 'div',
                 { className: 's' },
                 h('span', { className: 'mono' }, row.member.id),
+                h('span', null, row.childCount === 0 ? '无子成员' : `${String(row.childCount)} 个子成员`),
                 row.orphan ? h('span', null, '（父成员已不在名册）') : null,
               ),
             ),
             h('div', { className: 'r' }, h('span', { className: 'st-chip' }, MEMBER_STATUS[row.member.status] ?? String(row.member.status))),
-          ),
-        ),
+          )
+        }),
       )
     }
-
     /** 角色详情（L2-C / `p-role`）：profile + 能力矩阵 + 谁在用。数据来自 definitions.detail。 */
     function RoleDetailBox(props) {
       const item = props.item
@@ -1988,7 +2017,7 @@ window.__ModuleLoader__.load({
                   'div',
                   null,
                   h('div', { className: 'rc-h' }, h(Dot, { tone: 'run' }), h('span', { className: 'nm' }, data.team.name), h('span', { className: 'tag' }, TEAM_STATUS[data.team.status] ?? data.team.status)),
-                  h(RosterTree, { members: data.members, roles: data.roles }),
+                  h(RosterTree, { members: data.members, roles: data.roles, config: data.config }),
                   h('p', { className: 'muted', style: { margin: '10px 0 0', fontSize: 12 } },
                     `任务 ${data.tasks.length} 个 · 可用角色 ${data.roles.length} 个 · 配置 ${data.config === null ? '未落盘' : `revision ${data.config.revision ?? '—'}`}`),
                   h(TeamAdminBox, {
