@@ -65,7 +65,6 @@
 | `task.progress` | 写进度 | ✅ | — | ✅ | — |  |
 | `task.evidence` | 提交证据 | ✅ | — | ✅ | — |  |
 | `task.submit-review` | 提交评审 | ✅ | — | ✅ | — |  |
-| `task.review` | 接受评审（队长侧） | ✅ | ✅ | — | — |  |
 | `task.complete` | 完成任务 | ✅ | ✅ | — | — |  |
 | `task.reopen` | 重开任务 | ✅ | ✅ | — | — |  |
 | `task.cancel` | 取消任务 | ✅ | ✅ | — | — |  |
@@ -87,27 +86,27 @@
 
 ## 2. 按身份汇总（反向表：这个身份能做哪些）
 
-### 人类（41 / 41 个动作）
+### 人类（40 / 40 个动作）
 
 全部动作都允许；其中 🔒 标记的 5 个还要过一次性令牌，且只能由人类发起：
 
 > `definition.publish.confirm` · `team.disband` · `captain.handoff.confirm` · `plan.approve` · `migration.cutover`
 
-`project.read` · `definition.write` · `definition.copy-from-global` · `definition.publish.request` · `definition.publish.confirm` · `team.create` · `team.update` · `team.archive` · `team.disband` · `captain.assign` · `captain.handoff.propose` · `captain.handoff.confirm` · `member.appoint` · `member.release` · `member.archive` · `member.pause` · `run.create` · `run.revise` · `task.create` · `task.update` · `task.dependencies.change` · `task.claim` · `task.progress` · `task.evidence` · `task.submit-review` · `task.review` · `task.complete` · `task.reopen` · `task.cancel` · `knowledge.propose` · `knowledge.adopt` · `knowledge.archive` · `config.write` · `config.rebase` · `memory.read` · `memory.write` · `memory.forget` · `message.post` · `effect.settle` · `plan.approve` · `migration.cutover`
+`project.read` · `definition.write` · `definition.copy-from-global` · `definition.publish.request` · `definition.publish.confirm` · `team.create` · `team.update` · `team.archive` · `team.disband` · `captain.assign` · `captain.handoff.propose` · `captain.handoff.confirm` · `member.appoint` · `member.release` · `member.archive` · `member.pause` · `run.create` · `run.revise` · `task.create` · `task.update` · `task.dependencies.change` · `task.claim` · `task.progress` · `task.evidence` · `task.submit-review` · `task.complete` · `task.reopen` · `task.cancel` · `knowledge.propose` · `knowledge.adopt` · `knowledge.archive` · `config.write` · `config.rebase` · `memory.read` · `memory.write` · `memory.forget` · `message.post` · `effect.settle` · `plan.approve` · `migration.cutover`
 
-### 队长（33 / 41 个动作）
+### 队长（32 / 40 个动作）
 
-白名单；且 `context.teamId` 必须等于自己的团队。注意：**读当前项目的面板数据不需要任何动作**（见 §0.5），上面这 33 条是「能改什么」。
+白名单；且 `context.teamId` 必须等于自己的团队。注意：**读当前项目的面板数据不需要任何动作**（见 §0.5），上面这 32 条是「能改什么」。
 
-`project.read` · `definition.write` · `definition.copy-from-global` · `definition.publish.request` · `team.create` · `team.update` · `team.archive` · `captain.assign` · `captain.handoff.propose` · `member.appoint` · `member.release` · `member.archive` · `member.pause` · `run.create` · `run.revise` · `task.create` · `task.update` · `task.dependencies.change` · `task.claim` · `task.review` · `task.complete` · `task.reopen` · `task.cancel` · `knowledge.propose` · `knowledge.adopt` · `knowledge.archive` · `config.write` · `config.rebase` · `memory.read` · `memory.write` · `memory.forget` · `message.post` · `effect.settle`
+`project.read` · `definition.write` · `definition.copy-from-global` · `definition.publish.request` · `team.create` · `team.update` · `team.archive` · `captain.assign` · `captain.handoff.propose` · `member.appoint` · `member.release` · `member.archive` · `member.pause` · `run.create` · `run.revise` · `task.create` · `task.update` · `task.dependencies.change` · `task.claim` · `task.complete` · `task.reopen` · `task.cancel` · `knowledge.propose` · `knowledge.adopt` · `knowledge.archive` · `config.write` · `config.rebase` · `memory.read` · `memory.write` · `memory.forget` · `message.post` · `effect.settle`
 
-### 成员（9 / 41 个动作）
+### 成员（9 / 40 个动作）
 
 白名单；且只能操作自己的实体 / 自己的 Attempt。同样地，**读当前项目的面板数据不需要动作**（§0.5）；这 9 条里 4 条是干活必需的写（认领/进度/证据/提交评审），其余是读项目、读记忆、写记忆、提知识与发消息。
 
 `project.read` · `task.claim` · `task.progress` · `task.evidence` · `task.submit-review` · `knowledge.propose` · `memory.read` · `memory.write` · `message.post`
 
-### 系统（Effect Runner）（1 / 41 个动作）
+### 系统（Effect Runner）（1 / 40 个动作）
 
 **只能结算 Effect，不能发起任何业务动作** —— 这是刻意的：系统不是「超级身份」。
 
@@ -130,6 +129,7 @@
 |---|---|---|---|
 | `member.archive` | **新增**（归档成员，退役但可回放） | 人类 ✅ 队长 ✅ 成员 — | 与 `member.release` 同级：队长管自己团队的成员生命周期 |
 | `memberRestore` | 面板写**新增**，但复用 `member.archive` 动作 | 同上 | 恢复就是把归档成员放回在岗，属于同一类动作，不为它单开权限 |
+| `task.review` | **删除**（原本就在 `CAPTAIN_ACTIONS` 里，但从没进过 `Action` union，也**没有任何调用点**） | — | 评审实际走 `gateVerdict` → `task.complete`；保留一个永远不成立的动作只会误导读者 |
 
 > 注意 `memberRestore` 是个**面板写方法**，不是新的 `Action` —— 它走的是 `member.archive` 的授权。
 > 这是刻意的：为「恢复」单开一个动作会让权限矩阵多一行只有箭头不同的东西，收益为零。

@@ -37,7 +37,6 @@ export type Action =
   | 'task.progress'
   | 'task.evidence'
   | 'task.submit-review'
-  | 'task.review'
   | 'task.complete'
   | 'task.reopen'
   | 'task.cancel'
@@ -84,7 +83,6 @@ const CAPTAIN_ACTIONS: ReadonlySet<Action> = new Set<Action>([
   'task.update',
   'task.dependencies.change',
   'task.claim',
-  'task.review',
   'task.complete',
   'task.reopen',
   'task.cancel',

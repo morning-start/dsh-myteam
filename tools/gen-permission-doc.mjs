@@ -63,7 +63,6 @@ const GROUPS = [
     ['task.progress', '写进度'],
     ['task.evidence', '提交证据'],
     ['task.submit-review', '提交评审'],
-    ['task.review', '接受评审（队长侧）'],
     ['task.complete', '完成任务'],
     ['task.reopen', '重开任务'],
     ['task.cancel', '取消任务'],
@@ -184,6 +183,7 @@ lines.push('| 动作 | 变更 | 谁可以做 | 为什么 |')
 lines.push('|---|---|---|---|')
 lines.push('| `member.archive` | **新增**（归档成员，退役但可回放） | 人类 ✅ 队长 ✅ 成员 — | 与 `member.release` 同级：队长管自己团队的成员生命周期 |')
 lines.push('| `memberRestore` | 面板写**新增**，但复用 `member.archive` 动作 | 同上 | 恢复就是把归档成员放回在岗，属于同一类动作，不为它单开权限 |')
+lines.push('| `task.review` | **删除**（原本就在 `CAPTAIN_ACTIONS` 里，但从没进过 `Action` union，也**没有任何调用点**） | — | 评审实际走 `gateVerdict` → `task.complete`；保留一个永远不成立的动作只会误导读者 |')
 lines.push('')
 lines.push('> 注意 `memberRestore` 是个**面板写方法**，不是新的 `Action` —— 它走的是 `member.archive` 的授权。')
 lines.push('> 这是刻意的：为「恢复」单开一个动作会让权限矩阵多一行只有箭头不同的东西，收益为零。')
