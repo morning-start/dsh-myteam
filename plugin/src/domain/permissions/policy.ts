@@ -37,6 +37,7 @@ export type Action =
   | 'task.progress'
   | 'task.evidence'
   | 'task.submit-review'
+  | 'task.review'
   | 'task.complete'
   | 'task.reopen'
   | 'task.cancel'
