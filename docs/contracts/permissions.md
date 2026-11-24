@@ -14,6 +14,24 @@
 - 队长只能操作**自己团队**的实体；成员只能操作**自己的**实体与自己的 Attempt。
   这条限制不和动作权限混在一起写，见 §3。
 
+## 0.5 读写当前项目：读面不设动作门，写面要过动作门
+
+团队的存在意义是**完成当前项目**，所以「读写当前项目」是默认能力，不是特权。
+但要分清两层，避免把「能读」和「能改」混成一件事：
+
+| 面 | 例子 | 怎么判定 | 谁能用 |
+|---|---|---|---|
+| **读面**（面板查询） | `status` `overview` `board` `task` `team` `definitions` `runs` `run` `knowledge` `effects` `audit` `settings` `memory` | **不经过 `authorize(Action)`**：`panel-service.read()` 只按宿主绑定解析出会话所在的工作区，读到就折叠成视图。对应动作 `project.read` 只是名义登记 | 任何能打开这个项目的会话（人类 / 队长 / 成员都行） |
+| **写面**（命令） | 建队、建任务、认领、改配置、归档成员… | **必须过 `authorize(Action)`**：白名单 + 作用域（队长限本团队、成员限本人） | 见 §1 逐动作表 |
+
+为什么读面不设动作门：一个成员连自己团队的任务都读不到，就没法干活；而「读」不会改变项目状态，
+所以把它设成权限只会制造「界面看不见但改个参数就能读」的假安全。真正的边界在**写**上。
+
+> 有一条例外值得记住：`memory` 的**读**走的是 `memory.read` 动作（不是面板读面），
+> 因为记忆按 bank 分，成员的读要落到自己那个 bank —— 这是唯一一个「读也要授权」的面。
+
+---
+
 ## 1. 动作 × 身份（核心表）
 
 | 动作 | 说明 | 人类 | 队长 | 成员 | 系统 | 人类专属 |
@@ -79,13 +97,13 @@
 
 ### 队长（32 / 40 个动作）
 
-白名单；且 `context.teamId` 必须等于自己的团队。
+白名单；且 `context.teamId` 必须等于自己的团队。注意：**读当前项目的面板数据不需要任何动作**（见 §0.5），上面这 33 条是「能改什么」。
 
 `project.read` · `definition.write` · `definition.copy-from-global` · `definition.publish.request` · `team.create` · `team.update` · `team.archive` · `captain.assign` · `captain.handoff.propose` · `member.appoint` · `member.release` · `member.archive` · `member.pause` · `run.create` · `run.revise` · `task.create` · `task.update` · `task.dependencies.change` · `task.claim` · `task.complete` · `task.reopen` · `task.cancel` · `knowledge.propose` · `knowledge.adopt` · `knowledge.archive` · `config.write` · `config.rebase` · `memory.read` · `memory.write` · `memory.forget` · `message.post` · `effect.settle`
 
 ### 成员（9 / 40 个动作）
 
-白名单；且只能操作自己的实体 / 自己的 Attempt。
+白名单；且只能操作自己的实体 / 自己的 Attempt。同样地，**读当前项目的面板数据不需要动作**（§0.5）；这 9 条里 4 条是干活必需的写（认领/进度/证据/提交评审），另 5 条是读记忆、写记忆、提知识、发消息与读项目。
 
 `project.read` · `task.claim` · `task.progress` · `task.evidence` · `task.submit-review` · `knowledge.propose` · `memory.read` · `memory.write` · `message.post`
 

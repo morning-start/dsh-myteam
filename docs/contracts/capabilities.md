@@ -4,6 +4,11 @@
 > `src/domain/permissions/policy.ts`，工具面见 `src/application/tool-specs.ts`
 > 与 `docs/contracts/tool-surface.md`。
 
+> **先分清读面与写面**：团队是为了完成**当前项目**而存在的，「读写当前项目」是它的默认能力，
+> 不是特权。其中**读**（概览 / 看板 / 任务 / 团队 / 定义 / 流程 / 知识 / 审计 / 设置的面板查询）
+> 不经过动作授权，任何能打开这个项目的会话都能读；**写**才过动作白名单与作用域。
+> 逐动作的完整矩阵见 [permissions](permissions.md) §0.5 与 §1。
+
 ## 1. 身份 × 动作
 
 | 动作族 | 人类 | 队长 | 成员 | 系统 |
