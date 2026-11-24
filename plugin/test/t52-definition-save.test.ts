@@ -4,7 +4,7 @@
  * 缺口背景：`definition.role.revised` / `definition.workflow.revised` 事件与投影一直都在，
  * 创建命令也有，但**没有任何命令能发出 revised** —— 设计稿「编辑角色 / 编辑工作流」两屏
  * 只能新建、不能改。这里锁住：revision 递增、previousHash 是旧内容哈希、未知 id 报 NOT_FOUND、
- * 不合法内容拒绝且不落事件、blueprint 编辑明确拒绝（还没有保存命令）。
+ * 不合法内容拒绝且不落事件。蓝图另有 t53 专测（建 + 改）；这里只锁「蓝图缺 formation 时仍报 INVALID_PAYLOAD」。
  */
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
@@ -132,7 +132,7 @@ test('保存角色：未知 id → NOT_FOUND；profile 不是对象 → INVALID_
   }
 })
 
-test('保存工作流：revision+1 且 templates 更新；blueprint 编辑明确拒绝', () => {
+test('保存工作流：revision+1 且 templates 更新；蓝图缺 formation 仍报 INVALID_PAYLOAD', () => {
   const dir = mkdtempSync(join(tmpdir(), 'myteam-def-save-'))
   try {
     const runtime = openRuntime(dir)
@@ -160,6 +160,7 @@ test('保存工作流：revision+1 且 templates 更新；blueprint 编辑明确
       assert.equal(after.name, '交付流 v2')
       assert.equal(after.templates.length, 2)
 
+      // 蓝图现在能存（见 t53），但缺 formation 仍然是坏请求 —— 不能因为「支持了」就放过去。
       expectCode(
         () => applyDirectPanelWrite(runtime, 'definitionSave', { confirm: true, params: { kind: 'blueprint', id: 'bp_1' } }),
         'INVALID_PAYLOAD',

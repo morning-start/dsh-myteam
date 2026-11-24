@@ -23,9 +23,11 @@ import type { HumanConfirmation } from '../domain/permissions/human-authorizer.t
 import {
   appointMemberCommand,
   claimTaskCommand,
+  createProjectBlueprint,
   createTaskCommand,
   createTeamCommand,
   releaseMemberCommand,
+  saveProjectBlueprintCommand,
   saveProjectRole,
   saveProjectWorkflowCommand,
 } from './commands.ts'
@@ -577,7 +579,10 @@ export function applyDirectPanelWrite(
     case 'definitionSave': {
       if (input.confirm !== true) fail(ERROR_CODES.INVALID_PAYLOAD, '保存定义需要 confirm: true')
       const kind = requireString(input.params, 'kind')
-      const id = requireString(input.params, 'id')
+      // 蓝图允许不带 id（= 新建）；角色/工作流必须带 id（走修订）。
+      const id = kind === 'blueprint'
+        ? (optionalString(input.params, 'id') ?? '')
+        : requireString(input.params, 'id')
       if (kind === 'role') {
         const profile = input.params.profile
         if (typeof profile !== 'object' || profile === null) {
@@ -606,7 +611,34 @@ export function applyDirectPanelWrite(
         })
         return { method, operationId: id, committed: { kind, id } }
       }
-      fail(ERROR_CODES.INVALID_PAYLOAD, 'definitionSave 只支持 kind = role / workflow；蓝图编辑还没有保存命令', {
+      if (kind === 'blueprint') {
+        const formation = input.params.formation
+        if (!Array.isArray(formation)) {
+          fail(ERROR_CODES.INVALID_PAYLOAD, '蓝图 formation 必须是数组', { details: { kind, id } })
+        }
+        const workflows = input.params.workflows
+        if (!Array.isArray(workflows)) {
+          fail(ERROR_CODES.INVALID_PAYLOAD, '蓝图 workflows 必须是数组', { details: { kind, id } })
+        }
+        const fields = {
+          actor: PANEL_HUMAN,
+          name: requireString(input.params, 'name'),
+          description: optionalString(input.params, 'description') ?? '',
+          formation: formation as never,
+          workflows: workflows as string[],
+          defaults: (input.params.defaults ?? {}) as never,
+        }
+        // id 为空视为「新建」：面板建蓝图不需要先有一个空壳。
+        if (id.length === 0) {
+          const created = createProjectBlueprint(runtime, fields)
+          const event = created.events.find((entry) => entry.type === 'definition.blueprint.created')
+          const blueprint = (event?.payload as { blueprint?: { id: string } } | undefined)?.blueprint
+          return { method, operationId: blueprint?.id ?? '', committed: { kind, id: blueprint?.id ?? '' } }
+        }
+        saveProjectBlueprintCommand(runtime, { ...fields, id })
+        return { method, operationId: id, committed: { kind, id } }
+      }
+      fail(ERROR_CODES.INVALID_PAYLOAD, 'definitionSave 只支持 kind = role / workflow / blueprint', {
         details: { kind },
       })
     }

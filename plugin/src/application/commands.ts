@@ -9,9 +9,11 @@ import type {
   CapabilitySet,
   CompletionRule,
   ConfigOverrides,
+  FormationSlot,
   RoleDefinition,
   Task,
   TaskTemplate,
+  TeamBlueprint,
   WorkflowDefinition,
 } from '../contracts/entities.ts'
 import { ERROR_CODES, fail } from '../contracts/errors.ts'
@@ -19,7 +21,12 @@ import type { ActorRef } from '../contracts/events.ts'
 import { computeEffectiveConfig, DEFAULT_TEAM_CONFIG } from '../domain/config/merge.ts'
 import { normalizeRole, roleContentHash, validateRole } from '../domain/definitions/role.ts'
 import { normalizeWorkflow, validateWorkflow, workflowContentHash } from '../domain/definitions/workflow.ts'
-import { assertBlueprintResolvable } from '../domain/definitions/blueprint.ts'
+import {
+  assertBlueprintResolvable,
+  blueprintContentHash,
+  normalizeBlueprint,
+  validateBlueprint,
+} from '../domain/definitions/blueprint.ts'
 import { authorize } from '../domain/permissions/policy.ts'
 import { cycleIfEdgesChanged, graphOf } from '../domain/tasks/dag.ts'
 import { assertCurrentAttempt, createPlannedTask, isClaimable } from '../domain/tasks/task.ts'
@@ -150,6 +157,105 @@ export function saveProjectWorkflowCommand(
     entity: { kind: 'workflow-definition', id: workflow.id },
     entityRevision: workflow.revision,
     payload: { workflow, previousHash: workflowContentHash(existing) },
+  }
+  return runtime.commit([draft])
+}
+
+/** 蓝图的引用解析器：只认项目里已有的角色/工作流（引用断裂必须阻断，不能猜）。 */
+function blueprintResolvers(runtime: ProjectRuntime): {
+  resolveRole: (roleId: string) => { revision: number } | undefined
+  resolveWorkflow: (workflowId: string) => { revision: number } | undefined
+} {
+  return {
+    resolveRole: (roleId) => runtime.state.roles.get(roleId),
+    resolveWorkflow: (workflowId) => runtime.state.workflows.get(workflowId),
+  }
+}
+
+/**
+ * 新建项目蓝图（队形 × 引用 + 引用的工作流 + 默认配置覆盖）。
+ *
+ * 为什么要有：事件类型（`definition.blueprint.created`）和投影早就支持蓝图，
+ * 但**一直没有命令能发出它** —— 于是「从蓝图建团队」只有内置蓝图能用，人类既建不了
+ * 也改不了自己的蓝图（设计稿 g-blueprint-edit 因此点不动）。
+ */
+export function createProjectBlueprint(
+  runtime: ProjectRuntime,
+  input: {
+    actor: ActorRef
+    name: string
+    description: string
+    formation: FormationSlot[]
+    workflows: string[]
+    defaults: ConfigOverrides
+  },
+): CommitResult {
+  authorize('definition.write', input.actor)
+  const now = runtime.now()
+  const blueprint: TeamBlueprint = normalizeBlueprint({
+    id: runtime.nextId('blueprint'),
+    revision: 1,
+    name: input.name,
+    description: input.description,
+    formation: input.formation,
+    workflows: input.workflows,
+    defaults: input.defaults,
+    createdAt: now,
+    updatedAt: now,
+  })
+  const { resolveRole, resolveWorkflow } = blueprintResolvers(runtime)
+  const problems = validateBlueprint(blueprint, resolveRole, resolveWorkflow)
+  if (problems.length > 0) {
+    fail(ERROR_CODES.INVALID_PAYLOAD, '蓝图不合法', { details: { problems } })
+  }
+  const draft: DraftEvent = {
+    type: 'definition.blueprint.created',
+    actor: input.actor,
+    entity: { kind: 'blueprint-definition', id: blueprint.id },
+    entityRevision: 1,
+    payload: { blueprint, origin: null },
+  }
+  return runtime.commit([draft])
+}
+
+/** 保存（修订）已存在的项目蓝图；语义同 {@link saveProjectRole}。 */
+export function saveProjectBlueprintCommand(
+  runtime: ProjectRuntime,
+  input: {
+    actor: ActorRef
+    id: string
+    name: string
+    description: string
+    formation: FormationSlot[]
+    workflows: string[]
+    defaults: ConfigOverrides
+  },
+): CommitResult {
+  authorize('definition.write', input.actor)
+  const existing = runtime.state.blueprints.get(input.id)
+  if (existing === undefined) fail(ERROR_CODES.NOT_FOUND, '蓝图不存在', { details: { blueprintId: input.id } })
+  const blueprint: TeamBlueprint = normalizeBlueprint({
+    id: existing.id,
+    revision: existing.revision + 1,
+    name: input.name,
+    description: input.description,
+    formation: input.formation,
+    workflows: input.workflows,
+    defaults: input.defaults,
+    createdAt: existing.createdAt,
+    updatedAt: runtime.now(),
+  })
+  const { resolveRole, resolveWorkflow } = blueprintResolvers(runtime)
+  const problems = validateBlueprint(blueprint, resolveRole, resolveWorkflow)
+  if (problems.length > 0) {
+    fail(ERROR_CODES.INVALID_PAYLOAD, '蓝图不合法', { details: { problems } })
+  }
+  const draft: DraftEvent = {
+    type: 'definition.blueprint.revised',
+    actor: input.actor,
+    entity: { kind: 'blueprint-definition', id: blueprint.id },
+    entityRevision: blueprint.revision,
+    payload: { blueprint, previousHash: blueprintContentHash(existing) },
   }
   return runtime.commit([draft])
 }
