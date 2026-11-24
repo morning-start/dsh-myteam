@@ -17,14 +17,14 @@
     -->
     <link rel="stylesheet" href="../../../design-v2/dsh-shell.css" />
     <link rel="stylesheet" href="../../../design-v2/tokens.css" />
-    <link rel="stylesheet" href="../../../design-v2/myteam.css" />
+    <link rel="stylesheet" href="../../../tmp/visual/design.css" />
     <style>
       html, body { margin: 0; padding: 0; background: var(--dsh-bg, #f5f6f8); }
       #slot { min-height: 100vh; }
     </style>
   </head>
   <body>
-    <div id="slot" data-slot="main"></div>
+    <div id="slot" data-myteam></div>
     <script type="module">
       import { React, mount } from './mini-react-dom.mjs'
 
@@ -210,6 +210,17 @@
           if (params.get('form') === '1') await clickByText('button', '记一条')
 
           document.body.dataset.harnessReady = '1'
+          // 横向溢出量：>0 说明内容比视口宽（真溢出），=0 说明是夹具把内容裁掉了。
+          document.body.dataset.overflowX = String(document.documentElement.scrollWidth - document.documentElement.clientWidth)
+          document.body.dataset.widest = (() => {
+            const rows = []
+            for (const element of document.querySelectorAll('#slot *')) {
+              const box = element.getBoundingClientRect()
+              if (box.width > 0) rows.push([Math.round(box.right), element.tagName.toLowerCase() + '.' + String(element.className || '').split(' ').join('.')])
+            }
+            rows.sort((left, right) => right[0] - left[0])
+            return rows.slice(0, 3).map(([right, name]) => right + ' ' + name).join(' | ')
+          })()
           document.body.dataset.fetchLog = JSON.stringify(fetchLog.slice(0, 12))
           document.body.dataset.fetchTotal = String(fetchLog.length)
         } catch (error) {

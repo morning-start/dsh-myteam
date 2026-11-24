@@ -13,6 +13,7 @@
  */
 import { createServer } from 'node:http'
 import { readFile } from 'node:fs/promises'
+import { readFileSync, writeFileSync } from 'node:fs'
 import { existsSync, mkdirSync } from 'node:fs'
 import { spawn } from 'node:child_process'
 import { extname, join, normalize } from 'node:path'
@@ -20,6 +21,14 @@ import { extname, join, normalize } from 'node:path'
 const ROOT = process.cwd()
 const OUT = join(ROOT, 'tmp', 'visual')
 mkdirSync(OUT, { recursive: true })
+
+// 作用域转换与 panel.ts 一致：仓库 CSS 挂在 [data-slot="main"] 下（宿主槽位），
+// 夹具里换成 [data-myteam]，免得把壳体框架样式（dsh-shell.css 里 [data-slot] 的规则）
+// 也套到夹具容器上 —— 那些规则带外壳宽度约束，会把排版量歪。
+const designCss = readFileSync(join(ROOT, 'design-v2', 'myteam.css'), 'utf8')
+  .replace(/\[data-slot="main"\]/gu, '[data-myteam]')
+  .replace(/:root\s*\{/gu, '[data-myteam] {')
+writeFileSync(join(OUT, 'design.css'), designCss, 'utf8')
 
 const CHROME = [
   'C:/Program Files/Google/Chrome/Application/chrome.exe',
