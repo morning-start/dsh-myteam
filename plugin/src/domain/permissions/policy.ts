@@ -51,6 +51,8 @@ export type Action =
   | 'memory.forget'
   | 'message.post'
   | 'effect.settle'
+  | 'plan.propose'
+  | 'plan.discard'
   | 'plan.approve'
   | 'migration.cutover'
   | 'project.destroy'
@@ -77,6 +79,8 @@ const CAPTAIN_ACTIONS: ReadonlySet<Action> = new Set<Action>([
   'team.archive',
   'captain.assign',
   'captain.handoff.propose',
+  'plan.propose',
+  'plan.discard',
   'member.appoint',
   'member.release',
   'member.archive',

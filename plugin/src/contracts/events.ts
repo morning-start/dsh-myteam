@@ -145,6 +145,7 @@ export type EntityKind =
   | 'role-definition'
   | 'workflow-definition'
   | 'team-blueprint'
+  | 'team-plan'
   | 'team'
   | 'captain-assignment'
   | 'member'

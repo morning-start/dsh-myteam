@@ -113,27 +113,27 @@ myteam 的 `Action` 只覆盖「团队协作这件事本身」（建队、建任
 
 ## 2. 按身份汇总（反向表：这个身份能做哪些）
 
-### 人类（42 / 42 个动作）
+### 人类（44 / 44 个动作）
 
 全部动作都允许；其中 🔒 标记的 5 个还要过一次性令牌，且只能由人类发起：
 
 > `definition.publish.confirm` · `definition.global.write` · `team.disband` · `captain.handoff.confirm` · `plan.approve` · `migration.cutover` · `project.destroy`
 
-`project.read` · `definition.write` · `definition.copy-from-global` · `definition.publish.request` · `definition.publish.confirm` · `definition.global.write` · `team.create` · `team.update` · `team.archive` · `team.disband` · `captain.assign` · `captain.handoff.propose` · `captain.handoff.confirm` · `member.appoint` · `member.release` · `member.archive` · `member.pause` · `run.create` · `run.revise` · `task.create` · `task.update` · `task.dependencies.change` · `task.claim` · `task.progress` · `task.evidence` · `task.submit-review` · `task.complete` · `task.reopen` · `task.cancel` · `knowledge.propose` · `knowledge.adopt` · `knowledge.archive` · `config.write` · `config.rebase` · `memory.read` · `memory.write` · `memory.forget` · `message.post` · `effect.settle` · `plan.approve` · `migration.cutover` · `project.destroy`
+`project.read` · `definition.write` · `definition.copy-from-global` · `definition.publish.request` · `definition.publish.confirm` · `definition.global.write` · `team.create` · `team.update` · `team.archive` · `team.disband` · `captain.assign` · `captain.handoff.propose` · `captain.handoff.confirm` · `member.appoint` · `member.release` · `member.archive` · `member.pause` · `run.create` · `run.revise` · `task.create` · `task.update` · `task.dependencies.change` · `task.claim` · `task.progress` · `task.evidence` · `task.submit-review` · `task.complete` · `task.reopen` · `task.cancel` · `knowledge.propose` · `knowledge.adopt` · `knowledge.archive` · `config.write` · `config.rebase` · `memory.read` · `memory.write` · `memory.forget` · `message.post` · `effect.settle` · `plan.propose` · `plan.discard` · `plan.approve` · `migration.cutover` · `project.destroy`
 
-### 队长（32 / 42 个动作）
+### 队长（34 / 44 个动作）
 
-白名单；且 `context.teamId` 必须等于自己的团队。注意：**读当前项目的面板数据不需要任何动作**（见 §0.5），上面这 32 条是「能改什么」。
+白名单；且 `context.teamId` 必须等于自己的团队。注意：**读当前项目的面板数据不需要任何动作**（见 §0.5），上面这 34 条是「能改什么」。
 
-`project.read` · `definition.write` · `definition.copy-from-global` · `definition.publish.request` · `team.create` · `team.update` · `team.archive` · `captain.assign` · `captain.handoff.propose` · `member.appoint` · `member.release` · `member.archive` · `member.pause` · `run.create` · `run.revise` · `task.create` · `task.update` · `task.dependencies.change` · `task.claim` · `task.complete` · `task.reopen` · `task.cancel` · `knowledge.propose` · `knowledge.adopt` · `knowledge.archive` · `config.write` · `config.rebase` · `memory.read` · `memory.write` · `memory.forget` · `message.post` · `effect.settle`
+`project.read` · `definition.write` · `definition.copy-from-global` · `definition.publish.request` · `team.create` · `team.update` · `team.archive` · `captain.assign` · `captain.handoff.propose` · `member.appoint` · `member.release` · `member.archive` · `member.pause` · `run.create` · `run.revise` · `task.create` · `task.update` · `task.dependencies.change` · `task.claim` · `task.complete` · `task.reopen` · `task.cancel` · `knowledge.propose` · `knowledge.adopt` · `knowledge.archive` · `config.write` · `config.rebase` · `memory.read` · `memory.write` · `memory.forget` · `message.post` · `effect.settle` · `plan.propose` · `plan.discard`
 
-### 成员（9 / 42 个动作）
+### 成员（9 / 44 个动作）
 
 白名单；且只能操作自己的实体 / 自己的 Attempt。同样地，**读当前项目的面板数据不需要动作**（§0.5）；这 9 条里 4 条是干活必需的写（认领/进度/证据/提交评审），其余是读项目、读记忆、写记忆、提知识与发消息。
 
 `project.read` · `task.claim` · `task.progress` · `task.evidence` · `task.submit-review` · `knowledge.propose` · `memory.read` · `memory.write` · `message.post`
 
-### 系统（Effect Runner）（1 / 42 个动作）
+### 系统（Effect Runner）（1 / 44 个动作）
 
 **只能结算 Effect，不能发起任何业务动作** —— 这是刻意的：系统不是「超级身份」。
 

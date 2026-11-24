@@ -9,14 +9,17 @@ import type {
   CapabilitySet,
   CompletionRule,
   ConfigOverrides,
+  DefinitionRef,
   FormationSlot,
   RoleDefinition,
   Task,
   TaskTemplate,
   TeamBlueprint,
+  TeamPlan,
   WorkflowDefinition,
 } from '../contracts/entities.ts'
 import { ERROR_CODES, fail } from '../contracts/errors.ts'
+import { hashContent } from '../contracts/json.ts'
 import type { ActorRef } from '../contracts/events.ts'
 import { computeEffectiveConfig, DEFAULT_TEAM_CONFIG } from '../domain/config/merge.ts'
 import { normalizeRole, roleContentHash, validateRole } from '../domain/definitions/role.ts'
@@ -373,6 +376,168 @@ export function createTeamCommand(
   ]
 
   return runtime.commit(drafts)
+}
+
+/**
+ * 提案开队计划（`team.plan.proposed`）—— **只落计划，不建任何实体**。
+ *
+ * 这是「批准前不产生会话与花费」的落点：团队、成员、会话、Run 全部等到批准时才建。
+ * 丢弃只需要一条 `team.plan.discarded`，没有任何东西要回滚。
+ *
+ * 校验顺序（先便宜后贵，且都发生在写盘前）：
+ *   1. 名字与队长会话非空、队形非空；
+ *   2. 蓝图/工作流（若给了）必须存在且能解析引用 —— 否则批准时才炸就晚了；
+ *   3. 队形里的角色必须都存在（否则批准时聘不出来）。
+ */
+export function proposeTeamPlanCommand(
+  runtime: ProjectRuntime,
+  input: {
+    actor: ActorRef
+    name: string
+    goal: string
+    captainSessionId: string
+    blueprintId?: string
+    /** 队形；不给时用蓝图里的 formation。 */
+    formation?: FormationSlot[]
+    /** 默认工作流；不给时用蓝图里第一个可用的。 */
+    workflowId?: string
+    overrides?: ConfigOverrides
+  },
+): { plan: TeamPlan; result: CommitResult } {
+  authorize('plan.propose', input.actor)
+  const state = runtime.state
+
+  const name = input.name.trim()
+  if (name.length === 0) {
+    fail(ERROR_CODES.INVALID_PAYLOAD, '计划必须有团队名')
+  }
+  if (input.captainSessionId.trim().length === 0) {
+    fail(ERROR_CODES.INVALID_PAYLOAD, '计划必须指定队长会话')
+  }
+
+  let blueprintRef: DefinitionRef | null = null
+  let blueprintDefaults: ConfigOverrides | null = null
+  let blueprintFormation: FormationSlot[] = []
+  let blueprintWorkflow: string | null = null
+  if (input.blueprintId !== undefined) {
+    const blueprint = state.blueprints.get(input.blueprintId)
+    if (blueprint === undefined) {
+      fail(ERROR_CODES.NOT_FOUND, '蓝图不存在', { details: { blueprintId: input.blueprintId } })
+    }
+    // 引用必须当场就能解析：等到批准才发现缺角色，人已经以为能开跑了。
+    assertBlueprintResolvable(
+      blueprint,
+      (roleId) => state.roles.get(roleId),
+      (workflowId) => state.workflows.get(workflowId),
+    )
+    blueprintRef = { id: blueprint.id, revision: blueprint.revision }
+    blueprintDefaults = blueprint.defaults
+    blueprintFormation = blueprint.formation
+    blueprintWorkflow = blueprint.workflows[0] ?? null
+  }
+
+  const formation = input.formation ?? blueprintFormation
+  if (formation.length === 0) {
+    fail(ERROR_CODES.INVALID_PAYLOAD, '计划至少要有一个成员槽位（队长不算在队形里）')
+  }
+  for (const slot of formation) {
+    if (state.roles.get(slot.roleId) === undefined) {
+      fail(ERROR_CODES.NOT_FOUND, `队形里的角色不存在：${slot.roleId}`, { details: { roleId: slot.roleId } })
+    }
+    if (!Number.isInteger(slot.count) || slot.count < 1) {
+      fail(ERROR_CODES.INVALID_PAYLOAD, `槽位 ${slot.key} 的数量必须是正整数`, { details: { slot } })
+    }
+  }
+
+  const workflowId = input.workflowId ?? blueprintWorkflow
+  let workflowRef: DefinitionRef | null = null
+  if (workflowId !== null) {
+    const workflow = state.workflows.get(workflowId)
+    if (workflow === undefined) {
+      fail(ERROR_CODES.NOT_FOUND, '默认工作流不存在', { details: { workflowId } })
+    }
+    workflowRef = { id: workflow.id, revision: workflow.revision }
+  }
+
+  const overrides = input.overrides ?? blueprintDefaults ?? {}
+  const now = runtime.now()
+  const planId = runtime.nextId('plan')
+
+  // planHash 绑**内容**，不绑 id：队形/工作流/配置任何一项被改过，hash 就变，批准令牌立刻失效。
+  const planHash = hashContent({
+    name,
+    goal: input.goal,
+    blueprint: blueprintRef,
+    formation,
+    workflow: workflowRef,
+    captainSessionId: input.captainSessionId,
+    overrides,
+  })
+
+  const plan: TeamPlan = {
+    id: planId,
+    name,
+    goal: input.goal,
+    blueprint: blueprintRef,
+    formation,
+    workflow: workflowRef,
+    captainSessionId: input.captainSessionId,
+    overrides,
+    planHash,
+    proposedBy:
+      input.actor.kind === 'human'
+        ? `human:${input.actor.userId}`
+        : input.actor.kind === 'captain'
+          ? `captain:${input.actor.sessionId}`
+          : `${input.actor.kind}:${input.actor.sessionId}`,
+    proposedAt: now,
+  }
+
+  const result = runtime.commit([
+    {
+      type: 'team.plan.proposed',
+      actor: input.actor,
+      entity: { kind: 'team-plan', id: planId },
+      payload: { plan },
+    },
+  ])
+  return { plan, result }
+}
+
+/**
+ * 丢弃一份待批准的计划（`team.plan.discarded`）。
+ *
+ * 设计稿：「丢弃不产生任何会话与花费」。因为提案本来就没建实体，这里**不需要回滚任何东西**
+ * —— 这正是方案 B（独立聚合）换来的好处。
+ */
+export function discardTeamPlanCommand(
+  runtime: ProjectRuntime,
+  input: { actor: ActorRef; planId: string; reason: string },
+): CommitResult {
+  authorize('plan.discard', input.actor)
+  const plan = runtime.state.teamPlans.get(input.planId)
+  if (plan === undefined) {
+    fail(ERROR_CODES.NOT_FOUND, '没有这份待批准的计划（可能已经批准或丢弃）', {
+      details: { planId: input.planId },
+    })
+  }
+  return runtime.commit([
+    {
+      type: 'team.plan.discarded',
+      actor: input.actor,
+      entity: { kind: 'team-plan', id: plan.id },
+      payload: {
+        planId: plan.id,
+        reason: input.reason.trim().length === 0 ? '未说明原因' : input.reason.trim(),
+        discardedBy:
+          input.actor.kind === 'human'
+            ? `human:${input.actor.userId}`
+            : input.actor.kind === 'captain'
+              ? `captain:${input.actor.sessionId}`
+              : `${input.actor.kind}:${input.actor.sessionId}`,
+      },
+    },
+  ])
 }
 
 /**
