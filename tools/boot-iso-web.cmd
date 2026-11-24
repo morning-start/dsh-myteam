@@ -27,7 +27,10 @@ if "%PORT%"=="" set "PORT=3099"
 
 cd /d "%~dp0.."
 set "ROOT=%CD%"
-set "ISO=%ROOT%\tmp\iso-home"
+rem ISO can be overridden by an external DSH_HOME: verify-live.mjs uses its own home
+rem so it does not fight verify-iso.mjs over the same directory.
+if "%DSH_HOME%"=="" set "DSH_HOME=%ROOT%\tmp\iso-home"
+set "ISO=%DSH_HOME%"
 set "DSH=C:\APP\agent\DeepSeek Harness\resources\runtime\cli\bin\dsh.cmd"
 
 if not exist "%DSH%" (
@@ -37,25 +40,40 @@ if not exist "%DSH%" (
 if not exist "%ISO%" mkdir "%ISO%"
 set "DSH_HOME=%ISO%"
 
-if not exist "%ISO%\profiles\iso-myteam\package.json" (
-  echo [iso] creating profile "iso-myteam" from the shipped web template ...
-  "%DSH%" --profile iso-myteam --from-default-profile web --dump-config > nul
-  if errorlevel 1 (
-    echo [iso] profile creation failed
-    exit /b 1
-  )
-  set "LINK=link:%ROOT:\=/%/plugin"
-  echo [iso] adding plugin: !LINK!
-  "%DSH%" plugin --profile iso-myteam add "!LINK!"
-  if errorlevel 1 (
-    echo [iso] plugin install failed
-    exit /b 1
-  )
+if "%ISO_PROFILE%"=="" set "ISO_PROFILE=iso-myteam"
+
+rem ---------------------------------------------------------------------------
+rem Profile creation is written flat (no :label subroutine, no !VAR! delayed
+rem expansion) on purpose:
+rem   - cmd.exe refused to resolve "call :create_profile" in this file
+rem     ("The system cannot find the batch label specified - create_profile")
+rem     even though a minimal file with the same shape worked;
+rem   - the original nested-if version used !LINK!, which produced a literal
+rem     "!LINK!" the first time the block actually ran. That bug was invisible
+rem     for a long time because every earlier run took the "profile already
+rem     exists" path and skipped the block entirely.
+rem A flat sequence with plain %VAR% has neither failure mode.
+rem ---------------------------------------------------------------------------
+if exist "%ISO%\profiles\%ISO_PROFILE%\package.json" goto :iso_serve
+
+echo [iso] creating profile "%ISO_PROFILE%" from the shipped web template ...
+call "%DSH%" --profile %ISO_PROFILE% --from-default-profile web --dump-config > nul
+if errorlevel 1 (
+  echo [iso] profile creation failed
+  exit /b 1
 )
 
-echo.
+set "LINK=link:%ROOT:\=/%/plugin"
+echo [iso] adding plugin: %LINK%
+call "%DSH%" plugin --profile %ISO_PROFILE% add "%LINK%"
+if errorlevel 1 (
+  echo [iso] plugin install failed
+  exit /b 1
+)
+
+:iso_serve
 echo [iso] DSH_HOME=%ISO%
-echo [iso] profile=iso-myteam port=%PORT%
+echo [iso] profile=%ISO_PROFILE% port=%PORT%
 
 rem Screenshot / manual-check workspace: a copy of this repo's dogfood project, so the
 rem panel has real teams and tasks without touching the repo itself. Pick this folder in
@@ -71,4 +89,4 @@ echo [iso] open the printed ?token= URL in a browser; Ctrl+C stops only this ins
 echo.
 rem Optional extra CLI flags, e.g. for a cookie-injecting preview proxy:
 rem   set ISO_EXTRA_ARGS=--trusted-host 127.0.0.1:3098
-"%DSH%" --profile iso-myteam --host 127.0.0.1 --port %PORT% --no-open %ISO_EXTRA_ARGS%
+call "%DSH%" --profile %ISO_PROFILE% --host 127.0.0.1 --port %PORT% --no-open %ISO_EXTRA_ARGS%

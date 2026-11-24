@@ -2,6 +2,11 @@
 * text=auto eol=lf
 
 # 二进制（text=auto 已能识别，这里显式声明以防万一）
+# .cmd / .bat 必须是 CRLF：cmd.exe 的标签查找（call :label / goto :label）在 LF-only
+# 下会报「系统找不到指定的批处理标签」。这一条覆盖上面的 * text=auto eol=lf（真实踩过）。
+*.cmd  text eol=crlf
+*.bat  text eol=crlf
+
 *.png  binary
 *.jpg  binary
 *.jpeg binary
