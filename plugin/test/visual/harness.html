@@ -210,6 +210,19 @@
           if (params.get('form') === '1') await clickByText('button', '记一条')
 
           document.body.dataset.harnessReady = '1'
+          document.body.dataset.boxes = (() => {
+            const slot = document.getElementById('slot')
+            const box = (element) => (element === null ? '-' : Math.round(element.getBoundingClientRect().width) + '/' + Math.round(element.getBoundingClientRect().left))
+            const first = slot.firstElementChild
+            return [
+              'inner=' + window.innerWidth,
+              'body=' + Math.round(document.body.getBoundingClientRect().width),
+              'slot=' + box(slot),
+              'slotScroll=' + slot.scrollWidth,
+              'first=' + (first === null ? '-' : (first.className || first.tagName)) + ':' + box(first),
+              'wt=' + box(slot.querySelector('.wt')),
+            ].join(' ')
+          })()
           // 横向溢出量：>0 说明内容比视口宽（真溢出），=0 说明是夹具把内容裁掉了。
           document.body.dataset.overflowX = String(document.documentElement.scrollWidth - document.documentElement.clientWidth)
           document.body.dataset.widest = (() => {
