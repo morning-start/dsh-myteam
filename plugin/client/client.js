@@ -3125,6 +3125,64 @@ window.__ModuleLoader__.load({
      * `pendingApprovalsView`：前者域里没有 draft 聚合，后者是当场两段式、不排队。
      * 界面照实说明，不用假数据凑数。
      */
+    /**
+     * 计划卡的两个动作（`p-approval` 计划卡）。
+     *
+     * - **丢弃**：direct 写，带 `confirm: true`。设计稿「丢弃不产生任何会话与花费」——
+     *   因为提案本来就没建实体，丢弃只是清掉这一条。
+     * - **批准并开跑**：token 写。先预览拿令牌（令牌绑 `planHash`），再凭令牌确认。
+     *   用现成的 `TokenAction`，不另写一套两段式。
+     *
+     * 「改计划」不做按钮：设计稿没给「编辑已提交计划」的入口，改法只能是丢弃后重新提案。
+     */
+    function PlanCardActions(props) {
+      const { item, sessionId, onDone } = props
+      const [discarding, setDiscarding] = useState(false)
+      const [problem, setProblem] = useState(null)
+
+      const discard = async () => {
+        setDiscarding(true)
+        setProblem(null)
+        try {
+          await callWrite('planDiscard', sessionId, {
+            confirm: true,
+            params: { planId: item.id, reason: '人类在待确认页丢弃' },
+          })
+          onDone()
+        } catch (error) {
+          setProblem(messageOf(error))
+        } finally {
+          setDiscarding(false)
+        }
+      }
+
+      return h(
+        'div',
+        { style: { display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' } },
+        h(
+          TokenAction,
+          {
+            label: '批准并开跑',
+            method: 'planApprove',
+            sessionId,
+            params: { planId: item.id, planHash: item.planHash },
+            onDone,
+          },
+        ),
+        h(
+          'button',
+          {
+            type: 'button',
+            className: 'btn',
+            disabled: discarding,
+            onClick: () => { void discard() },
+          },
+          discarding ? '丢弃中…' : '丢弃',
+        ),
+        problem === null ? null : h('span', { className: 'muted', style: { fontSize: 12 } }, problem),
+      )
+    }
+
     function ApprovalScreen(props) {
       const data = props.data ?? {}
       const pending = Array.isArray(data.pending) ? data.pending : []
@@ -3160,6 +3218,13 @@ window.__ModuleLoader__.load({
             { className: 'r' },
             item.kind === 'gate' && props.onOpenTask !== undefined
               ? h('button', { type: 'button', className: 'btn', onClick: () => props.onOpenTask(item) }, '看任务')
+              : null,
+            item.kind === 'plan' && lane === 'pending' && props.sessionId !== undefined
+              ? h(PlanCardActions, {
+                  item,
+                  sessionId: props.sessionId,
+                  onDone: () => { if (props.onChanged !== undefined) props.onChanged() },
+                })
               : null,
           ),
         )
@@ -3284,11 +3349,14 @@ window.__ModuleLoader__.load({
         body = h(Data, { data: approvals, what: '待你确认' }, (data) =>
           h(ApprovalScreen, {
             data,
+            sessionId,
             onBack: () => setApprovalsOpen(false),
             onOpenTask: (item) => {
               setApprovalsOpen(false)
               setTaskId(item.id)
             },
+            // 批准/丢弃之后计划被消费，列表要重拉 —— 否则卡片还在，点了会 NOT_FOUND。
+            onChanged: () => { void approvals.reload() },
           }))
       } else if (tab === 'overview') {
         body = h(Data, { data: overview, what: '项目概览' }, (data) =>

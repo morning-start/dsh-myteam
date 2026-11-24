@@ -87,6 +87,13 @@ export interface PendingApprovalItem {
   detail: string | null
   since: string
   by: string | null
+  /**
+   * 计划卡专用：计划内容 hash。
+   *
+   * 客户端必须把它**原样带回**批准请求 —— 这是「你看到的是哪一版」的凭据。
+   * 不放在 `detail` 文案里，是因为文案会被人改、也会被截断。
+   */
+  planHash?: string
 }
 
 export interface DecidedApprovalItem {
@@ -168,6 +175,7 @@ export function pendingApprovalsView(state: ProjectState): PendingApprovalsView 
         ' · 批准前不建会话',
       since: plan.proposedAt,
       by: plan.proposedBy,
+      planHash: plan.planHash,
     })
   }
 

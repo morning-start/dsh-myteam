@@ -364,7 +364,7 @@ const EMPTY: Record<string, unknown> = {
   memory: { file: 'memory/myteam.db', exists: true, banks: [], entries: [], warnings: [] },
   audit: { items: [], nextBeforeSeq: null },
   settings: { configRevision: 1, defaults: {}, teams: [] },
-  pendingApprovals: { pending: [], decided: [], counts: { pending: 0, decided: 0 }, unsupported: { planApproval: true, captainTakeover: true } },
+  pendingApprovals: { pending: [], decided: [], counts: { pending: 0, decided: 0 }, unsupported: { planApproval: false, captainTakeover: false } },
   globalLibrary: { root: '/tmp/.dsh/myteam', exists: true, counts: { role: 0, workflow: 0, blueprint: 0, team: 0 }, entries: [], warnings: [] },
   globalAudit: { root: '/tmp/.dsh/myteam', exists: true, items: [], truncated: false, warnings: [] },
 }
@@ -1020,8 +1020,8 @@ test('L2-F 待你确认：概览只留一条横幅；点「逐项确认」进独
     assert.ok(/待确认 \d+/.test(text), `要有「待确认 N」切换：${text.slice(0, 300)}`)
     assert.ok(/已处理 \d+/.test(text), '要有「已处理 N」切换')
     assert.ok(text.includes('confirm: true 不是授权'), '要写清这些动作只能由人类执行')
-    // 数据只支持两类，界面要如实说明另外两类画不出来
-    assert.ok(text.includes('计划批准') && text.includes('队长接管'), '要如实说明计划批准与队长接管不在这页')
+    // 四类（门禁/发布/接管/计划）都接通了：不该再有「哪类画不出来」的说明
+    assert.ok(!text.includes('还没有对应的领域模型'), '四类都接通后不该再写「计划批准画不出来」')
 
     // 切到「已处理」
     const decidedTab = [...(tree.children as unknown as never[])].length >= 0
@@ -1033,6 +1033,74 @@ test('L2-F 待你确认：概览只留一条横幅；点「逐项确认」进独
     assert.ok(textOf(tree).includes('待你确认'), '切到已处理后仍在同一页')
   } finally {
     filled.restore()
+  }
+})
+
+test('待你确认：计划卡给出影响面，并带「批准并开跑」与「丢弃」两个动作', async () => {
+  // 设计稿 p-approval 的计划卡：批准计划 · 团队名 / 提出人 / N 个任务 · M 名成员 ·
+  // 批准后才创建成员会话 / 丢弃不产生任何会话与花费。三个按钮里「改计划」不做
+  // （设计稿没给编辑已提交计划的入口，改法只能是丢弃后重新提案）。
+  const planId = 'plan_00000001'
+  const data = {
+    ...FILLED,
+    pendingApprovals: {
+      pending: [
+        {
+          kind: 'plan',
+          id: planId,
+          title: '批准计划「结算改造」',
+          detail: '3 名成员 · 2 个任务 · 批准后开 Run · 批准前不建会话',
+          since: '2026-01-01T00:00:00.000Z',
+          by: 'captain:ses_captain',
+          planHash: 'sha256:plan-content',
+        },
+      ],
+      decided: [],
+      counts: { pending: 1, decided: 0 },
+      unsupported: { planApproval: false, captainTakeover: false },
+    },
+  }
+
+  const harness = loadClient(data)
+  try {
+    let tree = await mount(harness.view, { sessionId: 'ses_1' })
+    const expand = findButton(tree, '逐项确认')
+    assert.ok(expand !== null, '概览横幅要有「逐项确认」')
+    ;(expand!.props.onClick as () => void)()
+    tree = await mount(harness.view, { sessionId: 'ses_1' })
+
+    const text = textOf(tree)
+    assert.ok(text.includes('批准计划「结算改造」'), `要有计划标题：${text.slice(0, 400)}`)
+    assert.ok(text.includes('3 名成员'), '要写成员数')
+    assert.ok(text.includes('2 个任务'), '要写任务数')
+    assert.ok(text.includes('批准后开 Run'), '要写明会开 Run')
+    assert.ok(text.includes('批准前不建会话'), '要写明批准前不建会话')
+    assert.ok(text.includes('captain:ses_captain'), '要写提出人')
+    assert.ok(text.includes('开队计划'), '要有类别标签')
+
+    assert.ok(findButton(tree, '批准并开跑') !== null, '要有「批准并开跑」')
+    assert.ok(findButton(tree, '丢弃') !== null, '要有「丢弃」')
+    assert.ok(findButton(tree, '改计划') === null, '设计稿没给编辑已提交计划的入口，不该有「改计划」')
+  } finally {
+    harness.restore()
+  }
+})
+
+test('待你确认：四类都不再标「未覆盖」', async () => {
+  // 之前页面底部会写「计划批准 / 队长接管画不出来」。四类都接通后这段必须消失，
+  // 否则界面在骗人。
+  const harness = loadClient(FILLED)
+  try {
+    let tree = await mount(harness.view, { sessionId: 'ses_1' })
+    const expand = findButton(tree, '逐项确认')
+    assert.ok(expand !== null)
+    ;(expand!.props.onClick as () => void)()
+    tree = await mount(harness.view, { sessionId: 'ses_1' })
+    const text = textOf(tree)
+    assert.ok(!text.includes('还没有对应的领域模型'), '不该再有「计划批准画不出来」的说明')
+    assert.ok(!text.includes('不排队，所以都不会出现在这里'), '不该再有「接管不排队」的说明')
+  } finally {
+    harness.restore()
   }
 })
 
