@@ -33,6 +33,8 @@
       const empty = params.get('empty') === '1'
 
       const EMPTY = {
+  globalLibrary: { root: '/tmp/.dsh/myteam', exists: true, counts: { role: 1, workflow: 0, blueprint: 0, team: 0 }, entries: [{ kind: 'role', id: 'r1', name: '全局实现者', revision: 3, file: 'roles/r1.json', legacy: false, content: { profile: { name: '全局实现者', purpose: '按验收标准完成实现', instructions: '先读任务与验收标准，再动手。' }, capabilities: { tools: { allow: ['read', 'write', 'edit', 'pwsh'], deny: [] }, mcp: { allow: [], deny: [] }, skills: ['run-tests'] } }, contentHash: 'sha256:aaa111bbb222' }], warnings: [] },
+  globalAudit: { root: '/tmp/.dsh/myteam', exists: true, items: [{ at: '2026-11-24T09:00:00.000Z', operationId: 'op_1', action: 'definition.publish', target: 'roles/r1.json', status: 'published' }], truncated: false, warnings: [] },
         status: { name: '示例视图', counts: { teams: 0, tasks: 0, runs: 0, knowledge: 0 }, observedProjectSeq: 3, graphRevision: 1, configRevision: 1 },
         overview: { name: '示例视图', totals: { all: 0, done: 0, blocked: 0, review: 0 }, attention: { review: 0, blocked: 0, unknownEffects: 0 }, teams: [], graphRevision: 1, observedProjectSeq: 3 },
         board: { columns: [], totals: { all: 0 }, graphRevision: 1 },
@@ -200,6 +202,25 @@
             layout: { selectPanel: () => undefined },
           })
           const view = registrations.find((entry) => entry.options.name === 'conversation.view')?.Component
+          const mainPanel = registrations.find((entry) => entry.options.name === 'main')?.Component
+          // ?panel=1：挂左栏（全局库属于 root scope 的左栏面板）。
+          if (params.get('panel') === '1') {
+            if (mainPanel === undefined) {
+              document.getElementById('slot').textContent = '缺左栏面板组件'
+              return
+            }
+            await mount(mainPanel, { ctx: { layout: { selectPanel: () => undefined } } }, document.getElementById('slot'))
+            document.body.dataset.harnessReady = '1'
+            if (params.get('openGlobal') === '1') {
+              const roleTabs = [...document.querySelectorAll('[role="tab"]')]
+              const roleTab = roleTabs.find((element) => (element.textContent ?? '') === '角色')
+              if (roleTab !== undefined) { roleTab.click(); await new Promise((r) => setTimeout(r, 80)) }
+              const rows = [...document.querySelectorAll('.item.pick')]
+              const target = rows.find((element) => (element.textContent ?? '').includes('全局实现者'))
+              if (target !== undefined) { target.click(); await new Promise((r) => setTimeout(r, 100)) }
+            }
+            return
+          }
           if (view === undefined) {
             document.getElementById('slot').textContent = '缺会话「团队视图」组件'
             return

@@ -79,6 +79,7 @@ const SCENARIOS = [
   { name: 'teams', query: 'tab=teams&team=1' },
   { name: 'definitions', query: 'tab=definitions&open=1' },
   { name: 'blueprint', query: 'tab=definitions&openBlueprint=1' },
+  { name: 'global-edit', query: 'panel=1&openGlobal=1' },
   { name: 'memory', query: 'tab=memory' },
   { name: 'memory-form', query: 'tab=memory&form=1' },
   { name: 'memory-empty', query: 'tab=memory&empty=1' },

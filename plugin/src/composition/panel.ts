@@ -144,17 +144,55 @@ export function createPanelFacade(ctx: PanelHostContext): PanelFacade {
    * `direct` 方法要求请求体带 `confirm: true`，直接执行（域校验自兜底）。
    * 预览与确认必须共用同一个 authorizer（令牌登记在它里面）。
    */
+  /**
+   * 不依赖会话与工作区、也不是某个项目的写方法。
+   *
+   * `globalDefinitionSave` 直改的是 `$DSH_HOME/myteam`，跟哪个项目都没关系 ——
+   * 全局库面板本来就没有会话（它就是 root scope 的），如果照别的写方法要求「当前会话
+   * 绑定工作区」，这个动作在面板上永远点不动。所以这里单独放行：仍要 human（令牌 + HUMAN_ONLY
+   * 在用例层把关），但不要求 sessionId。
+   */
+  const GLOBAL_WRITE_METHODS = new Set<string>(['globalDefinitionSave'])
+
   const write = async (name: string, sessionId: string, body: unknown): Promise<unknown> => {
     if (!isPanelWriteMethod(name)) {
       return { ok: false, error: { code: 'INVALID_COMMAND', message: `未知写方法：${name}`, retryable: false } }
     }
+    const record = typeof body === 'object' && body !== null ? (body as Record<string, unknown>) : {}
+    const params = typeof record.params === 'object' && record.params !== null ? (record.params as Record<string, unknown>) : {}
+
+    if (GLOBAL_WRITE_METHODS.has(name)) {
+      try {
+        // 全局库不属任何项目：直改只看全局目录，不需要 runtime / rootDir。
+        if (panelWriteKind(name) === 'direct') {
+          return { ok: false, error: { code: 'INVALID_COMMAND', message: `${name} 是 token 通道`, retryable: false } }
+        }
+        if (record.action === 'confirm') {
+          if (record.confirmation === undefined) {
+            return { ok: false, error: { code: 'INVALID_PAYLOAD', message: '确认需要 confirmation 令牌', retryable: false } }
+          }
+          const reason = typeof record.reason === 'string' ? record.reason : ''
+          const applied = applyPanelWrite(undefined as never, writeAuthorizer, name, {
+            params,
+            reason,
+            confirmation: record.confirmation as never,
+          }, writeDeps)
+          return { ok: true, data: JSON.parse(JSON.stringify(applied)) }
+        }
+        const preview = previewPanelWrite(undefined as never, writeAuthorizer, name, params, writeDeps)
+        return { ok: true, data: JSON.parse(JSON.stringify(preview)) }
+      } catch (error) {
+        const message = error instanceof Error ? error.message : String(error)
+        const code = (error as { code?: string } | null)?.code ?? 'INTERNAL'
+        return { ok: false, error: { code, message, retryable: false } }
+      }
+    }
+
     if (typeof sessionId !== 'string' || sessionId.length === 0) return forbidden('面板写动作缺少会话身份')
     const agent = ctx.agents?.get(sessionId)
     if (agent === undefined || ctx.workingDirectory === undefined) {
       return forbidden('当前会话没有绑定工作区，不能执行面板写动作')
     }
-    const record = typeof body === 'object' && body !== null ? (body as Record<string, unknown>) : {}
-    const params = typeof record.params === 'object' && record.params !== null ? (record.params as Record<string, unknown>) : {}
     try {
       const rootDir = await ctx.workingDirectory.ensure(agent)
       const runtime = await hosts.open(rootDir)
@@ -384,7 +422,8 @@ export function createPanelRouteHandler(
         return
       }
       const writeSession = typeof envelope.sessionId === 'string' ? envelope.sessionId : ''
-      if (writeSession.length === 0) {
+      // 全局库写方法不属任何项目（面板本身也是 root scope、没有会话），不强制 sessionId。
+      if (writeSession.length === 0 && !(envelope as Record<string, unknown>).__global === true && writeName !== 'globalDefinitionSave') {
         sendPanelJson(request, response, 400, panelFailure('MT_BAD_REQUEST', '写动作必须带 sessionId'))
         return
       }

@@ -1852,6 +1852,39 @@ test('团队栏：成员状态用中文（archived → 已归档，released → 
   }
 })
 
+
+test('全局库左栏：详情页带「全局库直改」表单，预览走 globalDefinitionSave（不带 sessionId）', async () => {
+  const harness = loadClient(FILLED)
+  try {
+    let tree = await mount(harness.panel, { ctx: { layout: { selectPanel: () => undefined } } })
+
+    const rolesTab = findTab(tree, '角色')
+    assert.ok(rolesTab !== null, '全局库应有「角色」栏')
+    ;(rolesTab!.props.onClick as () => void)()
+    tree = await mount(harness.panel, { ctx: { layout: { selectPanel: () => undefined } } })
+
+    const row = findClickable(tree, '实现者')
+    assert.ok(row !== null, '列表里应有「实现者」这一行')
+    ;(row!.props.onClick as () => void)()
+    tree = await mount(harness.panel, { ctx: { layout: { selectPanel: () => undefined } } })
+
+    const begin = findButton(tree, '预览并准备保存')
+    assert.ok(begin !== null, '详情页应有全局直改表单的「预览并准备保存」')
+    ;(begin!.props.onClick as () => void)()
+    tree = await mount(harness.panel, { ctx: { layout: { selectPanel: () => undefined } } })
+
+    assert.deepEqual(harness.writes, ['globalDefinitionSave'], '应走 globalDefinitionSave')
+    const body = harness.writeBody
+    assert.equal(body === null ? undefined : body.sessionId, undefined, '全局写不带会话')
+    const params = body === null ? {} : (body.params as Record<string, unknown>)
+    assert.equal(params.kind, 'role')
+    assert.equal(params.id, 'r1')
+    assert.ok(Object.prototype.hasOwnProperty.call(params, 'expectedHash'), '必须带 expectedHash')
+  } finally {
+    harness.restore()
+  }
+})
+
 test('样式来源守卫：渲染出来的每个类名都定义在仓库 design-v2 里（不是打包副本）', async () => {
   // 这条是踩过坑才加的：包内 plugin/design-v2 是 build 从仓库 design-v2 **拷出来**的生成物，
   // 每次 build 都会 rmSync 重建。把新样式写进包内副本，下一次 build 就静默丢了 ——

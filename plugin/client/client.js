@@ -3209,6 +3209,198 @@ window.__ModuleLoader__.load({
       )
     }
 
+    /**
+     * 全局库定义编辑（G4）—— 直接改全局库里的一个定义，不经项目。
+     *
+     * 为什么复用项目侧的字段形状：角色就是 profile + capabilities，蓝图就是 formation + workflows，
+     * 换个作用域不该换一套术语。与项目侧的差别只有两点：
+     *   1. 提交走 globalDefinitionSave（token 通道），必须带上 entry.contentHash ——
+     *      服务端据此判断「你改的是不是你看到的那个版本」；
+     *   2. 影响面要先看：全局蓝图引用的必须是全局角色。
+     *
+     * 全局条目不属任何项目，所以这张表单也**不带 sessionId**（写通道对 globalDefinitionSave 免会话）。
+     */
+    function GlobalDefinitionEdit(props) {
+      const { entry, entries, onDone } = props
+      const content = entry === undefined || entry === null ? null : entry.content
+      const record = content !== null && typeof content === 'object' ? content : {}
+      const kind = entry === undefined || entry === null ? 'role' : entry.kind
+      const profile0 = kind === 'role' ? (record.profile ?? {}) : {}
+      const [name, setName] = useState(String(profile0.name ?? (entry === undefined ? '' : entry.name) ?? ''))
+      const [purpose, setPurpose] = useState(String(profile0.purpose ?? ''))
+      const [instructions, setInstructions] = useState(String(profile0.instructions ?? ''))
+      const [specialties, setSpecialties] = useState(Array.isArray(profile0.specialties) ? profile0.specialties.join(', ') : '')
+      const [blueprintName, setBlueprintName] = useState(String(record.name ?? (entry === undefined ? '' : entry.name) ?? ''))
+      const [description, setDescription] = useState(String(record.description ?? ''))
+      const [formationText, setFormationText] = useState(
+        (Array.isArray(record.formation) ? record.formation : [])
+          .map((slot) => [slot.key, slot.roleId, String(slot.count === undefined ? 1 : slot.count), slot.parentSlotKey === null || slot.parentSlotKey === undefined ? '' : slot.parentSlotKey].join(' | '))
+          .join('\n'),
+      )
+      const [workflowText, setWorkflowText] = useState((Array.isArray(record.workflows) ? record.workflows : []).join(', '))
+      const [stage, setStage] = useState('idle')
+      const [preview, setPreview] = useState(null)
+      const [problem, setProblem] = useState(null)
+      const [saved, setSaved] = useState(false)
+      const roleList = (Array.isArray(entries) ? entries : []).filter((item) => item.kind === 'role')
+      const workflowList = (Array.isArray(entries) ? entries : []).filter((item) => item.kind === 'workflow')
+    
+      const buildDefinition = () => {
+        if (kind === 'role') {
+          if (name.trim().length === 0) return { problem: '角色名不能为空' }
+          return {
+            definition: {
+              ...record,
+              profile: {
+                ...profile0,
+                name: name.trim(),
+                purpose: purpose.trim(),
+                instructions: instructions.trim(),
+                specialties: specialties.split(/[,，\s]+/).map((item) => item.trim()).filter((item) => item.length > 0),
+              },
+            },
+          }
+        }
+        if (kind === 'workflow') {
+          return { problem: '工作流的全局直改还没接：模板是结构化图，需要专门的表单。先做角色与蓝图。' }
+        }
+        if (blueprintName.trim().length === 0) return { problem: '蓝图名不能为空' }
+        const formation = []
+        const lines = formationText.split('\n').map((line) => line.trim()).filter((line) => line.length > 0)
+        for (let index = 0; index < lines.length; index += 1) {
+          const parts = lines[index].split('|').map((item) => item.trim())
+          if (parts.length < 3) return { problem: '第 ' + String(index + 1) + ' 行格式不对：key | 角色 | 数量（| 父槽位）' }
+          const count = Number(parts[2])
+          if (!Number.isInteger(count) || count < 1) return { problem: '第 ' + String(index + 1) + ' 行数量必须是正整数' }
+          formation.push({ key: parts[0], roleId: parts[1], count, parentSlotKey: parts.length > 3 && parts[3].length > 0 ? parts[3] : null })
+        }
+        if (formation.length === 0) return { problem: '至少需要一个组建槽位' }
+        return {
+          definition: {
+            ...record,
+            name: blueprintName.trim(),
+            description: description.trim(),
+            formation,
+            workflows: workflowText.split(/[,，\s]+/).map((item) => item.trim()).filter((item) => item.length > 0),
+            defaults: record.defaults === undefined ? {} : record.defaults,
+          },
+        }
+      }
+    
+      const submitParams = (built) => ({
+        kind: kind,
+        id: entry.id,
+        definition: built.definition,
+        expectedHash: entry.contentHash === undefined ? null : entry.contentHash,
+      })
+    
+      const begin = async () => {
+        const built = buildDefinition()
+        if (built.problem !== undefined) { setProblem(built.problem); return }
+        setStage('busy')
+        setProblem(null)
+        setSaved(false)
+        try {
+          const result = await callWrite('globalDefinitionSave', undefined, { params: submitParams(built) })
+          setPreview(result)
+          setStage('preview')
+        } catch (error) {
+          setProblem(messageOf(error))
+          setStage('failed')
+        }
+      }
+    
+      const commit = async () => {
+        const built = buildDefinition()
+        if (built.problem !== undefined) { setProblem(built.problem); return }
+        setStage('busy')
+        setProblem(null)
+        try {
+          await callWrite('globalDefinitionSave', undefined, {
+            params: submitParams(built),
+            action: 'confirm',
+            confirmation: preview.confirmation,
+            reason: '面板确认（全局库直改）',
+          })
+          setPreview(null)
+          setStage('idle')
+          setSaved(true)
+          if (onDone !== undefined) onDone()
+        } catch (error) {
+          setProblem(messageOf(error))
+          setStage('failed')
+        }
+      }
+    
+      const busy = stage === 'busy'
+      const textInput = (value, onChange, placeholder) =>
+        h('input', { type: 'text', className: 'box', placeholder, value,
+          style: { display: 'block', width: '100%', marginTop: 2, padding: '8px 10px', fontSize: 13 },
+          onChange: (event) => onChange(event.target.value) })
+      const field = (label, hint, control) => h(Field, { label, hint }, control)
+      const toolCount = (Array.isArray(record.capabilities) ? 0 : Array.isArray(record.capabilities === undefined ? undefined : record.capabilities.tools === undefined ? undefined : record.capabilities.tools.allow) ? record.capabilities.tools.allow.length : 0)
+    
+      const form =
+        kind === 'role'
+          ? [
+              field('角色名', undefined, textInput(name, setName, '角色名')),
+              field('用途', '一句话：这个角色解决什么问题。', textInput(purpose, setPurpose, '用途')),
+              h(Field, { label: '工作说明', hint: '写清楚怎么做、边界在哪里。' }, h('textarea', {
+                className: 'box', placeholder: '工作说明', value: instructions, rows: 3,
+                style: { display: 'block', width: '100%', marginTop: 2, padding: '8px 10px', fontSize: 13 },
+                onChange: (event) => setInstructions(event.target.value),
+              })),
+              field('专长', '可选；逗号或空格分隔。', textInput(specialties, setSpecialties, '专长')),
+              h('p', { className: 'muted', style: { margin: '6px 0 0', fontSize: 12 } },
+                '能力集不在这里改（保存时原样带回）；工具 ' + String(toolCount) + ' 个'),
+            ]
+          : kind === 'blueprint'
+            ? [
+                field('蓝图名', undefined, textInput(blueprintName, setBlueprintName, '蓝图名')),
+                field('说明', undefined, textInput(description, setDescription, '说明')),
+                h(Field, {
+                  label: '组建槽位',
+                  hint: roleList.length === 0
+                    ? '全局库里还没有角色，先有全局角色再写槽位。每行：key | 角色 | 数量（| 父槽位）'
+                    : '每行一个：key | 角色 | 数量（| 父槽位）。可用全局角色：' + roleList.map((item) => item.id).join(' / '),
+                }, h('textarea', {
+                  className: 'box mono',
+                  placeholder: 'impl | role_xxx | 1\nreview | role_yyy | 1 | impl',
+                  value: formationText, rows: 4,
+                  style: { display: 'block', width: '100%', marginTop: 2, padding: '8px 10px', fontSize: 12 },
+                  onChange: (event) => setFormationText(event.target.value),
+                })),
+                field('关联工作流', workflowList.length === 0 ? '全局库里还没有工作流。' : '逗号分隔；必须是全局库里的工作流 id。', textInput(workflowText, setWorkflowText, 'wf_1, wf_2')),
+              ]
+            : [h('p', { className: 'muted', style: { margin: '6px 0 0', fontSize: 12 } },
+                '这份定义的正文不是本工具能编辑的形状（可能是别的版本写的）。')]
+    
+      const action =
+        preview === null
+          ? h('div', { className: 'acts', style: { marginTop: 10 } },
+              h('button', { type: 'button', className: 'btn primary', disabled: busy, onClick: () => void begin() },
+                busy ? '读影响面…' : '预览并准备保存'))
+          : h('div', { className: 'box', style: { padding: '12px 14px', marginTop: 10 } },
+              h('div', { className: 'rc-h' }, h(Dot, { tone: 'gate' }),
+                h('span', { className: 'nm' }, preview.summary === undefined ? '全局直改' : preview.summary),
+                h('span', { className: 'tag' }, '待确认')),
+              impactLines(preview.impact).map((line) =>
+                h('p', { key: line, className: 'muted', style: { margin: '6px 0 0', fontSize: 12 } }, line)),
+              h('div', { className: 'acts', style: { marginTop: 10 } },
+                h('button', { type: 'button', className: 'btn primary', disabled: busy, onClick: () => void commit() },
+                  busy ? '提交中…' : '确认写入全局库'),
+                h('button', { type: 'button', className: 'btn', style: { marginLeft: 8 },
+                  onClick: () => { setPreview(null); setStage('idle') } }, '取消')))
+    
+      return h('div', { className: 'box', style: { padding: '12px 16px', marginTop: 12 } },
+        h('p', { className: 'muted', style: { margin: '0 0 6px', fontSize: 12 } },
+          '直接改全局库里的这份定义（改完所有引用它的项目下次读到新版本；审计留 previousHash）'),
+        ...form,
+        action,
+        problem === null ? null : h('p', { className: 'muted', style: { fontSize: 12, margin: '8px 0 0' } }, '没成功：' + problem),
+        saved === true ? h('p', { className: 'muted', style: { fontSize: 12, margin: '8px 0 0' } }, '已写入全局库。') : null)
+    }
+    
     /** 计数卡上那行小字：写清这一类的文件落在哪个目录（与读目录的实现一一对应）。 */
     const GLOBAL_KIND_DIR = {
       role: 'roles/',
@@ -3398,7 +3590,14 @@ window.__ModuleLoader__.load({
         body = h(Data, { data: library, what: navItem.label }, () =>
           openedEntry === null
             ? h(ListPane, { items: ofKind, empty: `${navItem.label}里还没有全局条目。` }, globalEntryRows(ofKind, (entry) => setOpened(entry.kind + ':' + entry.id)))
-            : h('div', { style: { padding: '12px 16px' } }, h(GlobalEntryDetail, { entry: openedEntry, entries, onBack: () => setOpened(null) })),
+            : h('div', { style: { padding: '12px 16px' } },
+                h(GlobalEntryDetail, { entry: openedEntry, entries, onBack: () => setOpened(null) }),
+                h(GlobalDefinitionEdit, {
+                  entry: openedEntry,
+                  entries,
+                  onDone: () => { setOpened(null); void library.reload() },
+                }),
+              ),
         )
       }
 
@@ -3423,7 +3622,7 @@ window.__ModuleLoader__.load({
           }),
           h(StatusBar, {
             chips: [
-              { text: '只读', tone: undefined },
+              { text: '人类可写（令牌确认）', tone: 'run' },
               { text: `条目 ${entries.length}` },
               { text: `根目录 ${shortRoot(library.data?.root)}` },
             ],
