@@ -1573,6 +1573,151 @@ test('定义栏「保存定义」：改角色名 → 发一次 definitionSave，
   }
 })
 
+test('定义栏「新建蓝图」：填队形 → 发一次 definitionSave(kind=blueprint)，不带 id（新建）', async () => {
+  const harness = loadClient(FILLED)
+  try {
+    let tree = await mount(harness.view, { sessionId: 'ses_1' })
+
+    const defsTab = findTab(tree, '定义')
+    assert.ok(defsTab !== null, '缺「定义」栏')
+    ;(defsTab!.props.onClick as () => void)()
+    tree = await mount(harness.view, { sessionId: 'ses_1' })
+
+    const open = findButton(tree, '新建蓝图')
+    assert.ok(open !== null, '定义栏缺「新建蓝图」（蓝图以前只有读面）')
+    ;(open!.props.onClick as () => void)()
+    tree = await mount(harness.view, { sessionId: 'ses_1' })
+
+    const name = findByPlaceholder(tree, '蓝图名')
+    assert.ok(name !== null, '缺蓝图名输入框')
+    ;(name!.props.onChange as (event: unknown) => void)({ target: { value: '两人小队' } })
+    tree = await mount(harness.view, { sessionId: 'ses_1' })
+
+    const formation = findByPlaceholder(tree, 'impl | role_xxx | 1\nreview | role_yyy | 1 | impl')
+    assert.ok(formation !== null, '缺队形输入框')
+    ;(formation!.props.onChange as (event: unknown) => void)({
+      target: { value: 'impl | role_1 | 1\nreview | role_1 | 2 | impl' },
+    })
+    tree = await mount(harness.view, { sessionId: 'ses_1' })
+
+    const submit = findButton(tree, '新建蓝图')
+    assert.ok(submit !== null)
+    ;(submit!.props.onClick as () => void)()
+    tree = await mount(harness.view, { sessionId: 'ses_1' })
+
+    assert.deepEqual(harness.writes, ['definitionSave'], '一次点击只能发一次写请求')
+    assert.equal(harness.writeBody?.confirm, true)
+    const params = harness.writeBody?.params as Record<string, unknown>
+    assert.equal(params.kind, 'blueprint')
+    assert.equal(params.id, undefined, '新建时不能带 id（带了就变成改一个不存在的）')
+    assert.equal(params.name, '两人小队')
+    assert.deepEqual(params.formation, [
+      { key: 'impl', roleId: 'role_1', count: 1, parentSlotKey: null },
+      { key: 'review', roleId: 'role_1', count: 2, parentSlotKey: 'impl' },
+    ], '队形按「key | 角色 | 数量 | 父槽位」解析成结构化数据')
+    // 提交后 onChanged 会触发 definitions.reload()，夹具回的仍是同一份数据，
+    // 因此表单不会真的消失；这里只断言「请求发对了」，不锁「已新建」这句文案。
+    assert.equal(harness.writeBody?.params !== undefined, true)
+  } finally {
+    harness.restore()
+  }
+})
+
+test('定义栏「新建蓝图」：数量不是正整数 → 本地拦下，不发请求', async () => {
+  const harness = loadClient(FILLED)
+  try {
+    let tree = await mount(harness.view, { sessionId: 'ses_1' })
+
+    const defsTab = findTab(tree, '定义')
+    assert.ok(defsTab !== null)
+    ;(defsTab!.props.onClick as () => void)()
+    tree = await mount(harness.view, { sessionId: 'ses_1' })
+
+    ;(findButton(tree, '新建蓝图')!.props.onClick as () => void)()
+    tree = await mount(harness.view, { sessionId: 'ses_1' })
+
+    ;(findByPlaceholder(tree, '蓝图名')!.props.onChange as (event: unknown) => void)({ target: { value: '坏蓝图' } })
+    tree = await mount(harness.view, { sessionId: 'ses_1' })
+    ;(findByPlaceholder(tree, 'impl | role_xxx | 1\nreview | role_yyy | 1 | impl')!.props.onChange as (event: unknown) => void)({
+      target: { value: 'impl | role_1 | 0' },
+    })
+    tree = await mount(harness.view, { sessionId: 'ses_1' })
+
+    ;(findButton(tree, '新建蓝图')!.props.onClick as () => void)()
+    tree = await mount(harness.view, { sessionId: 'ses_1' })
+
+    assert.deepEqual(harness.writes, [], '本地格式错误不该发请求，省一次往返')
+    assert.ok(textOf(tree).includes('必须是正整数'), '要说清哪一行不对')
+  } finally {
+    harness.restore()
+  }
+})
+
+test('定义栏：点开已有蓝图 → 表单预填，保存时带 id（走修订）', async () => {
+  const harness = loadClient({
+    ...FILLED,
+    definitions: {
+      items: [
+        ...(FILLED.definitions as { items: Record<string, unknown>[] }).items,
+        {
+          kind: 'blueprint',
+          id: 'bp_1',
+          name: '旧蓝图',
+          detail: {
+            blueprint: {
+              id: 'bp_1',
+              revision: 2,
+              name: '旧蓝图',
+              description: '第一版',
+              formation: [{ key: 'impl', roleId: 'role_1', count: 1, parentSlotKey: null }],
+              workflows: ['wf_1'],
+              defaults: {},
+            },
+          },
+          revision: 2,
+          contentHash: 'aa',
+          baseHash: 'aa',
+          origin: null,
+          archived: false,
+          published: null,
+          localChanged: true,
+          upstreamChanged: null,
+          updateAvailable: null,
+        },
+      ],
+    },
+  })
+  try {
+    let tree = await mount(harness.view, { sessionId: 'ses_1' })
+
+    const defsTab = findTab(tree, '定义')
+    assert.ok(defsTab !== null)
+    ;(defsTab!.props.onClick as () => void)()
+    tree = await mount(harness.view, { sessionId: 'ses_1' })
+
+    const open = findClickable(tree, '旧蓝图')
+    assert.ok(open !== null, '蓝图行应能点开')
+    ;(open!.props.onClick as () => void)()
+    tree = await mount(harness.view, { sessionId: 'ses_1' })
+
+    const name = findByPlaceholder(tree, '蓝图名')
+    assert.ok(name !== null, '缺蓝图编辑表单')
+    assert.equal(name!.props.value, '旧蓝图', '要用现有蓝图预填')
+
+    const submit = findButton(tree, '保存蓝图')
+    assert.ok(submit !== null, '修訂按钮叫「保存蓝图」')
+    ;(submit!.props.onClick as () => void)()
+    tree = await mount(harness.view, { sessionId: 'ses_1' })
+
+    assert.deepEqual(harness.writes, ['definitionSave'])
+    const params = harness.writeBody?.params as Record<string, unknown>
+    assert.equal(params.id, 'bp_1', '修订必须带 id')
+    assert.equal(params.kind, 'blueprint')
+  } finally {
+    harness.restore()
+  }
+})
+
 test('样式来源守卫：渲染出来的每个类名都定义在仓库 design-v2 里（不是打包副本）', async () => {
   // 这条是踩过坑才加的：包内 plugin/design-v2 是 build 从仓库 design-v2 **拷出来**的生成物，
   // 每次 build 都会 rmSync 重建。把新样式写进包内副本，下一次 build 就静默丢了 ——

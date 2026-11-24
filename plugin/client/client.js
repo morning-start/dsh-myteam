@@ -1964,9 +1964,167 @@ window.__ModuleLoader__.load({
       )
     }
 
+    /**
+     * 蓝图编辑（`definitionSave`，`kind: 'blueprint'`；项目副本版）。
+     *
+     * 队形用「一行一个槽位」的自由文本编辑：`key | 角色 | 数量 | 父槽位`。
+     * 为什么不做拖拽/图形编辑器：蓝图的校验规则（引用必须能解析、父子不能成环、
+     * 数量为正整数）都在域里，界面的责任只是**如实把错误原样显示出来**；画成图反而
+     * 会让「哪个槽位引用了不存在的角色」变得难看出来。真正的把关在 t53。
+     */
+    function BlueprintEditBox(props) {
+      const { item, roles, workflows, sessionId, onChanged } = props
+      const detail = item?.detail ?? {}
+      const blueprint = detail.blueprint ?? null
+      const roleList = Array.isArray(roles) ? roles : []
+      const workflowList = Array.isArray(workflows) ? workflows : []
+
+      const toLines = (formation) =>
+        (Array.isArray(formation) ? formation : [])
+          .map((slot) => [slot.key, slot.roleId, String(slot.count ?? 1), slot.parentSlotKey ?? ''].join(' | '))
+          .join('\n')
+
+      const [name, setName] = useState(String(blueprint?.name ?? item?.name ?? ''))
+      const [description, setDescription] = useState(String(blueprint?.description ?? ''))
+      const [formationText, setFormationText] = useState(toLines(blueprint?.formation))
+      const [pickedWorkflows, setPickedWorkflows] = useState(Array.isArray(blueprint?.workflows) ? blueprint.workflows : [])
+      const [busy, setBusy] = useState(false)
+      const [problem, setProblem] = useState(null)
+      const [saved, setSaved] = useState(false)
+
+      const submit = async () => {
+        if (busy) return
+        if (name.trim().length === 0) {
+          setProblem('蓝图名不能为空')
+          return
+        }
+        // 逐行解析；格式不对就在本地拦下来，不要让一行错格式变成一条难看懂的域错误。
+        const formation = []
+        const lines = formationText.split('\n').map((line) => line.trim()).filter((line) => line.length > 0)
+        for (const [index, line] of lines.entries()) {
+          const parts = line.split('|').map((part) => part.trim())
+          if (parts.length < 3) {
+            setProblem(`第 ${index + 1} 行格式不对：要写成 key | 角色 | 数量（| 父槽位）`)
+            return
+          }
+          const count = Number(parts[2])
+          if (!Number.isInteger(count) || count < 1) {
+            setProblem(`第 ${index + 1} 行数量必须是正整数（现在是「${parts[2]}」）`)
+            return
+          }
+          formation.push({
+            key: parts[0],
+            roleId: parts[1],
+            count,
+            parentSlotKey: parts.length > 3 && parts[3].length > 0 ? parts[3] : null,
+          })
+        }
+        if (formation.length === 0) {
+          setProblem('至少需要一个队形槽位')
+          return
+        }
+        setBusy(true)
+        setProblem(null)
+        setSaved(false)
+        try {
+          await callWrite('definitionSave', sessionId, {
+            confirm: true,
+            params: {
+              kind: 'blueprint',
+              // 没有 id = 新建（域里 createProjectBlueprint）；有 id 走修订。
+              ...(item === null || item === undefined ? {} : { id: item.id }),
+              name: name.trim(),
+              description: description.trim(),
+              formation,
+              workflows: pickedWorkflows,
+              defaults: blueprint?.defaults ?? {},
+            },
+          })
+          setSaved(true)
+          if (onChanged !== undefined) onChanged()
+        } catch (error) {
+          setProblem(messageOf(error))
+        } finally {
+          setBusy(false)
+        }
+      }
+
+      const toggleWorkflow = (id) => {
+        setPickedWorkflows((current) => (current.includes(id) ? current.filter((entry) => entry !== id) : [...current, id]))
+      }
+
+      return h(
+        'div',
+        { className: 'box', style: { padding: '12px 16px', marginTop: 12 } },
+        h('p', { className: 'muted', style: { margin: '0 0 6px', fontSize: 12 } },
+          item === null || item === undefined
+            ? '新建项目蓝图（队形引用必须能解析，否则域里会拒绝并说明原因）'
+            : `编辑这张蓝图（rev ${item.revision}；保存后 revision 递增、记 previousHash）`),
+        h(Field, { label: '蓝图名' }, h('input', {
+          type: 'text',
+          className: 'box',
+          placeholder: '蓝图名',
+          value: name,
+          style: { display: 'block', width: '100%', marginTop: 2, padding: '8px 10px', fontSize: 13 },
+          onChange: (event) => setName(event.target.value),
+        })),
+        h(Field, { label: '说明' }, h('input', {
+          type: 'text',
+          className: 'box',
+          placeholder: '说明',
+          value: description,
+          style: { display: 'block', width: '100%', marginTop: 2, padding: '8px 10px', fontSize: 13 },
+          onChange: (event) => setDescription(event.target.value),
+        })),
+        h(Field, {
+          label: '队形',
+          hint: roleList.length === 0
+            ? '这个项目还没有角色，先建角色再写队形。每行：key | 角色 | 数量（| 父槽位）'
+            : `每行一个槽位：key | 角色 | 数量（| 父槽位）。可用角色：${roleList.map((role) => `${role.id}（${role.name}）`).join(' / ')}`,
+        }, h('textarea', {
+          className: 'box mono',
+          placeholder: 'impl | role_xxx | 1\nreview | role_yyy | 1 | impl',
+          value: formationText,
+          rows: 4,
+          style: { display: 'block', width: '100%', marginTop: 2, padding: '8px 10px', fontSize: 12 },
+          onChange: (event) => setFormationText(event.target.value),
+        })),
+        workflowList.length === 0
+          ? h('p', { className: 'muted', style: { fontSize: 12, margin: '8px 0 0' } }, '还没有工作流可引用：蓝图可以不挂工作流。')
+          : [
+              h('p', { className: 'muted', style: { margin: '8px 0 4px', fontSize: 12 } }, '引用的工作流（可多选）'),
+              h('div', { className: 'kws' }, workflowList.map((workflow) =>
+                h('button', {
+                  key: workflow.id,
+                  type: 'button',
+                  className: joinClass('btn', pickedWorkflows.includes(workflow.id) ? 'primary' : ''),
+                  style: { marginRight: 6 },
+                  onClick: () => toggleWorkflow(workflow.id),
+                }, workflow.name ?? workflow.id))),
+            ],
+        problem === null
+          ? null
+          : h('p', { className: 'muted', style: { fontSize: 12, margin: '8px 0 0' } }, `没存上：${problem}`),
+        saved === true
+          ? h('p', { className: 'muted', style: { fontSize: 12, margin: '8px 0 0' } }, item === null || item === undefined ? '已新建。' : '已保存：revision 已递增。')
+          : null,
+        h(
+          'div',
+          { className: 'acts', style: { marginTop: 10 } },
+          h('button', { type: 'button', className: 'btn primary', disabled: busy === true, onClick: () => void submit() },
+            busy === true ? '保存中…' : item === null || item === undefined ? '新建蓝图' : '保存蓝图'),
+          h('span', { className: 'grow' }),
+          h('span', { className: 'muted', style: { fontSize: 12 } }, '队形写错时按域里报的原因改'),
+        ),
+      )
+    }
+
     function DefinitionsScreen(props) {
       const { data, sessionId, onChanged } = props
       const items = Array.isArray(data.items) ? data.items : []
+      const roles = items.filter((item) => item.kind === 'role')
+      const workflows = items.filter((item) => item.kind === 'workflow')
+      const [creatingBlueprint, setCreatingBlueprint] = useState(false)
       const [opened, setOpened] = useState(null)
       // 注意：这里必须是 `${kind}:${id}` 与 opened 比。写成 `':' === opened` 会让
       // openedItem 恒为 null —— 点定义行看起来「有反应」（状态变了）但什么都不渲染。
@@ -1974,6 +2132,31 @@ window.__ModuleLoader__.load({
       return h(
         'div',
         { className: 'body pad' },
+        h(
+          'div',
+          { className: 'bar', style: { padding: '0 0 10px' } },
+          h(
+            'button',
+            {
+              type: 'button',
+              className: joinClass('btn', creatingBlueprint === true ? 'primary' : ''),
+              onClick: () => setCreatingBlueprint(creatingBlueprint !== true),
+            },
+            creatingBlueprint === true ? '收起' : '新建蓝图',
+          ),
+        ),
+        creatingBlueprint === true
+          ? h(BlueprintEditBox, {
+              item: null,
+              roles,
+              workflows,
+              sessionId,
+              onChanged: () => {
+                setCreatingBlueprint(false)
+                if (onChanged !== undefined) onChanged()
+              },
+            })
+          : null,
         items.length === 0
           ? h('p', { className: 'muted', style: { fontSize: 12, margin: 0 } }, '这个项目还没有定义副本。')
           : h(
@@ -2006,14 +2189,18 @@ window.__ModuleLoader__.load({
                 ),
               ),
             ),
-        openedItem === null || openedItem.kind !== 'role'
+        openedItem === null
           ? null
-          : h(
-              'div',
-              null,
-              h('div', { className: 'box', style: { padding: '12px 16px', marginTop: 12 } }, h(RoleDetailBox, { item: openedItem, members: props.members })),
-              h(RoleEditBox, { item: openedItem, sessionId, onChanged }),
-            ),
+          : openedItem.kind === 'role'
+            ? h(
+                'div',
+                null,
+                h('div', { className: 'box', style: { padding: '12px 16px', marginTop: 12 } }, h(RoleDetailBox, { item: openedItem, members: props.members })),
+                h(RoleEditBox, { item: openedItem, sessionId, onChanged }),
+              )
+            : openedItem.kind === 'blueprint'
+              ? h(BlueprintEditBox, { item: openedItem, roles, workflows, sessionId, onChanged })
+              : null,
       )
     }
 

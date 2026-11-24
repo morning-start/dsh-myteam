@@ -99,6 +99,34 @@
         definitions: {
           items: [
             {
+              kind: 'blueprint',
+              id: 'bp_1',
+              name: '两人小队',
+              detail: {
+                blueprint: {
+                  id: 'bp_1',
+                  revision: 2,
+                  name: '两人小队',
+                  description: '一个实现者带一个审查者',
+                  formation: [
+                    { key: 'impl', roleId: 'role_1', count: 1, parentSlotKey: null },
+                    { key: 'review', roleId: 'role_2', count: 1, parentSlotKey: 'impl' },
+                  ],
+                  workflows: ['wf_1'],
+                  defaults: {},
+                },
+              },
+              revision: 2,
+              contentHash: 'bp111111',
+              baseHash: 'bp111111',
+              origin: null,
+              archived: false,
+              published: null,
+              localChanged: true,
+              upstreamChanged: null,
+              updateAvailable: null,
+            },
+            {
               kind: 'role',
               id: 'role_1',
               name: '实现者',
@@ -208,6 +236,14 @@
             }
           }
           if (params.get('form') === '1') await clickByText('button', '记一条')
+          if (params.get('openBlueprint') === '1') {
+            const picks = [...document.querySelectorAll('.item.pick')]
+            const blueprint = picks.find((node) => (node.textContent ?? '').includes('两人小队'))
+            if (blueprint !== undefined) {
+              blueprint.click()
+              await new Promise((resolve) => setTimeout(resolve, 80))
+            }
+          }
 
           document.body.dataset.harnessReady = '1'
           document.body.dataset.boxes = (() => {
