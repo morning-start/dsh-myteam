@@ -1885,6 +1885,142 @@ test('全局库左栏：详情页带「全局库直改」表单，预览走 glob
   }
 })
 
+
+test('全局库工作流：详情页表单能改模板，预览时 definition 里带解析后的 templates', async () => {
+  const harness = loadClient({
+    ...FILLED,
+    globalLibrary: {
+      root: '/tmp/.dsh/myteam',
+      exists: true,
+      counts: { role: 0, workflow: 1, blueprint: 0, team: 0 },
+      entries: [
+        {
+          kind: 'workflow',
+          id: 'wf_g',
+          name: '全局交付流',
+          revision: 2,
+          file: 'workflows/wf_g.json',
+          legacy: false,
+          contentHash: 'sha256:wfaa',
+          content: {
+            name: '全局交付流',
+            description: '一份全局工作流',
+            templates: [
+              { key: 'impl', title: '实现', description: '', acceptance: ['可验证'], requiredRoleId: null, dependsOn: [], gate: { commands: ['node --test'], requireEvidence: false, requireArtifacts: false }, deliverable: null },
+            ],
+            completion: { mode: 'all-tasks', requiredKeys: [] },
+          },
+        },
+      ],
+      warnings: [],
+    },
+  })
+  try {
+    let tree = await mount(harness.panel, { ctx: { layout: { selectPanel: () => undefined } } })
+
+    const wfTab = findTab(tree, '工作流')
+    assert.ok(wfTab !== null)
+    ;(wfTab!.props.onClick as () => void)()
+    tree = await mount(harness.panel, { ctx: { layout: { selectPanel: () => undefined } } })
+
+    const row = findClickable(tree, '全局交付流')
+    assert.ok(row !== null, '列表应有这份全局工作流')
+    ;(row!.props.onClick as () => void)()
+    tree = await mount(harness.panel, { ctx: { layout: { selectPanel: () => undefined } } })
+
+    const editor = findByPlaceholder(tree, 'impl | 实现 | 可验证 / 测试绿 | | | node --test')
+    assert.ok(editor !== null, '工作流详情应有「任务模板」编辑框（不再是「还没接」）')
+    ;(editor!.props.onChange as (event: unknown) => void)({
+      target: { value: 'impl | 实现 | 可验证 / 测试绿 | | | node --test\nreview | 复核 | 逐条核对 | | impl |' },
+    })
+    tree = await mount(harness.panel, { ctx: { layout: { selectPanel: () => undefined } } })
+
+    const begin = findButton(tree, '预览并准备保存')
+    assert.ok(begin !== null)
+    ;(begin!.props.onClick as () => void)()
+    tree = await mount(harness.panel, { ctx: { layout: { selectPanel: () => undefined } } })
+
+    assert.deepEqual(harness.writes, ['globalDefinitionSave'])
+    const params = (harness.writeBody === null ? {} : harness.writeBody.params) as Record<string, unknown>
+    assert.equal(params.kind, 'workflow')
+    assert.equal(params.id, 'wf_g')
+    const definition = params.definition as { templates: Array<Record<string, unknown>> }
+    assert.equal(definition.templates.length, 2, '两行模板都要解析出来')
+    assert.equal(definition.templates[0]!.key, 'impl')
+    assert.equal(definition.templates[0]!.title, '实现')
+    assert.deepEqual(definition.templates[0]!.acceptance, ['可验证', '测试绿'])
+    assert.equal(definition.templates[1]!.key, 'review')
+    assert.deepEqual(definition.templates[1]!.dependsOn, ['impl'], '第 5 段是依赖')
+  } finally {
+    harness.restore()
+  }
+})
+
+
+test('团队栏：归档撞上进行中尝试 → 出现「先暂停 / 等结束」二选一，点「先暂停」发 drain=pause', async () => {
+  // 让 memberArchive 第一次返回 CONFLICT（有进行中尝试），模拟设计稿 p-member-archive 的场景。
+  const team = { ...(FILLED.team as Record<string, unknown>) }
+  team.members = [{ id: 'member_1', roleId: 'role_1', status: 'active', parentMemberId: null }]
+  const harness = loadClient({ ...FILLED, team })
+  try {
+    let tree = await mount(harness.view, { sessionId: 'ses_1' })
+    ;(findTab(tree, '团队')!.props.onClick as () => void)()
+    tree = await mount(harness.view, { sessionId: 'ses_1' })
+    ;(findButton(tree, '甲队')!.props.onClick as () => void)()
+    tree = await mount(harness.view, { sessionId: 'ses_1' })
+
+    // 让 fetch 对 memberArchive 的第一次调用返回 CONFLICT（有进行中尝试）
+    const realFetch = globalThis.fetch
+    let archiveCalls = 0
+    let lastArchiveBody: Record<string, unknown> | null = null
+    globalThis.fetch = (async (input: unknown, init?: { body?: string }) => {
+      const url = String(input)
+      if (url.includes('write/memberArchive')) {
+        archiveCalls += 1
+        const confirmation = init?.body === undefined ? {} : (JSON.parse(init.body) as Record<string, unknown>)
+        lastArchiveBody = confirmation
+        const params = (confirmation.params ?? {}) as Record<string, unknown>
+        if (params.drain === 'pause') {
+          return { status: 200, text: async () => JSON.stringify({ ok: true, data: { method: 'memberArchive', operationId: 'm', committed: {} } }) }
+        }
+        return {
+          status: 200,
+          text: async () =>
+            JSON.stringify({
+              ok: false,
+              error: { code: 'CONFLICT', message: '成员还有进行中的尝试，等这一轮结束，或选择「先暂停再归档」' },
+            }),
+        }
+      }
+      return realFetch(input as never, init as never)
+    }) as typeof fetch
+
+    try {
+      // 点归档 → 撞 CONFLICT → 出现二选一
+      ;(findButton(tree, '归档')!.props.onClick as () => void)()
+      tree = await mount(harness.view, { sessionId: 'ses_1' })
+
+      const pause = findButton(tree, '先暂停，再归档')
+      const wait = findButton(tree, '我来等这轮结束')
+      assert.ok(pause !== null, '撞上进行中尝试时应给「先暂停，再归档」')
+      assert.ok(wait !== null, '也应给「我来等这轮结束」')
+
+      // 点「先暂停」→ 第二次请求带 drain=pause
+      ;(pause!.props.onClick as () => void)()
+      tree = await mount(harness.view, { sessionId: 'ses_1' })
+
+      assert.ok(archiveCalls >= 2, '应该发了两次 memberArchive（先 wait 被拒，再 pause）')
+      const body = lastArchiveBody
+      const params = (body === null ? {} : body.params) as Record<string, unknown>
+      assert.equal(params.drain, 'pause', '第二次要带 drain=pause')
+    } finally {
+      globalThis.fetch = realFetch
+    }
+  } finally {
+    harness.restore()
+  }
+})
+
 test('样式来源守卫：渲染出来的每个类名都定义在仓库 design-v2 里（不是打包副本）', async () => {
   // 这条是踩过坑才加的：包内 plugin/design-v2 是 build 从仓库 design-v2 **拷出来**的生成物，
   // 每次 build 都会 rmSync 重建。把新样式写进包内副本，下一次 build 就静默丢了 ——

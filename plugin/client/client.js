@@ -1677,6 +1677,9 @@ window.__ModuleLoader__.load({
       const [roleId, setRoleId] = useState(roleList.length > 0 ? roleList[0].id : '')
       const [busy, setBusy] = useState(null)
       const [problem, setProblem] = useState(null)
+      /** 归档撞上进行中尝试时记下成员，界面给「先暂停 / 等结束」二选一（设计稿 p-member-archive）。 */
+      const [pendingArchive, setPendingArchive] = useState(null)
+      /** 归档撞上进行中尝试时，记下要归档的成员，界面上给「先暂停 / 等结束」二选一。 */
 
       const appoint = async () => {
         if (busy !== null) return
@@ -1724,9 +1727,14 @@ window.__ModuleLoader__.load({
             confirm: true,
             params: { teamId, memberId, ...(drain === undefined ? {} : { drain }) },
           })
+          setPendingArchive(null)
           onDone()
         } catch (error) {
-          setProblem(messageOf(error))
+          // 设计稿 p-member-archive 的「先排空、再归档」：有进行中尝试时后端报 CONFLICT，
+          // 这里把它变成**二选一**（先暂停 / 等这轮结束），而不是甩一句错误让人自己猜。
+          const message = messageOf(error)
+          setProblem(message)
+          if (/进行中的尝试|active attempt/i.test(message)) setPendingArchive(memberId)
         } finally {
           setBusy(null)
         }
@@ -1787,6 +1795,29 @@ window.__ModuleLoader__.load({
         problem === null
           ? null
           : h('p', { className: 'muted', style: { fontSize: 12, margin: '8px 0 0' } }, `没成功：${problem}`),
+        pendingArchive === null
+          ? null
+          : h(
+              'div',
+              { className: 'box', style: { padding: '10px 12px', marginTop: 8 } },
+              h('p', { className: 'muted', style: { margin: '0 0 8px', fontSize: 12 } },
+                '这个成员还有进行中的尝试。归档前要先排空——二选一：'),
+              h('div', { className: 'acts' },
+                h('button', {
+                  type: 'button',
+                  className: 'btn primary',
+                  disabled: busy !== null,
+                  title: '先落 paused，再归档（两条事件，中间态可追溯）',
+                  onClick: () => void archive(pendingArchive, 'pause'),
+                }, '先暂停，再归档'),
+                h('button', {
+                  type: 'button',
+                  className: 'btn',
+                  style: { marginLeft: 8 },
+                  onClick: () => { setPendingArchive(null); setProblem(null) },
+                }, '我来等这轮结束'),
+              ),
+            ),
         archivedMembers.length === 0
           ? null
           : h(
@@ -3238,6 +3269,20 @@ window.__ModuleLoader__.load({
           .join('\n'),
       )
       const [workflowText, setWorkflowText] = useState((Array.isArray(record.workflows) ? record.workflows : []).join(', '))
+  const [wfName, setWfName] = useState(String(record.name ?? (entry === undefined ? '' : entry.name) ?? ''))
+  const [wfDescription, setWfDescription] = useState(String(record.description ?? ''))
+  const [templateText, setTemplateText] = useState(
+    (Array.isArray(record.templates) ? record.templates : [])
+      .map((template) => [
+        template.key,
+        template.title,
+        (Array.isArray(template.acceptance) ? template.acceptance : []).join(' / '),
+        template.requiredRoleId === null || template.requiredRoleId === undefined ? '' : template.requiredRoleId,
+        (Array.isArray(template.dependsOn) ? template.dependsOn : []).join(' / '),
+        (Array.isArray(template.gate === undefined ? [] : template.gate.commands) ? template.gate.commands : []).join(' / '),
+      ].join(' | '))
+      .join('\n'),
+  )
       const [stage, setStage] = useState('idle')
       const [preview, setPreview] = useState(null)
       const [problem, setProblem] = useState(null)
@@ -3262,8 +3307,37 @@ window.__ModuleLoader__.load({
           }
         }
         if (kind === 'workflow') {
-          return { problem: '工作流的全局直改还没接：模板是结构化图，需要专门的表单。先做角色与蓝图。' }
+      if (wfName.trim().length === 0) return { problem: '工作流名称不能为空' }
+      const templates = []
+      const rows = templateText.split('\n').map((line) => line.trim()).filter((line) => line.length > 0)
+      for (let index = 0; index < rows.length; index += 1) {
+        const parts = rows[index].split('|').map((item) => item.trim())
+        if (parts.length < 3) {
+          return { problem: '第 ' + String(index + 1) + ' 个模板格式不对：key | 标题 | 验收（| 角色 | 依赖 | 命令）' }
         }
+        const split = (value) => (value === undefined || value.length === 0 ? [] : value.split(/[/,，\s]+/).map((item) => item.trim()).filter((item) => item.length > 0))
+        templates.push({
+          key: parts[0],
+          title: parts[1],
+          description: '',
+          acceptance: split(parts[2]),
+          requiredRoleId: parts[3] === undefined || parts[3].length === 0 ? null : parts[3],
+          dependsOn: split(parts[4]),
+          gate: { commands: split(parts[5]), requireEvidence: false, requireArtifacts: false },
+          deliverable: null,
+        })
+      }
+      if (templates.length === 0) return { problem: '工作流至少需要一个任务模板' }
+      return {
+        definition: {
+          ...record,
+          name: wfName.trim(),
+          description: wfDescription.trim(),
+          templates,
+          completion: record.completion === undefined ? { mode: 'all-tasks', requiredKeys: [] } : record.completion,
+        },
+      }
+    }
         if (blueprintName.trim().length === 0) return { problem: '蓝图名不能为空' }
         const formation = []
         const lines = formationText.split('\n').map((line) => line.trim()).filter((line) => line.length > 0)
@@ -3354,6 +3428,23 @@ window.__ModuleLoader__.load({
               h('p', { className: 'muted', style: { margin: '6px 0 0', fontSize: 12 } },
                 '能力集不在这里改（保存时原样带回）；工具 ' + String(toolCount) + ' 个'),
             ]
+        : kind === 'workflow'
+          ? [
+              field('工作流名称', undefined, textInput(wfName, setWfName, '工作流名称')),
+              field('说明', undefined, textInput(wfDescription, setWfDescription, '说明')),
+              h(Field, {
+                label: '任务模板',
+                hint: '每行一个：key | 标题 | 验收（多条用 / 分隔）| 所需角色（可空）| 依赖 key（可空）| 门禁命令（可空）',
+              }, h('textarea', {
+                className: 'box mono',
+                placeholder: 'impl | 实现 | 可验证 / 测试绿 | | | node --test',
+                value: templateText, rows: 6,
+                style: { display: 'block', width: '100%', marginTop: 2, padding: '8px 10px', fontSize: 12 },
+                onChange: (event) => setTemplateText(event.target.value),
+              })),
+              h('p', { className: 'muted', style: { margin: '6px 0 0', fontSize: 12 } },
+                '完成规则不在这里改（保存时原样带回）：' + String(record.completion === undefined ? '未声明' : String(record.completion.mode))),
+            ]
           : kind === 'blueprint'
             ? [
                 field('蓝图名', undefined, textInput(blueprintName, setBlueprintName, '蓝图名')),
@@ -3372,8 +3463,8 @@ window.__ModuleLoader__.load({
                 })),
                 field('关联工作流', workflowList.length === 0 ? '全局库里还没有工作流。' : '逗号分隔；必须是全局库里的工作流 id。', textInput(workflowText, setWorkflowText, 'wf_1, wf_2')),
               ]
-            : [h('p', { className: 'muted', style: { margin: '6px 0 0', fontSize: 12 } },
-                '这份定义的正文不是本工具能编辑的形状（可能是别的版本写的）。')]
+              : [h('p', { className: 'muted', style: { margin: '6px 0 0', fontSize: 12 } },
+                  '这份定义的正文不是本工具能编辑的形状（可能是别的版本写的）。')]
     
       const action =
         preview === null
