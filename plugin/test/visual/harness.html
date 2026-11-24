@@ -1,0 +1,222 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <title>myteam 客户端 · 真 CSS 渲染夹具</title>
+    <!--
+      可视化夹具：把 plugin/client/client.js 真跑起来（真 CSS、真 DOM），用固定数据渲染
+      某一栏，然后由 tmp/shot.mjs 用无头浏览器截图。
+
+      为什么不是「起真实实例 + CDP 点 tab」：那要驱动 DSH 外壳（先开会话才到得了
+      「团队视图」标签页），一步错整轮就废；而这一页验的是**组件在真样式表下的排版**，
+      不验宿主装配 —— 宿主装配已经由 tmp/verify-iso.mjs 的 46 项 HTTP 判据覆盖。
+
+      样式直接引用仓库 design-v2/（source，不是 build 出来的包内副本）：
+      dsh-shell.css 提供 --dsh-* 外框变量，tokens.css 是 --mt-* 语义层，
+      myteam.css 全部选择器都挂在 [data-slot="main"] 下，所以容器要带这个属性。
+    -->
+    <link rel="stylesheet" href="../../../design-v2/dsh-shell.css" />
+    <link rel="stylesheet" href="../../../design-v2/tokens.css" />
+    <link rel="stylesheet" href="../../../design-v2/myteam.css" />
+    <style>
+      html, body { margin: 0; padding: 0; background: var(--dsh-bg, #f5f6f8); }
+      #slot { min-height: 100vh; }
+    </style>
+  </head>
+  <body>
+    <div id="slot" data-slot="main"></div>
+    <script type="module">
+      import { React, mount } from './mini-react-dom.mjs'
+
+      const params = new URLSearchParams(location.search)
+      const tab = params.get('tab') ?? 'overview'
+      const empty = params.get('empty') === '1'
+
+      const EMPTY = {
+        status: { name: '示例视图', counts: { teams: 0, tasks: 0, runs: 0, knowledge: 0 }, observedProjectSeq: 3, graphRevision: 1, configRevision: 1 },
+        overview: { name: '示例视图', totals: { all: 0, done: 0, blocked: 0, review: 0 }, attention: { review: 0, blocked: 0, unknownEffects: 0 }, teams: [], graphRevision: 1, observedProjectSeq: 3 },
+        board: { columns: [], totals: { all: 0 }, graphRevision: 1 },
+        definitions: { items: [] },
+        migration: { verdict: 'ready', headline: '没有可迁移的 v1 数据', markdown: '# 迁移\n无内容' },
+        runs: { items: [] },
+        effects: { items: [], counts: { requested: 0, accepted: 0, completed: 0, failed: 0, cancelled: 0, 'outcome-unknown': 0 } },
+        knowledge: { items: [] },
+        memory: { file: 'memory/myteam.db', exists: true, banks: [], entries: [], warnings: [] },
+        audit: { items: [], nextBeforeSeq: null },
+        settings: { configRevision: 1, defaults: {}, teams: [] },
+        task: null,
+        team: null,
+      }
+
+      const FILLED = {
+        ...EMPTY,
+        status: { name: '示例视图', counts: { teams: 1, tasks: 2, runs: 1, knowledge: 1 }, observedProjectSeq: 9, graphRevision: 4, configRevision: 1 },
+        overview: {
+          name: '示例视图',
+          totals: { all: 2, done: 1, blocked: 0, review: 1 },
+          attention: { review: 1, blocked: 0, unknownEffects: 0 },
+          teams: [{ id: 'team_1', name: '甲队', status: 'active', members: 2, tasks: 1, captain: { sessionId: 'ses_captain_1', generation: 1 } }],
+          graphRevision: 4,
+          observedProjectSeq: 9,
+        },
+        board: {
+          columns: [
+            {
+              status: 'review',
+              count: 1,
+              tasks: [{ id: 'task_1', title: '评审中的任务', status: 'review', ownerTeamId: 'team_1', ownerTeamName: '甲队', runId: null, blockedBy: [], dependencies: [], attemptId: 'attempt_1', updatedAt: '2026-01-01T00:00:00.000Z' }],
+            },
+            {
+              status: 'done',
+              count: 1,
+              tasks: [{ id: 'task_2', title: '已经做完的任务', status: 'done', ownerTeamId: 'team_1', ownerTeamName: '甲队', runId: null, blockedBy: [], dependencies: [], attemptId: null, updatedAt: '2026-01-01T00:00:00.000Z' }],
+            },
+          ],
+          totals: { all: 2 },
+          graphRevision: 4,
+        },
+        task: {
+          task: { id: 'task_1', title: '评审中的任务', status: 'review', attemptId: 'attempt_1', ownerTeamId: 'team_1', dependencies: [], acceptance: ['返回 ok'], description: '' },
+          team: { id: 'team_1', name: '甲队' },
+          run: null,
+          attempt: { id: 'attempt_1', status: 'active', memberId: 'member_1' },
+          verdict: null,
+          evidence: [],
+          dependencies: [],
+          dependents: [],
+        },
+        team: {
+          team: { id: 'team_1', name: '甲队', status: 'active' },
+          captain: { sessionId: 'ses_captain_1', generation: 1 },
+          members: [
+            { id: 'member_1', roleId: 'role_1', status: 'active', parentMemberId: null },
+            { id: 'member_2', roleId: 'role_2', status: 'active', parentMemberId: 'member_1' },
+          ],
+          tasks: [{ id: 'task_1', title: '评审中的任务', status: 'review' }],
+          roles: [{ id: 'role_1', name: '实现者' }, { id: 'role_2', name: '审查者' }],
+          config: null,
+        },
+        definitions: {
+          items: [
+            {
+              kind: 'role',
+              id: 'role_1',
+              name: '实现者',
+              detail: {
+                profile: { name: '实现者', purpose: '按验收标准实现', instructions: '先读 AC，再动手；改完跑测试。', specialties: ['TypeScript', '测试'] },
+                capabilities: { tools: { allow: ['read', 'write'], deny: [] }, mcp: { allow: [], deny: [] }, skills: ['run-tests'] },
+              },
+              revision: 3,
+              contentHash: 'abcdef123456',
+              baseHash: 'abcdef123456',
+              origin: null,
+              archived: false,
+              published: null,
+              localChanged: true,
+              upstreamChanged: null,
+              updateAvailable: null,
+            },
+            { kind: 'workflow', id: 'wf_1', name: '发版流程', detail: null, revision: 1, contentHash: 'ffff0000', baseHash: 'ffff0000', origin: null, archived: false, published: null, localChanged: false, upstreamChanged: null, updateAvailable: null },
+          ],
+        },
+        memory: {
+          file: 'memory/myteam.db',
+          exists: true,
+          banks: [{ bankId: 'team:team_1', live: 2, total: 2, lastUpdated: 'y' }],
+          entries: [
+            { id: 'm_1', bankId: 'team:team_1', text: '成员提交前先跑测试，别靠肉眼。', tags: ['gate', 'testing'], evidence: [], revision: 1, createdAt: 'x', updatedAt: 'y', forgotten: false },
+            { id: 'm_2', bankId: 'team:team_1:member:member_1', text: '实现者偏好小步提交，一次只改一件事。', tags: ['convention'], evidence: [], revision: 2, createdAt: 'x', updatedAt: 'y', forgotten: false },
+            { id: 'm_3', bankId: 'team:team_1', text: '这条已经忘掉了，但留痕可查。', tags: [], evidence: [], revision: 1, createdAt: 'x', updatedAt: 'y', forgotten: true },
+          ],
+          warnings: [],
+        },
+      }
+
+      const DATA = empty ? EMPTY : FILLED
+
+      // 假 fetch：按方法名回固定数据，写请求记一笔就回成功。
+      const writes = []
+      const fetchLog = []
+      window.__WRITES__ = writes
+      window.__FETCH_LOG__ = fetchLog
+      window.fetch = async (input, init) => {
+        const url = String(input)
+        const method = url.slice(url.lastIndexOf('__myteam/') + '__myteam/'.length).split('?')[0] ?? ''
+        if (method.startsWith('write/')) {
+          const name = method.slice('write/'.length)
+          writes.push({ name, body: init?.body === undefined ? null : JSON.parse(init.body) })
+          return { status: 200, text: async () => JSON.stringify({ ok: true, data: { method: name, operationId: 'op_1' } }) }
+        }
+        fetchLog.push(method)
+        const payload = DATA[method] ?? { items: [] }
+        return { status: 200, text: async () => JSON.stringify({ ok: true, data: payload }) }
+      }
+
+      let captured = null
+      window.__ModuleLoader__ = { load: (value) => { captured = value } }
+      window.__myteamHarness = { React, mount, get captured() { return captured } }
+
+      // 客户端 bundle 是普通脚本（靠 __ModuleLoader__ 注册），用 script 标签加载。
+      const script = document.createElement('script')
+      script.src = '../../client/client.js'
+      script.onload = async () => {
+        try {
+          const exported = captured.factory((name) => (name === 'react' ? React : {}))
+          const registrations = []
+          exported.apply({
+            effect: (fn) => { fn(); return () => undefined },
+            slots: {
+              inject: (_name, callback) => { callback(); return () => undefined },
+              register: (options, Component) => { registrations.push({ options, Component }); return () => undefined },
+            },
+            layout: { selectPanel: () => undefined },
+          })
+          const view = registrations.find((entry) => entry.options.name === 'conversation.view')?.Component
+          if (view === undefined) {
+            document.getElementById('slot').textContent = '缺会话「团队视图」组件'
+            return
+          }
+          // ProjectView 的初始 tab 是 overview；用一次点击把 tab 切到目标栏。
+          await mount(view, { sessionId: 'ses_1' }, document.getElementById('slot'))
+          if (tab !== 'overview') {
+            const wanted = { tasks: '任务', teams: '团队', definitions: '定义', runs: '流程', knowledge: '知识', memory: '记忆', audit: '审计', settings: '设置' }[tab]
+            const buttons = [...document.querySelectorAll('[role="tab"]')]
+            const target = buttons.find((element) => (element.textContent ?? '').includes(wanted))
+            if (target === undefined) {
+              document.body.dataset.harnessError = `找不到「${wanted}」标签`
+            } else {
+              target.click()
+              await new Promise((resolve) => setTimeout(resolve, 60))
+              await new Promise((resolve) => setTimeout(resolve, 60))
+            }
+          }
+          // 可选的“再点一下”：进到团队名册 / 展开一个定义 / 打开记忆表单。
+          const clickByText = async (selector, text) => {
+            const nodes = [...document.querySelectorAll(selector)]
+            const hit = nodes.find((node) => (node.textContent ?? '').includes(text))
+            if (hit === undefined) return false
+            hit.click()
+            await new Promise((resolve) => setTimeout(resolve, 80))
+            return true
+          }
+          if (params.get('team') === '1') await clickByText('button', '甲队')
+          if (params.get('open') === '1') {
+            const picks = [...document.querySelectorAll('.item.pick')]
+            if (picks[0] !== undefined) {
+              picks[0].click()
+              await new Promise((resolve) => setTimeout(resolve, 80))
+            }
+          }
+          if (params.get('form') === '1') await clickByText('button', '记一条')
+
+          document.body.dataset.harnessReady = '1'
+          document.body.dataset.fetchLog = JSON.stringify(fetchLog.slice(0, 12))
+          document.body.dataset.fetchTotal = String(fetchLog.length)
+        } catch (error) {
+          document.body.dataset.harnessError = String(error && error.stack ? error.stack : error).slice(0, 400)
+        }
+      }
+      document.body.appendChild(script)
+    </script>
+  </body>
+</html>
