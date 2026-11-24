@@ -29,6 +29,7 @@ export const PANEL_METHODS = [
   'globalLibrary',
   'globalAudit',
   'migration',
+  'pendingApprovals',
 ] as const
 
 export type PanelMethod = (typeof PANEL_METHODS)[number]
@@ -64,6 +65,7 @@ export const PANEL_METHOD_DOCS: Readonly<Record<PanelMethod, string>> = {
   globalLibrary: '全局库只读视图：$DSH_HOME/myteam 下的角色/工作流/蓝图（含 v1 teams 兼容）与读不懂的文件清单。',
   globalAudit: '全局操作审计（audit/global-operations.jsonl）：新→旧、坏行跳过并记 warning。',
   migration: 'v1 旧数据的只读迁移影响面报告（需要装配迁移分析器）。',
+  pendingApprovals: '待人类确认的事（门禁裁决 + 待确认的全局发布）与已处理的历史（门禁裁决结果）。',
 }
 
 export interface PanelRequest {

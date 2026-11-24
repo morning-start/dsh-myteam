@@ -57,6 +57,107 @@ export interface BoardView {
   columns: BoardColumn[]
 }
 
+/**
+ * 待人类确认的事 + 已处理的历史（`p-approval`）。
+ *
+ * 设计稿把「待你确认」做成一整页，分**待确认 / 已处理 / 已拒绝**。能撑起这一页的真实数据只有两类：
+ *
+ *   1. **门禁裁决**：任务停在 `review` 就是在等人下结论；`state.verdicts` 里有已下过的结论。
+ *   2. **待确认的全局发布**：`definition.publication.requested` 落了事件但还没 `outcome`。
+ *
+ * **做不到的**（如实写在这里，不假装有）：
+ *   - 「计划批准」：领域里没有 draft/plan 聚合，团队只有 active/archived/disbanded；
+ *   - 「队长接管」：它是**当场两段式**（预览签令牌 → 确认），不排队。
+ *     事件 `captain.handoff.proposed` 在投影里是 no-op，也没有写入方，所以查不出「谁在等接管」。
+ *
+ * 所以这一页只画**确实在等人类**的东西；另外两类等域模型补上再说。
+ */
+export interface PendingApprovalItem {
+  /** 用来区分卡片画法。 */
+  kind: 'gate' | 'publish'
+  id: string
+  title: string
+  /** 副标题：团队名 / 目标文件。 */
+  detail: string | null
+  since: string
+  by: string | null
+}
+
+export interface DecidedApprovalItem {
+  kind: 'gate'
+  id: string
+  title: string
+  outcome: string
+  decidedAt: string
+}
+
+export interface PendingApprovalsView {
+  pending: PendingApprovalItem[]
+  decided: DecidedApprovalItem[]
+  counts: { pending: number; decided: number }
+  /** 这一页覆盖不到的两类，明着告诉界面，别让它以为「没有了」。 */
+  unsupported: { planApproval: boolean; captainTakeover: boolean }
+}
+
+export function pendingApprovalsView(state: ProjectState): PendingApprovalsView {
+  const pending: PendingApprovalItem[] = []
+  const decided: DecidedApprovalItem[] = []
+
+  // 1) 门禁裁决：任务停在 review = 等人下结论。
+  for (const task of state.tasks.values()) {
+    if (task.status !== 'review') continue
+    // 关键：`task.verdict` **只记录裁决，不改任务状态** —— 下过结论的任务仍停在 review，
+    // 要等后续事件（completed / blocked）才离开这一列。不排掉的话，已经裁决过的任务
+    // 会一直挂在「待确认」里，人点进去发现没什么可确认的。
+    const existingVerdict = state.verdicts.get(task.id)
+    if (existingVerdict !== undefined && existingVerdict.attemptId === task.attemptId) continue
+    const teamName = task.ownerTeamId === null ? null : (state.teams.get(task.ownerTeamId)?.name ?? null)
+    pending.push({
+      kind: 'gate',
+      id: task.id,
+      title: task.title,
+      detail: teamName,
+      since: task.updatedAt,
+      by: null,
+    })
+  }
+
+  // 2) 待确认的全局发布（投影里 `outcome` 一到就删，所以剩下的都是还在等的）。
+  for (const item of state.pendingPublications.values()) {
+    pending.push({
+      kind: 'publish',
+      id: item.operationId,
+      title: item.target,
+      detail: item.kind,
+      since: item.requestedAt,
+      by: item.requestedBy,
+    })
+  }
+
+  // 3) 已处理的：门禁裁决结果（state.verdicts 已经是历史，不会被清）。
+  for (const verdict of state.verdicts.values()) {
+    const task = state.tasks.get(verdict.taskId)
+    decided.push({
+      kind: 'gate',
+      id: verdict.id,
+      title: task === undefined ? verdict.taskId : task.title,
+      outcome: verdict.outcome,
+      decidedAt: verdict.decidedAt,
+    })
+  }
+
+  // 新→旧：界面上先看到最近发生的。
+  pending.sort((left, right) => (left.since < right.since ? 1 : left.since > right.since ? -1 : 0))
+  decided.sort((left, right) => (left.decidedAt < right.decidedAt ? 1 : left.decidedAt > right.decidedAt ? -1 : 0))
+
+  return {
+    pending,
+    decided,
+    counts: { pending: pending.length, decided: decided.length },
+    unsupported: { planApproval: true, captainTakeover: true },
+  }
+}
+
 export function boardView(state: ProjectState): BoardView {
   const byStatus = new Map<TaskStatus, BoardTask[]>()
   for (const status of BOARD_ORDER) byStatus.set(status, [])

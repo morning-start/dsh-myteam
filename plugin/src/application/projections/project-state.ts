@@ -43,6 +43,27 @@ export interface DefinitionMeta {
   published: { operationId: string; globalHash: string; publishedAt: string } | null
 }
 
+/**
+ * 一条**待确认**的全局发布请求。
+ *
+ * 为什么要在投影里留这份状态：`definition.publication.requested` 之前是 no-op ——
+ * 请求落了事件，但投影不记，于是「谁在等人类确认发布」这件事**查不出来**，
+ * 界面上只能靠当场签的那个令牌（刷新就没了）。
+ *
+ * 这里只存「还等着」的那些：`outcome` 一到就删掉（不管成功还是失败），
+ * 历史由全局审计负责，不在项目投影里堆。
+ */
+export interface PendingPublication {
+  operationId: string
+  kind: 'role' | 'workflow' | 'blueprint'
+  /** 定义 id（不是文件名）。 */
+  id: string
+  /** 目标文件名，给人看。 */
+  target: string
+  requestedBy: string
+  requestedAt: string
+}
+
 export interface ProjectState {
   projectId: string
   name: string
@@ -76,6 +97,8 @@ export interface ProjectState {
   /** 项目级 DAG 版本：只随图结构（建任务、改依赖、实例化 Run）变化。 */
   graphRevision: number
   teamConfigs: Map<string, EffectiveConfigSnapshot>
+  /** 待人类确认的全局发布（按 operationId）。`outcome` 一到就删。 */
+  pendingPublications: Map<string, PendingPublication>
 }
 
 export function emptyProjectState(projectId: string): ProjectState {
@@ -104,6 +127,7 @@ export function emptyProjectState(projectId: string): ProjectState {
     configRevision: 0,
     graphRevision: 1,
     teamConfigs: new Map(),
+    pendingPublications: new Map(),
   }
 }
 
@@ -301,9 +325,29 @@ export function applyEvent(state: ProjectState, event: EventEnvelope): void {
       return
     }
 
-    case 'definition.publication.requested':
+    case 'definition.publication.requested': {
+      // 记下「谁在等人类确认发布」——之前这里是 no-op，导致这件事查不出来。
+      const payload = event.payload as {
+        operationId: string
+        target: string
+        requestedBy?: string
+      }
+      const entityKind = event.entity.kind
+      const kind: PendingPublication['kind'] =
+        entityKind === 'role-definition' ? 'role' : entityKind === 'workflow-definition' ? 'workflow' : 'blueprint'
+      state.pendingPublications.set(payload.operationId, {
+        operationId: payload.operationId,
+        kind,
+        id: event.entity.id,
+        target: payload.target,
+        requestedBy: payload.requestedBy ?? 'unknown',
+        requestedAt: event.occurredAt,
+      })
+      return
+    }
+
     case 'definition.publication.authorized':
-      // 待确认意图与授权只影响发布流程，不改变定义内容视图。
+      // 授权只是流程推进，请求仍在等 outcome —— 不清。
       return
 
     case 'definition.publication.outcome': {
@@ -312,6 +356,8 @@ export function applyEvent(state: ProjectState, event: EventEnvelope): void {
         globalHash: string | null
         operationId: string
       }
+      // 有了 outcome 就不算「待确认」了（成功失败都算已处理）。
+      state.pendingPublications.delete(payload.operationId)
       if (payload.outcome !== 'published' || payload.globalHash === null) return
       for (const [key, meta] of state.definitionMeta) {
         if (meta.published?.operationId === payload.operationId) {

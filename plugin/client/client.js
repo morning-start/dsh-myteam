@@ -3113,6 +3113,94 @@ window.__ModuleLoader__.load({
       )
     }
 
+    /**
+     * 待你确认（`p-approval`）—— 从概览横幅的「逐项确认」进来，是一整页而不是折叠区。
+     *
+     * 设计稿分三态（待确认 / 已处理 / 已拒绝）。这里只做两态，因为**数据只支持两态**：
+     *   - 待确认：任务停在 review（等人下门禁结论）+ 待确认的全局发布；
+     *   - 已处理：已下过的门禁裁决（含拒绝的，用 outcome 区分）。
+     * 「已拒绝」不单独一栏：门禁的拒绝结果和通过一样是裁决，放在已处理里按 outcome 标色更省事。
+     *
+     * **计划批准 / 队长接管 这两类画不出来**，原因见 `queries.ts` 的
+     * `pendingApprovalsView`：前者域里没有 draft 聚合，后者是当场两段式、不排队。
+     * 界面照实说明，不用假数据凑数。
+     */
+    function ApprovalScreen(props) {
+      const data = props.data ?? {}
+      const pending = Array.isArray(data.pending) ? data.pending : []
+      const decided = Array.isArray(data.decided) ? data.decided : []
+      const [lane, setLane] = useState('pending')
+      const unsupported = data.unsupported ?? {}
+
+      const kindLabel = (kind) => (kind === 'gate' ? '门禁裁决' : kind === 'publish' ? '全局发布' : String(kind))
+      const rows = lane === 'pending' ? pending : decided
+
+      const card = (item) =>
+        h(
+          'div',
+          { key: item.id, className: 'item' },
+          h(
+            'div',
+            { className: 'l' },
+            h('div', { className: 't' }, item.title),
+            h(
+              'div',
+              { className: 's' },
+              h('span', null, kindLabel(item.kind)),
+              item.detail === null || item.detail === undefined ? null : h('span', { className: 'mono' }, String(item.detail)),
+              item.by === null || item.by === undefined ? null : h('span', null, `提出：${String(item.by)}`),
+              lane === 'pending'
+                ? h('span', { className: 'mono' }, String(item.since ?? ''))
+                : h('span', { className: 'mono' }, `${String(item.outcome ?? '')} · ${String(item.decidedAt ?? '')}`),
+            ),
+          ),
+          h(
+            'div',
+            { className: 'r' },
+            item.kind === 'gate' && props.onOpenTask !== undefined
+              ? h('button', { type: 'button', className: 'btn', onClick: () => props.onOpenTask(item) }, '看任务')
+              : null,
+          ),
+        )
+
+      return h(
+        'div',
+        { className: 'body pad' },
+        h(
+          'div',
+          { style: { display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10 } },
+          h('button', { type: 'button', className: 'btn', onClick: () => props.onBack() }, '返回概览'),
+          h(SectionHeader, { title: '待你确认', note: `${String(pending.length)} 件在等` }),
+        ),
+        h('p', { className: 'muted', style: { margin: '0 0 10px', fontSize: 12 } },
+          '这些动作队长只能提案；执行必须来自人类入口并重新校验 —— confirm: true 不是授权。'),
+        h(
+          'div',
+          { className: 'acts', style: { marginBottom: 10 } },
+          h('button', {
+            type: 'button',
+            className: lane === 'pending' ? 'btn primary' : 'btn',
+            onClick: () => setLane('pending'),
+          }, `待确认 ${String(pending.length)}`),
+          h('button', {
+            type: 'button',
+            className: lane === 'decided' ? 'btn primary' : 'btn',
+            style: { marginLeft: 8 },
+            onClick: () => setLane('decided'),
+          }, `已处理 ${String(decided.length)}`),
+        ),
+        rows.length === 0
+          ? h('p', { className: 'muted', style: { margin: '6px 0 0', fontSize: 12 } },
+              lane === 'pending' ? '没有等你确认的事。门禁裁决与待确认的发布都会出现在这里。' : '还没有已处理的裁决。')
+          : h('div', { className: 'list' }, rows.map(card)),
+        unsupported.planApproval === true || unsupported.captainTakeover === true
+          ? h('p', { className: 'muted', style: { margin: '14px 0 0', fontSize: 12 } },
+              '这一页目前只覆盖门禁裁决与全局发布。「计划批准」还没有对应的领域模型（团队只有在岗/归档/解散）；'
+              + '「队长接管」是当场两段式确认、不排队，所以都不会出现在这里。')
+          : null,
+      )
+    }
+
     // 导航里的九栏现在都有端点；留这个兜底是为了将来加栏时的默认文案。
     const PROJECT_FALLBACK = { title: '未接入', reason: '这一栏还没有端点。' }
 
@@ -3141,6 +3229,8 @@ window.__ModuleLoader__.load({
       const audit = usePanelData(tab === 'audit' ? sessionId : undefined, 'audit', { limit: 200 })
       // 概览底部那 5 条「最近事件」：只在概览上拉，切走就停，不额外多打一枪。
       const overviewEvents = usePanelData(tab === 'overview' ? sessionId : undefined, 'audit', { limit: 5 })
+      // 待你确认整页：只在真的打开它时才拉，切走就停。
+      const approvals = usePanelData(approvalsOpen === true ? sessionId : undefined, 'pendingApprovals')
       const settings = usePanelData(tab === 'settings' ? sessionId : undefined, 'settings')
 
       const projectName = status.data?.name ?? overview.data?.name ?? '未命名'
@@ -3188,21 +3278,26 @@ window.__ModuleLoader__.load({
       let body
       if (taskId !== null) {
         body = h(TaskDetail, { taskId, sessionId, onBack: () => setTaskId(null) })
+      } else if (approvalsOpen === true) {
+        // 设计稿 p-approval 是一整页（从概览横幅的「逐项确认」进来），不是折叠区。
+        body = h(Data, { data: approvals, what: '待你确认' }, (data) =>
+          h(ApprovalScreen, {
+            data,
+            onBack: () => setApprovalsOpen(false),
+            onOpenTask: (item) => {
+              setApprovalsOpen(false)
+              setTaskId(item.id)
+            },
+          }))
       } else if (tab === 'overview') {
         body = h(Data, { data: overview, what: '项目概览' }, (data) =>
-          [
           h(OverviewScreen, {
             data,
             events: overviewEvents.data?.items,
             board: board.data,
             onSelect: go,
-            // 横幅上的「逐项确认」把底部明细展开（默认折叠：同一件事不要在首屏说两遍）。
             onExpandApprovals: () => setApprovalsOpen(true),
-          }),
-          approvalsOpen === true
-            ? h(ApprovalSection, { overview: overview.data, board: board.data, onOpenTask: (task) => { setTaskId(task.id) } })
-            : null,
-        ])
+          }))
       } else if (tab === 'tasks') {
         body = h(Data, { data: board, what: '任务看板' }, (data) =>
           h(TasksScreen, {

@@ -364,6 +364,7 @@ const EMPTY: Record<string, unknown> = {
   memory: { file: 'memory/myteam.db', exists: true, banks: [], entries: [], warnings: [] },
   audit: { items: [], nextBeforeSeq: null },
   settings: { configRevision: 1, defaults: {}, teams: [] },
+  pendingApprovals: { pending: [], decided: [], counts: { pending: 0, decided: 0 }, unsupported: { planApproval: true, captainTakeover: true } },
   globalLibrary: { root: '/tmp/.dsh/myteam', exists: true, counts: { role: 0, workflow: 0, blueprint: 0, team: 0 }, entries: [], warnings: [] },
   globalAudit: { root: '/tmp/.dsh/myteam', exists: true, items: [], truncated: false, warnings: [] },
 }
@@ -983,24 +984,15 @@ test('L2-F 流程泳道：按 Run 分行，空 Run 说清「没挂任务」', as
   }
 })
 
-test('L2-F 待你确认：默认折叠（同一件事不在首屏说两遍），点「逐项确认」才展开明细', async () => {
-  // 设计稿 p-overview 的顺序是：指标卡 → 一条横幅（几件 + 哪几件 + 「逐项确认」）
-  // → 团队 → 跨团队依赖 → 最近事件。**底部没有第二块列表**。
-  // 实现里横幅与底部明细说的是同一件事，所以明细默认折叠，由横幅的按钮展开。
+test('L2-F 待你确认：概览只留一条横幅；点「逐项确认」进独立一整页（不是折叠区）', async () => {
+  // 设计稿 p-approval 是一整页（从概览横幅的「逐项确认」进来），分待确认 / 已处理。
+  // 概览首屏只保留横幅，不再有第二块同内容的列表。
   const empty = loadClient(EMPTY)
   try {
     let tree = await mount(empty.view, { sessionId: 'ses_1' })
     let text = textOf(tree)
     assert.ok(!text.includes('待你确认'), '0 件时不该有横幅（waiting === 0 不渲染）')
-
-    // 点开明细 → 空态
-    const expand = findButton(tree, '逐项确认')
-    if (expand !== null) {
-      ;(expand.props.onClick as () => void)()
-      tree = await mount(empty.view, { sessionId: 'ses_1' })
-      text = textOf(tree)
-      assert.ok(text.includes('没有等你确认的事'), '0 件时展开要有空态')
-    }
+    assert.ok(findButton(tree, '逐项确认') === null, '0 件时也不该有「逐项确认」')
   } finally {
     empty.restore()
   }
@@ -1010,21 +1002,35 @@ test('L2-F 待你确认：默认折叠（同一件事不在首屏说两遍），
     let tree = await mount(filled.view, { sessionId: 'ses_1' })
     let text = textOf(tree)
 
-    // 横幅在，且说清有几件、哪几件
+    // 首屏：只有横幅（件数 + 哪几类），没有第二块列表
     assert.ok(text.includes('1 件事等你处理'), `横幅要给出件数：${text.slice(0, 260)}`)
     assert.ok(text.includes('1 个任务待裁决'), '横幅要写清是哪一类，不只给数字')
-    // 首屏不该同时出现第二块「待你确认」列表
     assert.ok(!text.includes('待你确认'), '首屏不该有第二块待确认列表（与横幅重复）')
-    assert.ok(!text.includes('评审中的任务'), '明细默认折叠时不该列出任务卡')
+    assert.ok(!text.includes('评审中的任务'), '明细不该在首屏就列出来')
 
-    // 点「逐项确认」→ 明细展开，列出 review 任务
+    // 点「逐项确认」→ 进独立一整页
     const expand = findButton(tree, '逐项确认')
     assert.ok(expand !== null, '横幅应有「逐项确认」')
     ;(expand!.props.onClick as () => void)()
     tree = await mount(filled.view, { sessionId: 'ses_1' })
     text = textOf(tree)
-    assert.ok(text.includes('待你确认'), '展开后应出现明细分节')
-    assert.ok(text.includes('评审中的任务'), '展开后要列出 review 任务')
+
+    assert.ok(text.includes('待你确认'), '独立页要有标题')
+    assert.ok(text.includes('返回概览'), '独立页要能返回概览')
+    assert.ok(/待确认 \d+/.test(text), `要有「待确认 N」切换：${text.slice(0, 300)}`)
+    assert.ok(/已处理 \d+/.test(text), '要有「已处理 N」切换')
+    assert.ok(text.includes('confirm: true 不是授权'), '要写清这些动作只能由人类执行')
+    // 数据只支持两类，界面要如实说明另外两类画不出来
+    assert.ok(text.includes('计划批准') && text.includes('队长接管'), '要如实说明计划批准与队长接管不在这页')
+
+    // 切到「已处理」
+    const decidedTab = [...(tree.children as unknown as never[])].length >= 0
+      ? findButton(tree, text.match(/已处理 \d+/)?.[0] ?? '已处理 0')
+      : null
+    assert.ok(decidedTab !== null, '应能点到「已处理」切换')
+    ;(decidedTab!.props.onClick as () => void)()
+    tree = await mount(filled.view, { sessionId: 'ses_1' })
+    assert.ok(textOf(tree).includes('待你确认'), '切到已处理后仍在同一页')
   } finally {
     filled.restore()
   }

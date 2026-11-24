@@ -11,7 +11,7 @@ import type { ErrorShape } from '../contracts/errors.ts'
 import { ERROR_CODES, fail, toErrorShape } from '../contracts/errors.ts'
 import type { ProjectRuntime } from './project-runtime.ts'
 import type { ProjectState } from './projections/project-state.ts'
-import { boardView, taskDetail, teamView } from './queries.ts'
+import { boardView, pendingApprovalsView, taskDetail, teamView } from './queries.ts'
 import { validateRequest } from './panel-contract.ts'
 import type { PanelMethod, PanelResponse } from './panel-contract.ts'
 
@@ -269,6 +269,9 @@ export class PanelService {
         const teamId = requireParam(params, 'teamId')
         return jsonSafe(teamView(state, teamId))
       }
+
+      case 'pendingApprovals':
+        return jsonSafe(pendingApprovalsView(state))
 
       case 'definitions':
         return jsonSafe({ items: definitionSummaries(state) })
