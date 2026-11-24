@@ -15,7 +15,7 @@ import { fileURLToPath } from 'node:url'
 import { PanelService } from '../application/panel-service.ts'
 import { migrationSummaryFor } from '../infrastructure/migration/v1/panel-summary.ts'
 import { globalLibraryRoot, readGlobalAudit, readGlobalLibrary } from '../infrastructure/global-library/library.ts'
-import { createGlobalPublisher } from '../infrastructure/global-library/write.ts'
+import { createGlobalEditor, createGlobalPublisher } from '../infrastructure/global-library/write.ts'
 import { memoryDbPath, readMemoryStore } from '../infrastructure/memory-store/read.ts'
 import { SqliteMemoryStore } from '../infrastructure/memory-store/sqlite-memory.ts'
 import { PANEL_METHODS, isGlobalPanelMethod } from '../application/panel-contract.ts'
@@ -120,7 +120,23 @@ export function createPanelFacade(ctx: PanelHostContext): PanelFacade {
 
   const writeAuthorizer = createPanelWriteAuthorizer()
   // 全局发布的写入器：文件系统细节留在 infrastructure，用例只认端口。
-  const globalPublisher = createGlobalPublisher(globalLibraryRoot())
+  const globalRoot = globalLibraryRoot()
+  const globalPublisher = createGlobalPublisher(globalRoot)
+  // 全局直改：与发布共用同一段原子写与审计；引用校验读的是**全局目录**，不是项目投影。
+  const globalEditor = createGlobalEditor(globalRoot)
+  const globalEntries = {
+    list: (kind: string) =>
+      readGlobalLibrary(globalRoot)
+        .entries.filter((entry) => entry.kind === kind)
+        .map((entry) => ({ kind: entry.kind as never, id: entry.id, revision: entry.revision ?? 0 })),
+  }
+  /** 面板写的外部端口：direct 要记忆库，token 要发布器/直改器。两处共用同一份。 */
+  const writeDeps = {
+    rootDir: undefined as string | undefined,
+    publisher: globalPublisher,
+    globalEditor,
+    globalEntries,
+  }
 
   /**
    * 写通道：按 `panelWriteKind` 分两种确认方式——
@@ -149,7 +165,11 @@ export function createPanelFacade(ctx: PanelHostContext): PanelFacade {
           runtime,
           name,
           { params, confirm: record.confirm === true },
-          { rootDir, openMemory: (dir) => new SqliteMemoryStore(join(dir, memoryDbPath(dir))) },
+          {
+            ...writeDeps,
+            rootDir,
+            openMemory: (dir: string) => new SqliteMemoryStore(join(dir, memoryDbPath(dir))),
+          },
         )
         return { ok: true, data: JSON.parse(JSON.stringify(applied)) }
       }
@@ -162,10 +182,10 @@ export function createPanelFacade(ctx: PanelHostContext): PanelFacade {
           params,
           reason,
           confirmation: record.confirmation as never,
-        }, { publisher: globalPublisher })
+        }, writeDeps)
         return { ok: true, data: JSON.parse(JSON.stringify(applied)) }
       }
-      const preview = previewPanelWrite(runtime, writeAuthorizer, name, params, { publisher: globalPublisher })
+      const preview = previewPanelWrite(runtime, writeAuthorizer, name, params, writeDeps)
       return { ok: true, data: JSON.parse(JSON.stringify(preview)) }
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error)

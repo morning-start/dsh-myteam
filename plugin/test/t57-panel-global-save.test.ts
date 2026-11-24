@@ -27,6 +27,9 @@ import {
 import type { PanelWriteDeps } from '../src/application/panel-writes.ts'
 import { createGlobalEditor, globalEntryFile } from '../src/infrastructure/global-library/write.ts'
 import { MyTeamError } from '../src/contracts/errors.ts'
+import { readFileSync } from 'node:fs'
+import { join as joinPath, dirname as dirnamePath } from 'node:path'
+import { fileURLToPath } from 'node:url'
 import { newId } from '../src/contracts/ids.ts'
 import type { ActorRef } from '../src/contracts/events.ts'
 import { EVENTS_FILE, WRITER_LOCK_FILE } from '../src/contracts/versions.ts'
@@ -127,4 +130,17 @@ test('伪造令牌（目标 hash 不匹配）被拒，且不写文件', () => {
     )
     assert.equal(existsSync(join(globalRoot, globalEntryFile('role', 'role_1'))), false, '伪造令牌不能写文件')
   })
+})
+
+test('装配层守卫：composition/panel.ts 必须把 globalEditor 与 globalEntries 传进写通道', () => {
+  const here = dirnamePath(fileURLToPath(import.meta.url))
+  const root = joinPath(here, '..', 'src', 'composition', 'panel.ts')
+  const source = readFileSync(root, 'utf8')
+  // t55/t56/t57 都是直接注入 deps，抓不到「端口写了、装配层没接」这种漏法。
+  assert.ok(source.includes('createGlobalEditor('), '装配层必须建 globalEditor')
+  const activeLines = source.split('\n').map((line) => line.trim()).filter((line) => !line.startsWith('//'))
+  assert.ok(activeLines.some((line) => line === 'globalEditor,'), 'writeDeps 必须带上 globalEditor（且不能被注释掉）')
+  assert.ok(activeLines.some((line) => line === 'globalEntries,'), 'writeDeps 必须带上 globalEntries（直改的引用校验要读全局目录）')
+  assert.ok(/previewPanelWrite([^)]*writeDeps)/s.test(source) || source.includes('params, writeDeps)'), '预览必须传 writeDeps')
+  assert.ok(source.includes('writeDeps)'), '确认必须传 writeDeps')
 })
