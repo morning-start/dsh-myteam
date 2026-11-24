@@ -11,6 +11,7 @@ import type {
   ConfigOverrides,
   DefinitionRef,
   FormationSlot,
+  Member,
   RoleDefinition,
   Task,
   TaskTemplate,
@@ -23,7 +24,7 @@ import { hashContent } from '../contracts/json.ts'
 import type { ActorRef } from '../contracts/events.ts'
 import { computeEffectiveConfig, DEFAULT_TEAM_CONFIG } from '../domain/config/merge.ts'
 import { normalizeRole, roleContentHash, validateRole } from '../domain/definitions/role.ts'
-import { normalizeWorkflow, validateWorkflow, workflowContentHash } from '../domain/definitions/workflow.ts'
+import { normalizeWorkflow, planInstantiation, validateWorkflow, workflowContentHash } from '../domain/definitions/workflow.ts'
 import {
   assertBlueprintResolvable,
   blueprintContentHash,
@@ -35,6 +36,7 @@ import { cycleIfEdgesChanged, graphOf } from '../domain/tasks/dag.ts'
 import { assertCurrentAttempt, createPlannedTask, isClaimable } from '../domain/tasks/task.ts'
 import { appointMember, assertMemberActive, assertMemberLimits, assertMemberStatusChange, memberDepth } from '../domain/teams/member.ts'
 import { assertGraphRevision, assertTeamActive, assertTeamStatusChange, createTeam } from '../domain/teams/team.ts'
+import { createWorkflowRun } from '../domain/workflows/run.ts'
 import type { CommitResult, DraftEvent, ProjectRuntime } from './project-runtime.ts'
 
 export function initializeProject(
@@ -376,6 +378,217 @@ export function createTeamCommand(
   ]
 
   return runtime.commit(drafts)
+}
+
+export interface ApproveTeamPlanResult {
+  commit: CommitResult
+  teamId: string
+  memberIds: string[]
+  runId: string | null
+  taskIds: string[]
+}
+
+/**
+ * 批准开队计划（`team.plan.approved`）—— **一个原子批次建出整个团队**。
+ *
+ * 这是「批准前不产生会话与花费」的另一半：批准之前什么都没建，批准这一次全建。
+ * 顺序固定，且**全部在同一个 `runtime.commit` 里**：
+ *
+ *   1. `team.plan.approved`（先消费计划：后面任何一步失败，整批回滚，
+ *      不会出现「计划没了但团队没建」）
+ *   2. `config.override.changed`（团队配置快照）
+ *   3. `team.created`（`status: 'active'`，带队长与队形）
+ *   4. N × `member.appointed`（按 formation 展开）
+ *   5. 若计划带工作流：`run.created` + 首批 `task.created`
+ *
+ * **为什么不用现成的 `appointMemberCommand` / `startWorkflowRunCommand`**：
+ * 它们各自 `commit`，而且会读 `state.teamConfigs` / `state.teams` ——
+ * 在一个批次里那些状态还没生效（`state` 只在 commit 之后更新）。
+ * 所以这里用同一批**领域函数**（`createTeam` / `appointMember` / `planInstantiation` /
+ * `createWorkflowRun`）自己组批次，保证「一次批准 = 一次原子变化」。
+ *
+ * **会话**：成员以 `appointed`（`sessionId: null`）建出来 —— 真正的会话由队长后续
+ * spawn 时绑定（`member.session.bound`）。这一层没有「创建宿主会话」的端口，
+ * 也不该有：会话是执行载体，不是账本实体。
+ *
+ * @param input.planHash - 调用方看到的计划内容 hash；与计划当前 hash 不符就拒
+ *   （防止「看的是旧计划、批的是新计划」）。
+ */
+export function approveTeamPlanCommand(
+  runtime: ProjectRuntime,
+  input: { actor: ActorRef; planId: string; planHash: string; startRun?: boolean },
+): ApproveTeamPlanResult {
+  authorize('plan.approve', input.actor)
+  const state = runtime.state
+
+  const plan = state.teamPlans.get(input.planId)
+  if (plan === undefined) {
+    fail(ERROR_CODES.NOT_FOUND, '没有这份待批准的计划（可能已经批准或丢弃）', { details: { planId: input.planId } })
+  }
+  if (plan.planHash !== input.planHash) {
+    fail(ERROR_CODES.CONFIRMATION_TARGET_CHANGED, '计划内容与预览时不一致，请重新预览再批准', {
+      details: { planId: plan.id, expectedHash: input.planHash, actualHash: plan.planHash },
+    })
+  }
+
+  const now = runtime.now()
+  const teamId = runtime.nextId('team')
+  const configRevision = state.configRevision + 1
+
+  // 蓝图默认值：批准时按计划里记的 blueprint revision 取（计划绑的是那一版）。
+  const blueprintDefaults =
+    plan.blueprint === null ? null : (state.blueprints.get(plan.blueprint.id)?.defaults ?? null)
+  const snapshot = computeEffectiveConfig({
+    projectDefaults: state.configDefaults as ConfigOverrides,
+    blueprintDefaults,
+    teamOverrides: plan.overrides,
+    configRevision,
+    sources: {
+      projectDefaultsRevision: state.configRevision,
+      blueprintRevision: plan.blueprint?.revision ?? null,
+      teamOverridesRevision: 1,
+    },
+  })
+
+  const team = createTeam({
+    id: teamId,
+    name: plan.name,
+    goal: plan.goal,
+    blueprint: plan.blueprint,
+    configRevision: snapshot.configRevision,
+    now,
+  })
+
+  // ── 成员：按 formation 展开。全部是深度 1（子成员由队长后续派生，不在批准这一步建）。──
+  const plannedCount = plan.formation.reduce((sum, slot) => sum + slot.count, 0)
+  assertMemberLimits({
+    existingMembers: 0,
+    depth: 1,
+    parentChildren: 0,
+    config: snapshot.values.limits,
+  })
+  if (plannedCount > snapshot.values.limits.maxMembers) {
+    fail(ERROR_CODES.PRECONDITION_FAILED, `计划要建 ${String(plannedCount)} 名成员，超过团队上限 ${String(snapshot.values.limits.maxMembers)}`, {
+      details: { plannedCount, maxMembers: snapshot.values.limits.maxMembers },
+    })
+  }
+
+  const members: { member: Member; roleRevision: number }[] = []
+  for (const slot of plan.formation) {
+    const role = state.roles.get(slot.roleId)
+    if (role === undefined) {
+      // 提案时校验过，但角色可能在提案之后被删（定义可以归档）。宁可拒绝也不建残缺团队。
+      fail(ERROR_CODES.NOT_FOUND, `队形里的角色已经不存在：${slot.roleId}`, { details: { roleId: slot.roleId } })
+    }
+    for (let index = 0; index < slot.count; index += 1) {
+      const { member } = appointMember({
+        id: runtime.nextId('member'),
+        teamId,
+        role,
+        parent: null,
+        sessionId: null,
+        now,
+      })
+      members.push({ member, roleRevision: role.revision })
+    }
+  }
+
+  // ── Run（可选）：和团队在同一个批次里实例化，避免「有团队没 Run」的中间态。──
+  const shouldStartRun = input.startRun !== false && plan.workflow !== null
+  let runId: string | null = null
+  let taskIds: string[] = []
+  let runDrafts: DraftEvent[] = []
+  let graphRevision = state.graphRevision
+  if (shouldStartRun) {
+    const definition = state.workflows.get(plan.workflow!.id)
+    if (definition === undefined) {
+      fail(ERROR_CODES.NOT_FOUND, '计划里的默认工作流已经不存在', { details: { workflowId: plan.workflow!.id } })
+    }
+    runId = runtime.nextId('run')
+    const instantiated = planInstantiation({
+      definition,
+      runId,
+      ownerTeamId: teamId,
+      now,
+      nextTaskId: () => runtime.nextId('task'),
+    })
+    // 根任务直接 ready，否则每次批准完还要人工放开一次。
+    for (const task of instantiated.tasks) {
+      if (task.dependencies.length === 0) task.status = 'ready'
+    }
+    const run = createWorkflowRun({
+      id: runId,
+      workflowId: definition.id,
+      workflowRevision: definition.revision,
+      teamId,
+      taskIds: instantiated.tasks.map((task) => task.id),
+      templateKeyToTaskId: instantiated.templateKeyToTaskId,
+      now,
+    })
+    graphRevision = state.graphRevision + 1
+    taskIds = instantiated.tasks.map((task) => task.id)
+    runDrafts = [
+      {
+        type: 'run.created',
+        actor: input.actor,
+        entity: { kind: 'workflow-run', id: runId, teamId },
+        entityRevision: 1,
+        configRevision: snapshot.configRevision,
+        payload: { run, completion: instantiated.completion, graphRevision },
+      },
+      ...instantiated.tasks.map(
+        (task): DraftEvent => ({
+          type: 'task.created',
+          actor: input.actor,
+          entity: { kind: 'task', id: task.id, teamId },
+          entityRevision: 1,
+          configRevision: snapshot.configRevision,
+          payload: { task, graphRevision },
+        }),
+      ),
+    ]
+  }
+
+  const drafts: DraftEvent[] = [
+    {
+      type: 'team.plan.approved',
+      actor: input.actor,
+      entity: { kind: 'team-plan', id: plan.id },
+      payload: { planId: plan.id, teamId, planHash: plan.planHash, runId },
+    },
+    {
+      type: 'config.override.changed',
+      actor: input.actor,
+      entity: { kind: 'config', id: teamId, teamId },
+      payload: { teamId, configRevision, overrides: plan.overrides, snapshot },
+    },
+    {
+      type: 'team.created',
+      actor: input.actor,
+      entity: { kind: 'team', id: teamId },
+      entityRevision: 1,
+      configRevision: snapshot.configRevision,
+      payload: {
+        team,
+        captain: { sessionId: plan.captainSessionId, generation: 1 },
+        formation: plan.formation,
+      },
+    },
+    ...members.map(
+      (entry): DraftEvent => ({
+        type: 'member.appointed',
+        actor: input.actor,
+        entity: { kind: 'member', id: entry.member.id, teamId },
+        entityRevision: 1,
+        configRevision: snapshot.configRevision,
+        payload: { member: entry.member, roleRevision: entry.roleRevision, parentMemberId: null },
+      }),
+    ),
+    ...runDrafts,
+  ]
+
+  const commit = runtime.commit(drafts)
+  return { commit, teamId, memberIds: members.map((entry) => entry.member.id), runId, taskIds }
 }
 
 /**
