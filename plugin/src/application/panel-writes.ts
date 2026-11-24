@@ -19,7 +19,7 @@ import type { EvidenceRef, GateCheckResult, GateVerdict, Task, VerdictOutcome } 
 import { ERROR_CODES, fail } from '../contracts/errors.ts'
 import type { GlobalLibraryEditPort, GlobalPublicationPort, PublicationKind } from '../contracts/publication.ts'
 import type { GlobalEntryReader } from './global-edit.ts'
-import { editGlobalDefinition } from './global-edit.ts'
+import { editGlobalDefinition, unpublishGlobalDefinition } from './global-edit.ts'
 import { HumanAuthorizer } from '../domain/permissions/human-authorizer.ts'
 import type { HumanConfirmation } from '../domain/permissions/human-authorizer.ts'
 import {
@@ -56,6 +56,7 @@ export const PANEL_WRITE_METHODS = [
   'memberRestore',
   'definitionPublish',
   'globalDefinitionSave',
+  'globalUnpublish',
   'definitionSave',
   'memoryRemember',
   'memoryForget',
@@ -87,6 +88,7 @@ export const PANEL_WRITE_KINDS: Readonly<Record<PanelWriteMethod, PanelWriteKind
   memberRestore: 'direct',
   definitionPublish: 'token',
   globalDefinitionSave: 'token',
+  globalUnpublish: 'token',
   definitionSave: 'direct',
   memoryRemember: 'direct',
   memoryForget: 'direct',
@@ -117,6 +119,7 @@ export const PANEL_WRITE_DOCS: Readonly<Record<PanelWriteMethod, string>> = {
   definitionSave: '保存项目定义（角色 / 工作流）：revision 递增并记 previousHash，需 `confirm: true`。',
   definitionPublish: '发布定义到全局库：预览引用与覆盖影响面，凭一次性令牌执行。动作 `definition.publish.confirm`（人类专属）。',
   globalDefinitionSave: '直改全局库里的定义（不经项目）：预览引用与被引用、冲突检测（expectedHash），凭一次性令牌执行。动作 `definition.global.write`（人类专属）。',
+  globalUnpublish: '下架全局库里的定义：只从目录里隐藏，文件保留、引用方仍能读；冲突检测后凭一次性令牌执行。动作 `definition.global.write`（人类专属）。',
   memoryRemember: '写一条长期记忆到团队 bank 或某个成员 bank，需 `confirm: true`。',
   memoryForget: '遗忘一条记忆（默认软删留痕，`hard` 才真删），需 `confirm: true`。',
 }
@@ -337,6 +340,36 @@ function stableHash(value: unknown): string {
   return 'impact:' + (hash >>> 0).toString(16)
 }
 
+/** 下架的预览：说清「会被从目录里隐藏」与「文件与引用不受影响」。 */
+function previewGlobalUnpublish(
+  deps: PanelWriteDeps,
+  input: { kind: PublicationKind; id: string },
+): { operationId: string; targetHash: string; impactHash: string; summary: string; impact: unknown } {
+  const editor = requireGlobalEditor(deps)
+  const actual = editor.readFileHash(input.kind, input.id)
+  if (actual === null) {
+    fail(ERROR_CODES.NOT_FOUND, '全局库里没有这份定义', { details: { kind: input.kind, id: input.id } })
+  }
+  const impact = {
+    target: input.kind + '/' + input.id,
+    hidesFromCatalog: true,
+    deletesFile: false,
+    reversible: true,
+    irreversible: [
+      '目录里不再出现这份定义（新建团队/复制时选不到）',
+      '文件与审计都保留；已经引用它的工作流、蓝图、团队照常能读到这一版',
+    ],
+  }
+  const operationId = 'global-unpub-' + Date.now().toString(36) + '-' + Math.random().toString(36).slice(2, 8)
+  return {
+    operationId,
+    targetHash: actual,
+    impactHash: stableHash(impact),
+    summary: '下架全局' + input.kind + '「' + input.id + '」：只从目录隐藏，引用方不受影响',
+    impact,
+  }
+}
+
 function requirePublisher(deps: PanelWriteDeps): GlobalPublicationPort {
   if (deps.publisher === undefined) {
     fail(ERROR_CODES.INTERNAL, '全局发布器未装配')
@@ -377,11 +410,55 @@ export function previewPanelWrite(
   deps: PanelWriteDeps = {},
 ): PanelWritePreview {
   switch (method) {
+    case 'globalUnpublish': {
+      const kind = requirePublicationKind(input.params)
+      const id = requireString(input.params, 'id')
+      const expectedHash = typeof input.params.expectedHash === 'string' ? input.params.expectedHash : ''
+      if (expectedHash.length === 0) fail(ERROR_CODES.INVALID_PAYLOAD, '下架必须带 expectedHash')
+      const current = requireGlobalEditor(deps).readFileHash(kind, id)
+      if (current === null) fail(ERROR_CODES.NOT_FOUND, '全局库里没有这份定义', { details: { kind, id } })
+      authorizer.verify(input.confirmation, {
+        operationId: input.confirmation.operationId,
+        action: 'definition.global.write',
+        targetHash: current,
+        impactHash: input.confirmation.impactHash,
+      })
+      authorizer.consume(input.confirmation)
+      const result = unpublishGlobalDefinition(
+        { editor: requireGlobalEditor(deps) },
+        {
+          actor: PANEL_HUMAN,
+          kind,
+          id,
+          expectedHash,
+          operationId: input.confirmation.operationId,
+          unpublishedAt: runtime.now(),
+          editor: 'panel:owner',
+        },
+      )
+      return { method, operationId: result.id, committed: result }
+    }
     case 'globalDefinitionSave': {
       const preview = previewGlobalEdit(deps, {
         kind: requirePublicationKind(params),
         id: requireString(params, 'id'),
         definition: params.definition,
+      })
+      const confirmation = authorizer.issue(
+        {
+          operationId: preview.operationId,
+          action: 'definition.global.write',
+          targetHash: preview.targetHash,
+          impactHash: preview.impactHash,
+        },
+        PANEL_HUMAN,
+      )
+      return { method, operationId: preview.operationId, summary: preview.summary, impact: preview.impact, confirmation }
+    }
+    case 'globalUnpublish': {
+      const preview = previewGlobalUnpublish(deps, {
+        kind: requirePublicationKind(params),
+        id: requireString(params, 'id'),
       })
       const confirmation = authorizer.issue(
         {
@@ -642,6 +719,7 @@ export function applyDirectPanelWrite(
     case 'teamDisband':
     case 'captainTakeover':
     case 'globalDefinitionSave':
+    case 'globalUnpublish':
     case 'definitionPublish':
       fail(ERROR_CODES.INVALID_COMMAND, `${method} 走确认令牌通道（先预览再确认），不能直接执行`)
     case 'memoryRemember': {

@@ -188,3 +188,47 @@ export function editGlobalDefinition(
 function pick(written: GlobalEditResult): { file: string; globalHash: string; previousHash: string | null } {
   return { file: written.file, globalHash: written.globalHash, previousHash: written.previousHash }
 }
+
+export interface UnpublishGlobalInput {
+  actor: ActorRef
+  kind: PublicationKind
+  id: string
+  /** 调用方看到的当前文件 hash。 */
+  expectedHash: string
+  operationId: string
+  unpublishedAt: string
+  editor: string
+}
+
+/**
+ * 下架一个全局定义（`definition.unpublish`）—— 只影响目录可见性，不删文件。
+ *
+ * 为什么不做「真删除」：事件与文件都保留才能让引用方继续读到这一版；真删会让
+ * 已经引用它的工作流/蓝图/团队断引用，那不是「下架」，是破坏。
+ */
+export function unpublishGlobalDefinition(
+  deps: { editor: GlobalLibraryEditPort },
+  input: UnpublishGlobalInput,
+): { outcome: 'unpublished'; kind: PublicationKind; id: string; file: string } {
+  const actual = deps.editor.readFileHash(input.kind, input.id)
+  if (actual === null) {
+    fail(ERROR_CODES.NOT_FOUND, '全局库里没有这份定义', { details: { kind: input.kind, id: input.id } })
+  }
+  if (actual !== input.expectedHash) {
+    const shorten = (hash: string | null) => (hash === null ? '不存在' : hash.slice(0, 16) + '…')
+    fail(
+      ERROR_CODES.CONFLICT,
+      `全局库里的 ${input.kind}/${input.id}.json 已经被别人改过了（期望 ${shorten(input.expectedHash)}，实际 ${shorten(actual)}）；重新载入后再下架`,
+      { details: { kind: input.kind, id: input.id, expectedHash: input.expectedHash, actualHash: actual } },
+    )
+  }
+  const result = deps.editor.unpublish({
+    kind: input.kind,
+    id: input.id,
+    operationId: input.operationId,
+    expectedHash: input.expectedHash,
+    unpublishedAt: input.unpublishedAt,
+    editor: input.editor,
+  })
+  return { outcome: 'unpublished', kind: input.kind, id: input.id, file: result.file }
+}

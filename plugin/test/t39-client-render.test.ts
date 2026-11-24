@@ -2021,6 +2021,56 @@ test('团队栏：归档撞上进行中尝试 → 出现「先暂停 / 等结束
   }
 })
 
+
+test('全局库详情：能「下架」—— 两段确认，走 globalUnpublish 且不带 sessionId', async () => {
+  const harness = loadClient(FILLED)
+  try {
+    let tree = await mount(harness.panel, { ctx: { layout: { selectPanel: () => undefined } } })
+    ;(findTab(tree, '角色')!.props.onClick as () => void)()
+    tree = await mount(harness.panel, { ctx: { layout: { selectPanel: () => undefined } } })
+    ;(findClickable(tree, '实现者')!.props.onClick as () => void)()
+    tree = await mount(harness.panel, { ctx: { layout: { selectPanel: () => undefined } } })
+
+    const unpublish = findButton(tree, '下架这份定义')
+    assert.ok(unpublish !== null, '详情页应有「下架这份定义」')
+    ;(unpublish!.props.onClick as () => void)()
+    tree = await mount(harness.panel, { ctx: { layout: { selectPanel: () => undefined } } })
+
+    assert.deepEqual(harness.writes, ['globalUnpublish'], '下架走 globalUnpublish')
+    const body = harness.writeBody
+    assert.equal(body === null ? undefined : body.sessionId, undefined, '全局写不带会话')
+    const params = (body === null ? {} : body.params) as Record<string, unknown>
+    assert.equal(params.kind, 'role')
+    assert.equal(params.id, 'r1')
+    assert.ok(Object.prototype.hasOwnProperty.call(params, 'expectedHash'))
+  } finally {
+    harness.restore()
+  }
+})
+
+test('名册主列表：已归档成员仍在列表里（不是只藏在归档区），且行尾是「恢复」不是「归档」', async () => {
+  const team = { ...(FILLED.team as Record<string, unknown>) }
+  team.members = [
+    { id: 'member_active', roleId: 'role_1', status: 'active', parentMemberId: null },
+    { id: 'member_archived', roleId: 'role_1', status: 'archived', parentMemberId: null },
+  ]
+  const harness = loadClient({ ...FILLED, team })
+  try {
+    let tree = await mount(harness.view, { sessionId: 'ses_1' })
+    ;(findTab(tree, '团队')!.props.onClick as () => void)()
+    tree = await mount(harness.view, { sessionId: 'ses_1' })
+    ;(findButton(tree, '甲队')!.props.onClick as () => void)()
+    tree = await mount(harness.view, { sessionId: 'ses_1' })
+
+    const text = textOf(tree)
+    assert.ok(text.includes('member_archived'), '已归档成员必须出现在名册里（设计稿：名册保留这条记录）')
+    // 归档成员那一行不该再有「归档」按钮 → 应该有「恢复」
+    assert.ok(findButton(tree, '恢复') !== null, '已归档成员行应有「恢复」')
+  } finally {
+    harness.restore()
+  }
+})
+
 test('样式来源守卫：渲染出来的每个类名都定义在仓库 design-v2 里（不是打包副本）', async () => {
   // 这条是踩过坑才加的：包内 plugin/design-v2 是 build 从仓库 design-v2 **拷出来**的生成物，
   // 每次 build 都会 rmSync 重建。把新样式写进包内副本，下一次 build 就静默丢了 ——

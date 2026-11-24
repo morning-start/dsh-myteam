@@ -290,8 +290,22 @@ window.__ModuleLoader__.load({
       )
     }
 
+    /**
+     * 加载中（L5 三态之一，设计稿 p-states「首屏只给一行字」）。
+     *
+     * 设计稿要求：**已经读到过的数据不清空**，切栏回来先显示旧值再刷新。
+     * 所以这里只画一行字，不画 spinner、不占位骨架 —— 骨架在「切回来」时会造成闪白。
+     * `stale` 为真时额外说明「显示的是上一份」，避免用户以为数据是新的。
+     */
     function Loading(props) {
-      return h('div', { className: 'body pad' }, h('p', { className: 'muted', style: { fontSize: 12 } }, props.what ?? '加载中…'))
+      return h(
+        'div',
+        { className: 'body pad' },
+        h('p', { className: 'muted', style: { fontSize: 12, margin: 0 } }, props.what ?? '加载中…'),
+        props.stale === true
+          ? h('p', { className: 'muted', style: { fontSize: 12, margin: '6px 0 0' } }, '下面显示的是上一次读到的内容，正在刷新。')
+          : null,
+      )
     }
 
     /**
@@ -403,8 +417,21 @@ window.__ModuleLoader__.load({
           reason: '这个面板是全局的，宿主不给它绑定会话；在队长会话里打开「团队视图」标签才能读视图数据。',
         })
       }
-      if (data.status === 'loading') return h(Loading, { what })
-      if (data.status === 'error') return h(Failure, { reason: data.reason, onRetry: onRetry ?? data.reload })
+      if (data.status === 'loading') {
+        // 设计稿 p-states：已读到过的数据不清空，切栏回来先显示旧值再刷新。
+        // 有上一份就继续渲染它（带一行「正在刷新」），没有才显示加载中。
+        if (data.data !== undefined && data.data !== null) {
+          return h('div', null, h(Loading, { what, stale: true }), children(data.data))
+        }
+        return h(Loading, { what })
+      }
+      if (data.status === 'error') {
+        // 失败也保留上一份成功数据（设计稿：「保留上一次成功的数据；失败原因原样露出」）。
+        if (data.data !== undefined && data.data !== null) {
+          return h('div', null, h(Failure, { reason: data.reason, onRetry: onRetry ?? data.reload }), children(data.data))
+        }
+        return h(Failure, { reason: data.reason, onRetry: onRetry ?? data.reload })
+      }
       return children(data.data)
     }
 
@@ -1755,7 +1782,10 @@ window.__ModuleLoader__.load({
         }
       }
 
-      const releasable = roster.filter((member) => member.status !== 'released' && member.status !== 'archived')
+      // 名册主列表只排除 released（终态、不提供恢复）；archived **必须留在名册里** ——
+      // 设计稿 p-member-archive 的原话是「名册里保留这条记录，记忆 bank 与证据都还在」。
+      // 之前把它从主列表筛掉、只放归档区，等于让人以为「归档后就看不见了」，正好反了。
+      const releasable = roster.filter((member) => member.status !== 'released')
       const archivedMembers = roster.filter((member) => member.status === 'archived')
 
       return h(
@@ -1867,18 +1897,31 @@ window.__ModuleLoader__.load({
                   h(
                     'div',
                     { className: 'r' },
-                    h(
-                      'button',
-                      {
-                        type: 'button',
-                        className: 'btn',
-                        style: { marginRight: 6 },
-                        disabled: busy !== null,
-                        title: '归档：名册留痕、记忆与证据保留，之后可恢复；与「释放（终态）」不同',
-                        onClick: () => void archive(member.id),
-                      },
-                      busy === member.id ? '归档中…' : '归档',
-                    ),
+                    member.status === 'archived'
+                      ? h(
+                          'button',
+                          {
+                            type: 'button',
+                            className: 'btn',
+                            style: { marginRight: 6 },
+                            disabled: busy !== null,
+                            title: '恢复成在岗；归档时保留的记录与记忆继续可用',
+                            onClick: () => void restoreMember(member.id),
+                          },
+                          busy === member.id ? '恢复中…' : '恢复',
+                        )
+                      : h(
+                          'button',
+                          {
+                            type: 'button',
+                            className: 'btn',
+                            style: { marginRight: 6 },
+                            disabled: busy !== null,
+                            title: '归档：名册留痕、记忆与证据保留，之后可恢复；与「释放（终态）」不同',
+                            onClick: () => void archive(member.id),
+                          },
+                          busy === member.id ? '归档中…' : '归档',
+                        ),
                     h(
                       'button',
                       {
@@ -3407,6 +3450,44 @@ window.__ModuleLoader__.load({
       }
     
       const busy = stage === 'busy'
+
+      /** 下架：两段式（预览影响面 → 确认）；语义是「从目录隐藏，不删文件」。 */
+      const [unpublishStage, setUnpublishStage] = useState('idle')
+      const [unpublishPreview, setUnpublishPreview] = useState(null)
+      const beginUnpublish = async () => {
+        setUnpublishStage('busy')
+        setProblem(null)
+        try {
+          const result = await callWrite('globalUnpublish', undefined, {
+            params: { kind: kind, id: entry.id, expectedHash: entry.contentHash === undefined ? null : entry.contentHash },
+          })
+          setUnpublishPreview(result)
+          setUnpublishStage('preview')
+        } catch (error) {
+          setProblem(messageOf(error))
+          setUnpublishStage('failed')
+        }
+      }
+      const commitUnpublish = async () => {
+        setUnpublishStage('busy')
+        setProblem(null)
+        try {
+          await callWrite('globalUnpublish', undefined, {
+            params: { kind: kind, id: entry.id, expectedHash: entry.contentHash === undefined ? null : entry.contentHash },
+            action: 'confirm',
+            confirmation: unpublishPreview.confirmation,
+            reason: '面板确认（下架全局定义）',
+          })
+          setUnpublishPreview(null)
+          setUnpublishStage('idle')
+          setSaved(true)
+          if (onDone !== undefined) onDone()
+        } catch (error) {
+          setProblem(messageOf(error))
+          setUnpublishStage('failed')
+        }
+      }
+
       const textInput = (value, onChange, placeholder) =>
         h('input', { type: 'text', className: 'box', placeholder, value,
           style: { display: 'block', width: '100%', marginTop: 2, padding: '8px 10px', fontSize: 13 },
@@ -3489,7 +3570,30 @@ window.__ModuleLoader__.load({
         ...form,
         action,
         problem === null ? null : h('p', { className: 'muted', style: { fontSize: 12, margin: '8px 0 0' } }, '没成功：' + problem),
-        saved === true ? h('p', { className: 'muted', style: { fontSize: 12, margin: '8px 0 0' } }, '已写入全局库。') : null)
+        saved === true ? h('p', { className: 'muted', style: { fontSize: 12, margin: '8px 0 0' } }, '已写入全局库。') : null,
+        h('div', { style: { marginTop: 14, paddingTop: 10 } },
+          h('p', { className: 'muted', style: { margin: '0 0 6px', fontSize: 12 } },
+            '下架只是从目录里隐藏：文件与审计都保留，已经引用它的工作流/蓝图/团队照常能读到这一版。'),
+          unpublishPreview === null
+            ? h('button', {
+                type: 'button',
+                className: 'btn',
+                disabled: busy,
+                onClick: () => void beginUnpublish(),
+              }, unpublishStage === 'busy' ? '读影响面…' : '下架这份定义')
+            : h('div', { className: 'box', style: { padding: '10px 12px' } },
+                h('div', { className: 'rc-h' }, h(Dot, { tone: 'gate' }),
+                  h('span', { className: 'nm' }, unpublishPreview.summary === undefined ? '下架' : unpublishPreview.summary),
+                  h('span', { className: 'tag' }, '待确认')),
+                impactLines(unpublishPreview.impact).map((line) =>
+                  h('p', { key: line, className: 'muted', style: { margin: '6px 0 0', fontSize: 12 } }, line)),
+                h('div', { className: 'acts', style: { marginTop: 10 } },
+                  h('button', { type: 'button', className: 'btn primary', disabled: busy, onClick: () => void commitUnpublish() },
+                    unpublishStage === 'busy' ? '提交中…' : '确认下架'),
+                  h('button', { type: 'button', className: 'btn', style: { marginLeft: 8 },
+                    onClick: () => { setUnpublishPreview(null); setUnpublishStage('idle') } }, '取消')),
+              ),
+        ))
     }
     
     /** 计数卡上那行小字：写清这一类的文件落在哪个目录（与读目录的实现一一对应）。 */

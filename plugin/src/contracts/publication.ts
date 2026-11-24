@@ -69,9 +69,32 @@ export interface GlobalEditResult {
  * 影响面预览，直改要 expectedHash），硬塞成一个方法会让调用方各自判断「现在该传哪些字段」。
  * 分开两个端口，实现里共用同一段写入与审计函数。
  */
+/**
+ * 下架（unpublish）—— 只影响**目录可见性**，不删文件。
+ *
+ * 设计稿 g-role / g-workflow / g-blueprint 原话：「下架只是不再出现在目录里；
+ * 已被引用的工作流与蓝图仍能读到这一版。」
+ *
+ * 所以它不是删除：文件与审计都留着，只多一条 `definition.unpublish` 记录与一个
+ * 「不在目录里」的标记（用同目录下的 `_hidden.json` 索引表达，不移动文件 —— 移动会让
+ * 引用方读不到，正好违背语义）。
+ */
+export interface GlobalUnpublishInput {
+  kind: PublicationKind
+  id: string
+  operationId: string
+  expectedHash: string
+  unpublishedAt: string
+  editor: string
+}
+
 export interface GlobalLibraryEditPort {
   /** 读当前文件 hash；不存在返回 null。用于预览与冲突检测。 */
   readFileHash(kind: PublicationKind, id: string): string | null
   /** 原子写入 + 追加审计；`expectedHash` 与磁盘不一致时抛 CONFLICT。 */
   writeFile(input: GlobalEditInput): GlobalEditResult
+  /** 下架：只标记「不在目录里」，文件与审计都留着。`expectedHash` 不符同样拒绝。 */
+  unpublish(input: GlobalUnpublishInput): { file: string; hidden: true }
+  /** 当前下架标记里的 id 列表（读全局库时用来过滤目录）。 */
+  hiddenIds(kind: PublicationKind): string[]
 }

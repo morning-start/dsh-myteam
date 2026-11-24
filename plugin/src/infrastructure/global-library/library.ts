@@ -128,12 +128,30 @@ function readEntry(
  * @param root - 全局库根目录（{@link globalLibraryRoot}）。
  * @returns 计数、条目与读不懂的文件清单；目录不存在时 `exists: false`，不抛错。
  */
+/**
+ * 下架索引：`_hidden.json` 里存 `["role:role_1", ...]`。
+ *
+ * 下架只影响目录可见性 —— 文件必须留着，引用方还要读得到这一版（设计稿原话）。
+ * 所以这里只是**读面过滤**，不是删。
+ */
+function readHiddenIndex(root: string): Set<string> {
+  const file = join(root, '_hidden.json')
+  if (!existsSync(file)) return new Set()
+  try {
+    const parsed: unknown = JSON.parse(readFileSync(file, 'utf8'))
+    return new Set(Array.isArray(parsed) ? parsed.filter((item): item is string => typeof item === 'string') : [])
+  } catch {
+    return new Set()
+  }
+}
+
 export function readGlobalLibrary(root: string): GlobalLibraryView {
   const counts: Record<GlobalEntryKind, number> = { role: 0, workflow: 0, blueprint: 0, team: 0 }
   const entries: GlobalEntry[] = []
   const warnings: GlobalWarning[] = []
   if (!existsSync(root)) return { root, exists: false, counts, entries, warnings }
 
+  const hidden = readHiddenIndex(root)
   for (const { kind, dir, legacy } of KIND_DIRS) {
     const directory = join(root, dir)
     if (!existsSync(directory)) continue
@@ -147,6 +165,8 @@ export function readGlobalLibrary(root: string): GlobalLibraryView {
     for (const name of names.sort()) {
       const entry = readEntry(root, kind, dir, name, legacy, warnings)
       if (entry === null) continue
+      // 下架的定义不在目录里出现（但文件还在，引用方照常能读）。
+      if (hidden.has(kind + ':' + entry.id)) continue
       entries.push(entry)
       counts[kind] += 1
     }

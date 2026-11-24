@@ -152,7 +152,7 @@ export function createPanelFacade(ctx: PanelHostContext): PanelFacade {
    * 绑定工作区」，这个动作在面板上永远点不动。所以这里单独放行：仍要 human（令牌 + HUMAN_ONLY
    * 在用例层把关），但不要求 sessionId。
    */
-  const GLOBAL_WRITE_METHODS = new Set<string>(['globalDefinitionSave'])
+  const GLOBAL_WRITE_METHODS = new Set<string>(['globalDefinitionSave', 'globalUnpublish'])
 
   const write = async (name: string, sessionId: string, body: unknown): Promise<unknown> => {
     if (!isPanelWriteMethod(name)) {
@@ -423,7 +423,8 @@ export function createPanelRouteHandler(
       }
       const writeSession = typeof envelope.sessionId === 'string' ? envelope.sessionId : ''
       // 全局库写方法不属任何项目（面板本身也是 root scope、没有会话），不强制 sessionId。
-      if (writeSession.length === 0 && !(envelope as Record<string, unknown>).__global === true && writeName !== 'globalDefinitionSave') {
+      const globalWrites = new Set(['globalDefinitionSave', 'globalUnpublish'])
+      if (writeSession.length === 0 && !(envelope as Record<string, unknown>).__global === true && !globalWrites.has(writeName)) {
         sendPanelJson(request, response, 400, panelFailure('MT_BAD_REQUEST', '写动作必须带 sessionId'))
         return
       }

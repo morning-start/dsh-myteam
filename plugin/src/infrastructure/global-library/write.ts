@@ -17,6 +17,7 @@ import type {
   GlobalEditInput,
   GlobalEditResult,
   GlobalLibraryEditPort,
+  GlobalUnpublishInput,
   GlobalPublicationPort,
   GlobalPublishInput,
   GlobalPublishResult,
@@ -147,5 +148,60 @@ export function createGlobalEditor(root: string): GlobalLibraryEditPort {
       })
       return { file: relative, globalHash, previousHash }
     },
+    unpublish(input: GlobalUnpublishInput): { file: string; hidden: true } {
+      const relative = globalEntryFile(input.kind, input.id)
+      const target = join(root, relative)
+      // 下架也要冲突检测：不能把一个已经被别人改过的版本「悄悄从目录里藏掉」。
+      const existing = existsSync(target) ? readFileSync(target, 'utf8') : null
+      const actualHash = existing === null ? null : hashOf(existing)
+      if (actualHash !== input.expectedHash) {
+        const shorten = (hash: string | null) => (hash === null ? '不存在' : hash.slice(0, 16) + '…')
+        fail(
+          ERROR_CODES.CONFLICT,
+          '全局库里的 ' + relative + ' 已经被别人改过了（期望 ' + shorten(input.expectedHash) +
+            '，实际 ' + shorten(actualHash) + '）；重新载入后再下架',
+          { details: { kind: input.kind, id: input.id, expectedHash: input.expectedHash, actualHash } },
+        )
+      }
+      const hidden = readHidden(root)
+      const key = input.kind + ':' + input.id
+      if (!hidden.includes(key)) hidden.push(key)
+      writeHidden(root, hidden)
+      appendAudit(root, {
+        at: input.unpublishedAt,
+        operationId: input.operationId,
+        action: 'definition.unpublish',
+        target: relative,
+        status: 'unpublished',
+        kind: input.kind,
+        id: input.id,
+        globalHash: actualHash,
+        editor: input.editor,
+      })
+      return { file: relative, hidden: true }
+    },
+    hiddenIds(kind: PublicationKind): string[] {
+      const hidden = readHidden(root)
+      const prefix = kind + ':'
+      return hidden.filter((entry) => entry.startsWith(prefix)).map((entry) => entry.slice(prefix.length))
+    },
   }
+}
+
+/** 下架索引文件：`_hidden.json`，内容是 `["role:role_1", ...]`。 */
+const HIDDEN_FILE = '_hidden.json'
+
+function readHidden(root: string): string[] {
+  const file = join(root, HIDDEN_FILE)
+  if (!existsSync(file)) return []
+  try {
+    const parsed: unknown = JSON.parse(readFileSync(file, 'utf8'))
+    return Array.isArray(parsed) ? parsed.filter((item): item is string => typeof item === 'string') : []
+  } catch {
+    return []
+  }
+}
+
+function writeHidden(root: string, hidden: string[]): void {
+  writeFileSync(join(root, HIDDEN_FILE), JSON.stringify(hidden, null, 2) + '\n', { encoding: 'utf8' })
 }
