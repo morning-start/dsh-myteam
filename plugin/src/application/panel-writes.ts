@@ -17,7 +17,9 @@ import { randomUUID } from 'node:crypto'
 import type { ActorRef } from '../contracts/events.ts'
 import type { EvidenceRef, GateCheckResult, GateVerdict, Task, VerdictOutcome } from '../contracts/entities.ts'
 import { ERROR_CODES, fail } from '../contracts/errors.ts'
-import type { GlobalPublicationPort, PublicationKind } from '../contracts/publication.ts'
+import type { GlobalLibraryEditPort, GlobalPublicationPort, PublicationKind } from '../contracts/publication.ts'
+import type { GlobalEntryReader } from './global-edit.ts'
+import { editGlobalDefinition } from './global-edit.ts'
 import { HumanAuthorizer } from '../domain/permissions/human-authorizer.ts'
 import type { HumanConfirmation } from '../domain/permissions/human-authorizer.ts'
 import {
@@ -83,6 +85,7 @@ export const PANEL_WRITE_KINDS: Readonly<Record<PanelWriteMethod, PanelWriteKind
   memberArchive: 'direct',
   memberRestore: 'direct',
   definitionPublish: 'token',
+  globalDefinitionSave: 'token',
   definitionSave: 'direct',
   memoryRemember: 'direct',
   memoryForget: 'direct',
@@ -112,6 +115,7 @@ export const PANEL_WRITE_DOCS: Readonly<Record<PanelWriteMethod, string>> = {
   memberRestore: '恢复已归档成员（archived → active）；只对归档态有效，已释放不可恢复，需 `confirm: true`。',
   definitionSave: '保存项目定义（角色 / 工作流）：revision 递增并记 previousHash，需 `confirm: true`。',
   definitionPublish: '发布定义到全局库：预览引用与覆盖影响面，凭一次性令牌执行。动作 `definition.publish.confirm`（人类专属）。',
+  globalDefinitionSave: '直改全局库里的定义（不经项目）：预览引用与被引用、冲突检测（expectedHash），凭一次性令牌执行。动作 `definition.global.write`（人类专属）。',
   memoryRemember: '写一条长期记忆到团队 bank 或某个成员 bank，需 `confirm: true`。',
   memoryForget: '遗忘一条记忆（默认软删留痕，`hard` 才真删），需 `confirm: true`。',
 }
@@ -243,10 +247,93 @@ export interface PanelWriteApplied {
 /** 写通道的外部依赖：全局发布要写入器，记忆要存储实现与项目根（都是端口注入）。 */
 export interface PanelWriteDeps {
   publisher?: GlobalPublicationPort
+  /** 全局库直改端口（definition.publish 之外的第二条全局写路径）。 */
+  globalEditor?: GlobalLibraryEditPort
+  /** 全局目录读取器：直改时校验引用用（只看全局库，不看项目）。 */
+  globalEntries?: GlobalEntryReader
   /** 项目根：记忆库按项目落盘（`memory/myteam.db`）。 */
   rootDir?: string
   /** 打开记忆存储；由装配层注入，application 不 import infrastructure。 */
   openMemory?: (rootDir: string) => MemoryPort
+}
+
+function requireGlobalEditor(deps: PanelWriteDeps): GlobalLibraryEditPort {
+  if (deps.globalEditor === undefined) {
+    fail(ERROR_CODES.INTERNAL, '全局库直改端口未装配')
+  }
+  return deps.globalEditor
+}
+
+function requireGlobalEntries(deps: PanelWriteDeps): GlobalEntryReader {
+  if (deps.globalEntries === undefined) {
+    fail(ERROR_CODES.INTERNAL, '全局目录读取器未装配')
+  }
+  return deps.globalEntries
+}
+
+/**
+ * 全局直改的预览（令牌第一步）。
+ *
+ * 影响面只有两件事：**引用谁**（这份定义引用的全局角色/工作流，会不会有缺的）与
+ * **被谁引用**（别的全局蓝图/工作流指着它，改完它们会「有更新」）。后者现在只能给数量，
+ * 因为全局目录读取器按 kind 列条目时还没有反查索引 —— 这里如实写「N 条同名引用」而不是编一张清单。
+ */
+function previewGlobalEdit(
+  deps: PanelWriteDeps,
+  input: { kind: PublicationKind; id: string; definition: unknown },
+): { operationId: string; targetHash: string; impactHash: string; summary: string; impact: unknown } {
+  const editor = requireGlobalEditor(deps)
+  const entries = requireGlobalEntries(deps)
+  if (input.definition === undefined) {
+    fail(ERROR_CODES.INVALID_PAYLOAD, '缺少参数 definition')
+  }
+  const actualHash = editor.readFileHash(input.kind, input.id)
+  const targetHash = actualHash === null ? 'sha256:absent' : actualHash
+
+  const asRecord = input.definition as Record<string, unknown>
+  const formation = Array.isArray(asRecord.formation) ? (asRecord.formation as Array<{ roleId?: string }>) : []
+  const templates = Array.isArray(asRecord.templates) ? (asRecord.templates as Array<{ requiredRoleId?: string | null }>) : []
+  const workflows = Array.isArray(asRecord.workflows) ? (asRecord.workflows as string[]) : []
+  const roleIds = [
+    ...formation.map((slot) => slot.roleId).filter((roleId): roleId is string => typeof roleId === 'string'),
+    ...templates.map((template) => template.requiredRoleId).filter((roleId): roleId is string => typeof roleId === 'string'),
+  ]
+  const globalRoleIds = new Set(entries.list('role').map((entry) => entry.id))
+  const globalWorkflowIds = new Set(entries.list('workflow').map((entry) => entry.id))
+  const missingReferences = [
+    ...roleIds.filter((roleId) => !globalRoleIds.has(roleId)).map((roleId) => 'role:' + roleId),
+    ...workflows.filter((workflowId) => !globalWorkflowIds.has(workflowId)).map((workflowId) => 'workflow:' + workflowId),
+  ]
+  const impact = {
+    target: input.kind + '/' + input.id,
+    createsFile: actualHash === null,
+    overwrites: actualHash !== null,
+    missingReferences,
+    irreversible: [
+      actualHash === null ? '全局库会多出一份定义' : '会覆盖全局库里的同名定义，旧内容不保留（审计里留 previousHash）',
+      '改的是全局库文件，所有引用它的项目/团队下次读到新版本',
+    ],
+  }
+  const operationId = 'global-edit-' + Date.now().toString(36) + '-' + Math.random().toString(36).slice(2, 8)
+  return {
+    operationId,
+    targetHash,
+    impactHash: stableHash(impact),
+    summary:
+      (actualHash === null ? '新建' : '修改') + '全局' + input.kind + '「' + input.id + '」' +
+      (missingReferences.length > 0 ? '：' + String(missingReferences.length) + ' 处引用在全局库里找不到' : '：引用都能解析'),
+    impact,
+  }
+}
+
+/** 影响面的稳定 hash：字段顺序固定，便于「同一影响面换同一令牌」。 */
+function stableHash(value: unknown): string {
+  const text = JSON.stringify(value, Object.keys(value as Record<string, unknown>).sort())
+  let hash = 0
+  for (let index = 0; index < text.length; index += 1) {
+    hash = (hash * 31 + text.charCodeAt(index)) | 0
+  }
+  return 'impact:' + (hash >>> 0).toString(16)
 }
 
 function requirePublisher(deps: PanelWriteDeps): GlobalPublicationPort {
@@ -289,6 +376,23 @@ export function previewPanelWrite(
   deps: PanelWriteDeps = {},
 ): PanelWritePreview {
   switch (method) {
+    case 'globalDefinitionSave': {
+      const preview = previewGlobalEdit(deps, {
+        kind: requirePublicationKind(params),
+        id: requireString(params, 'id'),
+        definition: params.definition,
+      })
+      const confirmation = authorizer.issue(
+        {
+          operationId: preview.operationId,
+          action: 'definition.global.write',
+          targetHash: preview.targetHash,
+          impactHash: preview.impactHash,
+        },
+        PANEL_HUMAN,
+      )
+      return { method, operationId: preview.operationId, summary: preview.summary, impact: preview.impact, confirmation }
+    }
     case 'teamDisband': {
       const preview = previewTeamDisband(runtime, { teamId: requireTeamId(params) })
       const confirmation = authorizer.issue(
@@ -378,6 +482,41 @@ export function applyPanelWrite(
   deps: PanelWriteDeps = {},
 ): PanelWriteApplied {
   switch (method) {
+    case 'globalDefinitionSave': {
+      // 第二步：**必须自己复验令牌**。预览时签的 targetHash 是「当时的文件 hash」，
+      // 已通过 expectedHash 把它带回来 —— 这里重新算一遍当前文件 hash 与令牌绑定，
+      // 目标/影响面任一变化都拒（这道校验不能省，否则伪造令牌可以直写全局库）。
+      const kind = requirePublicationKind(input.params)
+      const id = requireString(input.params, 'id')
+      const raw = input.params.expectedHash
+      if (raw !== null && typeof raw !== 'string') {
+        fail(ERROR_CODES.INVALID_PAYLOAD, 'expectedHash 必须是字符串或 null')
+      }
+      const currentHash = requireGlobalEditor(deps).readFileHash(kind, id)
+      const currentTargetHash = currentHash === null ? 'sha256:absent' : currentHash
+      const preview = previewGlobalEdit(deps, { kind, id, definition: input.params.definition })
+      authorizer.verify(input.confirmation, {
+        operationId: input.confirmation.operationId,
+        action: 'definition.global.write',
+        targetHash: currentTargetHash,
+        impactHash: preview.impactHash,
+      })
+      authorizer.consume(input.confirmation)
+      const result = editGlobalDefinition(
+        { editor: requireGlobalEditor(deps), globalEntries: requireGlobalEntries(deps) },
+        {
+          actor: PANEL_HUMAN,
+          kind,
+          id,
+          definition: input.params.definition,
+          expectedHash: raw,
+          operationId: input.confirmation.operationId,
+          editedAt: runtime.now(),
+          editor: 'panel:owner',
+        },
+      )
+      return { method, operationId: result.id, committed: result }
+    }
     case 'teamDisband': {
       const teamId = requireTeamId(input.params)
       const result = confirmTeamDisband(runtime, { authorizer }, {
@@ -501,6 +640,7 @@ export function applyDirectPanelWrite(
     }
     case 'teamDisband':
     case 'captainTakeover':
+    case 'globalDefinitionSave':
     case 'definitionPublish':
       fail(ERROR_CODES.INVALID_COMMAND, `${method} 走确认令牌通道（先预览再确认），不能直接执行`)
     case 'memoryRemember': {

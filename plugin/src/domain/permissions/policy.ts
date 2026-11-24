@@ -17,6 +17,7 @@ export type Action =
   | 'definition.copy-from-global'
   | 'definition.publish.request'
   | 'definition.publish.confirm'
+  | 'definition.global.write'
   | 'team.create'
   | 'team.update'
   | 'team.archive'
@@ -55,6 +56,7 @@ export type Action =
 
 /** 只有人类可以发起。agent 无法通过任何工具参数获得这些动作。 */
 export const HUMAN_ONLY: ReadonlySet<Action> = new Set<Action>([
+  'definition.global.write',
   'definition.publish.confirm',
   'team.disband',
   'captain.handoff.confirm',
