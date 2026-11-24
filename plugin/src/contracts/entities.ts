@@ -200,6 +200,43 @@ export interface Team {
   updatedAt: string
 }
 
+/**
+ * 一份**待人类批准**的开队计划。
+ *
+ * 为什么计划是独立聚合、而不是「草稿态的团队」（见 docs/decisions/团队计划批准.md §3）：
+ * 设计稿要求「批准前不产生任何会话与花费」。如果先建团队与成员占位，这条就变成
+ * **靠下游容错**（看板、名册、配置、Run 都得容忍「无会话成员」），而且丢弃后留下残留实体。
+ * 把计划做成独立聚合，「批准前什么都没建」是结构保证，丢弃只需清掉这一条。
+ *
+ * 计划被批准后即被**消费**（不再存在）；「批准后不可回到草稿」因此天然成立。
+ */
+export interface TeamPlan {
+  id: TeamPlanId
+  /** 计划要建的团队名与目标。 */
+  name: string
+  goal: string
+  /** 蓝图引用（含 revision：批准绑这一版）。 */
+  blueprint: DefinitionRef | null
+  /**
+   * 队形快照。蓝图里的 formation 允许在向导里改，改的是**这份副本**；
+   * 队长不在 formation 里（每队一个任期，单独由 captainSessionId 表达）。
+   */
+  formation: FormationSlot[]
+  /** 默认工作流（第一次开 Run 用）；null 表示批准后不自动开 Run。 */
+  workflow: DefinitionRef | null
+  /** 队长会话：提案人的会话。 */
+  captainSessionId: SessionId
+  /** 配置覆盖：蓝图默认 + 向导调整后的最终值。 */
+  overrides: ConfigOverrides
+  /**
+   * 计划内容 hash。批准令牌绑它 —— 队形/工作流/配置任何一项被改过，hash 就变，
+   * 令牌立刻失效。只绑 planId 是不够的：内容可以在预览与确认之间被改。
+   */
+  planHash: string
+  proposedBy: string
+  proposedAt: string
+}
+
 export type CaptainAssignmentReason = 'initial' | 'handoff' | 'recovery'
 
 export interface CaptainAssignment {

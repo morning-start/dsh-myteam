@@ -32,6 +32,7 @@ export const ID_PREFIXES = {
   event: 'evt',
   operation: 'op',
   session: 'ses',
+  plan: 'plan',
 } as const
 
 export type IdKind = keyof typeof ID_PREFIXES
@@ -53,6 +54,7 @@ export type BatchId = string
 export type EventId = string
 export type OperationId = string
 export type SessionId = string
+export type TeamPlanId = string
 
 /** 生成带前缀的随机 id（时间无关，避免用创建时间泄漏顺序）。 */
 export function newId(kind: IdKind): string {

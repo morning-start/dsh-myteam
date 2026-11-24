@@ -32,6 +32,7 @@ import type {
   Task,
   Team,
   TeamBlueprint,
+  TeamPlan,
   TeamMessage,
   WorkflowDefinition,
   WorkflowRun,
@@ -49,6 +50,7 @@ import type {
   SessionId,
   TaskId,
   TeamId,
+  TeamPlanId,
   WorkflowId,
   WorkflowRunId,
 } from './ids.ts'
@@ -74,6 +76,9 @@ export type EventType =
   | 'team.updated'
   | 'team.archived'
   | 'team.disbanded'
+  | 'team.plan.proposed'
+  | 'team.plan.approved'
+  | 'team.plan.discarded'
   | 'captain.assigned'
   | 'captain.handoff.proposed'
   | 'captain.handoff.confirmed'
@@ -245,6 +250,19 @@ export interface EventPayloads {
   'team.archived': { teamId: TeamId; revision: number }
   'team.disbanded': { teamId: TeamId; revision: number; reason: string }
 
+  /**
+   * 开队计划：只落计划，不建团队/成员/Run。
+   * 批准事件带 teamId 与 runId —— 计划被消费后，账本仍能追出「它建出了谁」。
+   */
+  'team.plan.proposed': { plan: TeamPlan }
+  'team.plan.approved': {
+    planId: TeamPlanId
+    teamId: TeamId
+    planHash: string
+    runId: WorkflowRunId | null
+  }
+  'team.plan.discarded': { planId: TeamPlanId; reason: string; discardedBy: string }
+
   'captain.assigned': {
     teamId: TeamId
     sessionId: SessionId
@@ -402,6 +420,16 @@ export interface EventEnvelope<T extends EventType = EventType> {
 export type EventOf<T extends EventType> = EventEnvelope<T>
 
 /** 目录里出现过的全部事件类型，测试用它证明「每个类型都有投影或显式忽略」。 */
+/**
+ * 全部事件类型的**运行时**清单。
+ *
+ * 为什么要和上面的 `EventType` 联合手工同步：扫描器用它判定「这行是不是已知事件」，
+ * 未知类型会被当成日志损坏（`PROJECT_WRITE_BLOCKED`），整个项目停止写入。
+ *
+ * **真实踩过**：加 `team.plan.*` 时只改了联合、忘了这里，第一次 commit 写进去、
+ * 第二次 commit 重扫就判损坏 —— 而且报错说的是「日志损坏」，完全指不到根因。
+ * 现在由 `t63` 守着：两张表必须完全一致，缺一个就红。
+ */
 export const EVENT_TYPES: readonly EventType[] = [
   'project.initialized',
   'definition.role.created',
@@ -417,6 +445,9 @@ export const EVENT_TYPES: readonly EventType[] = [
   'definition.publication.requested',
   'definition.publication.authorized',
   'definition.publication.outcome',
+  'team.plan.proposed',
+  'team.plan.approved',
+  'team.plan.discarded',
   'team.created',
   'team.updated',
   'team.archived',

@@ -22,6 +22,7 @@ import type {
   RoleDefinition,
   Task,
   Team,
+  TeamPlan,
   TeamBlueprint,
   TeamMessage,
   WorkflowDefinition,
@@ -116,6 +117,13 @@ export interface ProjectState {
   pendingPublications: Map<string, PendingPublication>
   /** 待人类确认的队长接管（按 teamId）。确认或被新指派覆盖时删。 */
   pendingHandoffs: Map<string, PendingHandoff>
+  /**
+   * 待人类批准的开队计划（按 planId）。
+   *
+   * 只存「还等着」的：`approved` / `discarded` 一到就删。计划被消费后不再存在于状态里，
+   * 「批准后不可回到草稿」因此是结构事实；历史由事件账本负责。
+   */
+  teamPlans: Map<string, TeamPlan>
 }
 
 export function emptyProjectState(projectId: string): ProjectState {
@@ -146,6 +154,7 @@ export function emptyProjectState(projectId: string): ProjectState {
     teamConfigs: new Map(),
     pendingPublications: new Map(),
     pendingHandoffs: new Map(),
+    teamPlans: new Map(),
   }
 }
 
@@ -165,6 +174,9 @@ export const HANDLED_EVENT_TYPES: readonly EventType[] = [
   'definition.publication.requested',
   'definition.publication.authorized',
   'definition.publication.outcome',
+  'team.plan.proposed',
+  'team.plan.approved',
+  'team.plan.discarded',
   'team.created',
   'team.updated',
   'team.archived',
@@ -386,6 +398,19 @@ export function applyEvent(state: ProjectState, event: EventEnvelope): void {
           })
         }
       }
+      return
+    }
+
+    case 'team.plan.proposed': {
+      const payload = event.payload as { plan: TeamPlan }
+      state.teamPlans.set(payload.plan.id, payload.plan)
+      return
+    }
+    case 'team.plan.approved':
+    case 'team.plan.discarded': {
+      // 计划被消费：批准了（实体在同一个批次里建出来）或丢弃了（什么都没建）。
+      const payload = event.payload as { planId: string }
+      state.teamPlans.delete(payload.planId)
       return
     }
 
