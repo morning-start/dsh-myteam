@@ -9,7 +9,7 @@
   （`application/actor-resolution.ts`），解析不到即 `FORBIDDEN`。
 - 队长 preset 只注册队长工具，成员 preset 只注册成员工具；两侧不共享注册表。
 
-## 队长工具（16）
+## 队长工具（17）
 
 | 工具 | 说明 | 必填参数 |
 |---|---|---|
@@ -19,6 +19,7 @@
 | `myteam_preview_disband` | 预览解散团队的影响面（只读，不写事件）。把返回的 targetHash 交给人类确认；人类侧确认后才真正执行。 | `teamId` |
 | `myteam_preview_takeover` | 预览队长接管的影响面（只读，不写事件）。把返回的 targetHash 交给人类确认；人类侧确认后才真正执行。 | `teamId`、`toSessionId` |
 | `myteam_propose_handoff` | 提案把本团队的队长换成另一个会话（**只提案，不执行**）。提案落进账本后，人类会在「待你确认」里看到；只有人类确认才会真正换队长、generation 才 +1。已有同样的待确认提案时会被拒。 | `teamId`、`toSessionId` |
+| `myteam_propose_plan` | 提案一份开队计划（**只提案，不建任何实体**）：名字、目标、队形、默认工作流。计划落进账本后，人类会在「待你确认」里看到并批准；批准之前不会建团队、成员、会话，也不花钱。已有计划内容完全相同时会返回同一份计划的 id（不重复落账）。 | `name`、`captainSessionId` |
 | `myteam_create_team` | 创建一支团队并让**当前会话**成为它的队长。只能在当前会话还不属于任何团队时调用（新项目的第一步）。 | `name`、`goal` |
 | `myteam_create_task` | 在项目里创建一个任务（默认归当前队长的团队）。 | `title`、`acceptance` |
 | `myteam_start_workflow` | 用一份工作流定义实例化一次运行（Run），生成全部任务并返回 taskId 映射。 | `workflowId` |

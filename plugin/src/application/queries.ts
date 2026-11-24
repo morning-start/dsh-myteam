@@ -65,19 +65,22 @@ export interface BoardView {
  *   1. **门禁裁决**：任务停在 `review` 就是在等人下结论；`state.verdicts` 里有已下过的结论。
  *   2. **待确认的全局发布**：`definition.publication.requested` 落了事件但还没 `outcome`。
  *
- * 三类里现在能画两类半：
+ * 四类里现在能画全：
  *   - **门禁裁决** ✅：任务停在 review 且当前 Attempt 还没有裁决；
  *   - **全局发布** ✅：`definition.publication.requested` 落了但还没 `outcome`；
  *   - **队长接管** ✅（2026-11-24 接通）：`captain.handoff.proposed` 之前**没有任何写入方**、
  *     投影也是 no-op，所以查不出「谁在等接管」。现在由 `proposeCaptainHandoffCommand` 落事件、
  *     投影记进 `pendingHandoffs`，这里就能列出来了。
  *
- * **仍然做不到的**（如实写在这里，不假装有）：
- *   - 「计划批准」：领域里没有 draft/plan 聚合，团队只有 active/archived/disbanded。
+ *   - **计划批准** ✅（2026-11-24 接通）：`TeamPlan` 是独立聚合，`teamPlans` 里存着待批准的
+ *     计划；批准才建团队/成员/Run（见 `docs/decisions/团队计划批准.md`）。
+ *
+ * 四类现在都画得出来。之前列在「做不到」里的两条（队长接管、计划批准）都已在 P 批接通，
+ * 这里不再保留任何「假装有」的说明。
  */
 export interface PendingApprovalItem {
   /** 用来区分卡片画法。 */
-  kind: 'gate' | 'publish' | 'handoff'
+  kind: 'gate' | 'publish' | 'handoff' | 'plan'
   id: string
   title: string
   /** 副标题：团队名 / 目标文件。 */
@@ -150,7 +153,25 @@ export function pendingApprovalsView(state: ProjectState): PendingApprovalsView 
     })
   }
 
-  // 4) 已处理的：门禁裁决结果（state.verdicts 已经是历史，不会被清）。
+  // 4) 待批准的开队计划。提案只落计划，批准才建团队 —— 所以这里列出来的是「还没花任何钱」的。
+  for (const plan of state.teamPlans.values()) {
+    const plannedMembers = plan.formation.reduce((sum, slot) => sum + slot.count, 0)
+    const workflow = plan.workflow === null ? undefined : state.workflows.get(plan.workflow.id)
+    const plannedTasks = workflow === undefined ? 0 : workflow.templates.length
+    pending.push({
+      kind: 'plan',
+      id: plan.id,
+      title: `批准计划「${plan.name}」`,
+      detail:
+        `${String(plannedMembers)} 名成员` +
+        (plan.workflow === null ? '' : ` · ${String(plannedTasks)} 个任务 · 批准后开 Run`) +
+        ' · 批准前不建会话',
+      since: plan.proposedAt,
+      by: plan.proposedBy,
+    })
+  }
+
+  // 5) 已处理的：门禁裁决结果（state.verdicts 已经是历史，不会被清）。
   for (const verdict of state.verdicts.values()) {
     const task = state.tasks.get(verdict.taskId)
     decided.push({
@@ -170,7 +191,7 @@ export function pendingApprovalsView(state: ProjectState): PendingApprovalsView 
     pending,
     decided,
     counts: { pending: pending.length, decided: decided.length },
-    unsupported: { planApproval: true, captainTakeover: false },
+    unsupported: { planApproval: false, captainTakeover: false },
   }
 }
 

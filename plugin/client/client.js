@@ -3133,7 +3133,7 @@ window.__ModuleLoader__.load({
       const unsupported = data.unsupported ?? {}
 
       const kindLabel = (kind) =>
-        kind === 'gate' ? '门禁裁决' : kind === 'publish' ? '全局发布' : kind === 'handoff' ? '队长接管' : String(kind)
+        kind === 'gate' ? '门禁裁决' : kind === 'publish' ? '全局发布' : kind === 'handoff' ? '队长接管' : kind === 'plan' ? '开队计划' : String(kind)
       const rows = lane === 'pending' ? pending : decided
 
       const card = (item) =>

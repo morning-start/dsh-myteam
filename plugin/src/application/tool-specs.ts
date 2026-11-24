@@ -20,6 +20,7 @@ import {
   createTaskCommand,
   createTeamCommand,
   proposeCaptainHandoffCommand,
+  proposeTeamPlanCommand,
 } from './commands.ts'
 import { completeTaskCommand, recordEvidenceCommand, recordProgressCommand, recordVerdictCommand, submitReviewCommand } from './task-commands.ts'
 import { startWorkflowRunCommand } from './run-commands.ts'
@@ -273,6 +274,78 @@ export function leadToolSpecs(): MyTeamToolSpec[] {
           toSessionId: requireString(record, 'toSessionId'),
         })
         return jsonSafe({ ok: true, data: { proposed: true, seq: result.seq } })
+      },
+    },
+    {
+      name: 'myteam_propose_plan',
+      description:
+        '提案一份开队计划（**只提案，不建任何实体**）：名字、目标、队形、默认工作流。'
+        + '计划落进账本后，人类会在「待你确认」里看到并批准；批准之前不会建团队、成员、会话，也不花钱。'
+        + '已有计划内容完全相同时会返回同一份计划的 id（不重复落账）。',
+      parameters: {
+        type: 'object',
+        properties: {
+          name: { type: 'string', description: '团队名' },
+          goal: { type: 'string', description: '团队目标' },
+          captainSessionId: { type: 'string', description: '队长会话 id' },
+          blueprintId: { type: 'string', description: '蓝图 id（可选；给了就用它的队形与默认工作流）' },
+          formation: {
+            type: 'array',
+            description: '队形（可选；不给时用蓝图里的）。每项 { key, roleId, count }',
+            items: {
+              type: 'object',
+              properties: {
+                key: { type: 'string' },
+                roleId: { type: 'string' },
+                count: { type: 'number' },
+              },
+              required: ['key', 'roleId', 'count'],
+              additionalProperties: false,
+            },
+          },
+          workflowId: { type: 'string', description: '默认工作流 id（可选）' },
+        },
+        required: ['name', 'captainSessionId'],
+        additionalProperties: false,
+      },
+      outputSchema: OUTPUT_SCHEMA,
+      execute(args, context) {
+        const record = asRecord(args)
+        const formationRaw = record.formation
+        let formation: { key: string; roleId: string; count: number; parentSlotKey: null }[] | undefined
+        if (Array.isArray(formationRaw)) {
+          formation = formationRaw.map((item, index) => {
+            const slot = asRecord(item)
+            const count = slot.count
+            if (typeof count !== 'number' || !Number.isInteger(count) || count < 1) {
+              fail(ERROR_CODES.INVALID_PAYLOAD, `formation[${String(index)}].count 必须是正整数`)
+            }
+            return {
+              key: requireString(slot, 'key'),
+              roleId: requireString(slot, 'roleId'),
+              count,
+              parentSlotKey: null,
+            }
+          })
+        }
+        const proposed = proposeTeamPlanCommand(context.runtime, {
+          actor: context.actor,
+          name: requireString(record, 'name'),
+          goal: typeof record.goal === 'string' ? record.goal : '',
+          captainSessionId: requireString(record, 'captainSessionId'),
+          blueprintId: typeof record.blueprintId === 'string' ? record.blueprintId : undefined,
+          formation,
+          workflowId: typeof record.workflowId === 'string' ? record.workflowId : undefined,
+        })
+        return jsonSafe({
+          ok: true,
+          data: {
+            planId: proposed.plan.id,
+            planHash: proposed.plan.planHash,
+            plannedMembers: proposed.plan.formation.reduce((sum, slot) => sum + slot.count, 0),
+            note: '计划已落账，等待人类批准；批准前不会建团队、成员或会话。',
+          },
+        })
       },
     },
     {
