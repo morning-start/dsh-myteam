@@ -15,7 +15,7 @@
  */
 import { randomUUID } from 'node:crypto'
 import type { ActorRef } from '../contracts/events.ts'
-import type { EvidenceRef, GateCheckResult, GateVerdict, Task, VerdictOutcome } from '../contracts/entities.ts'
+import type { ConfigOverrides, EvidenceRef, FormationSlot, GateCheckResult, GateVerdict, Task, VerdictOutcome } from '../contracts/entities.ts'
 import { ERROR_CODES, fail } from '../contracts/errors.ts'
 import type { GlobalLibraryEditPort, GlobalPublicationPort, PublicationKind } from '../contracts/publication.ts'
 import type { GlobalEntryReader } from './global-edit.ts'
@@ -37,6 +37,8 @@ import {
   saveProjectWorkflowCommand,
 } from './commands.ts'
 import { forgetMemory, rememberMemory } from './memory-commands.ts'
+import { approveTeamPlanCommand, discardTeamPlanCommand, proposeTeamPlanCommand } from './commands.ts'
+import { confirmTeamPlanApproval, previewTeamPlanApproval } from './human-actions.ts'
 import type { MemoryPort } from './ports.ts'
 import { confirmDefinitionPublication, requestDefinitionPublication } from './publication.ts'
 import { confirmCaptainTakeover, confirmTeamDisband, previewCaptainTakeover, previewTeamDisband } from './human-actions.ts'
@@ -62,6 +64,9 @@ export const PANEL_WRITE_METHODS = [
   'definitionSave',
   'memoryRemember',
   'memoryForget',
+  'planPropose',
+  'planDiscard',
+  'planApprove',
 ] as const
 
 export type PanelWriteMethod = (typeof PANEL_WRITE_METHODS)[number]
@@ -95,6 +100,11 @@ export const PANEL_WRITE_KINDS: Readonly<Record<PanelWriteMethod, PanelWriteKind
   definitionSave: 'direct',
   memoryRemember: 'direct',
   memoryForget: 'direct',
+  // 提案与丢弃不改变任何实体（提案只落计划、丢弃零回滚），不需要令牌仪式。
+  planPropose: 'direct',
+  planDiscard: 'direct',
+  // 批准会一次建出整个团队，是 HUMAN_ONLY —— 令牌把「看到的影响面」和「执行的那次」绑死。
+  planApprove: 'token',
 }
 
 /** 判断一个名字是否为已登记的面板写方法。 */
@@ -126,6 +136,9 @@ export const PANEL_WRITE_DOCS: Readonly<Record<PanelWriteMethod, string>> = {
   projectDestroy: '删除项目数据（事件日志 / 记忆库 / 投影 / 租约），**不可撤销**：先预览逐项影响面，输入项目名后才能凭一次性令牌执行。动作 `project.destroy`（人类专属）。',
   memoryRemember: '写一条长期记忆到团队 bank 或某个成员 bank，需 `confirm: true`。',
   memoryForget: '遗忘一条记忆（默认软删留痕，`hard` 才真删），需 `confirm: true`。',
+  planPropose: '提案开队计划：名字、目标、队长会话、队形与默认工作流，只落计划不建实体，需 `confirm: true`。',
+  planDiscard: '丢弃待批准的计划：只落一条 `team.plan.discarded`，不产生任何会话与花费，需 `confirm: true`。',
+  planApprove: '批准开队计划：预览影响面（几名成员、几个任务、开不开 Run），凭一次性令牌执行。动作 `plan.approve`（人类专属）。',
 }
 
 /** 面板动作的 actor：单属主部署下的人类入口。 */
@@ -210,6 +223,38 @@ function requireStringArray(params: Record<string, unknown>, key: string): strin
 function optionalStringArray(params: Record<string, unknown>, key: string): string[] | undefined {
   if (params[key] === undefined) return undefined
   return requireStringArray(params, key)
+}
+
+/** 队形参数：数组，每项 { key, roleId, count, parentSlotKey? }。 */
+function requireFormation(params: Record<string, unknown>): FormationSlot[] {
+  const raw = params.formation
+  if (!Array.isArray(raw) || raw.length === 0) {
+    fail(ERROR_CODES.INVALID_PAYLOAD, 'formation 必须是非空数组')
+  }
+  return raw.map((item, index) => {
+    if (item === null || typeof item !== 'object') {
+      fail(ERROR_CODES.INVALID_PAYLOAD, `formation[${String(index)}] 必须是对象`)
+    }
+    const record = item as Record<string, unknown>
+    const key = requireString(record, 'key')
+    const roleId = requireString(record, 'roleId')
+    const count = record.count
+    if (typeof count !== 'number' || !Number.isInteger(count) || count < 1) {
+      fail(ERROR_CODES.INVALID_PAYLOAD, `formation[${String(index)}].count 必须是正整数`)
+    }
+    const parentSlotKey = optionalString(record, 'parentSlotKey') ?? null
+    return { key, roleId, count, parentSlotKey }
+  })
+}
+
+/** 配置覆盖：可选对象；缺省为空对象（批准时再叠蓝图默认值）。 */
+function requireOverrides(params: Record<string, unknown>): ConfigOverrides {
+  const raw = params.overrides
+  if (raw === undefined || raw === null) return {}
+  if (typeof raw !== 'object' || Array.isArray(raw)) {
+    fail(ERROR_CODES.INVALID_PAYLOAD, 'overrides 必须是对象')
+  }
+  return raw as ConfigOverrides
 }
 
 function requireChecks(params: Record<string, unknown>): GateCheckResult[] {
@@ -539,6 +584,19 @@ export function previewPanelWrite(
       )
       return { method, operationId: preview.operationId, summary: preview.summary, impact: preview.impact, confirmation }
     }
+    case 'planApprove': {
+      const preview = previewTeamPlanApproval(runtime, { planId: requireString(params, 'planId') })
+      const confirmation = authorizer.issue(
+        {
+          operationId: preview.operationId,
+          action: 'plan.approve',
+          targetHash: preview.targetHash,
+          impactHash: preview.impactHash,
+        },
+        PANEL_HUMAN,
+      )
+      return { method, operationId: preview.operationId, summary: preview.summary, impact: preview.impact, confirmation }
+    }
     case 'teamDisband': {
       const preview = previewTeamDisband(runtime, { teamId: requireTeamId(params) })
       const confirmation = authorizer.issue(
@@ -567,6 +625,9 @@ export function previewPanelWrite(
       )
       return { method, operationId: preview.operationId, summary: preview.summary, impact: preview.impact, confirmation }
     }
+    case 'planPropose':
+    case 'planDiscard':
+      fail(ERROR_CODES.INVALID_COMMAND, `${method} 不走确认令牌：直接带 confirm: true 提交（见 applyDirectPanelWrite）`)
     case 'gateVerdict':
       fail(ERROR_CODES.INVALID_COMMAND, 'gateVerdict 不走确认令牌：直接带 confirm: true 提交（见 applyDirectPanelWrite）')
     case 'taskCreate':
@@ -628,6 +689,19 @@ export async function applyPanelWrite(
   deps: PanelWriteDeps = {},
 ): Promise<PanelWriteApplied> {
   switch (method) {
+    case 'planApprove': {
+      const planId = requireString(input.params, 'planId')
+      const planHash = requireString(input.params, 'planHash')
+      const result = confirmTeamPlanApproval(runtime, { authorizer }, {
+        actor: PANEL_HUMAN,
+        planId,
+        planHash,
+        startRun: input.params.startRun !== false,
+        operationId: input.confirmation.operationId,
+        confirmation: input.confirmation,
+      })
+      return { method, operationId: input.confirmation.operationId, committed: result }
+    }
     case 'globalDefinitionSave': {
       // 第二步：**必须自己复验令牌**。预览时签的 targetHash 是「当时的文件 hash」，
       // 已通过 expectedHash 把它带回来 —— 这里重新算一遍当前文件 hash 与令牌绑定，
@@ -755,6 +829,34 @@ export function applyDirectPanelWrite(
   deps: PanelWriteDeps = {},
 ): PanelWriteApplied {
   switch (method) {
+    case 'planPropose': {
+      if (input.confirm !== true) {
+        fail(ERROR_CODES.INVALID_PAYLOAD, '提案计划需要 confirm: true（会写进事件账本）')
+      }
+      const proposed = proposeTeamPlanCommand(runtime, {
+        actor: PANEL_HUMAN,
+        name: requireString(input.params, 'name'),
+        goal: optionalString(input.params, 'goal') ?? '',
+        captainSessionId: requireString(input.params, 'captainSessionId'),
+        blueprintId: optionalString(input.params, 'blueprintId'),
+        formation: requireFormation(input.params),
+        workflowId: optionalString(input.params, 'workflowId'),
+        overrides: requireOverrides(input.params),
+      })
+      return { method, operationId: proposed.plan.id, committed: { plan: proposed.plan } }
+    }
+    case 'planDiscard': {
+      if (input.confirm !== true) {
+        fail(ERROR_CODES.INVALID_PAYLOAD, '丢弃计划需要 confirm: true（会写进事件账本）')
+      }
+      const planId = requireString(input.params, 'planId')
+      discardTeamPlanCommand(runtime, {
+        actor: PANEL_HUMAN,
+        planId,
+        reason: optionalString(input.params, 'reason') ?? '',
+      })
+      return { method, operationId: planId, committed: { discarded: true } }
+    }
     case 'gateVerdict': {
       if (input.confirm !== true) {
         fail(ERROR_CODES.INVALID_PAYLOAD, '门禁裁决需要 confirm: true（一次判定会写进事件账本，不能撤销）')

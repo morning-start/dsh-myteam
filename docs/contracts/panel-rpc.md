@@ -56,6 +56,9 @@
 | `definitionSave` | `direct` | 保存项目定义（角色 / 工作流）：revision 递增并记 previousHash，需 `confirm: true`。 |
 | `memoryRemember` | `direct` | 写一条长期记忆到团队 bank 或某个成员 bank，需 `confirm: true`。 |
 | `memoryForget` | `direct` | 遗忘一条记忆（默认软删留痕，`hard` 才真删），需 `confirm: true`。 |
+| `planPropose` | `direct` | 提案开队计划：名字、目标、队长会话、队形与默认工作流，只落计划不建实体，需 `confirm: true`。 |
+| `planDiscard` | `direct` | 丢弃待批准的计划：只落一条 `team.plan.discarded`，不产生任何会话与花费，需 `confirm: true`。 |
+| `planApprove` | `token` | 批准开队计划：预览影响面（几名成员、几个任务、开不开 Run），凭一次性令牌执行。动作 `plan.approve`（人类专属）。 |
 
 ## 参数
 

@@ -19,7 +19,7 @@ import { ERROR_CODES, fail } from '../contracts/errors.ts'
 import type { ActorRef } from '../contracts/events.ts'
 import type { HumanAction, HumanAuthorizer, HumanConfirmation } from '../domain/permissions/human-authorizer.ts'
 import { authorize } from '../domain/permissions/policy.ts'
-import { changeTeamStatusCommand } from './commands.ts'
+import { approveTeamPlanCommand, changeTeamStatusCommand } from './commands.ts'
 import type { CommitResult, DraftEvent, ProjectRuntime } from './project-runtime.ts'
 
 export interface HumanActionPreview {
@@ -209,6 +209,105 @@ export function confirmCaptainTakeover(
 }
 
 /** 令牌里的 action 必须与调用方声明一致，防止「拿 A 的令牌做 B」。 */
+/**
+ * 预览批准开队计划的影响面（`plan.approve`，人类专属）。
+ *
+ * 令牌的 `targetHash` 就是 **planHash**：计划内容（队形/工作流/配置）任何一项被改过，
+ * hash 就变，令牌立刻失效。只绑 planId 是不够的 —— 内容可以在预览与确认之间被改。
+ *
+ * `impactHash` 绑影响面：会建几名成员、几个任务、开不开 Run。
+ */
+export function previewTeamPlanApproval(
+  runtime: ProjectRuntime,
+  input: { planId: string },
+): HumanActionPreview {
+  const plan = runtime.state.teamPlans.get(input.planId)
+  if (plan === undefined) {
+    fail(ERROR_CODES.NOT_FOUND, '没有这份待批准的计划（可能已经批准或丢弃）', {
+      details: { planId: input.planId },
+    })
+  }
+  const plannedMembers = plan.formation.reduce((sum, slot) => sum + slot.count, 0)
+  const workflow = plan.workflow === null ? null : runtime.state.workflows.get(plan.workflow.id)
+  const plannedTasks = workflow === null || workflow === undefined ? 0 : workflow.templates.length
+
+  const impact = {
+    planId: plan.id,
+    planHash: plan.planHash,
+    teamName: plan.name,
+    plannedMembers,
+    plannedTasks,
+    startsRun: plan.workflow !== null && workflow !== undefined,
+    workflowId: plan.workflow?.id ?? null,
+    captainSessionId: plan.captainSessionId,
+  }
+
+  return {
+    action: 'plan.approve',
+    operationId: runtime.nextId('operation'),
+    targetHash: plan.planHash,
+    impactHash: hashContent(impact),
+    summary:
+      `批准计划「${plan.name}」：建 ${String(plannedMembers)} 名成员` +
+      (impact.startsRun ? `、开 Run 并落 ${String(plannedTasks)} 个任务` : ''),
+    impact: impact as unknown as JsonValue,
+  }
+}
+
+/**
+ * 第二步：人类确认后批准计划。
+ *
+ * 顺序固定：**先复验令牌**（targetHash 是 planHash，内容改过就失效）→ 消费令牌 → 执行批准。
+ * 校验不能省，否则伪造令牌可以凭空建出整个团队。
+ */
+export function confirmTeamPlanApproval(
+  runtime: ProjectRuntime,
+  deps: HumanActionDeps,
+  input: {
+    actor: ActorRef
+    planId: string
+    planHash: string
+    startRun: boolean
+    operationId: string
+    confirmation: HumanConfirmation
+  },
+): { teamId: string; memberIds: string[]; runId: string | null; taskIds: string[] } {
+  authorize('plan.approve', input.actor)
+  const current = runtime.state.teamPlans.get(input.planId)
+  if (current === undefined) {
+    fail(ERROR_CODES.NOT_FOUND, '没有这份待批准的计划（可能已经批准或丢弃）', {
+      details: { planId: input.planId },
+    })
+  }
+  if (current.planHash !== input.planHash) {
+    fail(ERROR_CODES.CONFIRMATION_TARGET_CHANGED, '计划内容与预览时不一致，请重新预览再批准', {
+      details: { planId: input.planId, expectedHash: input.planHash, actualHash: current.planHash },
+    })
+  }
+
+  const preview = previewTeamPlanApproval(runtime, { planId: input.planId })
+  deps.authorizer.verify(input.confirmation, {
+    operationId: input.operationId,
+    action: 'plan.approve',
+    targetHash: preview.targetHash,
+    impactHash: preview.impactHash,
+  })
+  deps.authorizer.consume(input.confirmation)
+
+  const approved = approveTeamPlanCommand(runtime, {
+    actor: input.actor,
+    planId: input.planId,
+    planHash: input.planHash,
+    startRun: input.startRun,
+  })
+  return {
+    teamId: approved.teamId,
+    memberIds: approved.memberIds,
+    runId: approved.runId,
+    taskIds: approved.taskIds,
+  }
+}
+
 export function assertActionMatches(confirmation: HumanConfirmation, action: HumanAction): void {
   if (confirmation.action !== action) {
     fail(ERROR_CODES.HUMAN_CONFIRMATION_INVALID, '确认令牌的动作与请求不一致', {
