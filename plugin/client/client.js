@@ -371,6 +371,30 @@ window.__ModuleLoader__.load({
       )
     }
 
+    /**
+     * 空态（L5 共用件，`p-states` 的规范）。
+     *
+     * 设计稿那句话是硬要求：**只写「暂无数据」等于没有设计**。所以这个组件强制两件事——
+     *   1. `reason`：为什么空（没有它就没法判断是该等、该建，还是该换个地方看）；
+     *   2. `action`：下一步能做什么（可以是按钮，也可以只是一句「去哪做什么」）。
+     * 两者都不给就渲染不出来，逼着调用方想清楚，而不是随手甩一句「没有数据」。
+     */
+    function EmptyState(props) {
+      const { reason, action } = props
+      if (typeof reason !== 'string' || reason.trim().length === 0) {
+        // 宁可显眼地坏，也不要静默出一个「没有说明的空态」。
+        return h('p', { className: 'muted', style: { fontSize: 12, margin: 0 } }, '（空态缺说明：这是实现错误）')
+      }
+      return h(
+        'div',
+        { className: 'box', style: { padding: '14px 12px', textAlign: 'center' } },
+        h('div', { className: 'muted', style: { fontSize: 12 } }, reason),
+        action === undefined || action === null
+          ? null
+          : h('div', { style: { marginTop: 8 } }, action),
+      )
+    }
+
     function Data(props) {
       const { data, what, children, onRetry } = props
       if (data.status === 'no-session') {
@@ -501,7 +525,10 @@ window.__ModuleLoader__.load({
     function TeamCards(props) {
       const { teams } = props
       if (teams.length === 0) {
-        return h('p', { className: 'muted', style: { fontSize: 12, margin: '8px 0 0' } }, '这个项目还没有团队。')
+        return h(EmptyState, {
+          reason: '这个项目还没有团队。团队由人类在「团队」栏建，或让队长在会话里建。',
+          action: null,
+        })
       }
       return h(
         'div',
@@ -1096,7 +1123,7 @@ window.__ModuleLoader__.load({
                 'div',
                 { className: 'col-b' },
                 tasks.length === 0
-                  ? h('p', { className: 'muted', style: { fontSize: 12, margin: '2px 0 0' } }, '空')
+                  ? h('p', { className: 'muted', style: { fontSize: 12, margin: '2px 0 0' } }, '这个状态还没有任务')
                   : tasks.map((task) =>
                       h(
                         'button',
@@ -2158,7 +2185,10 @@ window.__ModuleLoader__.load({
             })
           : null,
         items.length === 0
-          ? h('p', { className: 'muted', style: { fontSize: 12, margin: 0 } }, '这个项目还没有定义副本。')
+          ? h(EmptyState, {
+              reason: '这个项目还没有定义副本。定义来自内置角色、会话里保存的修改，以及从全局库复制。',
+              action: null,
+            })
           : h(
               'div',
               { className: 'list' },
@@ -2226,12 +2256,18 @@ window.__ModuleLoader__.load({
 
     const RUN_STATUS = { active: '进行中', completed: '已完成', cancelled: '已取消' }
 
+    /**
+     * 列表外壳。空态直接交给 {@link EmptyState}（要求「为什么空 + 下一步」），
+     * 传字符串是过去的用法，会被当成 reason、没有 action —— 所以新代码请传节点。
+     */
     function ListPane(props) {
       return h(
         'div',
         { className: props.tight === true ? 'body pad tight' : 'body pad' },
         props.items.length === 0
-          ? h('p', { className: 'muted', style: { fontSize: 12, margin: 0 } }, props.empty)
+          ? typeof props.empty === 'string'
+            ? h(EmptyState, { reason: props.empty, action: props.emptyAction })
+            : props.empty
           : h('div', { className: 'list' }, props.children),
         props.footer ?? null,
       )
@@ -2618,7 +2654,7 @@ window.__ModuleLoader__.load({
           ListPane,
           {
             items: entries,
-            empty: '记忆库是空的。',
+            empty: '记忆库是空的。记忆只在成员真正写入、或人类在面板「记一条」之后才出现。',
             footer:
               warnings.length === 0
                 ? null
@@ -2701,7 +2737,7 @@ window.__ModuleLoader__.load({
         ListPane,
         {
           items,
-          empty: '这个项目还没有事件。',
+          empty: '这个项目还没有事件。每个写动作都会落一条账本事件，所以空账本意味着还没人动过它。',
           footer: h(
             'p',
             { className: 'muted', style: { margin: '10px 0 0', fontSize: 12 } },

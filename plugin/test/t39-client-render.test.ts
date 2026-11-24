@@ -1718,6 +1718,50 @@ test('定义栏：点开已有蓝图 → 表单预填，保存时带 id（走修
   }
 })
 
+test('空态纪律：每一栏的空态都要说清「为什么空」，不是只写「暂无数据」', async () => {
+  const harness = loadClient(EMPTY)
+  try {
+    const tabs = ['概览', '任务', '团队', '流程', '定义', '知识', '记忆', '审计', '设置']
+    for (const label of tabs) {
+      let tree = await mount(harness.view, { sessionId: 'ses_1' })
+      const tab = findTab(tree, label)
+      assert.ok(tab !== null, `缺「${label}」栏`)
+      ;(tab!.props.onClick as () => void)()
+      tree = await mount(harness.view, { sessionId: 'ses_1' })
+      const text = textOf(tree)
+
+      // 设计稿那句硬要求：只写「暂无数据」等于没有设计。
+      for (const lazy of ['暂无数据', '没有数据', '空空如也']) {
+        assert.ok(!text.includes(lazy), `「${label}」栏不该只写「${lazy}」`)
+      }
+      // 空态要给出原因（「还没有 / 没有 / 空」必须带上下文），这里用一条更硬的判据：
+      // 每栏的空提示至少要长到能说明原因，不能是两个字。
+      const emptyish = ['还没有', '是空的', '没有'].filter((phrase) => text.includes(phrase))
+      if (emptyish.length > 0) {
+        const shortest = Math.min(...emptyish.map((phrase) => {
+          const index = text.indexOf(phrase)
+          return text.slice(index, index + 40).length
+        }))
+        assert.ok(shortest >= 20, `「${label}」栏的空提示太短，像是没写原因：${text.slice(0, 120)}`)
+      }
+    }
+  } finally {
+    harness.restore()
+  }
+})
+
+test('空态纪律：实现里不许再出现"空"这类占位文案（源码级守卫）', () => {
+  const source = readFileSync(join(ROOT, 'client', 'client.js'), 'utf8')
+  // 文本节点出现「空」必须是带上下文的句子（例如「这个状态还没有任务」），
+  // 不允许 '空' 这种只有两个字、什么都没说的占位。
+  const offenders = []
+  for (const match of source.matchAll(/['"](\u7a7a|空)['"]/g)) offenders.push(match[0])
+  for (const match of source.matchAll(/h\('(p|div|span)'[^)]*?,\s*'空'\s*\)/g)) offenders.push(match[0].slice(0, 40))
+  assert.deepEqual(offenders, [], '找到孤立的「空」占位文案，要换成说明为什么空')
+  // 空态组件的入口必须存在，且 ListPane 走它。
+  assert.ok(source.includes('function EmptyState('), '空态应走共用件 EmptyState')
+  assert.ok(source.includes('h(EmptyState, { reason:'), 'ListPane 的字符串空态应转到 EmptyState')
+})
 test('样式来源守卫：渲染出来的每个类名都定义在仓库 design-v2 里（不是打包副本）', async () => {
   // 这条是踩过坑才加的：包内 plugin/design-v2 是 build 从仓库 design-v2 **拷出来**的生成物，
   // 每次 build 都会 rmSync 重建。把新样式写进包内副本，下一次 build 就静默丢了 ——
