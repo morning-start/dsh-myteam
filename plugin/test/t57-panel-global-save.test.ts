@@ -144,3 +144,19 @@ test('装配层守卫：composition/panel.ts 必须把 globalEditor 与 globalEn
   assert.ok(/previewPanelWrite([^)]*writeDeps)/s.test(source) || source.includes('params, writeDeps)'), '预览必须传 writeDeps')
   assert.ok(source.includes('writeDeps)'), '确认必须传 writeDeps')
 })
+
+test('登记守卫：写方法必须同时出现在 PANEL_WRITE_METHODS / KINDS / DOCS 三张表', async () => {
+  // 真实踩过：globalDefinitionSave 先进了 KINDS 与 DOCS，却漏进 PANEL_WRITE_METHODS ——
+  // 表现是「运行时调它报未知写方法」，而 t55/t56/t57 直接注入 deps 全都绿。
+  const mod = await import('../src/application/panel-writes.ts')
+  const methods = mod.PANEL_WRITE_METHODS as readonly string[]
+  const kinds = mod.PANEL_WRITE_KINDS as Record<string, string>
+  const docs = mod.PANEL_WRITE_DOCS as Record<string, string>
+  const missing: string[] = []
+  for (const method of methods) {
+    if (!(method in kinds)) missing.push(method + ' 缺 KINDS')
+    if (!(method in docs)) missing.push(method + ' 缺 DOCS')
+  }
+  assert.deepEqual(missing, [], '三张表必须一一对应')
+  assert.ok(methods.includes('globalDefinitionSave'), 'globalDefinitionSave 必须在白名单里')
+})

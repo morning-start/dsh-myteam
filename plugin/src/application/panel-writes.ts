@@ -55,6 +55,7 @@ export const PANEL_WRITE_METHODS = [
   'memberArchive',
   'memberRestore',
   'definitionPublish',
+  'globalDefinitionSave',
   'definitionSave',
   'memoryRemember',
   'memoryForget',
