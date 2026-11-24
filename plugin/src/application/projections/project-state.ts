@@ -64,6 +64,21 @@ export interface PendingPublication {
   requestedAt: string
 }
 
+/**
+ * 一份**待人类确认**的队长接管提案。
+ *
+ * 提案不改变队长（generation 不动）；人类确认时才 +1 并落 `captain.handoff.confirmed`。
+ * 提案会因为「队长被换掉了」而失效 —— 所以 `captain.assigned` / `confirmed` 都要把它清掉。
+ */
+export interface PendingHandoff {
+  teamId: string
+  /** 提案时的队长 generation；确认时据此判断提案有没有过期。 */
+  fromGeneration: number
+  toSessionId: string
+  proposedBy: string
+  proposedAt: string
+}
+
 export interface ProjectState {
   projectId: string
   name: string
@@ -99,6 +114,8 @@ export interface ProjectState {
   teamConfigs: Map<string, EffectiveConfigSnapshot>
   /** 待人类确认的全局发布（按 operationId）。`outcome` 一到就删。 */
   pendingPublications: Map<string, PendingPublication>
+  /** 待人类确认的队长接管（按 teamId）。确认或被新指派覆盖时删。 */
+  pendingHandoffs: Map<string, PendingHandoff>
 }
 
 export function emptyProjectState(projectId: string): ProjectState {
@@ -128,6 +145,7 @@ export function emptyProjectState(projectId: string): ProjectState {
     graphRevision: 1,
     teamConfigs: new Map(),
     pendingPublications: new Map(),
+    pendingHandoffs: new Map(),
   }
 }
 
@@ -415,10 +433,26 @@ export function applyEvent(state: ProjectState, event: EventEnvelope): void {
       state.captains.set(payload.teamId, { ...payload, assignedAt: event.occurredAt })
       return
     }
-    case 'captain.handoff.proposed':
+    case 'captain.handoff.proposed': {
+      const payload = event.payload as {
+        teamId: string
+        fromGeneration: number
+        toSessionId: string
+        proposedBy: string
+      }
+      state.pendingHandoffs.set(payload.teamId, {
+        teamId: payload.teamId,
+        fromGeneration: payload.fromGeneration,
+        toSessionId: payload.toSessionId,
+        proposedBy: payload.proposedBy,
+        proposedAt: event.occurredAt,
+      })
       return
+    }
     case 'captain.handoff.confirmed': {
       const payload = event.payload as { teamId: string; generation: number; toSessionId: string }
+      // 确认之后提案就不再是「待确认」了。
+      state.pendingHandoffs.delete(payload.teamId)
       state.captains.set(payload.teamId, {
         teamId: payload.teamId,
         sessionId: payload.toSessionId,

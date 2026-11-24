@@ -375,6 +375,70 @@ export function createTeamCommand(
   return runtime.commit(drafts)
 }
 
+/**
+ * 队长提案接管（`captain.handoff.proposed`）—— **只提案，不执行**。
+ *
+ * 为什么要这一步：设计稿 `p-approval` 的「队长接管」是排队等人类确认的；
+ * 而事件 `captain.handoff.proposed` 早就声明在事件目录里，却**没有任何写入方**、
+ * 投影也是 no-op —— 于是「谁在等接管确认」根本查不出来。这里把它接通。
+ *
+ * 分工照设计稿：「这些动作队长只能提案；执行必须来自人类入口并重新校验」。
+ *   - 提案：本命令（队长或人类都可以，走 `captain.handoff.propose`）；
+ *   - 执行：`confirmCaptainTakeover`（人类专属，`captain.handoff.confirm` + 令牌）。
+ *
+ * 提案不改变队长，也不动 generation —— 它只是把「想换成谁」记进账本，
+ * 让待确认页看得到。generation 只在人类确认时 +1。
+ */
+export function proposeCaptainHandoffCommand(
+  runtime: ProjectRuntime,
+  input: { actor: ActorRef; teamId: string; toSessionId: string },
+): CommitResult {
+  authorize('captain.handoff.propose', input.actor, { teamId: input.teamId })
+  const state = runtime.state
+  const team = state.teams.get(input.teamId)
+  if (team === undefined) {
+    fail(ERROR_CODES.NOT_FOUND, '团队不存在', { details: { teamId: input.teamId } })
+  }
+  if (team.status !== 'active') {
+    fail(ERROR_CODES.TEAM_NOT_ACTIVE, `团队状态为 ${team.status}，不能提案接管`, { details: { teamId: team.id } })
+  }
+  if (input.toSessionId.trim().length === 0) {
+    fail(ERROR_CODES.INVALID_PAYLOAD, '提案接管必须指定接任会话')
+  }
+  const current = state.captains.get(team.id) ?? null
+  if (current !== null && current.sessionId === input.toSessionId) {
+    fail(ERROR_CODES.CONFLICT, '该会话已经是当前队长', { details: { sessionId: input.toSessionId } })
+  }
+  // 同一个人重复提案 → 拒绝，别让待确认列表里堆一串一样的。
+  const pending = state.pendingHandoffs.get(team.id)
+  if (pending !== undefined && pending.toSessionId === input.toSessionId) {
+    fail(ERROR_CODES.CONFLICT, '已经有一份指向同一会话的待确认接管提案', {
+      details: { teamId: team.id, toSessionId: input.toSessionId, proposedAt: pending.proposedAt },
+    })
+  }
+
+  const proposedBy =
+    input.actor.kind === 'human'
+      ? `human:${input.actor.userId}`
+      : input.actor.kind === 'captain'
+        ? `captain:${input.actor.sessionId}`
+        : `${input.actor.kind}:${input.actor.sessionId}`
+
+  return runtime.commit([
+    {
+      type: 'captain.handoff.proposed',
+      actor: input.actor,
+      entity: { kind: 'captain-assignment', id: team.id, teamId: team.id },
+      payload: {
+        teamId: team.id,
+        fromGeneration: current?.generation ?? 0,
+        toSessionId: input.toSessionId,
+        proposedBy,
+      },
+    },
+  ])
+}
+
 export function createTaskCommand(
   runtime: ProjectRuntime,
   input: {

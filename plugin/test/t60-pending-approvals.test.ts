@@ -50,9 +50,9 @@ test('空项目：待确认与已处理都是空的，但必须如实标出两�
       assert.deepEqual(view.decided, [])
       assert.equal(view.counts.pending, 0)
       assert.equal(view.counts.decided, 0)
-      // 关键：不许假装全覆盖 —— 计划批准与队长接管都不在这页。
+      // 关键：不许假装全覆盖。计划批准仍然没有领域模型；队长接管已经接通（t61 守着）。
       assert.equal(view.unsupported.planApproval, true, '计划批准没有领域模型，必须标未覆盖')
-      assert.equal(view.unsupported.captainTakeover, true, '队长接管是当场两段式、不排队，必须标未覆盖')
+      assert.equal(view.unsupported.captainTakeover, false, '队长接管已接通（见 t61），不该再标未覆盖')
     } finally {
       runtime.close()
     }

@@ -3132,7 +3132,8 @@ window.__ModuleLoader__.load({
       const [lane, setLane] = useState('pending')
       const unsupported = data.unsupported ?? {}
 
-      const kindLabel = (kind) => (kind === 'gate' ? '门禁裁决' : kind === 'publish' ? '全局发布' : String(kind))
+      const kindLabel = (kind) =>
+        kind === 'gate' ? '门禁裁决' : kind === 'publish' ? '全局发布' : kind === 'handoff' ? '队长接管' : String(kind)
       const rows = lane === 'pending' ? pending : decided
 
       const card = (item) =>
@@ -3195,8 +3196,8 @@ window.__ModuleLoader__.load({
           : h('div', { className: 'list' }, rows.map(card)),
         unsupported.planApproval === true || unsupported.captainTakeover === true
           ? h('p', { className: 'muted', style: { margin: '14px 0 0', fontSize: 12 } },
-              '这一页目前只覆盖门禁裁决与全局发布。「计划批准」还没有对应的领域模型（团队只有在岗/归档/解散）；'
-              + '「队长接管」是当场两段式确认、不排队，所以都不会出现在这里。')
+              '这一页覆盖门禁裁决、全局发布与队长接管。「计划批准」还没有对应的领域模型'
+              + '（团队只有在岗 / 归档 / 解散，没有草稿态），所以不会出现在这里。')
           : null,
       )
     }

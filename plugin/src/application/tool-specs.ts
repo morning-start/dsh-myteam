@@ -19,6 +19,7 @@ import {
   createProjectWorkflowCommand,
   createTaskCommand,
   createTeamCommand,
+  proposeCaptainHandoffCommand,
 } from './commands.ts'
 import { completeTaskCommand, recordEvidenceCommand, recordProgressCommand, recordVerdictCommand, submitReviewCommand } from './task-commands.ts'
 import { startWorkflowRunCommand } from './run-commands.ts'
@@ -247,6 +248,31 @@ export function leadToolSpecs(): MyTeamToolSpec[] {
             toSessionId: requireString(record, 'toSessionId'),
           }),
         })
+      },
+    },
+    {
+      name: 'myteam_propose_handoff',
+      description:
+        '提案把本团队的队长换成另一个会话（**只提案，不执行**）。提案落进账本后，人类会在「待你确认」里看到；'
+        + '只有人类确认才会真正换队长、generation 才 +1。已有同样的待确认提案时会被拒。',
+      parameters: {
+        type: 'object',
+        properties: {
+          teamId: { type: 'string', description: '团队 id' },
+          toSessionId: { type: 'string', description: '接任队长的会话 id' },
+        },
+        required: ['teamId', 'toSessionId'],
+        additionalProperties: false,
+      },
+      outputSchema: OUTPUT_SCHEMA,
+      execute(args, context) {
+        const record = asRecord(args)
+        const result = proposeCaptainHandoffCommand(context.runtime, {
+          actor: context.actor,
+          teamId: requireString(record, 'teamId'),
+          toSessionId: requireString(record, 'toSessionId'),
+        })
+        return jsonSafe({ ok: true, data: { proposed: true, seq: result.seq } })
       },
     },
     {

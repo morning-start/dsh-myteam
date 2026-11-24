@@ -65,16 +65,19 @@ export interface BoardView {
  *   1. **门禁裁决**：任务停在 `review` 就是在等人下结论；`state.verdicts` 里有已下过的结论。
  *   2. **待确认的全局发布**：`definition.publication.requested` 落了事件但还没 `outcome`。
  *
- * **做不到的**（如实写在这里，不假装有）：
- *   - 「计划批准」：领域里没有 draft/plan 聚合，团队只有 active/archived/disbanded；
- *   - 「队长接管」：它是**当场两段式**（预览签令牌 → 确认），不排队。
- *     事件 `captain.handoff.proposed` 在投影里是 no-op，也没有写入方，所以查不出「谁在等接管」。
+ * 三类里现在能画两类半：
+ *   - **门禁裁决** ✅：任务停在 review 且当前 Attempt 还没有裁决；
+ *   - **全局发布** ✅：`definition.publication.requested` 落了但还没 `outcome`；
+ *   - **队长接管** ✅（2026-11-24 接通）：`captain.handoff.proposed` 之前**没有任何写入方**、
+ *     投影也是 no-op，所以查不出「谁在等接管」。现在由 `proposeCaptainHandoffCommand` 落事件、
+ *     投影记进 `pendingHandoffs`，这里就能列出来了。
  *
- * 所以这一页只画**确实在等人类**的东西；另外两类等域模型补上再说。
+ * **仍然做不到的**（如实写在这里，不假装有）：
+ *   - 「计划批准」：领域里没有 draft/plan 聚合，团队只有 active/archived/disbanded。
  */
 export interface PendingApprovalItem {
   /** 用来区分卡片画法。 */
-  kind: 'gate' | 'publish'
+  kind: 'gate' | 'publish' | 'handoff'
   id: string
   title: string
   /** 副标题：团队名 / 目标文件。 */
@@ -134,7 +137,20 @@ export function pendingApprovalsView(state: ProjectState): PendingApprovalsView 
     })
   }
 
-  // 3) 已处理的：门禁裁决结果（state.verdicts 已经是历史，不会被清）。
+  // 3) 待确认的队长接管提案（提案不改 generation，人类确认才 +1）。
+  for (const item of state.pendingHandoffs.values()) {
+    const team = state.teams.get(item.teamId)
+    pending.push({
+      kind: 'handoff',
+      id: item.teamId,
+      title: team === undefined ? item.teamId : `接管团队「${team.name}」`,
+      detail: `generation ${String(item.fromGeneration)} → ${String(item.fromGeneration + 1)} · 接任 ${item.toSessionId}`,
+      since: item.proposedAt,
+      by: item.proposedBy,
+    })
+  }
+
+  // 4) 已处理的：门禁裁决结果（state.verdicts 已经是历史，不会被清）。
   for (const verdict of state.verdicts.values()) {
     const task = state.tasks.get(verdict.taskId)
     decided.push({
@@ -154,7 +170,7 @@ export function pendingApprovalsView(state: ProjectState): PendingApprovalsView 
     pending,
     decided,
     counts: { pending: pending.length, decided: decided.length },
-    unsupported: { planApproval: true, captainTakeover: true },
+    unsupported: { planApproval: true, captainTakeover: false },
   }
 }
 
