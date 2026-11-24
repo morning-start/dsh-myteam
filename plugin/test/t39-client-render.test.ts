@@ -983,25 +983,48 @@ test('L2-F 流程泳道：按 Run 分行，空 Run 说清「没挂任务」', as
   }
 })
 
-test('L2-F 待你确认：有 review/blocked 时列出，没有时说「没有等你确认的事」', async () => {
+test('L2-F 待你确认：默认折叠（同一件事不在首屏说两遍），点「逐项确认」才展开明细', async () => {
+  // 设计稿 p-overview 的顺序是：指标卡 → 一条横幅（几件 + 哪几件 + 「逐项确认」）
+  // → 团队 → 跨团队依赖 → 最近事件。**底部没有第二块列表**。
+  // 实现里横幅与底部明细说的是同一件事，所以明细默认折叠，由横幅的按钮展开。
   const empty = loadClient(EMPTY)
   try {
-    const tree = await mount(empty.view, { sessionId: 'ses_1' })
-    const text = textOf(tree)
-    assert.ok(text.includes('待你确认'), `概览应带待确认分节：${text.slice(0, 200)}`)
-    assert.ok(text.includes('没有等你确认的事'), '0 件时要有空态')
+    let tree = await mount(empty.view, { sessionId: 'ses_1' })
+    let text = textOf(tree)
+    assert.ok(!text.includes('待你确认'), '0 件时不该有横幅（waiting === 0 不渲染）')
+
+    // 点开明细 → 空态
+    const expand = findButton(tree, '逐项确认')
+    if (expand !== null) {
+      ;(expand.props.onClick as () => void)()
+      tree = await mount(empty.view, { sessionId: 'ses_1' })
+      text = textOf(tree)
+      assert.ok(text.includes('没有等你确认的事'), '0 件时展开要有空态')
+    }
   } finally {
     empty.restore()
   }
 
   const filled = loadClient(FILLED)
   try {
-    const tree = await mount(filled.view, { sessionId: 'ses_1' })
-    const text = textOf(tree)
-    assert.ok(text.includes('待你确认'), '概览应带待确认分节')
-    assert.ok(text.includes('1 件'), `计数应反映 attention：${text.slice(0, 260)}`)
-    assert.ok(text.includes('评审中的任务'), '待确认里要列出 review 任务')
-    assert.ok(!text.includes('没有等你确认的事'), '有事项时不该显示空态')
+    let tree = await mount(filled.view, { sessionId: 'ses_1' })
+    let text = textOf(tree)
+
+    // 横幅在，且说清有几件、哪几件
+    assert.ok(text.includes('1 件事等你处理'), `横幅要给出件数：${text.slice(0, 260)}`)
+    assert.ok(text.includes('1 个任务待裁决'), '横幅要写清是哪一类，不只给数字')
+    // 首屏不该同时出现第二块「待你确认」列表
+    assert.ok(!text.includes('待你确认'), '首屏不该有第二块待确认列表（与横幅重复）')
+    assert.ok(!text.includes('评审中的任务'), '明细默认折叠时不该列出任务卡')
+
+    // 点「逐项确认」→ 明细展开，列出 review 任务
+    const expand = findButton(tree, '逐项确认')
+    assert.ok(expand !== null, '横幅应有「逐项确认」')
+    ;(expand!.props.onClick as () => void)()
+    tree = await mount(filled.view, { sessionId: 'ses_1' })
+    text = textOf(tree)
+    assert.ok(text.includes('待你确认'), '展开后应出现明细分节')
+    assert.ok(text.includes('评审中的任务'), '展开后要列出 review 任务')
   } finally {
     filled.restore()
   }

@@ -594,7 +594,7 @@ window.__ModuleLoader__.load({
     }
 
     function OverviewScreen(props) {
-      const { data, events, onSelect, board } = props
+      const { data, events, onSelect, board, onExpandApprovals } = props
       const totals = data.totals ?? { all: 0, done: 0, blocked: 0, review: 0 }
       const attention = data.attention ?? { review: 0, blocked: 0, unknownEffects: 0 }
       const teamList = Array.isArray(data.teams) ? data.teams : []
@@ -647,12 +647,16 @@ window.__ModuleLoader__.load({
                 { className: 'b-t' },
                 h('b', null, `${waiting} 件事等你处理`),
                 h('span', null,
-                  `待裁决 ${attention.review} · 受阻 ${attention.blocked}${(attention.unknownEffects ?? 0) > 0 ? ` · 未知副作用 ${attention.unknownEffects}` : ''}`),
+                  [
+                    attention.review > 0 ? `${attention.review} 个任务待裁决` : null,
+                    attention.blocked > 0 ? `${attention.blocked} 个任务受阻` : null,
+                    (attention.unknownEffects ?? 0) > 0 ? `${attention.unknownEffects} 个副作用结果未知` : null,
+                  ].filter((item) => item !== null).join(' · ')),
               ),
-              onSelect === undefined
+              onExpandApprovals === undefined
                 ? null
                 : h('div', { className: 'acts' },
-                    h('button', { type: 'button', className: 'btn primary', onClick: () => onSelect('tasks') }, '去任务栏处理')),
+                    h('button', { type: 'button', className: 'btn primary', onClick: () => onExpandApprovals() }, '逐项确认')),
             ),
         h(SectionHeader, { title: '团队', note: `${teamList.length} 个` }),
         h(TeamCards, { teams: teamList }),
@@ -2979,6 +2983,8 @@ window.__ModuleLoader__.load({
       const { sessionId } = props
       const [tab, setTab] = useState('overview')
       const [taskId, setTaskId] = useState(null)
+      /** 概览底部「待你确认」明细默认折叠（与顶部横幅重复）；点横幅才展开。 */
+      const [approvalsOpen, setApprovalsOpen] = useState(false)
       const [runId, setRunId] = useState(null)
 
       useEffect(() => {
@@ -3048,8 +3054,17 @@ window.__ModuleLoader__.load({
       } else if (tab === 'overview') {
         body = h(Data, { data: overview, what: '项目概览' }, (data) =>
           [
-          h(OverviewScreen, { data, events: overviewEvents.data?.items, board: board.data, onSelect: go }),
-          h(ApprovalSection, { overview: overview.data, board: board.data, onOpenTask: (task) => { setTaskId(task.id) } }),
+          h(OverviewScreen, {
+            data,
+            events: overviewEvents.data?.items,
+            board: board.data,
+            onSelect: go,
+            // 横幅上的「逐项确认」把底部明细展开（默认折叠：同一件事不要在首屏说两遍）。
+            onExpandApprovals: () => setApprovalsOpen(true),
+          }),
+          approvalsOpen === true
+            ? h(ApprovalSection, { overview: overview.data, board: board.data, onOpenTask: (task) => { setTaskId(task.id) } })
+            : null,
         ])
       } else if (tab === 'tasks') {
         body = h(Data, { data: board, what: '任务看板' }, (data) =>
