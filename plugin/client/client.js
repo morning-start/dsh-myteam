@@ -2973,6 +2973,114 @@ window.__ModuleLoader__.load({
             ),
           ),
         ),
+        props.sessionId === undefined
+          ? null
+          : h(DestroyProjectBox, {
+              projectName: props.projectName,
+              sessionId: props.sessionId,
+              onDone: () => {
+                if (props.onChanged !== undefined) props.onChanged()
+              },
+            }),
+      )
+    }
+
+    /**
+     * 删除项目数据（设计稿 `p-settings` 的「生命周期」区）。
+     *
+     * 这是**唯一不可撤销**的动作，所以界面比别的写动作多一道：必须手输项目名。
+     * 设计稿原话：「删除事件日志、SQLite 与生成视图，不可撤销。只在你确实要丢掉
+     * 整个项目历史时使用；归档只是停止写入。」
+     *
+     * 两段式：先「读影响面」拿到要删的每一项与总大小，再输入项目名 + 确认。
+     */
+    function DestroyProjectBox(props) {
+      const { projectName, sessionId, onDone } = props
+      const [stage, setStage] = useState('idle')
+      const [preview, setPreview] = useState(null)
+      const [typed, setTyped] = useState('')
+      const [problem, setProblem] = useState(null)
+
+      const begin = async () => {
+        setStage('busy')
+        setProblem(null)
+        try {
+          const result = await callWrite('projectDestroy', sessionId, { params: {} })
+          setPreview(result)
+          setStage('preview')
+        } catch (error) {
+          setProblem(messageOf(error))
+          setStage('failed')
+        }
+      }
+
+      const commit = async () => {
+        if (typed.trim() !== projectName) {
+          setProblem('输入的项目名不对，不能删除')
+          return
+        }
+        setStage('busy')
+        setProblem(null)
+        try {
+          await callWrite('projectDestroy', sessionId, {
+            params: { name: typed.trim() },
+            action: 'confirm',
+            confirmation: preview.confirmation,
+            reason: '面板确认（删除项目数据）',
+          })
+          setPreview(null)
+          setStage('done')
+          if (onDone !== undefined) onDone()
+        } catch (error) {
+          setProblem(messageOf(error))
+          setStage('failed')
+        }
+      }
+
+      const busy = stage === 'busy'
+      return h(
+        'div',
+        { className: 'box', style: { padding: '12px 16px', marginTop: 12 } },
+        h(SectionHeader, { title: '生命周期', note: '不可撤销' }),
+        h('p', { className: 'muted', style: { margin: '8px 0 0', fontSize: 12 } },
+          '删除事件日志、SQLite 与生成视图，不可撤销。只在你确实要丢掉整个项目历史时使用；归档只是停止写入。'),
+        stage === 'done'
+          ? h('p', { className: 'muted', style: { margin: '8px 0 0', fontSize: 12 } },
+              '项目数据已删除。这个工作区下次打开会重新初始化一个空项目。')
+          : preview === null
+            ? h('div', { className: 'acts', style: { marginTop: 10 } },
+                h('button', { type: 'button', className: 'btn', disabled: busy, onClick: () => void begin() },
+                  busy ? '读影响面…' : '删除项目数据'))
+            : h('div', null,
+                h('div', { className: 'rc-h', style: { marginTop: 10 } },
+                  h(Dot, { tone: 'fail' }),
+                  h('span', { className: 'nm' }, preview.summary === undefined ? '删除项目数据' : preview.summary),
+                  h('span', { className: 'tag' }, '不可撤销')),
+                impactLines(preview.impact).map((line) =>
+                  h('p', { key: line, className: 'muted', style: { margin: '6px 0 0', fontSize: 12 } }, line)),
+                h('p', { className: 'muted', style: { margin: '10px 0 4px', fontSize: 12 } },
+                  '输入项目名「' + projectName + '」继续：'),
+                h('input', {
+                  type: 'text',
+                  className: 'box',
+                  placeholder: projectName,
+                  value: typed,
+                  style: { display: 'block', width: '100%', padding: '8px 10px', fontSize: 13 },
+                  onChange: (event) => setTyped(event.target.value),
+                }),
+                h('div', { className: 'acts', style: { marginTop: 10 } },
+                  h('button', {
+                    type: 'button',
+                    className: 'btn primary',
+                    disabled: busy || typed.trim() !== projectName,
+                    onClick: () => void commit(),
+                  }, busy ? '删除中…' : '删除项目数据'),
+                  h('button', { type: 'button', className: 'btn', style: { marginLeft: 8 },
+                    onClick: () => { setPreview(null); setTyped(''); setStage('idle') } }, '取消')),
+              ),
+        problem === null
+          ? null
+          : h('p', { className: 'muted', style: { fontSize: 12, margin: '8px 0 0' } }, '没成功：' + problem),
       )
     }
 
@@ -3105,7 +3213,13 @@ window.__ModuleLoader__.load({
         body = h(Data, { data: audit, what: '审计' }, (data) => h(AuditScreen, { data }))
       } else if (tab === 'settings') {
         body = [
-          h(Data, { data: settings, what: '项目设置' }, (data) => h(SettingsScreen, { data })),
+          h(Data, { data: settings, what: '项目设置' }, (data) =>
+            h(SettingsScreen, {
+              data,
+              sessionId,
+              projectName,
+              onChanged: () => void settings.reload(),
+            })),
           h(Data, { data: migration, what: 'v1 迁移影响面' }, (data) => h(MigrationScreen, { data })),
         ]
       } else {

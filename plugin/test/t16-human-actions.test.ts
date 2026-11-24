@@ -274,7 +274,7 @@ test('人类专属动作：agent 既不能签发也不能执行', () => {
   }
 })
 
-test('面板写通道：预览签发令牌 → 凭令牌执行 → 同一令牌不可复用', () => {
+test('面板写通道：预览签发令牌 → 凭令牌执行 → 同一令牌不可复用', async () => {
   const dir = mkdtempSync(join(tmpdir(), 'myteam-human-'))
   try {
     const runtime = openRuntime(dir)
@@ -287,7 +287,7 @@ test('面板写通道：预览签发令牌 → 凭令牌执行 → 同一令牌�
       assert.equal(preview.confirmation.action, 'team.disband')
       assert.equal(typeof preview.confirmation.nonce, 'string')
 
-      const applied = applyPanelWrite(runtime, authorizer, 'teamDisband', {
+      const applied = await applyPanelWrite(runtime, authorizer, 'teamDisband', {
         params: { teamId },
         confirmation: preview.confirmation,
         reason: '项目结束',
@@ -297,7 +297,7 @@ test('面板写通道：预览签发令牌 → 凭令牌执行 → 同一令牌�
       assert.equal(runtime.state.teams.get(teamId)!.status, 'disbanded')
 
       // 令牌是一次性的：再确认一次必须失败（消费或状态冲突，二者都不执行写入）
-      assert.throws(() =>
+      await assert.rejects(() =>
         applyPanelWrite(runtime, authorizer, 'teamDisband', {
           params: { teamId },
           confirmation: preview.confirmation,
@@ -312,7 +312,7 @@ test('面板写通道：预览签发令牌 → 凭令牌执行 → 同一令牌�
   }
 })
 
-test('面板写通道：队长接管也要令牌，接管后 generation 递增', () => {
+test('面板写通道：队长接管也要令牌，接管后 generation 递增', async () => {
   const dir = mkdtempSync(join(tmpdir(), 'myteam-human-'))
   try {
     const runtime = openRuntime(dir)
@@ -328,7 +328,7 @@ test('面板写通道：队长接管也要令牌，接管后 generation 递增',
       assert.equal(preview.confirmation.action, 'captain.takeover')
       assert.match(preview.summary, /队长/, '预览要说明这是队长变更')
 
-      applyPanelWrite(runtime, authorizer, 'captainTakeover', {
+      await applyPanelWrite(runtime, authorizer, 'captainTakeover', {
         params: { teamId, toSessionId: 'ses_next_captain' },
         confirmation: preview.confirmation,
         reason: '会话切换',

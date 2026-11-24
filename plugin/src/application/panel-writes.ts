@@ -19,6 +19,7 @@ import type { EvidenceRef, GateCheckResult, GateVerdict, Task, VerdictOutcome } 
 import { ERROR_CODES, fail } from '../contracts/errors.ts'
 import type { GlobalLibraryEditPort, GlobalPublicationPort, PublicationKind } from '../contracts/publication.ts'
 import type { GlobalEntryReader } from './global-edit.ts'
+import type { ProjectDestroyPort } from '../contracts/project-destroy.ts'
 import { editGlobalDefinition, unpublishGlobalDefinition } from './global-edit.ts'
 import { HumanAuthorizer } from '../domain/permissions/human-authorizer.ts'
 import type { HumanConfirmation } from '../domain/permissions/human-authorizer.ts'
@@ -57,6 +58,7 @@ export const PANEL_WRITE_METHODS = [
   'definitionPublish',
   'globalDefinitionSave',
   'globalUnpublish',
+  'projectDestroy',
   'definitionSave',
   'memoryRemember',
   'memoryForget',
@@ -89,6 +91,7 @@ export const PANEL_WRITE_KINDS: Readonly<Record<PanelWriteMethod, PanelWriteKind
   definitionPublish: 'token',
   globalDefinitionSave: 'token',
   globalUnpublish: 'token',
+  projectDestroy: 'token',
   definitionSave: 'direct',
   memoryRemember: 'direct',
   memoryForget: 'direct',
@@ -120,6 +123,7 @@ export const PANEL_WRITE_DOCS: Readonly<Record<PanelWriteMethod, string>> = {
   definitionPublish: '发布定义到全局库：预览引用与覆盖影响面，凭一次性令牌执行。动作 `definition.publish.confirm`（人类专属）。',
   globalDefinitionSave: '直改全局库里的定义（不经项目）：预览引用与被引用、冲突检测（expectedHash），凭一次性令牌执行。动作 `definition.global.write`（人类专属）。',
   globalUnpublish: '下架全局库里的定义：只从目录里隐藏，文件保留、引用方仍能读；冲突检测后凭一次性令牌执行。动作 `definition.global.write`（人类专属）。',
+  projectDestroy: '删除项目数据（事件日志 / 记忆库 / 投影 / 租约），**不可撤销**：先预览逐项影响面，输入项目名后才能凭一次性令牌执行。动作 `project.destroy`（人类专属）。',
   memoryRemember: '写一条长期记忆到团队 bank 或某个成员 bank，需 `confirm: true`。',
   memoryForget: '遗忘一条记忆（默认软删留痕，`hard` 才真删），需 `confirm: true`。',
 }
@@ -142,6 +146,13 @@ function requireString(params: Record<string, unknown>, key: string): string {
     fail(ERROR_CODES.INVALID_PAYLOAD, `缺少参数 ${key}`)
   }
   return value
+}
+
+function requireRootDir(deps: PanelWriteDeps): string {
+  if (deps.rootDir === undefined || deps.rootDir.length === 0) {
+    fail(ERROR_CODES.INTERNAL, '项目根未装配，不能销毁')
+  }
+  return deps.rootDir
 }
 
 function requireTeamId(params: Record<string, unknown>): string {
@@ -255,10 +266,53 @@ export interface PanelWriteDeps {
   globalEditor?: GlobalLibraryEditPort
   /** 全局目录读取器：直改时校验引用用（只看全局库，不看项目）。 */
   globalEntries?: GlobalEntryReader
+  /**
+   * 项目数据销毁器。**必须由装配层注入**，并且它的审计文件是全局审计
+   * （`$DSH_HOME/myteam/audit/global-operations.jsonl`）—— 项目的账本正是被删的东西，
+   * 销毁记录不能写在里面。
+   */
+  destroyer?: ProjectDestroyPort
+  /** 关掉某个工作区的运行时（释放写者租约）。销毁前必须调。 */
+  closeProject?: (rootDir: string) => Promise<void>
   /** 项目根：记忆库按项目落盘（`memory/myteam.db`）。 */
   rootDir?: string
   /** 打开记忆存储；由装配层注入，application 不 import infrastructure。 */
   openMemory?: (rootDir: string) => MemoryPort
+}
+
+function requireDestroyer(deps: PanelWriteDeps): ProjectDestroyPort {
+  if (deps.destroyer === undefined) {
+    fail(ERROR_CODES.INTERNAL, '项目销毁器未装配')
+  }
+  return deps.destroyer
+}
+
+/** 销毁预览：逐项列出要删的东西与不可逆后果。 */
+function previewProjectDestroy(
+  deps: PanelWriteDeps,
+  rootDir: string,
+): { operationId: string; targetHash: string; impactHash: string; summary: string; impact: unknown } {
+  const destroyer = requireDestroyer(deps)
+  const preview = destroyer.preview(rootDir)
+  const impact = {
+    target: rootDir,
+    name: preview.name,
+    projectId: preview.projectId,
+    targets: preview.targets,
+    totalBytes: preview.totalBytes,
+    irreversible: preview.irreversible,
+  }
+  const operationId = 'project-destroy-' + Date.now().toString(36) + '-' + Math.random().toString(36).slice(2, 8)
+  return {
+    operationId,
+    // targetHash 绑「要删的这个项目」：项目名 + projectId + 总字节数。
+    // 目标变了（比如删之前又写了一堆事件）就拒，避免「看的是 12 KB、删的是 40 MB」。
+    targetHash: stableHash({ name: preview.name, projectId: preview.projectId, bytes: preview.totalBytes }),
+    impactHash: stableHash(impact),
+    summary: '删除项目「' + preview.name + '」的全部数据（' + String(preview.targets.length) + ' 项 · ' +
+      String(Math.round(preview.totalBytes / 1024)) + ' KB）：不可撤销',
+    impact,
+  }
 }
 
 function requireGlobalEditor(deps: PanelWriteDeps): GlobalLibraryEditPort {
@@ -455,6 +509,20 @@ export function previewPanelWrite(
       )
       return { method, operationId: preview.operationId, summary: preview.summary, impact: preview.impact, confirmation }
     }
+    case 'projectDestroy': {
+      // 项目数据销毁：两步式。第一步出影响面并签令牌，不删任何东西。
+      const preview = previewProjectDestroy(deps, requireRootDir(deps))
+      const confirmation = authorizer.issue(
+        {
+          operationId: preview.operationId,
+          action: 'project.destroy',
+          targetHash: preview.targetHash,
+          impactHash: preview.impactHash,
+        },
+        PANEL_HUMAN,
+      )
+      return { method, operationId: preview.operationId, summary: preview.summary, impact: preview.impact, confirmation }
+    }
     case 'globalUnpublish': {
       const preview = previewGlobalUnpublish(deps, {
         kind: requirePublicationKind(params),
@@ -552,13 +620,13 @@ export function previewPanelWrite(
  * @param input - 令牌、参数与人类填写的理由。
  * @param deps - 额外端口（全局发布用）。
  */
-export function applyPanelWrite(
+export async function applyPanelWrite(
   runtime: ProjectRuntime,
   authorizer: HumanAuthorizer,
   method: PanelWriteMethod,
   input: { params: Record<string, unknown>; confirmation: HumanConfirmation; reason: string },
   deps: PanelWriteDeps = {},
-): PanelWriteApplied {
+): Promise<PanelWriteApplied> {
   switch (method) {
     case 'globalDefinitionSave': {
       // 第二步：**必须自己复验令牌**。预览时签的 targetHash 是「当时的文件 hash」，
@@ -720,6 +788,7 @@ export function applyDirectPanelWrite(
     case 'captainTakeover':
     case 'globalDefinitionSave':
     case 'globalUnpublish':
+    case 'projectDestroy':
     case 'definitionPublish':
       fail(ERROR_CODES.INVALID_COMMAND, `${method} 走确认令牌通道（先预览再确认），不能直接执行`)
     case 'memoryRemember': {

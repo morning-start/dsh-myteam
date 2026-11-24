@@ -16,6 +16,8 @@ import { PanelService } from '../application/panel-service.ts'
 import { migrationSummaryFor } from '../infrastructure/migration/v1/panel-summary.ts'
 import { globalLibraryRoot, readGlobalAudit, readGlobalLibrary } from '../infrastructure/global-library/library.ts'
 import { createGlobalEditor, createGlobalPublisher } from '../infrastructure/global-library/write.ts'
+import { createProjectDestroyer } from '../infrastructure/fs/project-destroy.ts'
+import { GLOBAL_AUDIT_FILE } from '../contracts/versions.ts'
 import { memoryDbPath, readMemoryStore } from '../infrastructure/memory-store/read.ts'
 import { SqliteMemoryStore } from '../infrastructure/memory-store/sqlite-memory.ts'
 import { PANEL_METHODS, isGlobalPanelMethod } from '../application/panel-contract.ts'
@@ -130,12 +132,29 @@ export function createPanelFacade(ctx: PanelHostContext): PanelFacade {
         .entries.filter((entry) => entry.kind === kind)
         .map((entry) => ({ kind: entry.kind as never, id: entry.id, revision: entry.revision ?? 0 })),
   }
-  /** 面板写的外部端口：direct 要记忆库，token 要发布器/直改器。两处共用同一份。 */
+  /**
+   * 项目数据销毁器：审计写**全局**审计文件。
+   *
+   * 为什么不是项目审计：被删掉的东西正是项目账本，销毁记录写进去会跟着一起消失。
+   */
+  const destroyer = createProjectDestroyer(join(globalRoot, '..', GLOBAL_AUDIT_FILE))
+  /** 面板写的外部端口：direct 要记忆库，token 要发布器/直改器/销毁器。三处共用同一份。 */
   const writeDeps = {
     rootDir: undefined as string | undefined,
     publisher: globalPublisher,
     globalEditor,
     globalEntries,
+    destroyer,
+    /**
+     * 销毁前关掉该工作区的运行时，释放写者租约。
+     *
+     * `ProjectHosts` 只有 `closeAll`（没有单 root 关闭）：销毁是不可逆动作、极少发生，
+     * 关掉全部再让后续 `open` 重开是可接受的代价；不关就删目录会让租约文件以
+     * 「被删掉」而不是「被释放」收场。
+     */
+    closeProject: async () => {
+      await hosts.closeAll()
+    },
   }
 
   /**

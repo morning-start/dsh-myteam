@@ -51,6 +51,7 @@
 | `definitionPublish` | `token` | 发布定义到全局库：预览引用与覆盖影响面，凭一次性令牌执行。动作 `definition.publish.confirm`（人类专属）。 |
 | `globalDefinitionSave` | `token` | 直改全局库里的定义（不经项目）：预览引用与被引用、冲突检测（expectedHash），凭一次性令牌执行。动作 `definition.global.write`（人类专属）。 |
 | `globalUnpublish` | `token` | 下架全局库里的定义：只从目录里隐藏，文件保留、引用方仍能读；冲突检测后凭一次性令牌执行。动作 `definition.global.write`（人类专属）。 |
+| `projectDestroy` | `token` | 删除项目数据（事件日志 / 记忆库 / 投影 / 租约），**不可撤销**：先预览逐项影响面，输入项目名后才能凭一次性令牌执行。动作 `project.destroy`（人类专属）。 |
 | `definitionSave` | `direct` | 保存项目定义（角色 / 工作流）：revision 递增并记 previousHash，需 `confirm: true`。 |
 | `memoryRemember` | `direct` | 写一条长期记忆到团队 bank 或某个成员 bank，需 `confirm: true`。 |
 | `memoryForget` | `direct` | 遗忘一条记忆（默认软删留痕，`hard` 才真删），需 `confirm: true`。 |

@@ -53,7 +53,9 @@ const ROLE = (name: string) => ({
   capabilities: { tools: { allow: ['read', 'write'], deny: [] }, mcp: { allow: [], deny: [] }, skills: [] },
 })
 
-function withBoth(body: (runtime: ProjectRuntime, deps: PanelWriteDeps, globalRoot: string) => void): void {
+async function withBoth(
+  body: (runtime: ProjectRuntime, deps: PanelWriteDeps, globalRoot: string) => void | Promise<void>,
+): Promise<void> {
   const projectDir = mkdtempSync(join(tmpdir(), 'myteam-t57-proj-'))
   const globalRoot = mkdtempSync(join(tmpdir(), 'myteam-t57-global-'))
   const runtime = openRuntime(projectDir)
@@ -63,7 +65,8 @@ function withBoth(body: (runtime: ProjectRuntime, deps: PanelWriteDeps, globalRo
       globalEditor: createGlobalEditor(globalRoot),
       globalEntries: { list: () => [] },
     }
-    body(runtime, deps, globalRoot)
+    // await：applyPanelWrite 现在返回 Promise，不等它就会在 finally 关掉运行时之后才跑完。
+    await body(runtime, deps, globalRoot)
   } finally {
     runtime.close()
     rmSync(projectDir, { recursive: true, force: true })
@@ -75,8 +78,8 @@ test('globalDefinitionSave 登记为 token 通道', () => {
   assert.equal(panelWriteKind('globalDefinitionSave'), 'token')
 })
 
-test('applyDirectPanelWrite 拒绝 globalDefinitionSave（不能绕过令牌直接执行）', () => {
-  withBoth((runtime, deps) => {
+test('applyDirectPanelWrite 拒绝 globalDefinitionSave（不能绕过令牌直接执行）', async () => {
+  await withBoth(async (runtime, deps) => {
     assert.throws(
       () => applyDirectPanelWrite(runtime, 'globalDefinitionSave', {
         confirm: true,
@@ -87,8 +90,8 @@ test('applyDirectPanelWrite 拒绝 globalDefinitionSave（不能绕过令牌直�
   })
 })
 
-test('两步：先出影响面与令牌，再凭令牌写文件（进全局目录）', () => {
-  withBoth((runtime, deps, globalRoot) => {
+test('两步：先出影响面与令牌，再凭令牌写文件（进全局目录）', async () => {
+  await withBoth(async (runtime, deps, globalRoot) => {
     const authorizer = createPanelWriteAuthorizer()
     const params = { kind: 'role', id: 'role_1', definition: ROLE('实现者'), expectedHash: null }
 
@@ -98,7 +101,7 @@ test('两步：先出影响面与令牌，再凭令牌写文件（进全局目�
     assert.ok(String(preview.summary).includes('role_1'), '影响面要说清改的是哪份')
 
     // 第二步：凭令牌执行
-    const applied = applyPanelWrite(runtime, authorizer, 'globalDefinitionSave', {
+    const applied = await applyPanelWrite(runtime, authorizer, 'globalDefinitionSave', {
       params: { ...params, expectedHash: null },
       confirmation: preview.confirmation!,
       reason: '改个描述',
@@ -109,10 +112,10 @@ test('两步：先出影响面与令牌，再凭令牌写文件（进全局目�
   })
 })
 
-test('伪造令牌（目标 hash 不匹配）被拒，且不写文件', () => {
-  withBoth((runtime, deps, globalRoot) => {
+test('伪造令牌（目标 hash 不匹配）被拒，且不写文件', async () => {
+  await withBoth(async (runtime, deps, globalRoot) => {
     const authorizer = createPanelWriteAuthorizer()
-    assert.throws(
+    await assert.rejects(
       () => applyPanelWrite(runtime, authorizer, 'globalDefinitionSave', {
         params: { kind: 'role', id: 'role_1', definition: ROLE('实现者'), expectedHash: null },
         confirmation: {

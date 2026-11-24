@@ -265,7 +265,7 @@ test('定义不存在：发布申请直接 NOT_FOUND', () => {
   }
 })
 
-test('面板写通道：definitionPublish 预览签发令牌 → 凭令牌发布到全局库', () => {
+test('面板写通道：definitionPublish 预览签发令牌 → 凭令牌发布到全局库', async () => {
   const fx = createReviewTaskFixture({ prefix: 'myteam-pub-' })
   const globalRoot = mkdtempSync(join(tmpdir(), 'myteam-global-'))
   try {
@@ -276,7 +276,7 @@ test('面板写通道：definitionPublish 预览签发令牌 → 凭令牌发布
     assert.match(preview.summary, /全局库/)
     assert.equal(preview.confirmation.action, 'definition.publish.confirm')
 
-    const applied = applyPanelWrite(
+    const applied = await applyPanelWrite(
       fx.runtime,
       auth,
       'definitionPublish',

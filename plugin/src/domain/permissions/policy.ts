@@ -53,6 +53,7 @@ export type Action =
   | 'effect.settle'
   | 'plan.approve'
   | 'migration.cutover'
+  | 'project.destroy'
 
 /** 只有人类可以发起。agent 无法通过任何工具参数获得这些动作。 */
 export const HUMAN_ONLY: ReadonlySet<Action> = new Set<Action>([
@@ -62,6 +63,7 @@ export const HUMAN_ONLY: ReadonlySet<Action> = new Set<Action>([
   'captain.handoff.confirm',
   'plan.approve',
   'migration.cutover',
+  'project.destroy',
 ])
 
 /** 队长可发起的项目级动作。 */

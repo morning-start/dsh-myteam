@@ -2094,6 +2094,35 @@ test('名册主列表：已归档成员仍在列表里（不是只藏在归档�
   }
 })
 
+
+test('设置栏：删除项目数据 —— 两段式，输对项目名才能确认', async () => {
+  const harness = loadClient(FILLED)
+  try {
+    let tree = await mount(harness.view, { sessionId: 'ses_1' })
+    ;(findTab(tree, '设置')!.props.onClick as () => void)()
+    tree = await mount(harness.view, { sessionId: 'ses_1' })
+
+    const begin = findButton(tree, '删除项目数据')
+    assert.ok(begin !== null, '设置栏应有「删除项目数据」（设计稿 p-settings 的生命周期区）')
+    ;(begin!.props.onClick as () => void)()
+    tree = await mount(harness.view, { sessionId: 'ses_1' })
+
+    assert.deepEqual(harness.writes, ['projectDestroy'], '第一步只是读影响面')
+    const body = harness.writeBody
+    const params = (body === null ? {} : body.params) as Record<string, unknown>
+    assert.deepEqual(params, {}, '第一步不带参数（只读影响面）')
+
+    // 输入框占位符是项目名；输错时确认按钮必须是禁用的
+    const input = findByPlaceholder(tree, '示例视图')
+    assert.ok(input !== null, '要有「输入项目名继续」的输入框')
+    const confirm = findButton(tree, '删除项目数据')
+    assert.ok(confirm !== null)
+    assert.equal(confirm!.props.disabled, true, '没输名字时不能确认')
+  } finally {
+    harness.restore()
+  }
+})
+
 test('样式来源守卫：渲染出来的每个类名都定义在仓库 design-v2 里（不是打包副本）', async () => {
   // 这条是踩过坑才加的：包内 plugin/design-v2 是 build 从仓库 design-v2 **拷出来**的生成物，
   // 每次 build 都会 rmSync 重建。把新样式写进包内副本，下一次 build 就静默丢了 ——
