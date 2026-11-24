@@ -11,9 +11,10 @@
 | [tool-surface](tool-surface.md) | **生成**（`tools/gen-tool-contract.mjs`） | 队长 15 个 + 成员 3 个工具、身份规则、错误码表 |
 | [config-schema](config-schema.md) | **生成**（`tools/gen-config-contract.mjs`） | 团队配置字段、默认值、合并与上限 |
 | [capabilities](capabilities.md) | 手工（数字来自代码） | 能力矩阵：动作集合、谁能做、当前有没有实现 |
+| [permissions](permissions.md) | **生成**（`tools/gen-permission-doc.mjs`） | 人类 / 队长 / 成员 / 系统 的读写权限逐动作矩阵 + 作用域限制 |
 | [contribution](contribution.md) | 手工摘要 | 第三方 Role / 团队模板怎么贡献、安全边界在哪 |
 
-生成的三份顶部都带「不要手改」标记；手改会被下一次生成覆盖，也会被 `tools/verify.mjs` 里的
+生成的几份顶部都带「不要手改」标记；手改会被下一次生成覆盖，也会被 `tools/verify.mjs` 里的
 `gen-* --check` 判红。
 
 ## 2. 改契约的流程
