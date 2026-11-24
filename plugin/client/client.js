@@ -1732,13 +1732,19 @@ window.__ModuleLoader__.load({
         }
       }
 
-      /**
-       * 恢复归档成员。领域上 `archived → active` 合法（t54 守着），但**面板还没有对应的写方法** ——
-       * 这里如实说「暂不支持」，不偷偷拿 definitionSave 或别的通道去凑。
-       */
+      /** 恢复归档成员：archived → active。只对归档态有效（已释放不可恢复，由后端拒）。 */
       const restoreMember = async (memberId) => {
-        setProblem(`恢复需要一个新面板写（memberRestore），当前版本没有；领域已允许 archived → active，见 docs/decisions/成员归档语义.md`)
-        void memberId
+        if (busy !== null) return
+        setBusy(memberId)
+        setProblem(null)
+        try {
+          await callWrite('memberRestore', sessionId, { confirm: true, params: { teamId, memberId } })
+          onDone()
+        } catch (error) {
+          setProblem(messageOf(error))
+        } finally {
+          setBusy(null)
+        }
       }
 
       const releasable = roster.filter((member) => member.status !== 'released' && member.status !== 'archived')

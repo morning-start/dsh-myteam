@@ -671,6 +671,48 @@ export function archiveMemberCommand(
   return runtime.commit(drafts)
 }
 
+/**
+ * 恢复归档成员（`archived → active`，落 `member.status.changed`）。
+ *
+ * 只有归档能恢复：`released` 是终态，`released → active` 不在迁移表里，会在这里被
+ * `assertMemberStatusChange` 拒掉。这是「归档可回放、释放不可」这条差异的实际落点。
+ *
+ * 恢复不碰会话：`memberSessionGeneration` 不变，旧 generation 的写入继续被拒（归档期间
+ * 会话已结束，恢复也不会让旧 attemptId 复活）。要重新上线接活，由队长另行绑会话。
+ */
+export function restoreMemberCommand(
+  runtime: ProjectRuntime,
+  input: { actor: ActorRef; teamId: string; memberId: string },
+): CommitResult {
+  const state = runtime.state
+  const team = state.teams.get(input.teamId)
+  if (team === undefined) fail(ERROR_CODES.NOT_FOUND, '团队不存在', { details: { teamId: input.teamId } })
+  authorize('member.archive', input.actor, { teamId: input.teamId })
+  assertTeamActive(team)
+
+  const member = state.members.get(input.memberId)
+  if (member === undefined || member.teamId !== input.teamId) {
+    fail(ERROR_CODES.NOT_FOUND, '成员不存在', { details: { memberId: input.memberId, teamId: input.teamId } })
+  }
+  // 只有 archived 能被恢复；其它状态在这里统一报 INVALID_TRANSITION。
+  if (member.status !== 'archived') {
+    fail(ERROR_CODES.INVALID_TRANSITION, `只有已归档的成员能恢复（当前 ${member.status}）`, {
+      details: { memberId: member.id, from: member.status },
+    })
+  }
+  assertMemberStatusChange(member.status, 'active')
+
+  const revision = member.revision + 1
+  const draft: DraftEvent = {
+    type: 'member.status.changed',
+    actor: input.actor,
+    entity: { kind: 'member', id: member.id, teamId: team.id },
+    entityRevision: revision,
+    payload: { teamId: team.id, memberId: member.id, status: 'active', revision },
+  }
+  return runtime.commit([draft])
+}
+
 export function releaseMemberCommand(
   runtime: ProjectRuntime,
   input: { actor: ActorRef; teamId: string; memberId: string },

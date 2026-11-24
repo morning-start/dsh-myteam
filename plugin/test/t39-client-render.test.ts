@@ -1818,13 +1818,16 @@ test('团队栏：已归档成员不再出现在可操作行，改为单独一�
     const text = textOf(tree)
     assert.ok(text.includes('已归档'), '归档成员要有「已归档」标注')
     assert.ok(text.includes('可回放'), '要说清归档是退役但可回放，不是死了')
-    // 「恢复」入口在，但当前版本没有对应写方法，点了要如实说，不能假装成功。
+    // 「恢复」入口在，且现在有真正的写方法 memberRestore（archived → active）。
     const restore = findButton(tree, '恢复')
     assert.ok(restore !== null, '归档区应有「恢复」入口')
     ;(restore!.props.onClick as () => void)()
     tree = await mount(harness.view, { sessionId: 'ses_1' })
-    assert.deepEqual(harness.writes, [], '恢复当前没有写方法，不能乱发请求')
-    assert.ok(textOf(tree).includes('memberRestore'), '要如实说缺哪个写方法')
+    assert.deepEqual(harness.writes, ['memberRestore'], '恢复走 memberRestore，不能拿别的通道凑')
+    assert.equal(harness.writeBody?.confirm, true, 'direct 类写动作必须带 confirm: true')
+    const params = harness.writeBody?.params as Record<string, unknown>
+    assert.equal(params.teamId, 'team_1')
+    assert.equal(params.memberId, 'member_2')
   } finally {
     harness.restore()
   }

@@ -29,6 +29,7 @@ import {
   createTeamCommand,
   initializeProject,
   releaseMemberCommand,
+  restoreMemberCommand,
 } from '../src/application/commands.ts'
 import { canChangeMemberStatus } from '../src/domain/teams/member.ts'
 import { newId } from '../src/contracts/ids.ts'
@@ -207,6 +208,42 @@ test('已释放的成员不能再归档（released 是终态）', () => {
     releaseMemberCommand(runtime, { actor: HUMAN, teamId, memberId })
     assert.throws(
       () => archiveMemberCommand(runtime, { actor: HUMAN, teamId, memberId }),
+      (error: unknown) => error instanceof MyTeamError && error.code === 'INVALID_TRANSITION',
+    )
+  })
+})
+
+test('恢复：archived → active 落 member.status.changed；非归档态报 INVALID_TRANSITION', () => {
+  withRuntime((runtime) => {
+    const { teamId, memberId, taskId } = seed(runtime)
+    archiveMemberCommand(runtime, { actor: HUMAN, teamId, memberId })
+    assert.equal(runtime.state.members.get(memberId)!.status, 'archived')
+
+    const result = restoreMemberCommand(runtime, { actor: HUMAN, teamId, memberId })
+    assert.equal(result.events.length, 1)
+    assert.equal(result.events[0]!.type, 'member.status.changed')
+    assert.equal((result.events[0]!.payload as { status: string }).status, 'active')
+    assert.equal(runtime.state.members.get(memberId)!.status, 'active', '恢复后回到在岗')
+
+    // 恢复后又能认领任务了（归档期间不行，恢复后可以）。
+    assert.ok(runtime.state.tasks.has(taskId))
+    const claimed = claimTaskCommand(runtime, { actor: HUMAN, taskId, memberId })
+    assert.equal(claimed.events.length, 1, '恢复后应能重新接活')
+
+    // 对在岗成员「恢复」是无效动作。
+    assert.throws(
+      () => restoreMemberCommand(runtime, { actor: HUMAN, teamId, memberId }),
+      (error: unknown) => error instanceof MyTeamError && error.code === 'INVALID_TRANSITION',
+    )
+  })
+})
+
+test('恢复：已释放成员不可恢复（released 是终态）', () => {
+  withRuntime((runtime) => {
+    const { teamId, memberId } = seed(runtime)
+    releaseMemberCommand(runtime, { actor: HUMAN, teamId, memberId })
+    assert.throws(
+      () => restoreMemberCommand(runtime, { actor: HUMAN, teamId, memberId }),
       (error: unknown) => error instanceof MyTeamError && error.code === 'INVALID_TRANSITION',
     )
   })

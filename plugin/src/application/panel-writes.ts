@@ -28,6 +28,7 @@ import {
   createTaskCommand,
   createTeamCommand,
   releaseMemberCommand,
+  restoreMemberCommand,
   saveProjectBlueprintCommand,
   saveProjectRole,
   saveProjectWorkflowCommand,
@@ -50,6 +51,7 @@ export const PANEL_WRITE_METHODS = [
   'memberAppoint',
   'memberRelease',
   'memberArchive',
+  'memberRestore',
   'definitionPublish',
   'definitionSave',
   'memoryRemember',
@@ -79,6 +81,7 @@ export const PANEL_WRITE_KINDS: Readonly<Record<PanelWriteMethod, PanelWriteKind
   memberAppoint: 'direct',
   memberRelease: 'direct',
   memberArchive: 'direct',
+  memberRestore: 'direct',
   definitionPublish: 'token',
   definitionSave: 'direct',
   memoryRemember: 'direct',
@@ -106,6 +109,7 @@ export const PANEL_WRITE_DOCS: Readonly<Record<PanelWriteMethod, string>> = {
   memberAppoint: '召唤成员：团队 + 角色（可选父成员与会话）→ 聘任并固化角色快照，需 `confirm: true`。',
   memberRelease: '释放成员（终态）：成员不能有进行中的尝试；释放后不再接活，需 `confirm: true`。',
   memberArchive: '归档成员（退役但可回放）：名册留痕、记忆与证据保留、可恢复；有进行中尝试时要么等结束（drain=wait），要么先暂停再归档（drain=pause）；子成员须先处理，需 `confirm: true`。',
+  memberRestore: '恢复已归档成员（archived → active）；只对归档态有效，已释放不可恢复，需 `confirm: true`。',
   definitionSave: '保存项目定义（角色 / 工作流）：revision 递增并记 previousHash，需 `confirm: true`。',
   definitionPublish: '发布定义到全局库：预览引用与覆盖影响面，凭一次性令牌执行。动作 `definition.publish.confirm`（人类专属）。',
   memoryRemember: '写一条长期记忆到团队 bank 或某个成员 bank，需 `confirm: true`。',
@@ -325,6 +329,8 @@ export function previewPanelWrite(
       fail(ERROR_CODES.INVALID_COMMAND, 'memberAppoint 不走确认令牌：直接带 confirm: true 提交（见 applyDirectPanelWrite）')
     case 'memberArchive':
       fail(ERROR_CODES.INVALID_COMMAND, 'memberArchive 不走确认令牌：直接带 confirm: true 提交（见 applyDirectPanelWrite）')
+    case 'memberRestore':
+      fail(ERROR_CODES.INVALID_COMMAND, 'memberRestore 不走确认令牌：直接带 confirm: true 提交（见 applyDirectPanelWrite）')
     case 'memberRelease':
       fail(ERROR_CODES.INVALID_COMMAND, 'memberRelease 不走确认令牌：直接带 confirm: true 提交（见 applyDirectPanelWrite）')
     case 'memoryRemember':
@@ -407,6 +413,8 @@ export function applyPanelWrite(
       fail(ERROR_CODES.INVALID_COMMAND, 'memberAppoint 不使用确认令牌，请走 applyDirectPanelWrite')
     case 'memberArchive':
       fail(ERROR_CODES.INVALID_COMMAND, 'memberArchive 不使用确认令牌，请走 applyDirectPanelWrite')
+    case 'memberRestore':
+      fail(ERROR_CODES.INVALID_COMMAND, 'memberRestore 不使用确认令牌，请走 applyDirectPanelWrite')
     case 'memberRelease':
       fail(ERROR_CODES.INVALID_COMMAND, 'memberRelease 不使用确认令牌，请走 applyDirectPanelWrite')
     case 'memoryRemember':
@@ -725,6 +733,15 @@ export function applyDirectPanelWrite(
         ...(drainRaw === undefined ? {} : { drain: drainRaw }),
       })
       return { method, operationId: memberId, committed: { memberId, teamId, status: 'archived' } }
+    }
+    case 'memberRestore': {
+      if (input.confirm !== true) {
+        fail(ERROR_CODES.INVALID_PAYLOAD, '恢复成员需要 confirm: true')
+      }
+      const teamId = requireString(input.params, 'teamId')
+      const memberId = requireString(input.params, 'memberId')
+      restoreMemberCommand(runtime, { actor: PANEL_HUMAN, teamId, memberId })
+      return { method, operationId: memberId, committed: { memberId, teamId, status: 'active' } }
     }
     case 'memberRelease': {
       if (input.confirm !== true) {
