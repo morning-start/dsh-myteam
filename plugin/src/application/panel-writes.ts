@@ -37,7 +37,7 @@ import {
   saveProjectWorkflowCommand,
 } from './commands.ts'
 import { forgetMemory, rememberMemory } from './memory-commands.ts'
-import { approveTeamPlanCommand, discardTeamPlanCommand, proposeTeamPlanCommand } from './commands.ts'
+import { discardTeamPlanCommand, proposeTeamPlanCommand } from './commands.ts'
 import { confirmTeamPlanApproval, previewTeamPlanApproval } from './human-actions.ts'
 import type { MemoryPort } from './ports.ts'
 import { confirmDefinitionPublication, requestDefinitionPublication } from './publication.ts'

@@ -7,7 +7,6 @@
  * 迁移分析通过端口注入：应用层不知道旧文件怎么读，只知道「有人能给出结论」。
  */
 import type { JsonValue } from '../contracts/json.ts'
-import type { ErrorShape } from '../contracts/errors.ts'
 import { ERROR_CODES, fail, toErrorShape } from '../contracts/errors.ts'
 import type { ProjectRuntime } from './project-runtime.ts'
 import type { ProjectState } from './projections/project-state.ts'

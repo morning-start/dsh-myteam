@@ -108,7 +108,11 @@ export interface PendingApprovalsView {
   pending: PendingApprovalItem[]
   decided: DecidedApprovalItem[]
   counts: { pending: number; decided: number }
-  /** 这一页覆盖不到的两类，明着告诉界面，别让它以为「没有了」。 */
+  /**
+   * 覆盖缺口标记。四类（门禁裁决 / 全局发布 / 队长接管 / 计划批准）都已接通，
+   * 所以两个值现在**恒为 false**；字段保留是为了将来真的出现缺口时，界面能如实说明
+   * 而不是让人以为「没有了」。
+   */
   unsupported: { planApproval: boolean; captainTakeover: boolean }
 }
 

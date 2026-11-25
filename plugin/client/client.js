@@ -460,7 +460,7 @@ window.__ModuleLoader__.load({
       { status: 'cancelled', label: '已取消', tone: 'idle' },
     ]
 
-    const TEAM_STATUS = { active: '进行中', draft: '草稿', archived: '已归档', disbanded: '已解散' }
+    const TEAM_STATUS = { active: '进行中', archived: '已归档', disbanded: '已解散' }
     /** 成员状态的中文名。`archived` 是「已归档（可回放）」，与 `released`「已释放」分开写。 */
     const MEMBER_STATUS = {
       appointed: '已聘任',
@@ -2452,6 +2452,9 @@ window.__ModuleLoader__.load({
 
     const RUN_STATUS = { active: '进行中', completed: '已完成', cancelled: '已取消' }
 
+    /** 待你确认页的四类卡片名。四种都接通了（门禁 / 发布 / 接管 / 计划）。 */
+    const APPROVAL_KIND = { gate: '门禁裁决', publish: '全局发布', handoff: '队长接管', plan: '开队计划' }
+
     /**
      * 列表外壳。空态直接交给 {@link EmptyState}（要求「为什么空 + 下一步」），
      * 传字符串是过去的用法，会被当成 reason、没有 action —— 所以新代码请传节点。
@@ -3188,10 +3191,9 @@ window.__ModuleLoader__.load({
       const pending = Array.isArray(data.pending) ? data.pending : []
       const decided = Array.isArray(data.decided) ? data.decided : []
       const [lane, setLane] = useState('pending')
-      const unsupported = data.unsupported ?? {}
 
       const kindLabel = (kind) =>
-        kind === 'gate' ? '门禁裁决' : kind === 'publish' ? '全局发布' : kind === 'handoff' ? '队长接管' : kind === 'plan' ? '开队计划' : String(kind)
+        Object.hasOwn(APPROVAL_KIND, kind) ? APPROVAL_KIND[kind] : String(kind)
       const rows = lane === 'pending' ? pending : decided
 
       const card = (item) =>
@@ -3259,11 +3261,6 @@ window.__ModuleLoader__.load({
           ? h('p', { className: 'muted', style: { margin: '6px 0 0', fontSize: 12 } },
               lane === 'pending' ? '没有等你确认的事。门禁裁决与待确认的发布都会出现在这里。' : '还没有已处理的裁决。')
           : h('div', { className: 'list' }, rows.map(card)),
-        unsupported.planApproval === true || unsupported.captainTakeover === true
-          ? h('p', { className: 'muted', style: { margin: '14px 0 0', fontSize: 12 } },
-              '这一页覆盖门禁裁决、全局发布与队长接管。「计划批准」还没有对应的领域模型'
-              + '（团队只有在岗 / 归档 / 解散，没有草稿态），所以不会出现在这里。')
-          : null,
       )
     }
 
@@ -3449,6 +3446,9 @@ window.__ModuleLoader__.load({
     }
 
     // ───────────────────────── 全局库（左栏入口） ─────────────────────────
+
+    /** 全局库哪一栏对应哪种定义（概览与发布没有种类）。 */
+    const GLOBAL_TAB_KIND = { roles: 'role', workflows: 'workflow', blueprints: 'blueprint' }
 
     const GLOBAL_NAV = [
       { id: 'overview', label: '概览', icon: 'grid', hint: '全局库概览' },
@@ -4092,7 +4092,7 @@ window.__ModuleLoader__.load({
       const library = usePanelData(undefined, 'globalLibrary', undefined, { allowNoSession: true })
       const globalAudit = usePanelData(undefined, 'globalAudit', { limit: 100 }, { allowNoSession: true })
 
-      const kindForTab = tab === 'roles' ? 'role' : tab === 'workflows' ? 'workflow' : tab === 'blueprints' ? 'blueprint' : null
+      const kindForTab = Object.hasOwn(GLOBAL_TAB_KIND, tab) ? GLOBAL_TAB_KIND[tab] : null
       const entries = Array.isArray(library.data?.entries) ? library.data.entries : []
       const ofKind = kindForTab === null ? [] : entries.filter((entry) => entry.kind === kindForTab)
       const openedEntry = opened === null ? null : (entries.find((entry) => entry.kind + ':' + entry.id === opened) ?? null)
