@@ -35,3 +35,16 @@
   - `node .tmp/probe-actor.mjs` → `human → "human:u1"` / `captain → "captain:ses_c"` / `member → 抛错 FORBIDDEN: 成员不能发起动作 plan.propose` / `system → 抛错 FORBIDDEN: 系统身份不能发起业务动作 plan.propose`，exit 0
   - `node .tmp/probe-discard2.mjs` → `human → "human:u1"` / `captain → "captain:ses_c"` / `member → 抛错 FORBIDDEN: 成员不能发起动作 plan.discard` / `system → 抛错 FORBIDDEN: 系统身份不能发起业务动作 plan.discard`，exit 0
 - Outcome: dead end —— **不是缺陷**。`authorize` 在到达那行之前就拒了 member/system，三元链的最后一支不可达。上一轮那条「缺陷」判断是错的，撤销。代码保持原样。
+
+## 3. 归档成员在名册树里的位置 —— 验完并加守卫
+- Saw: `界面依赖与搭建顺序.md` 把「归档成员进树之后位置对不对」列为没验过；`teamView` 不按状态过滤（归档成员会进来），`RosterTree` 用 `ids` 判断父成员存在性。
+- Decided: 先跑探针看真实数据源会不会给出「归档父 + 在岗子」这种组合，再决定要不要加特殊处理。
+- Did: `.tmp/probe-roster.mjs`（三层，归档中间层）、`.tmp/probe-roster2.mjs`（合法顺序从叶子往上归档）；新增 `plugin/test/t68-roster-archive-position.test.ts`；更新 `界面依赖与搭建顺序.md` 那条「没验过」；`07` 测试数 67→68。
+- Evidence:
+  - `node .tmp/probe-roster.mjs` → `MyTeamError: 成员还有未归档/未释放的子成员，先处理子成员再归档`，code `CONFLICT`，exit 1（**探针被领域层拦住 = 发现**）
+  - `node .tmp/probe-roster2.mjs` → `depth=0 appointed / depth=1 archived / depth=2 archived`，无孤儿，exit 0
+  - `node --test plugin/test/t68-*.test.ts` → pass 2 / fail 0
+  - 反证：去掉 `archiveMemberCommand` 的「子成员先处理」守卫 → `pass 1 / fail 1`；恢复 → `pass 2 / fail 0`，且 `git diff commands.ts` 为空
+  - `node --test plugin/test/*.test.ts` → tests 345 / pass 345 / fail 0
+  - `node tools/verify.mjs` → VERIFY_OK，exit 0
+- Outcome: done —— 结论：领域层已排除危险组合，树的层级正确。文档那条从「没验过」改成「已验（t68）」。

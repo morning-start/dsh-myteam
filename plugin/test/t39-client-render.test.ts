@@ -1499,6 +1499,71 @@ test('任务详情：已完成的任务不给移动按钮（完成/撤销走门�
   }
 })
 
+test('团队栏「先落计划」：发 planPropose 而不是 teamCreate，且没选蓝图时拦下', async () => {
+  // 设计稿 p-team-new 的最后一步是「先落一份计划；你批准之后才建会话与开 Run」。
+  // 这条锁住：切到「先落计划」后走的是 planPropose，不是 teamCreate —— 否则
+  // 界面看起来一样，实际已经把钱花了。
+  // 自带一份蓝图：FILLED 的 definitions 是空的，没有蓝图可选就测不到「选了蓝图才发请求」。
+  const data = {
+    ...FILLED,
+    definitions: {
+      items: [
+        { id: 'bp_1', kind: 'blueprint', name: '结算改造三人组', revision: 3 },
+      ],
+    },
+  }
+  const harness = loadClient(data)
+  try {
+    let tree = await mount(harness.view, { sessionId: 'ses_1' })
+    ;(findTab(tree, '团队')!.props.onClick as () => void)()
+    tree = await mount(harness.view, { sessionId: 'ses_1' })
+    ;(findButton(tree, '建团队')!.props.onClick as () => void)()
+    tree = await mount(harness.view, { sessionId: 'ses_1' })
+
+    // 切到「先落计划」
+    const planMode = findButton(tree, '先落计划')
+    assert.ok(planMode !== null, '表单缺「先落计划」模式')
+    ;(planMode!.props.onClick as () => void)()
+    tree = await mount(harness.view, { sessionId: 'ses_1' })
+
+    // 说明文案要讲清「批准前不建团队、不建成员、不花钱」
+    const text = textOf(tree)
+    assert.ok(text.includes('批准前不建团队'), `要说明批准前不建实体：${text.slice(0, 300)}`)
+    assert.ok(text.includes('不花钱'), '要说明不花钱')
+
+    // 填名字与目标，但不选蓝图 → 应被拦下，不发请求
+    ;(findByPlaceholder(tree, '团队名字')!.props.onChange as (event: unknown) => void)({ target: { value: '丙队' } })
+    tree = await mount(harness.view, { sessionId: 'ses_1' })
+    ;(findByPlaceholder(tree, '团队目标')!.props.onChange as (event: unknown) => void)({ target: { value: '按蓝图开队' } })
+    tree = await mount(harness.view, { sessionId: 'ses_1' })
+
+    const submitNoBlueprint = findButton(tree, '落计划，去待确认')
+    assert.ok(submitNoBlueprint !== null, '按钮文案要变成「落计划，去待确认」')
+    ;(submitNoBlueprint!.props.onClick as () => void)()
+    tree = await mount(harness.view, { sessionId: 'ses_1' })
+
+    assert.deepEqual(harness.writes, [], '没选蓝图时不该发出任何写请求')
+    assert.ok(textOf(tree).includes('需要选一份蓝图'), '要给出比服务端错误更好懂的提示')
+
+    // 选一份蓝图 → 发 planPropose
+    const blueprintButton = findButton(tree, '结算改造三人组')
+    assert.ok(blueprintButton !== null, 'FILLED 里应有这份蓝图可选')
+    ;(blueprintButton!.props.onClick as () => void)()
+    tree = await mount(harness.view, { sessionId: 'ses_1' })
+    ;(findButton(tree, '落计划，去待确认')!.props.onClick as () => void)()
+    tree = await mount(harness.view, { sessionId: 'ses_1' })
+
+    assert.deepEqual(harness.writes, ['planPropose'], '应发 planPropose，不能是 teamCreate')
+    assert.equal(harness.writeBody?.confirm, true, 'direct 类写动作必须带 confirm: true')
+    const params = harness.writeBody?.params as Record<string, unknown>
+    assert.equal(params.name, '丙队')
+    assert.equal(params.goal, '按蓝图开队')
+    assert.equal(typeof params.blueprintId, 'string', '必须带蓝图 id')
+  } finally {
+    harness.restore()
+  }
+})
+
 test('团队栏「建团队」：填名字/目标/队长会话 → 只发一次 teamCreate', async () => {
   const harness = loadClient(FILLED)
   try {

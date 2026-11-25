@@ -1612,13 +1612,25 @@ window.__ModuleLoader__.load({
       )
     }
 
-    /** 建团队（`teamCreate`，`p-team-new`）：名字 + 目标 + 队长会话，可选蓝图。 */
+    /**
+     * 建团队（`p-team-new`）：名字 + 目标 + 队长会话，可选蓝图。
+     *
+     * 两条路，对应设计稿的两步：
+     * - **直接建**（`teamCreate`，direct）：立刻建出团队与队长，成员由队长后续召唤；
+     * - **先落计划**（`planPropose`，direct）：只写一条计划进「待你确认」，
+     *   **批准前不建团队、不建成员、不花钱**（设计稿「影响面先看后确认」）。
+     *   计划批准走令牌两段式（`planApprove`），在待确认页操作。
+     *
+     * 为什么两种都留：直接建适合「先有个团队再说」；先落计划适合要按蓝图成建制开队、
+     * 且希望人类先看影响面。设计稿把后者放在向导最后一步，这里做成同一个表单上的选择。
+     */
     function TeamCreateForm(props) {
       const { sessionId, blueprints, onDone, onCancel } = props
       const [name, setName] = useState('')
       const [goal, setGoal] = useState('')
       const [captainSessionId, setCaptainSessionId] = useState(sessionId ?? '')
       const [blueprintId, setBlueprintId] = useState('')
+      const [planOnly, setPlanOnly] = useState(false)
       const [busy, setBusy] = useState(false)
       const [problem, setProblem] = useState(null)
       const list = Array.isArray(blueprints) ? blueprints : []
@@ -1640,15 +1652,35 @@ window.__ModuleLoader__.load({
         setBusy(true)
         setProblem(null)
         try {
-          await callWrite('teamCreate', sessionId, {
-            confirm: true,
-            params: {
-              name: name.trim(),
-              goal: goal.trim(),
-              captainSessionId: captainSessionId.trim(),
-              ...(blueprintId.length === 0 ? {} : { blueprintId }),
-            },
-          })
+          if (planOnly) {
+            // 先落计划：只写一条 team.plan.proposed，批准前什么都不建。
+            // 队形由服务端从蓝图取；没套蓝图时服务端会拒（计划至少要一个成员槽位），
+            // 所以这里先拦一下，给出比服务端错误更好懂的提示。
+            if (blueprintId.length === 0) {
+              setProblem('先落计划需要选一份蓝图：队形从蓝图来，没有蓝图就没有成员槽位')
+              setBusy(false)
+              return
+            }
+            await callWrite('planPropose', sessionId, {
+              confirm: true,
+              params: {
+                name: name.trim(),
+                goal: goal.trim(),
+                captainSessionId: captainSessionId.trim(),
+                blueprintId,
+              },
+            })
+          } else {
+            await callWrite('teamCreate', sessionId, {
+              confirm: true,
+              params: {
+                name: name.trim(),
+                goal: goal.trim(),
+                captainSessionId: captainSessionId.trim(),
+                ...(blueprintId.length === 0 ? {} : { blueprintId }),
+              },
+            })
+          }
           onDone()
         } catch (error) {
           setProblem(messageOf(error))
@@ -1713,13 +1745,39 @@ window.__ModuleLoader__.load({
                 ),
               ),
             ),
+        h(
+          'div',
+          { className: 'kws', style: { marginTop: 10 } },
+          h('span', { className: 'muted', style: { fontSize: 12, marginRight: 6 } }, '怎么建'),
+          h(
+            'button',
+            { type: 'button', className: joinClass('btn', planOnly ? '' : 'primary'), style: { marginRight: 6 }, onClick: () => setPlanOnly(false) },
+            '直接建',
+          ),
+          h(
+            'button',
+            { type: 'button', className: joinClass('btn', planOnly ? 'primary' : ''), onClick: () => setPlanOnly(true) },
+            '先落计划',
+          ),
+        ),
+        h(
+          'p',
+          { className: 'muted', style: { fontSize: 12, margin: '6px 0 0' } },
+          planOnly
+            ? '只写一条计划进「待你确认」；批准前不建团队、不建成员，也不花钱。批准在待确认页做。'
+            : '立刻建出团队与队长；成员由队长后续召唤。',
+        ),
         problem === null
           ? null
           : h('p', { className: 'muted', style: { fontSize: 12, margin: '8px 0 0' } }, `没建成：${problem}`),
         h(
           'div',
           { className: 'acts', style: { marginTop: 10 } },
-          h('button', { type: 'button', className: 'btn primary', disabled: busy === true, onClick: () => void submit() }, busy === true ? '创建中…' : '建团队'),
+          h(
+            'button',
+            { type: 'button', className: 'btn primary', disabled: busy === true, onClick: () => void submit() },
+            busy === true ? '提交中…' : planOnly ? '落计划，去待确认' : '建团队',
+          ),
           h('button', { type: 'button', className: 'btn', style: { marginLeft: 8 }, onClick: onCancel }, '取消'),
         ),
       )
@@ -1973,7 +2031,7 @@ window.__ModuleLoader__.load({
     }
 
     function TeamsScreen(props) {
-      const { overview, sessionId } = props
+      const { overview, sessionId, blueprints } = props
       const teams = overview.data?.teams ?? []
       const [selected, setSelected] = useState(null)
       const [creating, setCreating] = useState(false)
@@ -1999,6 +2057,7 @@ window.__ModuleLoader__.load({
         creating === true
           ? h(TeamCreateForm, {
               sessionId,
+              blueprints,
               onDone: () => {
                 setCreating(false)
                 if (props.onChanged !== undefined) props.onChanged()
@@ -3375,7 +3434,14 @@ window.__ModuleLoader__.load({
           }))
       } else if (tab === 'teams') {
         body = h(Data, { data: overview, what: '团队' }, () =>
-          h(TeamsScreen, { overview, sessionId, onChanged: () => void overview.reload() }))
+          h(TeamsScreen, {
+            overview,
+            sessionId,
+            // 建团队表单要选蓝图（「先落计划」必须从蓝图取队形）。
+            // definitions.items 里混着角色/工作流/蓝图，按 kind 筛。
+            blueprints: (definitions.data?.items ?? []).filter((item) => item.kind === 'blueprint'),
+            onChanged: () => void overview.reload(),
+          }))
       } else if (tab === 'definitions') {
         body = h(Data, { data: definitions, what: '项目定义副本' }, (data) =>
           h(DefinitionsScreen, { data, sessionId, members: [], onChanged: () => void definitions.reload() }))
