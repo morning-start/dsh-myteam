@@ -558,6 +558,82 @@ try {
       if (!ok) await shot(`fail-${lane}`)
     }
   }
+  // 建团队表单的两种建法（p-team-new）：直接建 / 先落计划。
+  // 这两条是 2026-11-25 新接的（planPropose 之前客户端 0 处调用），
+  // 单测只证明「点了会发什么请求」，这里证明「在真宿主里点得到」。
+  if (lanesVerified) {
+    const backToTeams = await evaluate(`(() => {
+      const scope = document.querySelector('[data-myteam]')
+      if (scope === null) return 'no-panel'
+      const nodes = [...scope.querySelectorAll('[role="tab"], button, a, span, div')]
+      const target = nodes.find((el) => {
+        if ((el.textContent ?? '').trim() !== '团队') return false
+        return ![...el.children].some((child) => (child.textContent ?? '').trim() === '团队')
+      })
+      if (target === undefined) return 'no-tab'
+      target.click()
+      return 'ok'
+    })()`)
+    await sleep(1200)
+    const openForm = await evaluate(`(() => {
+      const scope = document.querySelector('[data-myteam]')
+      if (scope === null) return 'no-panel'
+      const nodes = [...scope.querySelectorAll('button')]
+      const target = nodes.find((el) => (el.textContent ?? '').trim() === '建团队')
+      if (target === undefined) return 'no-button'
+      target.click()
+      return 'ok'
+    })()`)
+    await sleep(1200)
+    const formText = await evaluate(`(() => {
+      const root = document.querySelector('[data-myteam]')
+      if (root === null) return ''
+      const clone = root.cloneNode(true)
+      for (const node of clone.querySelectorAll('script, style, template, noscript')) node.remove()
+      return (clone.textContent ?? '').replace(/\\s+/g, ' ').trim().slice(0, 1200)
+    })()`)
+    const formStr = String(formText)
+    check('团队栏「建团队」表单能打开',
+      backToTeams === 'ok' && openForm === 'ok' && formStr.includes('团队名字'),
+      `回到团队栏=${String(backToTeams)}；开表单=${String(openForm)} → ${formStr.slice(0, 80)}…`)
+    check('建团队表单有两种建法（直接建 / 先落计划）',
+      formStr.includes('直接建') && formStr.includes('先落计划'),
+      formStr.includes('先落计划') ? '两种都在' : '缺「先落计划」')
+    await shot('05-team-create-form')
+  }
+
+  // 待你确认整页（p-approval）：从概览横幅的「逐项确认」进。
+  // 空项目没有待确认项，横幅不渲染 —— 那就断言「没有横幅」也是对的（0 件不该出现）。
+  if (lanesVerified) {
+    const backToOverview = await evaluate(`(() => {
+      const scope = document.querySelector('[data-myteam]')
+      if (scope === null) return 'no-panel'
+      const nodes = [...scope.querySelectorAll('[role="tab"], button, a, span, div')]
+      const target = nodes.find((el) => {
+        if ((el.textContent ?? '').trim() !== '概览') return false
+        return ![...el.children].some((child) => (child.textContent ?? '').trim() === '概览')
+      })
+      if (target === undefined) return 'no-tab'
+      target.click()
+      return 'ok'
+    })()`)
+    await sleep(1200)
+    const overviewText = await evaluate(`(() => {
+      const root = document.querySelector('[data-myteam]')
+      if (root === null) return ''
+      const clone = root.cloneNode(true)
+      for (const node of clone.querySelectorAll('script, style, template, noscript')) node.remove()
+      return (clone.textContent ?? '').replace(/\\s+/g, ' ').trim().slice(0, 1200)
+    })()`)
+    const ovStr = String(overviewText)
+    const hasBanner = ovStr.includes('逐项确认')
+    const waitingZero = ovStr.includes('0 件待确认') || ovStr.includes('等你确认0')
+    check('概览：0 件待确认时不出现「逐项确认」横幅',
+      backToOverview === 'ok' && (!hasBanner || !waitingZero),
+      `${String(backToOverview)}；横幅=${hasBanner ? '有' : '无'}`)
+    await shot('06-overview')
+  }
+
   await shot('04-last-lane')
 
   console.log(`\n截图：${OUT}`)

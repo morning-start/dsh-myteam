@@ -71,3 +71,12 @@
   - `node --test plugin/test/*.test.ts` → tests 347 / pass 347 / fail 0
   - `node tools/verify.mjs` → VERIFY_OK，exit 0
 - Outcome: done —— 五块有数据、一块（花费）如实标未采集。只读是真的只读（写动作全隐藏，有断言钉住）。
+
+## 6. 重写 39 页覆盖表 —— 上一版三条过期
+- Saw: 验收判据 4 要求「39 页未实现数为 0 或每页有书面理由」。实测逐页对：39/39 有对应实现。但 `实现对齐.md` §6.1 还写着「30 页有实现、9 页没有」，其中 I 组全局库编辑、`p-member-archive`、`p-archive` 三条已过期。
+- Decided: 判据要能被人复跑，所以不只改数字，把核对命令也写进文档。
+- Did: 重写 `docs/features/实现对齐.md` §6.1（九组逐页对照 + 与上一版的差异 + 一处如实标注的缺口）。
+- Evidence:
+  - 逐页探针脚本 → `设计稿 39 页；有对应实现 39 页；缺 0 页`
+  - `node tools/verify.mjs` → VERIFY_OK（文档治理 59、链接 358 条断链 0、事实 68 测试文件），exit 0
+- Outcome: done
