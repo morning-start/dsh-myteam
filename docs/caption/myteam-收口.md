@@ -59,3 +59,15 @@
   - `node --test plugin/test/*.test.ts` → tests 346 / pass 346 / fail 0
   - `node tools/verify.mjs` → VERIFY_OK，exit 0
 - Outcome: done —— 顺带发现并修掉一个真缺陷：`TeamCreateForm` 的蓝图选择器**从来没渲染过**（调用点没传 `blueprints`，`props.blueprints` 恒 undefined），意味着「直接建」那条路以前也选不了蓝图。
+
+## 5. p-archive 归档回放 —— 39 页设计稿全部落地
+- Saw: `p-archive` 是 39 页里唯一没有实现的。设计稿要六块：结局 / 为什么结束 / 影响面 / 花费 / 进度 / 名册终态。
+- Decided: 先确认数据够不够，再决定画哪些。`grep tokenCount|usage|costUsd` 在 `plugin/src` 无命中 → 花费没有数据源，不编数字。
+- Did: `plugin/client/client.js` 新增 `ArchiveReplay`；`TeamsScreen` 按 `data.team.status === 'archived'` 分支；人类专属动作按 `selectedTeamStatus` 隐藏；新增 `teamAudit` 数据源；`t39` 加一条用例；`实现对齐.md` G 组改 ✅；重跑 build-lib。
+- Evidence:
+  - `grep tokenCount|inputTokens|outputTokens|usage|tokenUsage|costUsd plugin/src` → No matches found
+  - `node --test plugin/test/t39-client-render.test.ts` → pass 54 / fail 0
+  - 反证：归档分支改 `false` → `pass 53 / fail 1`；恢复 → 54/54
+  - `node --test plugin/test/*.test.ts` → tests 347 / pass 347 / fail 0
+  - `node tools/verify.mjs` → VERIFY_OK，exit 0
+- Outcome: done —— 五块有数据、一块（花费）如实标未采集。只读是真的只读（写动作全隐藏，有断言钉住）。
