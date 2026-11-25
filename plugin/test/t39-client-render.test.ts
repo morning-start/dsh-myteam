@@ -1499,6 +1499,87 @@ test('任务详情：已完成的任务不给移动按钮（完成/撤销走门�
   }
 })
 
+test('归档回放（p-archive）：只读、五块有数据、花费如实写未采集', async () => {
+  // 设计稿 p-archive：已归档团队的只读回放。六块里五块有数据，
+  // 「花费（token / 调用次数 / 命中率）」项目里没有数据源 —— 必须如实写未采集，不能编数字。
+  // team 读面是 { team, captain, members, tasks, roles, config } 的包装结构，别拍平。
+  const team = {
+    team: { id: 'team_arch', name: '支付页重构', status: 'archived' },
+    captain: null,
+    members: [
+      { id: 'm_1', roleId: 'role_1', status: 'released', parentMemberId: null },
+      { id: 'm_2', roleId: 'role_1', status: 'archived', parentMemberId: null },
+    ],
+    tasks: [
+      { id: 't1', title: '完成一', status: 'done' },
+      { id: 't2', title: '完成二', status: 'done' },
+      { id: 't3', title: '卡住', status: 'blocked' },
+      { id: 't4', title: '没开始', status: 'planned' },
+    ],
+    roles: [{ id: 'role_1', name: '实现者' }],
+    config: { revision: 1, limits: { maxMembers: 8, maxMemberDepth: 3, maxChildrenPerMember: 4 } },
+  }
+  const data = {
+    ...FILLED,
+    overview: {
+      ...(FILLED.overview as Record<string, unknown>),
+      teams: [{ id: 'team_arch', name: '支付页重构', status: 'archived', members: 2, tasks: 4, captain: null }],
+    },
+    team,
+    audit: {
+      items: [
+        {
+          seq: 42,
+          at: '2026-08-14T00:00:00.000Z',
+          type: 'team.archived',
+          entity: { kind: 'team', id: 'team_arch', teamId: 'team_arch' },
+          actor: { kind: 'human', userId: 'u1' },
+        },
+      ],
+      nextBeforeSeq: null,
+    },
+  }
+
+  const harness = loadClient(data)
+  try {
+    let tree = await mount(harness.view, { sessionId: 'ses_1' })
+    ;(findTab(tree, '团队')!.props.onClick as () => void)()
+    tree = await mount(harness.view, { sessionId: 'ses_1' })
+    ;(findButton(tree, '支付页重构')!.props.onClick as () => void)()
+    tree = await mount(harness.view, { sessionId: 'ses_1' })
+
+    const text = textOf(tree)
+
+    // 1) 只读标识
+    assert.ok(text.includes('只读'), '归档视图要标明只读')
+    assert.ok(text.includes('归档 ≠ 解散 ≠ 删除数据'), '要有结局说明')
+
+    // 2) 为什么结束：从审计里读到 team.archived
+    assert.ok(text.includes('2026-08-14'), `要显示归档时间：${text.slice(0, 400)}`)
+    assert.ok(text.includes('之后没有任何写入'), '要说明归档后没有写入')
+
+    // 3) 影响面：名册终态计数
+    assert.ok(text.includes('释放 1'), '要数出已释放成员')
+    assert.ok(text.includes('归档 1'), '要数出已归档成员')
+
+    // 4) 进度：任务按状态计数
+    assert.ok(text.includes('完成 2'), '要数出已完成任务')
+    assert.ok(text.includes('受阻 1'), '要数出受阻任务')
+
+    // 5) 花费：如实写未采集，且不许出现编造的 token 数字
+    assert.ok(text.includes('未采集'), '花费没有数据源，必须写未采集')
+    assert.ok(text.includes('没有 token 计量数据源'), '要说明为什么没有')
+    assert.ok(!/\d+(\.\d+)?[kKmM] token/.test(text), '不许编造 token 数字')
+
+    // 6) 只读：不该出现任何写动作按钮
+    for (const label of ['解散团队', '接管', '召唤成员', '释放', '归档', '恢复']) {
+      assert.equal(findButton(tree, label), null, `归档视图不该有「${label}」按钮`)
+    }
+  } finally {
+    harness.restore()
+  }
+})
+
 test('团队栏「先落计划」：发 planPropose 而不是 teamCreate，且没选蓝图时拦下', async () => {
   // 设计稿 p-team-new 的最后一步是「先落一份计划；你批准之后才建会话与开 Run」。
   // 这条锁住：切到「先落计划」后走的是 planPropose，不是 teamCreate —— 否则

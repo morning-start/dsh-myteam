@@ -48,3 +48,14 @@
   - `node --test plugin/test/*.test.ts` → tests 345 / pass 345 / fail 0
   - `node tools/verify.mjs` → VERIFY_OK，exit 0
 - Outcome: done —— 结论：领域层已排除危险组合，树的层级正确。文档那条从「没验过」改成「已验（t68）」。
+
+## 4. planPropose 接进界面 —— 顺带修好一直没渲染的蓝图选择器
+- Saw: `planPropose` 服务端有写方法，客户端 0 处调用（`grep planPropose client.js` → 0 次），界面上没有入口能落计划。设计稿 `p-team-new` 最后一步正是「先落一份计划，批准后才建会话与开 Run」。
+- Decided: 在现有「建团队」表单上加「怎么建」二选一（直接建 / 先落计划），不新开一屏 —— 设计稿把两者放在同一个向导里。
+- Did: `plugin/client/client.js`（TeamCreateForm 加 planOnly 状态与分支、TeamsScreen 接收并传 blueprints、调用点从 definitions 筛蓝图）；`plugin/test/t39-client-render.test.ts` 加一条用例；重跑 build-lib。
+- Evidence:
+  - `node --test plugin/test/t39-client-render.test.ts` → pass 53 / fail 0
+  - 反证：把 `planPropose` 改回 `teamCreate` → `pass 52 / fail 1`（用例名「团队栏「先落计划」…」）；恢复 → 53/53
+  - `node --test plugin/test/*.test.ts` → tests 346 / pass 346 / fail 0
+  - `node tools/verify.mjs` → VERIFY_OK，exit 0
+- Outcome: done —— 顺带发现并修掉一个真缺陷：`TeamCreateForm` 的蓝图选择器**从来没渲染过**（调用点没传 `blueprints`，`props.blueprints` 恒 undefined），意味着「直接建」那条路以前也选不了蓝图。

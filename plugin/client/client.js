@@ -2030,12 +2030,134 @@ window.__ModuleLoader__.load({
       )
     }
 
+    /**
+     * 归档回放（`p-archive`）：已归档团队的只读回放。
+     *
+     * 设计稿的六块里，**五块有数据**，一块没有：
+     *   - 结局（归档 ≠ 解散 ≠ 删除数据）—— 静态说明 + 团队状态；
+     *   - 为什么结束 —— 从审计里找 `team.archived` 事件，读它的 actor 与时间；
+     *   - 影响面 —— 名册终态（多少在岗/归档/释放）+ 任务分布（完成/受阻/未开始）；
+     *   - 进度 —— 任务按状态计数；
+     *   - 名册终态 —— 每个成员的最终状态与它名下的任务数；
+     *   - **花费（token / 调用次数 / 命中率）—— 没有数据源**：项目里没有 token 计量，
+     *     不画假数字，如实写「未采集」并说明为什么。
+     *
+     * 只读：整块不提供任何写动作（设计稿原话「归档视图只读：不会因为查看而写入任何事件」）。
+     */
+    function ArchiveReplay(props) {
+      const { team, members, tasks, events } = props
+      const roster = Array.isArray(members) ? members : []
+      const taskList = Array.isArray(tasks) ? tasks : []
+      const audit = Array.isArray(events) ? events : []
+
+      // 为什么结束：审计里这条团队最近一次 team.archived。
+      const archivedEvent = audit.find(
+        (event) => event.type === 'team.archived'
+          && (event.entity?.teamId === team.id || event.entity?.id === team.id),
+      )
+
+      const countBy = (list, key) => {
+        const out = new Map()
+        for (const item of list) out.set(item[key], (out.get(item[key]) ?? 0) + 1)
+        return out
+      }
+      const memberByStatus = countBy(roster, 'status')
+      const taskByStatus = countBy(taskList, 'status')
+
+      const doneTasks = taskByStatus.get('done') ?? 0
+      const blockedTasks = taskByStatus.get('blocked') ?? 0
+      const openTasks = taskList.length - doneTasks - blockedTasks - (taskByStatus.get('cancelled') ?? 0)
+
+      // 每个成员名下的任务数（按 ownerTeamId 无法细分到人，这里用 tasks 里没有 memberId 的事实如实说明）
+      const roleName = (roleId) => props.roles?.find((role) => role.id === roleId)?.name ?? roleId
+
+      return h(
+        'div',
+        { className: 'box', style: { padding: '14px 16px', marginTop: 12 } },
+        h(
+          'div',
+          { className: 'rc-h' },
+          h(Dot, { tone: 'idle' }),
+          h('span', { className: 'nm' }, team.name),
+          h('span', { className: 'tag' }, '已归档'),
+          h('span', { className: 'cnt' }, '只读'),
+        ),
+        h(
+          'p',
+          { className: 'muted', style: { margin: '6px 0 0', fontSize: 12 } },
+          archivedEvent === undefined
+            ? '归档时间与操作人没有出现在最近 200 条审计里（可能更早）。'
+            : `归档于 ${String(archivedEvent.at ?? '')} · 由 ${actorText(archivedEvent.actor)} 操作 · 之后没有任何写入`,
+        ),
+
+        h(SectionHeader, { title: '结局', note: '归档 ≠ 解散 ≠ 删除数据' }),
+        h(
+          'p',
+          { className: 'muted', style: { margin: '6px 0 0', fontSize: 12 } },
+          '归档只写事件：项目事件日志与产物都还在，名册、记忆 bank 与证据都保留；解散才是团队终止，删除数据是另一件事。',
+        ),
+
+        h(SectionHeader, { title: '影响面', note: `${roster.length} 名成员 · ${taskList.length} 个任务` }),
+        h(
+          'div',
+          { className: 'kws', style: { marginTop: 6 } },
+          h('span', { className: 'kw' }, `在岗 ${String(memberByStatus.get('active') ?? 0)}`),
+          h('span', { className: 'kw' }, `归档 ${String(memberByStatus.get('archived') ?? 0)}`),
+          h('span', { className: 'kw' }, `释放 ${String(memberByStatus.get('released') ?? 0)}`),
+          h('span', { className: 'kw' }, `已聘任 ${String(memberByStatus.get('appointed') ?? 0)}`),
+        ),
+
+        h(SectionHeader, { title: '进度', note: `${taskList.length} 个任务` }),
+        h(
+          'div',
+          { className: 'kws', style: { marginTop: 6 } },
+          h('span', { className: 'kw' }, `完成 ${String(doneTasks)}`),
+          h('span', { className: 'kw' }, `受阻 ${String(blockedTasks)}`),
+          h('span', { className: 'kw' }, `未完成 ${String(Math.max(0, openTasks))}`),
+        ),
+        h(
+          'p',
+          { className: 'muted', style: { margin: '6px 0 0', fontSize: 12 } },
+          '受阻不是失败：恢复团队后可以重新开跑。',
+        ),
+
+        h(SectionHeader, { title: '名册终态', note: '身份固定，不复用' }),
+        roster.length === 0
+          ? h('p', { className: 'muted', style: { margin: '6px 0 0', fontSize: 12 } }, '这支团队没有成员记录。')
+          : h(
+              'div',
+              { className: 'list', style: { marginTop: 6 } },
+              roster.map((member) =>
+                h(ListRow, {
+                  key: member.id,
+                  title: roleName(member.roleId),
+                  sub: [member.id, MEMBER_STATUS[member.status] ?? String(member.status)],
+                  right: null,
+                }),
+              ),
+            ),
+
+        h(SectionHeader, { title: '花费', note: '未采集' }),
+        h(
+          'p',
+          { className: 'muted', style: { margin: '6px 0 0', fontSize: 12 } },
+          '设计稿这一块要 token 用量、调用次数与命中率，但项目里**没有 token 计量数据源**'
+          + '（事件账本只记业务事实，不记模型用量）。这里不画估算数字 —— 编出来的花费比没有更糟。',
+        ),
+      )
+    }
+
     function TeamsScreen(props) {
-      const { overview, sessionId, blueprints } = props
+      const { overview, sessionId, blueprints, auditEvents } = props
       const teams = overview.data?.teams ?? []
       const [selected, setSelected] = useState(null)
       const [creating, setCreating] = useState(false)
       const detail = usePanelData(selected === null ? undefined : sessionId, 'team', selected === null ? {} : { teamId: selected })
+      // 归档团队只读：解散/接管这些写动作不该出现。用 overview 里的状态判断，
+      // 不依赖 team 详情是否已经回来。
+      const selectedTeamStatus = selected === null
+        ? null
+        : (teams.find((team) => team.id === selected)?.status ?? null)
       return h(
         'div',
         { className: 'body pad' },
@@ -2072,7 +2194,16 @@ window.__ModuleLoader__.load({
               'div',
               { className: 'box', style: { padding: '14px 16px', marginTop: 12 } },
               h(Data, { data: detail, what: '团队名册' }, (data) =>
-                h(
+                // 已归档团队走只读回放（p-archive）：不提供任何写动作。
+                data.team.status === 'archived'
+                  ? h(ArchiveReplay, {
+                      team: data.team,
+                      members: data.members,
+                      tasks: data.tasks,
+                      roles: data.roles,
+                      events: auditEvents,
+                    })
+                  : h(
                   'div',
                   null,
                   h('div', { className: 'rc-h' }, h(Dot, { tone: 'run' }), h('span', { className: 'nm' }, data.team.name), h('span', { className: 'tag' }, TEAM_STATUS[data.team.status] ?? data.team.status)),
@@ -2092,7 +2223,7 @@ window.__ModuleLoader__.load({
                 ),
               ),
             ),
-        selected === null
+        selected === null || selectedTeamStatus === 'archived'
           ? null
           : h(
               'div',
@@ -3351,6 +3482,8 @@ window.__ModuleLoader__.load({
       const audit = usePanelData(tab === 'audit' ? sessionId : undefined, 'audit', { limit: 200 })
       // 概览底部那 5 条「最近事件」：只在概览上拉，切走就停，不额外多打一枪。
       const overviewEvents = usePanelData(tab === 'overview' ? sessionId : undefined, 'audit', { limit: 5 })
+      // 团队栏的归档回放要读 team.archived 事件（「为什么结束」），只在团队栏拉。
+      const teamAudit = usePanelData(tab === 'teams' ? sessionId : undefined, 'audit', { limit: 200 })
       // 待你确认整页：只在真的打开它时才拉，切走就停。
       const approvals = usePanelData(approvalsOpen === true ? sessionId : undefined, 'pendingApprovals')
       const settings = usePanelData(tab === 'settings' ? sessionId : undefined, 'settings')
@@ -3440,6 +3573,7 @@ window.__ModuleLoader__.load({
             // 建团队表单要选蓝图（「先落计划」必须从蓝图取队形）。
             // definitions.items 里混着角色/工作流/蓝图，按 kind 筛。
             blueprints: (definitions.data?.items ?? []).filter((item) => item.kind === 'blueprint'),
+            auditEvents: teamAudit.data?.items,
             onChanged: () => void overview.reload(),
           }))
       } else if (tab === 'definitions') {
