@@ -80,3 +80,42 @@
   - 逐页探针脚本 → `设计稿 39 页；有对应实现 39 页；缺 0 页`
   - `node tools/verify.mjs` → VERIFY_OK（文档治理 59、链接 358 条断链 0、事实 68 测试文件），exit 0
 - Outcome: done
+
+## 7. 真机补三条 —— 建团队表单 / 两种建法 / 0 件不出横幅
+- Saw: 最近三批只过了 t39 渲染冒烟。`verify-live.mjs` 原有 29 条，但都是「九栏能点开」，没覆盖新做的计划卡与「先落计划」。
+- Decided: 真机检查必须覆盖新功能，否则「真机验过」是空话。
+- Did: `tools/verify-live.mjs` 加三条 CDP 真点检查。
+- Evidence:
+  - 第一版失败：`FAIL 团队栏「建团队」表单能打开 — no-button` —— 逐栏循环最后停在「设置」栏，没先切回「团队」。
+  - 修正后：`LIVE_OK 32/32`（原 29 + 新 3）
+  - 反证：去掉「先落计划」按钮 → 重新 build → `FAIL 建团队表单有两种建法（直接建 / 先落计划）— 缺「先落计划」`，`LIVE_FAIL 31/32`；恢复 → `LIVE_OK 32/32`
+  - `node --test plugin/test/*.test.ts` → 347/347；`node tools/verify.mjs` → VERIFY_OK
+- Outcome: done
+
+## Close
+- **Gate**: `node tools/verify.mjs` → VERIFY_OK，exit 0（十道门禁全绿）；`node --test plugin/test/*.test.ts` → tests 347 / pass 347 / fail 0；`node tools/verify-live.mjs --reuse-home` → LIVE_OK 32/32。
+- **判据 1**（VERIFY_OK）✓
+- **判据 2**（单测全绿）✓ 347/347
+- **判据 3**（工作区无未提交）✓ 本批提交后干净
+- **判据 4**（39 页未实现数为 0 或每页有书面理由）✓ 逐页探针：39/39 有对应实现；唯一画不出的「花费」块已在界面与文档里写明原因（无 token 计量数据源）
+- **判据 5**（文档事实与代码一致）✓ DOC_FACTS_OK 模块 65 / 测试 68 / 读 17 / 写 20 / 工具 17+3
+
+### 本轮做完的（7 个提交）
+1. `2c9eb25` 之前的简化改动收口 + 台账目录
+2. `t68` 归档成员在名册树里的位置（把「没验过」变成有守卫）
+3. `2c9eb25` `planPropose` 接进建团队表单（顺带修好一直没渲染的蓝图选择器）
+4. `03565b9` `p-archive` 归档回放（39 页全部落地）
+5. `099f5c9` 重写 39 页覆盖表（上一版三条过期）
+6. `f31906a` 真机补三条 CDP 检查
+
+### 死路（记下来，别重踩）
+- **`system:undefined` 不是缺陷**：`authorize` 在到达那行之前就拒了 member/system，三元链最后一支不可达。上一轮那条「缺陷」判断是错的。
+- **`verify-live` 第一版找不到「建团队」按钮**：逐栏循环最后停在「设置」栏，必须先点回「团队」。
+- **`FILLED.team` 是包装结构** `{ team, captain, members, tasks, roles, config }`，拍平了归档分支就不触发。
+
+### 未验证（如实列出）
+- **深色主题**：本轮没有在深色下渲染过归档回放与建团队表单。
+- **窄宽（375px）**：同上，只在默认宽度验过。
+- **真实模型回合**：没有跑「让队长真的组一次队」的端到端（需要模型凭据，本轮没动）。
+- **`p-archive` 的「花费」块**：没有数据源，画不出来 —— 这是能力缺口，不是未验证项，但用户看到时应当知道。
+- **`tsc --noEmit`**：`plugin/node_modules` 里没有 typescript，门禁里也没有类型检查这一道。类型层面本轮无证据。
