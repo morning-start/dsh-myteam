@@ -61,11 +61,21 @@ function relativeFromRoot(full) {
   return join(full).slice(root.length + 1)
 }
 
-/** 入口模块：导出是包对外公开面，不参与「src 内是否被引用」的判定 */
+/**
+ * 入口模块：导出是包对外公开面，不参与「src 内是否被引用」的判定。
+ *
+ * 必须与 `plugin/package.json` 的 `exports` 一一对应（v2 五层架构下装载面是
+ * `src/composition/*.ts`）。旧版写的是 v1 的 `src/host.ts` / `src/panel.ts` /
+ * `src/smoke.ts`——那些文件在 v2 里不存在，于是「跳过入口」这条规则空转，
+ * 真实的装载入口反而被当成普通模块统计。
+ */
 const ENTRY_MODULES = new Set([
-  'plugin/src/host.ts',
-  'plugin/src/panel.ts',
-  'plugin/src/smoke.ts',
+  'plugin/src/composition/host.ts', // package.json exports "." / "./host"（经根 index.js 转发）
+  'plugin/src/composition/member.ts', // exports "./member"
+  'plugin/src/composition/panel.ts', // exports "./panel"
+  'plugin/src/composition/human-command.ts', // exports "./commands"
+  'plugin/src/composition/human-actions-skill.ts', // exports "./human-actions-skill"
+  'plugin/src/composition/human-card-kind.ts', // exports "./human-cards"
 ])
 
 /** 白名单：已知但有意保留（每条必须有理由，否则就是在给旧债发免死金牌） */

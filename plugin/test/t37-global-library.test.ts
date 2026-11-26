@@ -92,7 +92,9 @@ test('全局审计：新→旧、坏行跳过、truncated 反映还有更早的'
 })
 
 test('全局库根：DSH_HOME 优先，缺省回落 ~/.dsh', () => {
-  assert.equal(globalLibraryRoot({ DSH_HOME: '/tmp/x' }, '/home/u'), join('/tmp/x', 'myteam'))
-  assert.equal(globalLibraryRoot({}, '/home/u'), join('/home/u', '.dsh', 'myteam'))
-  assert.equal(globalLibraryRoot({ DSH_HOME: '   ' }, '/home/u'), join('/home/u', '.dsh', 'myteam'))
+  // 假家目录用占位名，不写任何真实账户路径：这个文件随包分发，写死路径等于泄漏作者机器布局。
+  const fakeHome = join(tmpdir(), 'myteam-fake-home')
+  assert.equal(globalLibraryRoot({ DSH_HOME: join(tmpdir(), 'x') }, fakeHome), join(tmpdir(), 'x', 'myteam'))
+  assert.equal(globalLibraryRoot({}, fakeHome), join(fakeHome, '.dsh', 'myteam'))
+  assert.equal(globalLibraryRoot({ DSH_HOME: '   ' }, fakeHome), join(fakeHome, '.dsh', 'myteam'))
 })

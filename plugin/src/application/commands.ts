@@ -33,7 +33,7 @@ import {
 } from '../domain/definitions/blueprint.ts'
 import { authorize } from '../domain/permissions/policy.ts'
 import { cycleIfEdgesChanged, graphOf } from '../domain/tasks/dag.ts'
-import { assertCurrentAttempt, createPlannedTask, isClaimable } from '../domain/tasks/task.ts'
+import { assertCurrentAttempt, createPlannedTask, isClaimable, nextAttemptGeneration } from '../domain/tasks/task.ts'
 import { appointMember, assertMemberActive, assertMemberLimits, assertMemberStatusChange, memberDepth } from '../domain/teams/member.ts'
 import { assertGraphRevision, assertTeamActive, assertTeamStatusChange, createTeam } from '../domain/teams/team.ts'
 import { createWorkflowRun } from '../domain/workflows/run.ts'

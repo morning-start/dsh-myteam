@@ -3,16 +3,17 @@
   "version": "2.0.0",
   "description": "myteam v2 —— DSH 内的项目级多智能体团队运行时：定义资产、项目事件真源、任务 DAG、门禁与统一投影。",
   "type": "module",
-  "main": "./lib/composition/host.mjs",
+  "main": "./index.js",
   "exports": {
-    ".": "./lib/composition/host.mjs",
-    "./host": "./lib/composition/host.mjs",
+    ".": "./index.js",
+    "./host": "./index.js",
     "./member": "./lib/composition/member.mjs",
     "./panel": "./lib/composition/panel.mjs",
     "./client": "./client/client.js",
     "./commands": "./lib/composition/human-command.mjs",
     "./human-actions-skill": "./lib/composition/human-actions-skill.mjs",
     "./human-cards": "./lib/composition/human-card-kind.mjs",
+    "./locale/*.json": "./locale/*.json",
     "./icon": "./icon.svg",
     "./icon.svg": "./icon.svg",
     "./package.json": "./package.json"
@@ -39,20 +40,22 @@
     }
   },
   "files": [
+    "index.js",
     "lib",
     "src",
     "client",
     "scripts",
+    "locale",
     "design-v2",
     "cordis.patch.yml",
     "icon.svg"
   ],
   "scripts": {
+    "build": "node scripts/build-lib.mjs",
     "build:lib": "node scripts/build-lib.mjs",
     "test": "node --test test/*.test.ts",
     "verify": "node ../tools/verify.mjs",
-    "check:arch": "node ../tools/check-architecture.mjs",
-    "prepack": "node scripts/build-lib.mjs"
+    "check:arch": "node ../tools/check-architecture.mjs"
   },
   "license": "MIT"
 }

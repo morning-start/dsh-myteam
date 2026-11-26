@@ -1,0 +1,86 @@
+name: Release
+
+# 按 tag 发版：`git tag v2.0.1 && git push origin v2.0.1`
+#
+# 与模板的差别（本包特有，都是必需的）：
+#   1. 本包**不 private**：`files` 里带 lib/ 与 design-v2，产物必须由构建生成后再打包，
+#      所以打包前先跑 `npm run build`（等价于原来的 prepack，但**不再挂在安装钩子上**——
+#      安装期执行脚本会被 dsh_plugin_check 的 security:install-hooks 判 fail）。
+#   2. 本包的测试在**仓库根**（tools/ 门禁读 plugin/src），所以 checkout 后要回到仓库根跑门禁。
+#   3. 没有 NPM_TOKEN 时只发 GitHub Release，不发 npm。
+
+on:
+  push:
+    tags: ['v*']
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  id-token: write
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    env:
+      NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          registry-url: https://registry.npmjs.org
+
+      - name: tag 必须与 package.json 版本一致
+        run: |
+          version=$(node -p "require('./plugin/package.json').version")
+          tag="${GITHUB_REF_NAME#v}"
+          if [ "$version" != "$tag" ]; then
+            echo "::error::tag $GITHUB_REF_NAME 与 plugin/package.json 的 $version 不一致"
+            exit 1
+          fi
+          echo "releasing $version"
+
+      - name: 包必须可被 dsh 装载
+        run: |
+          node -e "const m=require('./plugin/package.json'); if(!m.dsh?.bundle?.patch){console.error('缺少 dsh.bundle.patch：dsh plugin add 会拒绝');process.exit(1)}"
+          node -e "const m=require('./plugin/package.json'); if(m.main!=='./index.js'){console.error('main 必须是 ./index.js');process.exit(1)}"
+
+      - name: 构建产物（lib/ + 包内 design-v2）
+        working-directory: plugin
+        run: node scripts/build-lib.mjs --force
+
+      - name: 测试
+        working-directory: plugin
+        run: node --test --test-reporter=spec test/*.test.ts
+
+      - name: 门禁（与本地同一个入口）
+        run: node tools/check-all.mjs
+
+      - name: 打包
+        working-directory: plugin
+        run: |
+          npm pack
+          asset=$(node -p "require('./package.json').name.replace(/^@[^/]+\//, '')")
+          mkdir -p ../dist
+          cp ./*.tgz "../dist/$asset.tgz"
+          echo "ASSET=dist/$asset.tgz" >> "$GITHUB_ENV"
+
+      - name: 发布到 npm
+        if: env.NPM_TOKEN != ''
+        working-directory: plugin
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+        run: npm publish --provenance --access public
+
+      - name: 建 GitHub Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create "$GITHUB_REF_NAME" "$ASSET" \
+            --title "$GITHUB_REF_NAME" \
+            --generate-notes

@@ -55,8 +55,17 @@ const libDir = join(root, 'lib')
 const stagingDir = join(root, 'lib.__staging__')
 /** 浏览器直载产物（不经 src 编译）：package.json exports["./client"]；与源码指纹分开记录 */
 const clientFile = join(root, 'client', 'client.js')
-/** 官方插件契约要求的装载入口（t42 复算） */
-const ENTRY = './lib/composition/host.mjs'
+/**
+ * 官方插件契约要求的装载入口（t42 复算）。
+ *
+ * 标准 bundle 形态：包根的 `index.js` 是纯 JS 入口（`dsh_plugin_check` 的
+ * `recipe:entry` 只认它），它把 `lib/composition/host.mjs` 的 `apply` / `inject`
+ * 原样转发出去。所以这里校验两个点：`main` / `exports["."]` 指向根 `index.js`，
+ * 且 `index.js` 的转发目标就是下面这条产物路径——只改其中一处会立刻红。
+ */
+const ENTRY = './index.js'
+/** 根入口转发的实现产物；与 ENTRY 必须成对成立 */
+const ENTRY_TARGET = './lib/composition/host.mjs'
 
 /**
  * 客户端产物指纹（P2 门禁缺口）：`client/client.js` 由浏览器**直接装载**，不经过 src→lib 构建，
@@ -224,6 +233,18 @@ async function main() {
       `package.json 入口应为 "${ENTRY}"（main=${pkg.main}, exports["."]=${entry}）；请修正后重跑`,
     )
   }
+  // 根入口是纯 JS 转发层：它必须真的指向本次构建产出的那条路径，否则宿主装载到的是
+  // 「入口在、实现不在」的半截包——这种失败在运行期才暴露，代价远高于在这里拦下。
+  const entryFile = join(root, 'index.js')
+  if (!existsSync(entryFile)) {
+    throw new Error(`缺少根入口 ${ENTRY}（标准 bundle 形态要求包根有纯 JS 入口）；lib/ 未做任何改动`)
+  }
+  const entrySource = readFileSync(entryFile, 'utf8')
+  if (!entrySource.includes(`'${ENTRY_TARGET}'`)) {
+    throw new Error(
+      `根入口 ${ENTRY} 没有转发到 "${ENTRY_TARGET}"（构建产物入口）；lib/ 未做任何改动`,
+    )
+  }
   let clientHash = null
   if (existsSync(clientFile)) {
     clientHash = clientHashOf(clientFile)
@@ -274,6 +295,8 @@ async function main() {
       builtAt: new Date().toISOString(),
       node: process.version,
       entry: ENTRY,
+      // 根入口转发的实现产物：t42 用它核对「入口在、实现也在」
+      entryTarget: ENTRY_TARGET,
       modules: files.length,
       sourceHash: sourceHashOf(files),
       // v2 的浏览器产物在 R5 落地前不存在；有则记指纹，没有就明确缺省。

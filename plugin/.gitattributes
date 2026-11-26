@@ -1,0 +1,20 @@
+# 统一行尾：仓库与工作区一律 LF（跨平台 diff 不产生噪音）
+* text=auto eol=lf
+
+# .cmd / .bat 必须是 CRLF：cmd.exe 的标签查找（call :label / goto :label）在 LF-only
+# 下会报「系统找不到指定的批处理标签」。这一条必须排在 `* text=auto eol=lf` 之后覆盖它。
+*.cmd text eol=crlf
+*.bat text eol=crlf
+
+# 二进制
+*.png  binary
+*.jpg  binary
+*.jpeg binary
+*.gif  binary
+*.webp binary
+*.ico  binary
+*.woff binary
+*.woff2 binary
+*.ttf  binary
+*.zip  binary
+*.asar binary

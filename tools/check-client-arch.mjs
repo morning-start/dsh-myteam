@@ -18,11 +18,25 @@
  *
  * 用法：node tools/check-client-arch.mjs [--json]
  */
-import { readdirSync, readFileSync } from 'node:fs'
+import { existsSync, readdirSync, readFileSync } from 'node:fs'
 import { join, resolve } from 'node:path'
 
 const ROOT = resolve(import.meta.dirname, '..')
 const SRC = join(ROOT, 'plugin', 'client', 'src')
+
+/**
+ * 分片源不存在时如实报告并退出 0。
+ *
+ * 这道门禁守的是「`client/src/*.js` 分片按序号分层、不许倒挂」。v2 的客户端是
+ * **单文件** `client/client.js`（浏览器直载，不经构建），根本没有分片目录。
+ * 旧版在这里直接 `readdirSync` 抛 ENOENT，把整个 `check-all` 门禁打断。
+ * 现在：没有分片就明说「不适用」，而不是假装通过、也不是崩掉。
+ */
+if (!existsSync(SRC)) {
+  console.log('客户端分片: 无（v2 客户端是单文件 plugin/client/client.js，分片分层检查不适用）')
+  console.log('客户端依赖方向: 与基线持平')
+  process.exit(0)
+}
 
 const files = readdirSync(SRC).filter((f) => f.endsWith('.js')).sort()
 

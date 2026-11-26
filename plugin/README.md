@@ -96,22 +96,22 @@ composition → infrastructure → application → domain → contracts
 cd plugin
 node --test test/*.test.ts        # 142 个测试
 node ../tools/check-architecture.mjs   # ARCH_OK files=49 violations=0
-node scripts/build-lib.mjs        # 构建 lib/（入口 lib/composition/host.mjs）；lib 不入库，安装/本地运行前必须先跑
+node scripts/build-lib.mjs        # 构建 lib/（根入口 index.js 转发到 lib/composition/host.mjs）；lib 不入库，安装/本地运行前必须先跑
 node ../tools/gen-panel-contract.mjs --check   # 面板契约文档与代码一致
 node ../tools/gen-tool-contract.mjs --check    # 工具面契约文档与代码一致
 node ../tools/gen-config-contract.mjs --check  # 配置字段契约文档与代码一致
 # 真实 cutover 演练（只读；候选写临时目录，不动工作区）
-node ../tools/myteam-cutover.mjs --root "E:\Workplace\extension\dsh-myteam"
+node ../tools/myteam-cutover.mjs --root "<项目目录>"
 
 # v1 数据只读分析（不写旧文件、不迁移）
-node ../tools/myteam-migrate.mjs analyze --root "E:\Workplace\extension\dsh-myteam"
-node ../tools/myteam-migrate.mjs plan    --root "E:\Workplace\extension\dsh-myteam" --json
+node ../tools/myteam-migrate.mjs analyze --root "<项目目录>"
+node ../tools/myteam-migrate.mjs plan    --root "<项目目录>" --json
 # 候选导入：写到一个独立目录，旧工作区不动；写完立即对账
-node ../tools/myteam-migrate.mjs candidate --root "E:\Workplace\extension\dsh-myteam" --candidate "<候选目录>"
+node ../tools/myteam-migrate.mjs candidate --root "<项目目录>" --candidate "<候选目录>"
 # cutover 计划：检查候选完整性、源是否变化、列出步骤与回滚边界（不执行切换）
-node ../tools/myteam-migrate.mjs cutover-plan --root "E:\Workplace\extension\dsh-myteam" --candidate "<候选目录>"
+node ../tools/myteam-migrate.mjs cutover-plan --root "<项目目录>" --candidate "<候选目录>"
 # cutover 演练：在临时副本上跑完分析→候选→切换→首次打开→回滚，不碰真实工作区
-node ../tools/rehearse-cutover.mjs --root "E:\Workplace\extension\dsh-myteam"
+node ../tools/rehearse-cutover.mjs --root "<项目目录>"
 ```
 
 不需要 `npm install`：Node ≥ 22.18 直接擦除类型运行 `.ts`，仓库保持零运行时依赖。

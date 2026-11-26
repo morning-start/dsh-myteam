@@ -14,6 +14,7 @@ import {
   createTeamCommand,
   initializeProject,
 } from '../src/application/commands.ts'
+import { cancelTaskCommand, reopenTaskCommand } from '../src/application/task-commands.ts'
 import { newId } from '../src/contracts/ids.ts'
 import type { ActorRef } from '../src/contracts/events.ts'
 import { MyTeamError } from '../src/contracts/errors.ts'
@@ -67,6 +68,18 @@ function scenario(runtime: ProjectRuntime): { teamId: string; taskId: string; me
   return { teamId, taskId, memberId, roleId }
 }
 
+/** 再建一条**没有依赖**的任务（创建即 ready，可被认领）。 */
+function readyTask(runtime: ProjectRuntime, teamId: string, title: string): string {
+  const created = createTaskCommand(runtime, {
+    actor: HUMAN,
+    title,
+    description: title,
+    acceptance: ['做完'],
+    ownerTeamId: teamId,
+  })
+  return (created.events[0]!.payload as { task: { id: string } }).task.id
+}
+
 test('项目切片：建项目 → 角色 → 团队 → 成员 → 任务 → 认领', () => {
   const dir = mkdtempSync(join(tmpdir(), 'myteam-runtime-'))
   try {
@@ -91,6 +104,41 @@ test('项目切片：建项目 → 角色 → 团队 → 成员 → 任务 → �
       const captain = runtime.state.captains.get(teamId)!
       assert.equal(captain.generation, 1)
       assert.equal(captain.sessionId, 'ses_captain_01')
+    } finally {
+      runtime.close()
+    }
+  } finally {
+    rmSync(dir, { recursive: true, force: true })
+  }
+})
+
+test('Attempt generation：同一任务反复重开后，generation 必须严格递增', () => {
+  const dir = mkdtempSync(join(tmpdir(), 'myteam-runtime-'))
+  try {
+    const runtime = openRuntime(dir)
+    try {
+      const { teamId, memberId } = scenario(runtime)
+      const taskId = readyTask(runtime, teamId, '反复重开')
+
+      const generations: number[] = []
+      // 三轮「认领 → 取消 → 重开」。只做一轮时旧实现（取历史最大值 + 1）
+      // 也会给出 2，测不出问题；做到三轮，旧实现会停在 2，新实现才是 1/2/3。
+      for (let round = 1; round <= 3; round += 1) {
+        const claim = claimTaskCommand(runtime, { actor: HUMAN, taskId, memberId })
+        const attempt = (claim.events[0]!.payload as { attempt: { id: string; generation: number } }).attempt
+        generations.push(attempt.generation)
+
+        cancelTaskCommand(runtime, { actor: HUMAN, taskId, reason: `第 ${round} 轮换人` })
+        assert.equal(runtime.state.attempts.get(attempt.id)!.status, 'revoked')
+        reopenTaskCommand(runtime, { actor: HUMAN, taskId, reason: `第 ${round} 轮重开` })
+        assert.equal(runtime.state.tasks.get(taskId)!.status, 'ready')
+      }
+
+      assert.deepEqual(
+        generations,
+        [1, 2, 3],
+        '同一任务的 Attempt generation 必须严格递增：复用旧值会让迟到的旧 Attempt 写入被当成当前世代',
+      )
     } finally {
       runtime.close()
     }

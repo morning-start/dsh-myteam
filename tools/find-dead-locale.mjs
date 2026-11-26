@@ -21,10 +21,16 @@ import { join, resolve } from 'node:path'
 const CLIENT = resolve('plugin/client/client.js')
 const lines = readFileSync(CLIENT, 'utf8').split(/\r?\n/)
 
-/** 从 `const <name> = {` 那一行开始，括号配平取出表体行（含起止行号） */
+/**
+ * 词条表可能不存在——那不是错误，而是「这个客户端没有内嵌词条表」。
+ *
+ * v2 的客户端把界面文案直接写在组件里（`client.js` 里没有任何 `const zh = {`），
+ * 词条表是 v1 的形态。旧版在这里 `throw`，导致整个 `check-all` 门禁在第一步就崩，
+ * 后面所有检查都没跑。现在：找不到表就如实报告「无词条表」，退出码 0。
+ */
 function tableRange(name) {
   const start = lines.findIndex((l) => new RegExp(`^\\s*const ${name} = \\{`).test(l))
-  if (start < 0) throw new Error(`找不到词条表 ${name}`)
+  if (start < 0) return null
   let depth = 0
   let started = false
   for (let i = start; i < lines.length; i++) {
@@ -38,6 +44,18 @@ function tableRange(name) {
 
 const zhRange = tableRange('zh')
 const enRange = tableRange('en')
+
+if (zhRange === null && enRange === null) {
+  console.log('词条表: 无（客户端未内嵌 zh/en 词条表，界面文案直接写在组件里）')
+  console.log('死词条（zh 侧）: 0')
+  process.exit(0)
+}
+if (zhRange === null || enRange === null) {
+  console.log(`死词条（zh 侧）: 1`)
+  console.log(`  DEAD 词条表不成对：zh=${zhRange === null ? '缺' : '有'} / en=${enRange === null ? '缺' : '有'}`)
+  process.exit(1)
+}
+
 const keyOf = (tableLines) => new Set(tableLines.flatMap((l) => [...l.matchAll(/^\s+'([^']+)':/g)].map((m) => m[1])))
 const zhKeys = keyOf(zhRange.lines)
 const enKeys = keyOf(enRange.lines)

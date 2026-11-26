@@ -1,0 +1,6 @@
+{
+  "meta": {
+    "title": "myteam",
+    "description": "Project-level multi-agent team runtime for DSH: reusable role/workflow/blueprint definitions, a project event ledger as the single source of truth, a task DAG with gates, and one auditable panel. Captain and member tool surfaces are mounted through two agent presets."
+  }
+}

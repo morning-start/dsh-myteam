@@ -1,0 +1,75 @@
+{
+  "version": 1,
+  "description": "dsh-plugin-myteam 的项目级检查。规则是数据，执行器是 dsh_project_check 工具或 dsh-plugin-creator 的 scripts/check-project.mjs；规则类型参考该包的 docs/CHECKS.md。",
+  "rules": [
+    {
+      "id": "docs:links",
+      "type": "doc-links",
+      "exclude": [
+        "\\.dsh-memory/",
+        "^plugin/lib/"
+      ]
+    },
+    {
+      "id": "locale:parity",
+      "type": "locale-parity",
+      "files": [
+        "locale/en.json",
+        "locale/zh.json"
+      ]
+    },
+    {
+      "id": "bundle:entry",
+      "type": "file-exists",
+      "path": "index.js"
+    },
+    {
+      "id": "bundle:patch",
+      "type": "json-field",
+      "path": "package.json",
+      "field": "dsh.bundle.patch",
+      "equals": "./cordis.patch.yml"
+    },
+    {
+      "id": "bundle:files-listed",
+      "type": "files-listed",
+      "manifest": "package.json",
+      "exclude": [
+        ".gitignore",
+        ".gitattributes",
+        "checks.json",
+        "package.json",
+        "README.md",
+        "tsconfig.json",
+        "test",
+        ".github/workflows/release.yml"
+      ],
+      "note": "test/ 是仓库内测试与视觉夹具（含无头浏览器 harness），不随包分发；其余为仓库元数据。"
+    },
+    {
+      "id": "arch:layers",
+      "type": "import-boundary",
+      "root": "src",
+      "extensions": [".ts"],
+      "layers": {
+        "contracts": ["domain", "application", "infrastructure", "composition"],
+        "domain": ["application", "infrastructure", "composition"],
+        "application": ["infrastructure", "composition"],
+        "infrastructure": ["composition"],
+        "composition": []
+      },
+      "builtins": {
+        "contracts": ["fs", "child_process", "path", "os", "net", "http", "worker_threads"],
+        "domain": ["fs", "child_process", "path", "os", "net", "http", "worker_threads"],
+        "application": ["fs", "child_process", "path", "os", "net", "http", "worker_threads"]
+      },
+      "allowExternal": ["infrastructure", "composition"]
+    },
+    {
+      "id": "arch:console",
+      "type": "no-console",
+      "root": "src",
+      "layers": ["contracts", "domain", "application"]
+    }
+  ]
+}
