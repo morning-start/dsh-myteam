@@ -40,14 +40,55 @@
 | `seed-demo-team.mjs` | 播**单团队**演示数据：3 队员 / 5 任务 / 门禁 / 证据 / token 计量 |
 | `seed-panel-check.mjs` | 播「面板验收」活团队（panel-check：2 实现者 + 1 评审者）。CHG-73 起另含证据过期 `t4`、已取消 `t5` + 上游已取消 `t6`、批量候选 `b1`/`b2`、可删角色 `panel-temp-role`；`panel-draft` 为草稿态。`--clean` 清理（会把 manifest 里登记的演示角色文件一并删掉） |
 
-## 构建与一致性
+## 门禁与扫描器
+
+> 这一节是**本地与 CI 共用的唯一入口**。`check-all.mjs` 按输出行断言，任一项不符即 exit 1；
+> 不在 CI 里另写一套命令，否则两套必然漂移。
 
 | 文件 | 用途 |
 |---|---|
-| `check-drift.mjs` | 源码 ↔ 产物漂移检查（R38、D9 的独立复算面）。直接复用 `plugin/scripts/build-lib.mjs` 的 `compileSource`，编译口径只有一个来源；`sourceURL` 行两边归一化。`MISMATCH: 0` 退 0，否则退 1（可当 CI 门禁） |
+| `check-all.mjs` | **一键门禁**（10 项）：架构 / 类型 / 指纹 / 文档链接 / 客户端依赖 / 死词条 / 死导出 / 未接线导出 / 死模块 / 项目规则。CI 与本地同一个命令 |
+| `verify.mjs` | **全量门禁**（11 项）：单测 + 架构 + 四份生成契约 + 权限矩阵 + 文档治理/链接/路径/事实。比 `check-all` 更全，耗时更长 |
+| `check-architecture.mjs` | 分层与依赖方向（V1–V5）：目录归属、依赖方向、宿主模块、第三方包、打印边界。通过打印 `ARCH_OK ... violations=0` |
+| `check-types.mjs` | 类型门禁 `tsc --noEmit`。构建用 `stripTypeScriptTypes` **只擦类型不校验**，所以「访问不存在的属性」这类错误只有这道门禁能抓。依赖未安装时**明确失败**并给出 `npm ci`，不静默跳过 |
+| `check-project.mjs` | 跑 `plugin/checks.json` 里声明的项目规则（引擎在 `tools/checks/`，与 `dsh_project_check` 工具同一实现）：`import-boundary` 分层、`no-console`、入口/patch/本地化对等、包内文件白名单 |
+| `check-drift.mjs` | 源码 ↔ 产物漂移检查（R38、D9 的独立复算面）。直接复用 `plugin/scripts/build-lib.mjs` 的 `compileSource`，编译口径只有一个来源；`sourceURL` 行两边归一化 |
+| `check-client-arch.mjs` | 客户端分片依赖方向。v2 客户端是单文件 `client/client.js`，没有分片目录时如实报告「不适用」 |
+| `check-doc-links.mjs` | markdown 相对链接必须解析得到（锚点只查文件，不查 fragment） |
+| `check-doc-paths.mjs` | 正文里**行内代码**写的仓库路径必须存在（`check-doc-links` 只看 markdown 链接语法，看不到行内代码里的路径） |
+| `check-doc-facts.mjs` | 文档里的可数事实（模块数 / 测试文件数 / 方法数 / 工具数）必须等于代码算出来的数 |
+| `check-docs.mjs` | 文档治理：每个子目录有 README、根目录只允许 README、状态 token 合法、生成物保留「不要手改」标记 |
+| `check-doc-replacement.mjs` | 读 `docs/delivery/11-文档替换清单.md`，汇总哪些旧文档可以删（`--strict` 有待补写即非零退出） |
+| `find-dead-locale.mjs` | 死词条：从 `client.js` 的 `const zh/en` 词条表取 key，统计全仓引用。没有词条表时如实报告「无」 |
+| `find-dead-exports.mjs` | 死导出（棘轮，基线 `tools/dead-exports-allow.json`）：`export` 出去但除定义文件外零引用 |
+| `find-unwired-exports.mjs` | 未接线导出（棘轮，基线 `tools/unwired-exports-allow.json`）：生产零调用、但有测试引用 |
+| `find-dead-modules.mjs` | 死模块：从 `src/composition/*.ts` 入口 + `tools/` 下 CLI 的引用做可达性遍历，`.d.ts` 不计入 |
 | `diff-one.mjs` | 单文件差异对比（人工核查某一份产物用） |
-| `gen-tool-contract.mjs` | 从 `plugin/src/application/tool-specs.ts` + `contracts/errors.ts` **生成** `docs/contracts/tool-surface.md`（工具清单 + 错误码表）。`--check` 只校验不写文件，已接进 `verify.mjs`。原 `gen-error-docs.mjs` 在 v2 里已废弃（它读的 `plugin/src/core/errors.ts` 与写的 `docs/04` 都不存在了），错误码表由本脚本覆盖 |
 | `smoke-commit-perf.mjs` | 提交性能冒烟（CHG-59）：真实 lib 产物上对比「增量提交」与「全量重放」的耗时，并验证两者投影一致 |
+
+## 生成契约
+
+> 生成物顶部带「不要手改」标记；`--check` 只校验不写文件，已接进 `verify.mjs`。
+
+| 文件 | 用途 |
+|---|---|
+| `gen-panel-contract.mjs` | 从 `application/panel-contract.ts` + `panel-writes.ts` 生成 `docs/contracts/panel-rpc.md` |
+| `gen-tool-contract.mjs` | 从 `application/tool-specs.ts` + `contracts/errors.ts` 生成 `docs/contracts/tool-surface.md`（工具清单 + 错误码表）。原 `gen-error-docs.mjs` 在 v2 里已废弃 |
+| `gen-config-contract.mjs` | 从 `domain/config/merge.ts` 的 `DEFAULT_TEAM_CONFIG` 生成 `docs/contracts/config-schema.md` |
+| `gen-permission-doc.mjs` | 从 `domain/permissions/policy.ts` 生成 `docs/contracts/permissions.md`（动作 × 角色的权限矩阵） |
+
+## 迁移与人类动作 CLI
+
+> 这三个脚本直接 import `plugin/src/**`，是「生产在用但不在宿主装载链上」的那部分代码。
+
+| 文件 | 用途 |
+|---|---|
+| `myteam-migrate.mjs` | v1 数据只读分析 / 候选导入 / cutover 计划。`analyze` / `plan` / `candidate` / `cutover-plan` 四个子命令 |
+| `myteam-cutover.mjs` | 真实 cutover 演练（只读；候选写临时目录，不动工作区） |
+| `rehearse-cutover.mjs` | 在临时副本上跑完「分析 → 候选 → 切换 → 首次打开 → 回滚」，不碰真实工作区 |
+| `myteam-human.mjs` | 人类专属动作 CLI（解散团队 / 队长接管）：预览只读、执行前重算影响面、令牌一次性 |
+| `myteam-inspect.mjs` | 只读体检：不拿租约、不写文件，看一个项目目录的账本状态 |
+| `myteam-docs-purge.mjs` | 文档清理辅助（一次性） |
 
 ## 取证与探针
 

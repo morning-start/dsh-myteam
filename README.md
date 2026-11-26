@@ -74,27 +74,25 @@ myteam 将系统分为三层：
 
 ## 5. 构建与验证
 
+从**仓库根**跑（根 `package.json` 只转发命令，没有依赖）：
+
 ```bash
-# 修改 plugin/src 或 client 源片段后重建装载产物
-cd plugin && npm run bundle
-
-# 离线单元测试
-cd plugin && npm test
-
-# 仓库统一门禁
-node tools/check-all.mjs
-
-# 源码与构建产物漂移检查
-node tools/check-drift.mjs
-
-# 当前代码结构报告
-node tools/arch-report.mjs
-
-# 文档相对链接检查
-node tools/check-doc-links.mjs
+npm run setup       # 一次性装开发依赖（只用于类型门禁，锁在 plugin/package-lock.json）
+npm run build       # 重建装载产物 lib/（不入库，安装/本地运行前必须先跑）
+npm test            # 离线单元测试
+npm run typecheck   # tsc --noEmit；构建只擦类型不校验，这道门禁抓「访问不存在的属性」
+npm run check       # 统一门禁 10 项（架构 / 类型 / 指纹 / 文档链接 / 客户端 / 死代码 / 项目规则）
+npm run verify      # 全量门禁 11 项（单测 + 四份生成契约 + 权限矩阵 + 文档治理/链接/路径/事实）
+npm run live        # 真机：起隔离实例 + CDP 真点一遍（需要 Chrome）
+npm run arch        # 当前代码结构报告
 ```
 
-环境要求：Node ≥ 22.18，DSH `0.2.1-rc.0 ~ 0.3.0`。当前是否通过测试只以本次实际运行结果为准；README 不再维护容易过期的测试数、工具数或 RPC 数徽章。
+也可以直接调脚本（不经 npm）：`node tools/check-all.mjs`、`node tools/verify.mjs` 等，
+全部从仓库根执行。各脚本的用途见 [tools/README](tools/README.md)。
+
+环境要求：Node ≥ 22.18，DSH `0.2.1-rc.0 ~ 0.3.0`。**运行时零依赖**——宿主装载本插件不需要 `npm install`；
+`plugin/package.json` 的 `devDependencies` 只服务类型门禁。当前是否通过测试只以本次实际运行结果为准；
+README 不再维护容易过期的测试数、工具数或 RPC 数徽章。
 
 ### DSH Web 活体验收
 

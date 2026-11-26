@@ -1,4 +1,4 @@
-# dsh-plugin-myteam · v2
+﻿# dsh-plugin-myteam · v2
 
 项目级多智能体团队运行时。v2 是**重写**，不是给 v1 打补丁：v1 的完整实现保存在
 Git 标签 `v1-backup`，本分支从新的分层骨架开始重新实现。
@@ -94,8 +94,9 @@ composition → infrastructure → application → domain → contracts
 
 ```bash
 cd plugin
-node --test test/*.test.ts        # 142 个测试
-node ../tools/check-architecture.mjs   # ARCH_OK files=49 violations=0
+node --test test/*.test.ts        # 348 个测试
+node ../tools/check-architecture.mjs   # ARCH_OK files=66 violations=0
+node ../tools/check-types.mjs     # TYPES_OK（tsc --noEmit；需先 npm ci）
 node scripts/build-lib.mjs        # 构建 lib/（根入口 index.js 转发到 lib/composition/host.mjs）；lib 不入库，安装/本地运行前必须先跑
 node ../tools/gen-panel-contract.mjs --check   # 面板契约文档与代码一致
 node ../tools/gen-tool-contract.mjs --check    # 工具面契约文档与代码一致

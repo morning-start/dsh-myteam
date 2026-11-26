@@ -1,0 +1,21 @@
+{
+  "name": "dsh-myteam-repo",
+  "version": "2.0.0",
+  "private": true,
+  "description": "dsh-plugin-myteam 的仓库根：统一入口。插件包本身在 plugin/，运行时零依赖；这里只转发命令。",
+  "type": "module",
+  "scripts": {
+    "setup": "npm --prefix plugin ci",
+    "build": "npm --prefix plugin run build",
+    "test": "npm --prefix plugin test",
+    "typecheck": "node tools/check-types.mjs",
+    "check": "node tools/check-all.mjs",
+    "verify": "node tools/verify.mjs",
+    "live": "node tools/verify-live.mjs",
+    "arch": "node tools/arch-report.mjs"
+  },
+  "engines": {
+    "node": ">=22.18"
+  },
+  "license": "MIT"
+}

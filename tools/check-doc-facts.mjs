@@ -16,7 +16,7 @@
  *   - 写方法数：`PANEL_WRITE_METHODS` 长度，并按 `token` / `direct` 分类计数；
  *   - 工具数：`tool-specs.ts` 里 captain / member 两张表的条目数。
  */
-import { readdirSync, readFileSync, statSync } from 'node:fs'
+import { existsSync, readdirSync, readFileSync, statSync } from 'node:fs'
 import { join } from 'node:path'
 
 const ROOT = process.cwd()
@@ -73,6 +73,14 @@ const captainTools = uniqueTools.filter((n) => !memberToolNames.includes(n))
 const actual = {
   modules: walk('plugin/src').length,
   testFiles: readdirSync('plugin/test').filter((n) => n.endsWith('.test.ts')).length,
+  // 用例数：数每个测试文件里的 `test(` / `it(` 调用。比「跑一遍 node --test」便宜得多，
+  // 而且足够对账 README 注释里写的「N 个测试」。
+  testCases: readdirSync('plugin/test')
+    .filter((n) => n.endsWith('.test.ts'))
+    .reduce((sum, n) => {
+      const src = readFileSync(join('plugin/test', n), 'utf8')
+      return sum + [...src.matchAll(/^\s*(?:await\s+)?(?:test|it)\s*\(/gm)].length
+    }, 0),
   readMethods: readMethods.length,
   globalMethods: globalMethods.length,
   writeMethods: writeMethods.length,
@@ -123,6 +131,26 @@ expect('面板读面', /含\s*(\d+)\s*个免会话/, actual.globalMethods, '免�
 expect('工具面', /队长\s*(\d+)\s*个\s*\+\s*成员\s*(\d+)\s*个/, [actual.captainTools, actual.memberTools], '工具数')
 expect('写面', /(\d+)\s*项：令牌类\s*(\d+)[^+]*\+\s*直接确认类\s*(\d+)/,
   [actual.writeMethods, actual.tokenWrites, actual.directWrites], '写方法数')
+
+// ---- 与 plugin/README.md 的命令注释对账 ----
+//
+// 为什么也要查这里：`plugin/README.md` 的「运行」代码块把命令和**期望输出**写在同一行
+// （`node --test test/*.test.ts  # 348 个测试`、`check-architecture.mjs  # ARCH_OK files=66`）。
+// 这些数字没有任何门禁守着，2026-11-26 实测已经漂了两处（142 个测试 / files=49，
+// 实际 348 / 66）。07 §2 是「唯一允许写这些数字的地方」，但 README 的注释里既然写了，
+// 就得一起对账，否则读者照着注释判断「跑对了没有」会得到错误结论。
+const PLUGIN_README = 'plugin/README.md'
+if (existsSync(PLUGIN_README)) {
+  const readme = readFileSync(PLUGIN_README, 'utf8')
+  const testCount = readme.match(/node --test test\/\*\.test\.ts\s*#\s*(\d+)\s*个测试/)
+  if (testCount && Number(testCount[1]) !== actual.testCases) {
+    problems.push(`${PLUGIN_README} 写的是 ${testCount[1]} 个测试，实际 ${actual.testCases} 条用例`)
+  }
+  const archCount = readme.match(/check-architecture\.mjs\s*#\s*ARCH_OK files=(\d+)/)
+  if (archCount && Number(archCount[1]) !== actual.modules) {
+    problems.push(`${PLUGIN_README} 写的是 ARCH_OK files=${archCount[1]}，实际 files=${actual.modules}`)
+  }
+}
 
 notes.push(`模块 ${actual.modules} ｜ 测试文件 ${actual.testFiles} ｜ 读方法 ${actual.readMethods}（免会话 ${actual.globalMethods}）`)
 notes.push(`写方法 ${actual.writeMethods}（token ${actual.tokenWrites} / direct ${actual.directWrites}）｜ 工具 ${actual.captainTools}+${actual.memberTools}`)

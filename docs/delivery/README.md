@@ -24,13 +24,19 @@
 ## 3. 统一验证命令
 
 ```bash
+# 一次性装开发依赖（只用于类型门禁，锁在 package-lock.json）
+cd plugin && npm ci
+
 # 构建产物与源码同步
-cd plugin && npm run bundle
+cd plugin && npm run build
 
 # 完整单元测试
 cd plugin && npm test
 
-# 仓库统一 8 项门禁
+# 类型检查（tsc --noEmit）
+cd plugin && npm run typecheck
+
+# 仓库统一 10 项门禁
 node tools/check-all.mjs
 
 # 仅检查文档链接

@@ -61,7 +61,7 @@ for (const d of drift.slice(0, 20)) console.log(' -', d)
 if (absSourceUrl.length > 0) {
   console.warn(
     `[warn] lib/ 里还有 ${absSourceUrl.length}/${files.length} 个产物带绝对路径 sourceURL（D9）——` +
-      '重跑 `cd plugin && npm run bundle` 才会消失；本检查只比代码，故不计入 MISMATCH',
+      '重跑 `cd plugin && npm run build` 才会消失；本检查只比代码，故不计入 MISMATCH',
   )
 }
 process.exitCode = drift.length > 0 ? 1 : 0
