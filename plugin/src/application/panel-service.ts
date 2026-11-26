@@ -11,8 +11,8 @@ import { ERROR_CODES, fail, toErrorShape } from '../contracts/errors.ts'
 import type { ProjectRuntime } from './project-runtime.ts'
 import type { ProjectState } from './projections/project-state.ts'
 import { boardView, pendingApprovalsView, taskDetail, teamView } from './queries.ts'
-import { validateRequest } from './panel-contract.ts'
-import type { PanelMethod, PanelResponse } from './panel-contract.ts'
+import { isGlobalPanelMethod, validateRequest } from './panel-contract.ts'
+import type { GlobalPanelMethod, PanelMethod, PanelResponse } from './panel-contract.ts'
 
 /** 打开项目的端口；生产实现是 ProjectHosts，测试可以给只读假宿主。 */
 export interface ProjectRuntimeHost {
@@ -190,6 +190,11 @@ export class PanelService {
   async invoke(rootDir: string, input: unknown): Promise<PanelResponse> {
     try {
       const request = validateRequest(input)
+      // 全局库方法不属任何项目：它们读 $DSH_HOME/myteam，必须走 invokeGlobal。
+      // 这里显式拒绝而不是「顺手也读一下」——把项目级 rootDir 当成全局库根是静默错误。
+      if (isGlobalPanelMethod(request.method)) {
+        fail(ERROR_CODES.INVALID_COMMAND, `全局方法 ${request.method} 必须走 invokeGlobal，不能按项目读取`)
+      }
       const data = await this.read(rootDir, request.method, request.params)
       return { ok: true, data }
     } catch (error) {
@@ -197,7 +202,19 @@ export class PanelService {
     }
   }
 
-  private async read(rootDir: string, method: PanelMethod, params: Record<string, unknown> | undefined): Promise<JsonValue> {
+  /**
+   * 项目级只读方法。
+   *
+   * 参数类型**排除**全局库方法（`globalLibrary` / `globalAudit`）：它们读的是
+   * `$DSH_HOME/myteam`，不属任何项目，走 `invokeGlobal`。把 `PanelMethod` 整个收进来
+   * 会让下面的穷尽性检查（`const exhaustive: never = method`）永远不成立——tsc 报
+   * TS2322，而 strip 构建不报错，于是「漏了一个 case」这件事没人发现。
+   */
+  private async read(
+    rootDir: string,
+    method: Exclude<PanelMethod, GlobalPanelMethod>,
+    params: Record<string, unknown> | undefined,
+  ): Promise<JsonValue> {
     if (method === 'migration') {
       const analyze = this.options.analyzeMigration
       if (analyze === undefined) {

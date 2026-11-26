@@ -357,7 +357,10 @@ export function applyEvent(state: ProjectState, event: EventEnvelope): void {
 
     case 'definition.publication.requested': {
       // 记下「谁在等人类确认发布」——之前这里是 no-op，导致这件事查不出来。
-      const payload = event.payload as {
+      // 先断言成 unknown 再断言成目标形状：事件载荷是 60 多种形状的联合，直接断言
+      // 会被 tsc 判为「两侧不重叠」（TS2352）——它是对的，联合里确实没有一种能直接
+      // 收窄到这里。先过 unknown 是显式声明「我知道自己在重新解释载荷」。
+      const payload = event.payload as unknown as {
         operationId: string
         target: string
         requestedBy?: string

@@ -19,6 +19,7 @@ import type {
   SessionId,
   TaskId,
   TeamId,
+  TeamPlanId,
   WorkflowId,
   WorkflowRunId,
 } from './ids.ts'

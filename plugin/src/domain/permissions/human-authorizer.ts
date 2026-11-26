@@ -20,10 +20,13 @@ import { hashContent } from '../../contracts/json.ts'
 
 export type HumanAction =
   | 'definition.publish'
+  | 'definition.publish.confirm'
   | 'definition.delete'
+  | 'definition.global.write'
   | 'team.disband'
   | 'plan.approve'
   | 'captain.takeover'
+  | 'project.destroy'
   | 'migration.cutover'
 
 export interface ConfirmationRequest {

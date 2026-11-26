@@ -20,7 +20,8 @@ import type {
   WorkflowDefinition,
 } from '../contracts/entities.ts'
 import { ERROR_CODES, fail } from '../contracts/errors.ts'
-import { hashContent } from '../contracts/json.ts'
+import { cloneJson, hashContent } from '../contracts/json.ts'
+import type { JsonValue } from '../contracts/json.ts'
 import type { ActorRef } from '../contracts/events.ts'
 import { computeEffectiveConfig, DEFAULT_TEAM_CONFIG } from '../domain/config/merge.ts'
 import { normalizeRole, roleContentHash, validateRole } from '../domain/definitions/role.ts'
@@ -38,6 +39,31 @@ import { appointMember, assertMemberActive, assertMemberLimits, assertMemberStat
 import { assertGraphRevision, assertTeamActive, assertTeamStatusChange, createTeam } from '../domain/teams/team.ts'
 import { createWorkflowRun } from '../domain/workflows/run.ts'
 import type { CommitResult, DraftEvent, ProjectRuntime } from './project-runtime.ts'
+
+/**
+ * 把发起动作的 actor 压成一个可读标签，写进事件的 `proposedBy` / `discardedBy`。
+ *
+ * 为什么需要显式收窄而不是内联三元链：`plan.propose` / `plan.discard` 都在
+ * `HUMAN_ONLY` 里，`authorize` 会在到达这里之前就拒掉 member/system，所以最后一个
+ * 分支**运行时不可达**。但类型系统看不到「前面某个函数已经排除过」，内联三元链的
+ * 最后一支会去读 `system` 分支上不存在的 `sessionId`——tsc 报 TS2339，而 strip 构建
+ * 不报错，于是这个隐患一直没人发现。
+ *
+ * 这里把不可达分支显式写成 `never`：将来若有人把某个动作从 HUMAN_ONLY 里移出来，
+ * 编译器会立刻在这里报错，而不是等到运行期产出 `system:undefined`。
+ */
+function proposerLabel(actor: ActorRef): string {
+  switch (actor.kind) {
+    case 'human':
+      return `human:${actor.userId}`
+    case 'captain':
+      return `captain:${actor.sessionId}`
+    case 'member':
+      return `member:${actor.sessionId}`
+    case 'system':
+      return `system:${actor.component}`
+  }
+}
 
 export function initializeProject(
   runtime: ProjectRuntime,
@@ -658,7 +684,12 @@ export function proposeTeamPlanCommand(
       fail(ERROR_CODES.NOT_FOUND, `队形里的角色不存在：${slot.roleId}`, { details: { roleId: slot.roleId } })
     }
     if (!Number.isInteger(slot.count) || slot.count < 1) {
-      fail(ERROR_CODES.INVALID_PAYLOAD, `槽位 ${slot.key} 的数量必须是正整数`, { details: { slot } })
+      // details 必须是 JsonValue：FormationSlot 是 interface（无索引签名），直接塞进去
+      // tsc 会拒。cloneJson<T> 保留原类型 T，帮不上忙；这里显式走一次 JSON 往返，
+      // 得到结构相同、类型是 JsonValue 的值。
+      fail(ERROR_CODES.INVALID_PAYLOAD, `槽位 ${slot.key} 的数量必须是正整数`, {
+        details: JSON.parse(JSON.stringify(slot)) as JsonValue,
+      })
     }
   }
 
@@ -697,12 +728,7 @@ export function proposeTeamPlanCommand(
     captainSessionId: input.captainSessionId,
     overrides,
     planHash,
-    proposedBy:
-      input.actor.kind === 'human'
-        ? `human:${input.actor.userId}`
-        : input.actor.kind === 'captain'
-          ? `captain:${input.actor.sessionId}`
-          : `${input.actor.kind}:${input.actor.sessionId}`,
+    proposedBy: proposerLabel(input.actor),
     proposedAt: now,
   }
 
@@ -742,12 +768,7 @@ export function discardTeamPlanCommand(
       payload: {
         planId: plan.id,
         reason: input.reason.trim().length === 0 ? '未说明原因' : input.reason.trim(),
-        discardedBy:
-          input.actor.kind === 'human'
-            ? `human:${input.actor.userId}`
-            : input.actor.kind === 'captain'
-              ? `captain:${input.actor.sessionId}`
-              : `${input.actor.kind}:${input.actor.sessionId}`,
+        discardedBy: proposerLabel(input.actor),
       },
     },
   ])
@@ -795,12 +816,7 @@ export function proposeCaptainHandoffCommand(
     })
   }
 
-  const proposedBy =
-    input.actor.kind === 'human'
-      ? `human:${input.actor.userId}`
-      : input.actor.kind === 'captain'
-        ? `captain:${input.actor.sessionId}`
-        : `${input.actor.kind}:${input.actor.sessionId}`
+  const proposedBy = proposerLabel(input.actor)
 
   return runtime.commit([
     {

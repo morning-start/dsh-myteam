@@ -10,7 +10,8 @@
  * 不能伪装成「命令没提交」。这里只做前几步，Effect 由上层在 commit 返回后
  * 调度，并且结果必须另写事件。
  */
-import type { EventEnvelope, ActorRef, EntityRef, EventType, LegacyOrigin } from '../contracts/events.ts'
+import type { EventEnvelope, ActorRef, EntityRef, EventType } from '../contracts/events.ts'
+import type { LegacyOrigin } from '../contracts/entities.ts'
 import { ERROR_CODES, fail } from '../contracts/errors.ts'
 import type { IdKind } from '../contracts/ids.ts'
 import { canonicalJson } from '../contracts/json.ts'

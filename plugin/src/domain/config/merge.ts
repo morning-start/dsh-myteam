@@ -69,6 +69,17 @@ const MESSAGING_BOOLEAN_KEYS = ['allowMemberToMember'] as const
 const MESSAGING_NUMBER_KEYS = ['maxMessagesPerTask'] as const
 
 /**
+ * 「这个键在已知键集合里吗」。
+ *
+ * 直接写 `KNOWN.includes(key)` 在 `as const` 元组上会被 tsc 拒绝：`includes` 的参数
+ * 被收窄成字面量联合类型，而调用方给的是 `string`（来自 `Object.keys`）。这里把参数
+ * 放宽成 `readonly string[]`，语义不变，类型才对得上。
+ */
+function isKnownKey(known: readonly string[], key: string): boolean {
+  return known.includes(key)
+}
+
+/**
  * 校验一层覆盖。返回问题清单，由调用方决定是拒绝命令还是只展示。
  *
  * 未知键与类型错误是两类问题：前者通常是拼写，后者通常是面板传错类型，
@@ -98,7 +109,7 @@ export function validateOverrides(overrides: ConfigOverrides, layer: string): st
 
   if (overrides.gates !== undefined) {
     for (const key of Object.keys(overrides.gates)) {
-      if (![...GATE_BOOLEAN_KEYS, ...GATE_NUMBER_KEYS].includes(key)) {
+      if (!isKnownKey([...GATE_BOOLEAN_KEYS, ...GATE_NUMBER_KEYS], key)) {
         problems.push(`${layer}.gates 含未知键：${key}`)
       }
     }
@@ -116,7 +127,7 @@ export function validateOverrides(overrides: ConfigOverrides, layer: string): st
 
   if (overrides.messaging !== undefined) {
     for (const key of Object.keys(overrides.messaging)) {
-      if (![...MESSAGING_BOOLEAN_KEYS, ...MESSAGING_NUMBER_KEYS].includes(key)) {
+      if (!isKnownKey([...MESSAGING_BOOLEAN_KEYS, ...MESSAGING_NUMBER_KEYS], key)) {
         problems.push(`${layer}.messaging 含未知键：${key}`)
       }
     }

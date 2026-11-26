@@ -25,7 +25,9 @@ import {
   applyDirectPanelWrite,
   applyPanelWrite,
   createPanelWriteAuthorizer,
+  isDirectPanelWrite,
   isPanelWriteMethod,
+  isTokenPanelWrite,
   panelWriteKind,
   previewPanelWrite,
 } from '../application/panel-writes.ts'
@@ -75,6 +77,13 @@ interface PanelFailure {
 
 function forbidden(message: string): PanelFailure {
   return { ok: false, error: { code: 'FORBIDDEN', message, retryable: false } }
+}
+
+/** 把 HTTP 来的 unknown 收窄成面板参数：非对象一律当「没传参数」。 */
+function asParams(query: unknown): Record<string, unknown> | undefined {
+  return typeof query === 'object' && query !== null && !Array.isArray(query)
+    ? (query as Record<string, unknown>)
+    : undefined
 }
 
 export interface PanelFacade {
@@ -183,8 +192,8 @@ export function createPanelFacade(ctx: PanelHostContext): PanelFacade {
     if (GLOBAL_WRITE_METHODS.has(name)) {
       try {
         // 全局库不属任何项目：直改只看全局目录，不需要 runtime / rootDir。
-        if (panelWriteKind(name) === 'direct') {
-          return { ok: false, error: { code: 'INVALID_COMMAND', message: `${name} 是 token 通道`, retryable: false } }
+        if (!isTokenPanelWrite(name)) {
+          return { ok: false, error: { code: 'INVALID_COMMAND', message: `${name} 不是 token 通道`, retryable: false } }
         }
         if (record.action === 'confirm') {
           if (record.confirmation === undefined) {
@@ -217,7 +226,7 @@ export function createPanelFacade(ctx: PanelHostContext): PanelFacade {
       const runtime = await hosts.open(rootDir)
       // 预览与确认都基于最新账本：陈旧投影会让 hash 校验假失败。
       runtime.refresh()
-      if (panelWriteKind(name) === 'direct') {
+      if (isDirectPanelWrite(name)) {
         const applied = applyDirectPanelWrite(
           runtime,
           name,
@@ -229,6 +238,10 @@ export function createPanelFacade(ctx: PanelHostContext): PanelFacade {
           },
         )
         return { ok: true, data: JSON.parse(JSON.stringify(applied)) }
+      }
+      // 到这里 name 只剩 token 类：上面的类型谓词已经把它收窄了。
+      if (!isTokenPanelWrite(name)) {
+        return { ok: false, error: { code: 'INVALID_COMMAND', message: `未知写方法：${name}`, retryable: false } }
       }
       if (record.action === 'confirm') {
         if (record.confirmation === undefined) {
@@ -254,8 +267,11 @@ export function createPanelFacade(ctx: PanelHostContext): PanelFacade {
   const methods: PanelFacade['methods'] = {}
   for (const method of PANEL_METHODS) {
     // 全局库方法不属任何项目：不解析工作区，也不要求会话身份。
+    // query 是 unknown（来自 HTTP 请求体），invokeGlobal 的签名要 Record | undefined，
+    // 所以在这里显式收窄一次——非对象一律当「没传参数」，而不是把 unknown 硬塞进去。
     methods[method] = isGlobalPanelMethod(method)
-      ? async (_agent: { id: string }, query: unknown) => service.invokeGlobal(method, query)
+      ? async (_agent: { id: string }, query: unknown) =>
+          service.invokeGlobal(method, asParams(query))
       : async (agent: { id: string }, query: unknown) => dispatch(agent.id, method, query)
   }
 

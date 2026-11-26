@@ -29,6 +29,14 @@ export interface EventStorePort {
 export interface WriterLockPort {
   acquire(projectId: string): WriteToken
   assert(token: WriteToken): void
+  /**
+   * 续租：把租约的 `renewedAt` 推到当前时间并返回新令牌。
+   *
+   * 端口上必须声明它，否则 `ProjectRuntime.renewLease()` 调用的是一个端口没承诺过的
+   * 方法——strip 构建不报错，只有 tsc 能看到（TS2339）。实现侧
+   * `WriterLeaseManager.renew()` 一直存在，是端口落后于实现。
+   */
+  renew(token: WriteToken): WriteToken
   release(token: WriteToken): void
 }
 

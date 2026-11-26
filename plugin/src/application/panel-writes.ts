@@ -117,6 +117,37 @@ export function panelWriteKind(method: PanelWriteMethod): PanelWriteKind {
   return PANEL_WRITE_KINDS[method]
 }
 
+/**
+ * 按确认方式切分的写方法子集。
+ *
+ * 为什么需要：`previewPanelWrite` / `applyPanelWrite` 只处理 token 类，
+ * `applyDirectPanelWrite` 只处理 direct 类。三者都用 `switch` + `const exhaustive: never`
+ * 做穷尽性检查，但参数类型若写成整个 `PanelWriteMethod`，那个 `never` 永远不成立——
+ * tsc 报 TS2322，strip 构建不报错，于是「漏了一个 case」这件事没人发现。
+ */
+export type TokenPanelWriteMethod = {
+  [K in PanelWriteMethod]: (typeof PANEL_WRITE_KINDS)[K] extends 'token' ? K : never
+}[PanelWriteMethod]
+export type DirectPanelWriteMethod = {
+  [K in PanelWriteMethod]: (typeof PANEL_WRITE_KINDS)[K] extends 'direct' ? K : never
+}[PanelWriteMethod]
+
+/**
+ * 类型守卫：`name` 是不是 direct 类写方法。
+ *
+ * 为什么不用 `panelWriteKind(name) === 'direct'`：那是一次运行时比较，TS 不会据此
+ * 收窄 `name` 的类型，调用方仍然要写 `as never` 才能过编译——而 `as never` 会把
+ * 「传错方法」这件事彻底藏起来。类型谓词让收窄发生在类型层。
+ */
+export function isDirectPanelWrite(method: PanelWriteMethod): method is DirectPanelWriteMethod {
+  return PANEL_WRITE_KINDS[method] === 'direct'
+}
+
+/** 类型守卫：`name` 是不是 token 类写方法。 */
+export function isTokenPanelWrite(method: PanelWriteMethod): method is TokenPanelWriteMethod {
+  return PANEL_WRITE_KINDS[method] === 'token'
+}
+
 /** 每个写方法的一句话说明；由 `tools/gen-panel-contract.mjs` 生成契约文档。 */
 export const PANEL_WRITE_DOCS: Readonly<Record<PanelWriteMethod, string>> = {
   teamDisband: '解散团队：预览成员与任务影响面，凭一次性令牌执行。动作 `team.disband`（人类专属）。',
@@ -509,34 +540,6 @@ export function previewPanelWrite(
   deps: PanelWriteDeps = {},
 ): PanelWritePreview {
   switch (method) {
-    case 'globalUnpublish': {
-      const kind = requirePublicationKind(input.params)
-      const id = requireString(input.params, 'id')
-      const expectedHash = typeof input.params.expectedHash === 'string' ? input.params.expectedHash : ''
-      if (expectedHash.length === 0) fail(ERROR_CODES.INVALID_PAYLOAD, '下架必须带 expectedHash')
-      const current = requireGlobalEditor(deps).readFileHash(kind, id)
-      if (current === null) fail(ERROR_CODES.NOT_FOUND, '全局库里没有这份定义', { details: { kind, id } })
-      authorizer.verify(input.confirmation, {
-        operationId: input.confirmation.operationId,
-        action: 'definition.global.write',
-        targetHash: current,
-        impactHash: input.confirmation.impactHash,
-      })
-      authorizer.consume(input.confirmation)
-      const result = unpublishGlobalDefinition(
-        { editor: requireGlobalEditor(deps) },
-        {
-          actor: PANEL_HUMAN,
-          kind,
-          id,
-          expectedHash,
-          operationId: input.confirmation.operationId,
-          unpublishedAt: runtime.now(),
-          editor: 'panel:owner',
-        },
-      )
-      return { method, operationId: result.id, committed: result }
-    }
     case 'globalDefinitionSave': {
       const preview = previewGlobalEdit(deps, {
         kind: requirePublicationKind(params),
@@ -684,7 +687,7 @@ export function previewPanelWrite(
 export async function applyPanelWrite(
   runtime: ProjectRuntime,
   authorizer: HumanAuthorizer,
-  method: PanelWriteMethod,
+  method: TokenPanelWriteMethod,
   input: { params: Record<string, unknown>; confirmation: HumanConfirmation; reason: string },
   deps: PanelWriteDeps = {},
 ): Promise<PanelWriteApplied> {
@@ -824,7 +827,7 @@ export interface PanelDirectWriteInput {
  */
 export function applyDirectPanelWrite(
   runtime: ProjectRuntime,
-  method: PanelWriteMethod,
+  method: DirectPanelWriteMethod,
   input: PanelDirectWriteInput,
   deps: PanelWriteDeps = {},
 ): PanelWriteApplied {

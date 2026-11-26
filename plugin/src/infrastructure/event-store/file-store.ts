@@ -26,6 +26,7 @@ import { dirname } from 'node:path'
 import type { BatchCommit } from '../../contracts/batch.ts'
 import { encodeBatch } from '../../contracts/batch.ts'
 import { ERROR_CODES, fail } from '../../contracts/errors.ts'
+import type { JsonValue } from '../../contracts/json.ts'
 import type { EventEnvelope } from '../../contracts/events.ts'
 import type { LogScan } from './log-scan.ts'
 import { committedEvents, nextProjectSeq, scanLog } from './log-scan.ts'
@@ -172,7 +173,11 @@ export class FileEventStore {
     if (scanAfter.corruption !== null || scanAfter.tornTail !== null) {
       // 截断后仍不干净：说明判断错误，保留备份并停止，不再继续动文件。
       fail(ERROR_CODES.PROJECT_WRITE_BLOCKED, '截断后日志仍不完整，已保留备份并停止写入', {
-        details: { backupPath, corruption: scanAfter.corruption, tornTail: scanAfter.tornTail },
+        // details 必须是 JsonValue：ScanIssue / tornTail 是 interface（无索引签名），
+        // 直接塞进去 tsc 会拒。显式走一次 JSON 往返得到结构相同、类型是 JsonValue 的值。
+        details: JSON.parse(
+          JSON.stringify({ backupPath, corruption: scanAfter.corruption, tornTail: scanAfter.tornTail }),
+        ) as JsonValue,
       })
     }
 

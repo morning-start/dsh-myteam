@@ -28,6 +28,16 @@ const checks = [
     expect: ['ARCH_OK', 'violations=0'],
   },
   { name: '构建指纹（src ↔ lib）', argv: ['tools/check-drift.mjs'], expect: ['MISMATCH: 0'] },
+  {
+    // 类型门禁：构建用 stripTypeScriptTypes **只擦类型、从不校验**，所以「访问不存在的
+    // 属性」这类错误永远逃过编译器。2026-11-26 第一次真跑 tsc 就抓出 123 个错误，
+    // 其中两个是真实运行时缺陷（`input is not defined` 让面板「全局下架」必崩、
+    // `context.actor` 恒 undefined 让两个工具必崩）——它们都是「测试绿着、真实调用坏着」。
+    // 这条门禁就是让那类缺陷在提交前就红。
+    name: '类型检查（tsc --noEmit）',
+    argv: ['tools/check-types.mjs'],
+    expect: ['TYPES_OK'],
+  },
   { name: '文档链接', argv: ['tools/check-doc-links.mjs'], expect: ['断链 0'] },
   { name: '客户端依赖方向', argv: ['tools/check-client-arch.mjs'], expect: ['与基线持平'] },
   { name: '死词条', argv: ['tools/find-dead-locale.mjs'], expect: ['死词条（zh 侧）: 0'] },

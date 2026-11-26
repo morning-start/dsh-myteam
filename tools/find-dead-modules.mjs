@@ -14,12 +14,18 @@ if (ENTRIES.length === 0) {
   process.exit(1)
 }
 
-/** 递归列出 src 下所有 .ts */
+/**
+ * 递归列出 src 下所有 .ts（**排除 .d.ts**）。
+ *
+ * 为什么排除：`.d.ts` 是纯类型声明，被 tsc 全局加载、没有 import 语句，天然不可能
+ * 被「从入口可达」遍历到。把它算进可达性分析，结果是它永远显示为 DEAD —— 那不是
+ * 死代码，是分析器把「声明」当成了「模块」。
+ */
 function walk(dir, out = []) {
   for (const name of readdirSync(dir)) {
     const full = join(dir, name)
     if (statSync(full).isDirectory()) walk(full, out)
-    else if (name.endsWith('.ts')) out.push(full)
+    else if (name.endsWith('.ts') && !name.endsWith('.d.ts')) out.push(full)
   }
   return out
 }

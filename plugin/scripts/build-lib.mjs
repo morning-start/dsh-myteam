@@ -245,6 +245,19 @@ async function main() {
       `根入口 ${ENTRY} 没有转发到 "${ENTRY_TARGET}"（构建产物入口）；lib/ 未做任何改动`,
     )
   }
+  // 根入口必须真的能被 Node 解析。
+  //
+  // 为什么单独查：`index.js` 是**手写的纯 JS**，不经过 stripTypeScriptTypes，也不在
+  // `src/**` 的编译范围里——构建的闸 1（`node --check` 每个暂存产物）扫不到它。
+  // 2026-11-26 实测踩到：注释里写了 `lib/**/*.mjs`，其中 `*/` 提前闭合了块注释，
+  // 整个文件变成语法错误，宿主报 `failed to import: SyntaxError: Unexpected token '*'`，
+  // 插件整体不装载、左侧栏没有入口——而 tsc、348 个测试、dsh_plugin_check 全部是绿的。
+  // 这里用 `node --check` 把它拦在构建期。
+  const entryCheck = spawnSync(process.execPath, ['--check', entryFile], { encoding: 'utf8' })
+  if (entryCheck.status !== 0) {
+    const detail = `${entryCheck.stderr ?? ''}${entryCheck.error ? `\n${entryCheck.error.message}` : ''}`.trim()
+    throw new Error(`根入口 ${ENTRY} 语法非法（宿主会 failed to import，插件整体不装载）：\n${detail}`)
+  }
   let clientHash = null
   if (existsSync(clientFile)) {
     clientHash = clientHashOf(clientFile)

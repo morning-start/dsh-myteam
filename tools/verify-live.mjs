@@ -164,7 +164,13 @@ try {
   // `C:\Users\<user>\Documents\deepseek-harness\default-workspace` —— 用户的真实目录。
   // 不把它改掉，会话 cwd 就落在真实目录上，验证会读到/写到用户的项目数据。
   // 这里改的是**隔离 home 内**的 storages/workspace.json（属于我们自己的副本，不动用户那份）。
+  //
+  // ⚠️ 2026-11-26 实测踩到：旧版只在 workspace.json **已存在**时打补丁，首次启动时它
+  // 还不存在 → 直接跳过 → 宿主随后自建了一个指向真实目录的条目 → 会话 cwd 落在
+  // `C:\Users\<user>\Documents\deepseek-harness\default-workspace`，那里是 v1 数据，
+  // 面板每栏都显示「未初始化」，两项真机检查因此失败。现在**预置**一份，启动前就指好。
   const wsJsonPath = join(ISO, 'storages', 'workspace.json')
+  const WS_ID = 'iso-workspace-fixed'
   if (existsSync(wsJsonPath)) {
     const parsed = JSON.parse(readFileSync(wsJsonPath, 'utf8'))
     let patched = 0
@@ -185,7 +191,33 @@ try {
       patched > 0 ? `本次改 ${String(patched)} 个` : '已是副本路径',
     )
   } else {
-    check('把隔离 home 的默认工作区指向副本（不碰用户真实目录）', true, '首次启动尚无 workspace.json，宿主会自建')
+    // 首次启动：预置一份，让宿主从一开始就用副本路径，而不是先建一个真实目录的条目。
+    mkdirSync(join(ISO, 'storages'), { recursive: true })
+    const now = new Date().toISOString()
+    writeFileSync(
+      wsJsonPath,
+      JSON.stringify(
+        {
+          unit: { name: 'workspace', version: 2 },
+          global: {
+            initialized: true,
+            workspaceIds: [WS_ID],
+            archivedSessionIds: [],
+            pinnedSessionIds: [],
+            defaultWorkspaceId: WS_ID,
+          },
+          tables: {
+            workspaces: {
+              [WS_ID]: { path: WS, title: 'iso-workspace', sessionIds: [], createdAt: now, updatedAt: now },
+            },
+          },
+        },
+        null,
+        2,
+      ) + '\n',
+      'utf8',
+    )
+    check('把隔离 home 的默认工作区指向副本（不碰用户真实目录）', true, '预置 workspace.json（首次启动）')
   }
 
   // ── 1. 起隔离实例（自己的 DSH_HOME / profile / 端口）────────────────────────

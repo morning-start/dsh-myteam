@@ -128,7 +128,7 @@ export type EventType =
  * 不靠这个字符串。
  */
 export type ActorRef =
-  | { kind: 'human'; userId: string; via: 'panel' | 'command' | 'confirmation' }
+  | { kind: 'human'; userId: string; via: 'panel' | 'command' | 'confirmation' | 'host' }
   | { kind: 'captain'; teamId: TeamId; sessionId: SessionId; generation: number }
   | {
       kind: 'member'
@@ -145,6 +145,7 @@ export type EntityKind =
   | 'role-definition'
   | 'workflow-definition'
   | 'team-blueprint'
+  | 'blueprint-definition'
   | 'team-plan'
   | 'team'
   | 'captain-assignment'

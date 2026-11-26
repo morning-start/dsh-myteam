@@ -14,7 +14,8 @@
  * 令牌在确认时按**当时**的定义内容与影响面重算，所以预览之后改过定义就会
  * `CONFIRMATION_TARGET_CHANGED`：确认的必须是看到的那一版。
  */
-import type { ActorRef, CommitResult, DraftEvent, ProjectRuntime } from './project-runtime.ts'
+import type { CommitResult, DraftEvent, ProjectRuntime } from './project-runtime.ts'
+import type { ActorRef } from '../contracts/events.ts'
 import type { GlobalPublicationPort, PublicationKind } from '../contracts/publication.ts'
 import { hashContent } from '../contracts/json.ts'
 import { ERROR_CODES, fail } from '../contracts/errors.ts'

@@ -1,11 +1,11 @@
 {
   "schema": 1,
-  "builtAt": "2026-11-26T14:10:42.888Z",
+  "builtAt": "2026-11-26T14:34:47.756Z",
   "node": "v24.21.0",
   "entry": "./index.js",
   "entryTarget": "./lib/composition/host.mjs",
-  "modules": 65,
-  "sourceHash": "e6476997fac8a48e3d40268ea8bf10d068b22a49967dbf5ae0b6712e64221592",
+  "modules": 66,
+  "sourceHash": "d390131c74a6b1c3543bc1c1cba2a30d6648aa16e75f65c626c92695f70ee703",
   "clientFile": "client/client.js",
   "clientHash": "ffc62074e4144691e332323940bbd58fd1aeafe9df95d2359409ee5d267ee9ff",
   "files": [
@@ -41,6 +41,7 @@
     "contracts/entities.ts",
     "contracts/errors.ts",
     "contracts/events.ts",
+    "contracts/host-modules.d.ts",
     "contracts/ids.ts",
     "contracts/json.ts",
     "contracts/memory.ts",

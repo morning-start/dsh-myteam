@@ -269,11 +269,13 @@ export function leadToolSpecs(): MyTeamToolSpec[] {
       execute(args, context) {
         const record = asRecord(args)
         const result = proposeCaptainHandoffCommand(context.runtime, {
-          actor: context.actor,
+          // 身份只能从会话解析（actorOf），不能读 context.actor —— 那个字段在
+          // ToolRuntimeContext 里根本不存在，composition/host.ts 也没传，运行时是 undefined。
+          actor: actorOf(context),
           teamId: requireString(record, 'teamId'),
           toSessionId: requireString(record, 'toSessionId'),
         })
-        return jsonSafe({ ok: true, data: { proposed: true, seq: result.seq } })
+        return jsonSafe({ ok: true, data: { proposed: true, seq: result.lastSeq } })
       },
     },
     {
@@ -329,7 +331,8 @@ export function leadToolSpecs(): MyTeamToolSpec[] {
           })
         }
         const proposed = proposeTeamPlanCommand(context.runtime, {
-          actor: context.actor,
+          // 同 myteam_propose_handoff：身份只能从会话解析，context.actor 不存在。
+          actor: actorOf(context),
           name: requireString(record, 'name'),
           goal: typeof record.goal === 'string' ? record.goal : '',
           captainSessionId: requireString(record, 'captainSessionId'),
