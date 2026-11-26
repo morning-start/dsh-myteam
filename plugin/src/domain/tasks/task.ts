@@ -1,4 +1,4 @@
-/**
+﻿/**
  * 任务状态机与完成判定（纯领域）。
  *
  * 两条容易做错的边界，这里明确规定：
@@ -103,9 +103,22 @@ export function createPlannedTask(input: CreateTaskInput): Task {
   }
 }
 
-/** 下一次 Attempt 的 generation：严格递增，不允许复用旧值。 */
-export function nextAttemptGeneration(previous: Attempt | null): number {
-  return previous === null ? 1 : previous.generation + 1
+/**
+ * 下一次 Attempt 的 generation：**严格递增，不允许复用旧值**。
+ *
+ * 为什么参数是「该任务的全部历史 attempt」而不是「当前 attempt」：
+ * 任务被 cancel / 会话丢失后回到 ready 时，`task.attemptId` 会变回 null，
+ * 但历史 attempt 仍然留在账本里。旧签名 `(previous: Attempt | null)` 在这种情况下
+ * 返回 1，而复用了已经被用过的 generation —— 与它自己的文档注释矛盾，也让
+ * `assertCurrentAttempt` 的「状态 + generation 一起核对」失去意义（迟到的旧写入
+ * 会和新 attempt 撞 generation）。
+ *
+ * 调用方传空数组表示「这个任务从没有过 attempt」，返回 1。
+ *
+ * @param history - 该任务的**全部**历史 attempt（含已 revoked / completed 的）。
+ */
+export function nextAttemptGeneration(history: readonly Attempt[]): number {
+  return history.reduce((max, attempt) => Math.max(max, attempt.generation), 0) + 1
 }
 
 /**

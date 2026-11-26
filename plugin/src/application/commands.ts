@@ -932,7 +932,10 @@ export function claimTaskCommand(
   }
 
   const previousAttempts = [...state.attempts.values()].filter((attempt) => attempt.taskId === task.id)
-  const generation = previousAttempts.reduce((max, attempt) => Math.max(max, attempt.generation), 0) + 1
+  // generation 的口径只有一个来源（domain/tasks/task.ts）：取该任务**全部**历史 attempt 的
+  // 最大值 + 1。这里曾经自己 reduce 了一遍，与领域函数是两份实现——领域那份还带着
+  // 「previous 为 null 就返回 1」的复用缺陷，两边一旦分叉，迟到的旧写入会和新 attempt 撞号。
+  const generation = nextAttemptGeneration(previousAttempts)
 
   const now = runtime.now()
   const attempt: Attempt = {

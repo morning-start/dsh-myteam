@@ -110,23 +110,33 @@ test('完成判定：全部满足才通过', () => {
 })
 
 test('Attempt generation 单调递增', () => {
-  assert.equal(nextAttemptGeneration(null), 1)
+  const attempt = (generation: number) => ({
+    id: `att_0000000${generation}`,
+    taskId: 'task_00000001',
+    teamId: 'team_00000001',
+    memberId: 'mem_00000001',
+    generation,
+    configRevision: 1,
+    roleRevision: 1,
+    sessionId: 'ses_00000001',
+    status: 'revoked' as const,
+    startedAt: NOW,
+    endedAt: NOW,
+  })
+
+  assert.equal(nextAttemptGeneration([]), 1, '从没有过 attempt → 1')
+  assert.equal(nextAttemptGeneration([attempt(3)]), 4, '有 attempt → 最大值 + 1')
+
+  // 回归锁：任务被 cancel / 会话丢失后回到 ready 时，task.attemptId 变回 null，
+  // 但历史 attempt 仍在账本里。旧实现收「当前 attempt」并在这里返回 1，复用了
+  // 已经用过的 generation —— 与「严格递增，不允许复用旧值」的契约矛盾。
   assert.equal(
-    nextAttemptGeneration({
-      id: 'att_00000001',
-      taskId: 'task_00000001',
-      teamId: 'team_00000001',
-      memberId: 'mem_00000001',
-      generation: 3,
-      configRevision: 1,
-      roleRevision: 1,
-      sessionId: 'ses_00000001',
-      status: 'revoked',
-      startedAt: NOW,
-      endedAt: NOW,
-    }),
+    nextAttemptGeneration([attempt(1), attempt(2), attempt(3)]),
     4,
+    '历史有 1/2/3 时必须给 4，不能因为「当前 attempt 为 null」就回到 1',
   )
+  // 乱序输入也要取最大值，不能只看最后一条
+  assert.equal(nextAttemptGeneration([attempt(5), attempt(2)]), 6, '取最大值，不依赖顺序')
 })
 
 test('配置：分层合并顺序与钳制', () => {
