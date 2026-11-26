@@ -7,7 +7,8 @@
 
 | 文件 | 任务 | 状态 |
 |---|---|---|
-| [myteam-收口](myteam-收口.md) | myteam 收口：按「配置 → 数据源 → 功能 → UI」推进，39 页设计稿全部落地 | 进行中 |
+| [myteam-收口](myteam-收口.md) | myteam 收口：按「配置 → 数据源 → 功能 → UI」推进，39 页设计稿全部落地 | 已收口 |
+| [修复](修复.md) | 修复门禁与死代码：`check-all` 过期路径、死代码扫描器失效、CI 三条过期命令、`nextAttemptGeneration` 复用 generation | 已收口 |
 
 ## 写法
 
