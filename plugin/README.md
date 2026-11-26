@@ -114,7 +114,17 @@ node ../tools/myteam-migrate.mjs cutover-plan --root "<项目目录>" --candidat
 node ../tools/rehearse-cutover.mjs --root "<项目目录>"
 ```
 
-不需要 `npm install`：Node ≥ 22.18 直接擦除类型运行 `.ts`，仓库保持零运行时依赖。
+**运行时零依赖**：Node ≥ 22.18 直接擦除类型运行 `.ts`，宿主装载本插件不需要 `npm install`。
+
+**开发依赖只有类型门禁用的两个**（`typescript` / `@types/node`，锁在 `package-lock.json` 里）：
+
+```bash
+cd plugin && npm ci      # 只装 devDependencies，约 3 个包
+npm run typecheck        # tsc --noEmit；等价于 node ../tools/check-types.mjs
+```
+
+不装也能跑构建与测试，但 `node tools/check-all.mjs` 的「类型检查」会**明确失败**
+（`TYPES_FAIL 依赖未安装`）而不是静默跳过——一条会跳过的门禁等于没有门禁。
 
 ## 数据布局（v2 目标，R6 迁移后生效）
 

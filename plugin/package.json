@@ -54,8 +54,13 @@
     "build": "node scripts/build-lib.mjs",
     "build:lib": "node scripts/build-lib.mjs",
     "test": "node --test test/*.test.ts",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
     "verify": "node ../tools/verify.mjs",
     "check:arch": "node ../tools/check-architecture.mjs"
+  },
+  "devDependencies": {
+    "@types/node": "^22.0.0",
+    "typescript": "^5.0.0"
   },
   "license": "MIT"
 }

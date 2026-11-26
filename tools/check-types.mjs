@@ -1,4 +1,4 @@
-#!/usr/bin/env node
+﻿#!/usr/bin/env node
 /**
  * 类型门禁：`tsc --noEmit`。
  *
@@ -11,15 +11,15 @@
  *     `composition/host.ts` 也没传 → `myteam_propose_handoff` / `myteam_propose_plan` 必崩。
  * 两个都是「测试绿着、真实调用坏着」，正是这道门禁存在的理由。
  *
- * 依赖：`typescript` 与 `@types/node` 装在 `plugin/node_modules`（**不入库**，也不进
- * `package.json` 的 dependencies —— 本包保持零运行时依赖）。没装时本脚本**不崩**，
- * 而是明确报告「未安装」并退出 0，同时在输出里写清怎么装：
- *   cd plugin && npm install --no-save --no-package-lock typescript@5 @types/node@22
+ * 依赖：`typescript` 与 `@types/node` 是 `plugin/package.json` 的 **devDependencies**，
+ * 由 `plugin/package-lock.json` 锁版本，用 `npm ci` 复现。它们**不进** `dependencies`——
+ * 本包保持零运行时依赖，宿主装载时不需要它们。
  *
- * ⚠️ 用 `--no-save` 装：`npm install <pkg>` 会按 `.package-lock.json` 重算整棵树，
- * 把上一次 `--no-save` 装的包删掉。两个包必须**同一条命令**装。
+ * 没装时本脚本**明确失败**（退出 1），而不是「跳过并退出 0」：
+ * 一条会静默跳过的门禁等于没有门禁。新克隆的仓库忘了 `npm ci` 时，应该看到一条
+ * 说清「缺什么、怎么装」的红，而不是一条看起来通过的绿。
  *
- * 退出码：类型检查通过 0；有类型错误 1；typescript 未安装 0（但输出里明确标注）。
+ * 退出码：类型检查通过 0；有类型错误 1；依赖未安装 1（并给出 `npm ci` 指令）。
  */
 import { spawnSync } from 'node:child_process'
 import { existsSync } from 'node:fs'
@@ -35,11 +35,10 @@ if (!existsSync(TSC) || !existsSync(NODE_TYPES)) {
   const missing = []
   if (!existsSync(TSC)) missing.push('typescript')
   if (!existsSync(NODE_TYPES)) missing.push('@types/node')
-  console.log(`类型检查: 跳过（plugin/node_modules 里缺 ${missing.join(' / ')}，不入库）`)
-  console.log('安装方式（两个包必须同一条命令，--no-save 不写进 package.json）：')
-  console.log('  cd plugin && npm install --no-save --no-package-lock typescript@5 @types/node@22')
-  console.log('TYPES_SKIPPED')
-  process.exit(0)
+  console.log(`TYPES_FAIL 依赖未安装：plugin/node_modules 里缺 ${missing.join(' / ')}`)
+  console.log('  它们是 plugin/package.json 的 devDependencies（锁在 package-lock.json 里）。')
+  console.log('  安装：cd plugin && npm ci')
+  process.exit(1)
 }
 
 const result = spawnSync(process.execPath, [TSC, '-p', 'tsconfig.json', '--noEmit'], {

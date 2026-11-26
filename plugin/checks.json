@@ -39,12 +39,13 @@
         ".gitattributes",
         "checks.json",
         "package.json",
+        "package-lock.json",
         "README.md",
         "tsconfig.json",
         "test",
         ".github/workflows/release.yml"
       ],
-      "note": "test/ 是仓库内测试与视觉夹具（含无头浏览器 harness），不随包分发；其余为仓库元数据。"
+      "note": "test/ 是仓库内测试与视觉夹具（含无头浏览器 harness），不随包分发；package-lock.json 锁的是 devDependencies（typescript / @types/node），只用于类型门禁，宿主装载时不需要。其余为仓库元数据。"
     },
     {
       "id": "arch:layers",

@@ -31,6 +31,14 @@ jobs:
           # 项目用 Node 原生 TS type stripping（engines: >=22.18），不需要编译步骤
           node-version: '22'
 
+      - name: 安装开发依赖（typescript + @types/node）
+        working-directory: plugin
+        # 这两个是 devDependencies，锁在 package-lock.json 里，只用于类型门禁；
+        # 它们不进 dependencies，宿主装载本插件时不需要。
+        # 不装的话 check-all 的「类型检查」会明确失败（TYPES_FAIL 依赖未安装），
+        # 而不是静默跳过——一条会跳过的门禁等于没有门禁。
+        run: npm ci
+
       - name: 构建产物（lib/ + 包内 design-v2）
         working-directory: plugin
         # 非 TTY 环境会自动放行「DSH 可能正在运行」确认；显式 --force 让日志里没有歧义
@@ -42,5 +50,5 @@ jobs:
         run: node --test --test-reporter=spec test/*.test.ts
 
       # 门禁与本地同一个入口（不在 CI 里另写一套命令，否则两套会漂移）
-      - name: 门禁（架构 / 指纹 / 文档 / 客户端 / 死代码 / 项目规则）
+      - name: 门禁（架构 / 类型 / 指纹 / 文档 / 客户端 / 死代码 / 项目规则）
         run: node tools/check-all.mjs
