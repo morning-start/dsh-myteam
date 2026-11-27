@@ -5,38 +5,43 @@
  * 前端在用户点过提交后置 `confirm: true`——所以每个方法都必须自己守住语义。
  * 由 {@link ../panel-writes.ts} 统一重导出。
  */
-import type { GateVerdict, Task } from '../../contracts/entities.ts'
 import { ERROR_CODES, fail } from '../../contracts/errors.ts'
-import { editGlobalDefinition } from '../global-edit.ts'
+import { editGlobalDefinition, unpublishGlobalDefinition } from '../global-edit.ts'
 import { HumanAuthorizer } from '../../domain/permissions/human-authorizer.ts'
-import type { HumanConfirmation } from '../../domain/permissions/human-authorizer.ts'
-import { appointMemberCommand, archiveMemberCommand, claimTaskCommand, createProjectBlueprint, createTaskCommand, createTeamCommand, releaseMemberCommand, restoreMemberCommand, saveProjectBlueprintCommand, saveProjectRole, saveProjectWorkflowCommand } from '../commands.ts'
+import { appointMemberCommand, archiveMemberCommand, claimTaskCommand, createProjectBlueprint, createTaskCommand, createTeamCommand, releaseMemberCommand, restoreMemberCommand, saveProjectBlueprintCommand, saveProjectRole, saveProjectWorkflowCommand, discardTeamPlanCommand, proposeTeamPlanCommand } from '../commands.ts'
 import { forgetMemory, rememberMemory } from '../memory-commands.ts'
-import { discardTeamPlanCommand, proposeTeamPlanCommand } from '../commands.ts'
-import { confirmTeamPlanApproval } from '../human-actions.ts'
+import { confirmTeamPlanApproval, confirmCaptainTakeover, confirmTeamDisband } from '../human-actions.ts'
 import { confirmDefinitionPublication } from '../publication.ts'
-import { confirmCaptainTakeover, confirmTeamDisband } from '../human-actions.ts'
-import type { ProjectRuntime } from '../project-runtime.ts'
 import { cancelTaskCommand, recordVerdictCommand, reopenTaskCommand } from '../task-commands.ts'
-import type { PanelWriteApplied, PanelWriteDeps } from './deps.ts'
-import { requireGlobalEditor, requireGlobalEntries, requireMemory, requirePublicationKind, requirePublisher } from './deps.ts'
-import type { DirectPanelWriteMethod, TokenPanelWriteMethod } from './methods.ts'
+import { requireDestroyer, requireGlobalEditor, requireGlobalEntries, requireMemory, requirePublicationKind, requirePublisher } from './deps.ts'
 import { PANEL_HUMAN } from './methods.ts'
-import { optionalString, optionalStringArray, requireChecks, requireEvidenceList, requireFormation, requireOutcome, requireOverrides, requireString, requireStringArray, requireTeamId } from './params.ts'
-import { previewGlobalEdit } from './previews.ts'
+import { optionalString, optionalStringArray, requireChecks, requireEvidenceList, requireFormation, requireOutcome, requireOverrides, requireRootDir, requireString, requireStringArray, requireTeamId } from './params.ts'
+import { previewGlobalEdit, previewGlobalUnpublish, previewProjectDestroy } from './previews.ts'
+import type { GateVerdict, Task } from '../../contracts/entities.ts'
+import type { HumanConfirmation } from '../../domain/permissions/human-authorizer.ts'
+import type { ProjectRuntime } from '../project-runtime.ts'
+import type { PanelWriteApplied, PanelWriteDeps } from './deps.ts'
+import type { PanelWriteMethod } from './methods.ts'
 
 /**
  * 第二步：凭令牌确认并执行。
- * @param runtime - 项目运行时（已打开，状态须是最新）。
+ *
+ * `method` 故意收成 **`PanelWriteMethod`（全部方法）而不是 `TokenPanelWriteMethod`**：
+ * 这样 switch 必须覆盖每一个方法——令牌类给出实现、直接确认类显式拒绝——`default` 的
+ * `const exhaustive: never = method` 才是真的穷尽检查。写成窄类型看起来更严，实际会让
+ * 直接确认类的方法在这张表里「不存在」，少写一个 token case 也编译得过去（`globalUnpublish`
+ * 就漏过一次）。误用另一类通道时这里会明确报错，而不是落到「未实现的写方法」。
+ *
+ * @param runtime - 项目运行时（已打开，状态须是最新；免会话的全局方法由装配层传 `undefined`）。
  * @param authorizer - 与预览同一实例（令牌登记在它里面）。
  * @param method - 白名单方法名。
  * @param input - 令牌、参数与人类填写的理由。
- * @param deps - 额外端口（全局发布用）。
+ * @param deps - 额外端口（全局发布 / 全局直改 / 项目销毁用）。
  */
 export async function applyPanelWrite(
   runtime: ProjectRuntime,
   authorizer: HumanAuthorizer,
-  method: TokenPanelWriteMethod,
+  method: PanelWriteMethod,
   input: { params: Record<string, unknown>; confirmation: HumanConfirmation; reason: string },
   deps: PanelWriteDeps = {},
 ): Promise<PanelWriteApplied> {
@@ -83,11 +88,46 @@ export async function applyPanelWrite(
           definition: input.params.definition,
           expectedHash: raw,
           operationId: input.confirmation.operationId,
-          editedAt: runtime.now(),
+          // 全局写方法是**免会话**的：装配层这里传的是 `undefined`（没有项目运行时），
+          // 所以不能向 runtime 要时间——那会让「确认」一律崩在 `runtime.now()` 上。
+          editedAt: new Date().toISOString(),
           editor: 'panel:owner',
         },
       )
       return { method, operationId: result.id, committed: result }
+    }
+    case 'globalUnpublish': {
+      // 第二步：与 globalDefinitionSave 同一套复验——重新读当前文件 hash、重算影响面，
+      // 与令牌绑定的那一次逐项比对。文件在这两步之间被人改过就拒，否则「藏掉的是别人
+      // 刚改的那一版」。下架只写目录隐藏索引，不动文件（引用方仍读得到这一版）。
+      const kind = requirePublicationKind(input.params)
+      const id = requireString(input.params, 'id')
+      const preview = previewGlobalUnpublish(deps, { kind, id })
+      authorizer.verify(input.confirmation, {
+        operationId: input.confirmation.operationId,
+        action: 'definition.global.write',
+        targetHash: preview.targetHash,
+        impactHash: preview.impactHash,
+      })
+      authorizer.consume(input.confirmation)
+      const result = unpublishGlobalDefinition(
+        { editor: requireGlobalEditor(deps) },
+        {
+          actor: PANEL_HUMAN,
+          kind,
+          id,
+          // 令牌复验已经证明「当前 hash == 令牌绑定的 hash」，所以这里传的就是复验读到的
+          // 那个 hash；前端带回来的 expectedHash 不参与判定（钉住目标的是令牌，不是一个
+          // 可以随手改的参数）。命令层还会再比一次，比的是同一个值。
+          expectedHash: preview.targetHash,
+          operationId: input.confirmation.operationId,
+          // 全局方法是**免会话**的：装配层那边没有项目运行时（传的是 undefined），
+          // 所以这里不能向 runtime 要时间。
+          unpublishedAt: new Date().toISOString(),
+          editor: 'panel:owner',
+        },
+      )
+      return { method, operationId: input.confirmation.operationId, committed: result }
     }
     case 'teamDisband': {
       const teamId = requireTeamId(input.params)
@@ -112,6 +152,37 @@ export async function applyPanelWrite(
       })
       return { method, operationId: input.confirmation.operationId, committed: result }
     }
+    case 'projectDestroy': {
+      // 不可逆动作的第二步：用同一个 rootDir 重新算一遍影响面再比令牌。
+      // 令牌的 targetHash 绑的是「项目名 + projectId + 总字节数」——预览之后又写了一堆
+      // 事件（字节数变了）就拒，避免「看的是 12 KB、删的是 40 MB」。
+      // 项目名必须由人类重新输入：`expectedName` 与 manifest 不符时销毁器自己也会拒，
+      // 这里不做「猜一个名字」的兜底。
+      const expectedName = requireString(input.params, 'name')
+      const rootDir = requireRootDir(deps)
+      const preview = previewProjectDestroy(deps, rootDir)
+      authorizer.verify(input.confirmation, {
+        operationId: input.confirmation.operationId,
+        action: 'project.destroy',
+        targetHash: preview.targetHash,
+        impactHash: preview.impactHash,
+      })
+      authorizer.consume(input.confirmation)
+      const result = await requireDestroyer(deps).destroy({
+        rootDir,
+        expectedName,
+        operationId: input.confirmation.operationId,
+        auditAt: runtime.now(),
+        actor: 'panel:owner',
+        // 先关运行时再删目录：不关的话写者租约文件会以「被删掉」而不是「被释放」收场。
+        closeRuntime: async () => {
+          if (deps.closeProject === undefined) return false
+          await deps.closeProject(rootDir)
+          return true
+        },
+      })
+      return { method, operationId: input.confirmation.operationId, committed: result }
+    }
     case 'gateVerdict':
       fail(ERROR_CODES.INVALID_COMMAND, 'gateVerdict 不使用确认令牌，请走 applyDirectPanelWrite')
     case 'taskCreate':
@@ -133,6 +204,9 @@ export async function applyPanelWrite(
       fail(ERROR_CODES.INVALID_COMMAND, `${method} 不使用确认令牌，请走 applyDirectPanelWrite`)
     case 'definitionSave':
       fail(ERROR_CODES.INVALID_COMMAND, 'definitionSave 不使用确认令牌，请走 applyDirectPanelWrite')
+    case 'planPropose':
+    case 'planDiscard':
+      fail(ERROR_CODES.INVALID_COMMAND, `${method} 不使用确认令牌，请走 applyDirectPanelWrite`)
     case 'definitionPublish': {
       const result = confirmDefinitionPublication(runtime, { authorizer, publisher: requirePublisher(deps) }, {
         actor: PANEL_HUMAN,
@@ -169,14 +243,17 @@ export interface PanelDirectWriteInput {
  * `recordVerdictCommand` 的两道域校验（任务须在 `review`、`attemptId` 须为当前
  * Attempt），而不是依赖调用方老实。
  *
+ * `method` 与 `applyPanelWrite` 同理收成 `PanelWriteMethod`（全部方法）：令牌类在这里
+ * 显式拒绝，于是两张 switch 合起来覆盖全部方法，少写一个 direct case 编译器就会报。
+ *
  * @param runtime - 项目运行时（已刷新到最新账本）。
- * @param method - 白名单方法名，且其 `PanelWriteKind` 必须是 `direct`。
+ * @param method - 白名单方法名；其 `PanelWriteKind` 必须是 `direct`，否则明确报错。
  * @param input - 参数与确认位。
  * @param deps - 额外端口（写记忆需要存储实现与项目根）。
  */
 export function applyDirectPanelWrite(
   runtime: ProjectRuntime,
-  method: DirectPanelWriteMethod,
+  method: PanelWriteMethod,
   input: PanelDirectWriteInput,
   deps: PanelWriteDeps = {},
 ): PanelWriteApplied {
@@ -244,6 +321,7 @@ export function applyDirectPanelWrite(
     case 'globalUnpublish':
     case 'projectDestroy':
     case 'definitionPublish':
+    case 'planApprove':
       fail(ERROR_CODES.INVALID_COMMAND, `${method} 走确认令牌通道（先预览再确认），不能直接执行`)
     case 'memoryRemember': {
       if (input.confirm !== true) {

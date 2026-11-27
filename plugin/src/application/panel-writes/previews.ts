@@ -5,20 +5,19 @@
  * 隐藏而非删除）。令牌里只留 hash，正文不落盘。由 {@link ../panel-writes.ts} 统一重导出。
  */
 import { ERROR_CODES, fail } from '../../contracts/errors.ts'
-import type { PublicationKind } from '../../contracts/publication.ts'
 import { HumanAuthorizer } from '../../domain/permissions/human-authorizer.ts'
-import { previewTeamPlanApproval } from '../human-actions.ts'
+import { previewTeamPlanApproval, previewCaptainTakeover, previewTeamDisband } from '../human-actions.ts'
 import { requestDefinitionPublication } from '../publication.ts'
-import { previewCaptainTakeover, previewTeamDisband } from '../human-actions.ts'
-import type { ProjectRuntime } from '../project-runtime.ts'
-import type { PanelWriteDeps, PanelWritePreview } from './deps.ts'
 import { requireDestroyer, requireGlobalEditor, requireGlobalEntries, requirePublicationKind, requirePublisher } from './deps.ts'
-import type { PanelWriteMethod } from './methods.ts'
 import { PANEL_HUMAN } from './methods.ts'
 import { requireRootDir, requireString, requireTeamId } from './params.ts'
+import type { PublicationKind } from '../../contracts/publication.ts'
+import type { ProjectRuntime } from '../project-runtime.ts'
+import type { PanelWriteDeps, PanelWritePreview } from './deps.ts'
+import type { PanelWriteMethod } from './methods.ts'
 
 /** 销毁预览：逐项列出要删的东西与不可逆后果。 */
-function previewProjectDestroy(
+export function previewProjectDestroy(
   deps: PanelWriteDeps,
   rootDir: string,
 ): { operationId: string; targetHash: string; impactHash: string; summary: string; impact: unknown } {
@@ -111,7 +110,7 @@ function stableHash(value: unknown): string {
 }
 
 /** 下架的预览：说清「会被从目录里隐藏」与「文件与引用不受影响」。 */
-function previewGlobalUnpublish(
+export function previewGlobalUnpublish(
   deps: PanelWriteDeps,
   input: { kind: PublicationKind; id: string },
 ): { operationId: string; targetHash: string; impactHash: string; summary: string; impact: unknown } {

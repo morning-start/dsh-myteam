@@ -7,8 +7,8 @@
  * 由 {@link ../panel-writes.ts} 统一重导出。
  */
 import { randomUUID } from 'node:crypto'
-import type { ActorRef } from '../../contracts/events.ts'
 import { HumanAuthorizer } from '../../domain/permissions/human-authorizer.ts'
+import type { ActorRef } from '../../contracts/events.ts'
 
 /** 面板写方法白名单。新增写能力必须同时在这里登记并补测试。 */
 export const PANEL_WRITE_METHODS = [
@@ -47,7 +47,18 @@ export type PanelWriteMethod = (typeof PANEL_WRITE_METHODS)[number]
  */
 export type PanelWriteKind = 'token' | 'direct'
 
-export const PANEL_WRITE_KINDS: Readonly<Record<PanelWriteMethod, PanelWriteKind>> = {
+/**
+ * 写方法的确认方式表。
+ *
+ * **这里必须是 `as const satisfies`，不能写成 `: Record<…>` 注解**——注解会把
+ * `'token' | 'direct'` 这两个字面量拓宽成 `PanelWriteKind`，下面按表推导的
+ * `TokenPanelWriteMethod` / `DirectPanelWriteMethod` 就会整体塌成 `never`：
+ * 于是 `applyPanelWrite` 的 `default: const exhaustive: never = method` 变成空转，
+ * 少写一个 case 编译器也看不见（`globalUnpublish` 就是这么漏了 apply 分支，
+ * 直到按聚合拆分时才被死导出扫描顺带扫出来）。
+ * `satisfies` 只校验形状、保留字面量，穷尽检查才是真的。
+ */
+export const PANEL_WRITE_KINDS = {
   teamDisband: 'token',
   captainTakeover: 'token',
   gateVerdict: 'direct',
@@ -70,7 +81,7 @@ export const PANEL_WRITE_KINDS: Readonly<Record<PanelWriteMethod, PanelWriteKind
   planDiscard: 'direct',
   // 批准会一次建出整个团队，是 HUMAN_ONLY —— 令牌把「看到的影响面」和「执行的那次」绑死。
   planApprove: 'token',
-}
+} as const satisfies Readonly<Record<PanelWriteMethod, PanelWriteKind>>
 
 /** 判断一个名字是否为已登记的面板写方法。 */
 export function isPanelWriteMethod(value: string): value is PanelWriteMethod {
