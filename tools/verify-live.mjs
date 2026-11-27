@@ -666,6 +666,184 @@ try {
     await shot('06-overview')
   }
 
+  // ── 7. 全局写通道：写入 → 下架 → 令牌重放（CHG-215 补的确认链路）───────────
+  //
+  // 为什么走 HTTP 而不是界面：全局库写方法**免会话**（路由自己就不强制 sessionId），
+  // 而「确认」这一步正是 CHG-215 修的地方 —— 之前令牌签得出来、确认必报「未实现的
+  // 写方法」或崩在 `runtime.now()` 上（全局方法没有项目运行时）。这两条只有真宿主
+  // 才验得到：单测传的是 `undefined as never`，装配层到底传什么只有跑起来才知道。
+  const postWrite = async (name, envelope) => {
+    const response = await fetch(`${BASE}/__myteam/write/${name}`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json', cookie },
+      body: JSON.stringify(envelope),
+    })
+    const text = await response.text()
+    try {
+      return { status: response.status, body: JSON.parse(text) }
+    } catch {
+      return { status: response.status, body: { ok: false, error: { code: 'NON_JSON', message: text.slice(0, 120) } } }
+    }
+  }
+  // 每次运行用不同的 id：同一个 id 第二次跑会因为「文件已存在 + expectedHash=null」被判
+  // CONFLICT，那条判据就只在干净 home 上成立、不能复跑。
+  const liveRoleId = 'role_live_' + Date.now().toString(36)
+  const globalRolePath = join(ISO, 'myteam', 'roles', `${liveRoleId}.json`)
+  const liveRole = {
+    profile: { name: '验收角色', purpose: '验收', instructions: '按 AC', specialties: [] },
+    capabilities: { tools: { allow: ['read'], deny: [] }, mcp: { allow: [], deny: [] }, skills: [] },
+  }
+
+  const savePreview = await postWrite('globalDefinitionSave', {
+    params: { kind: 'role', id: liveRoleId, definition: liveRole, expectedHash: null },
+  })
+  const savePreviewOk = savePreview.body?.ok === true && typeof savePreview.body?.data?.confirmation?.nonce === 'string'
+  check('全局写入：预览签发令牌（真宿主 HTTP）', savePreviewOk,
+    String(savePreview.body?.error?.code ?? savePreview.status))
+
+  if (savePreviewOk) {
+    const saved = await postWrite('globalDefinitionSave', {
+      params: { kind: 'role', id: liveRoleId, definition: liveRole, expectedHash: null },
+      action: 'confirm',
+      confirmation: savePreview.body.data.confirmation,
+      reason: '验收：写入全局角色',
+    })
+    check('全局写入：凭令牌确认后文件落地（免会话，不能向 runtime 要时间）',
+      saved.body?.ok === true && existsSync(globalRolePath),
+      String(saved.body?.error?.code ?? saved.body?.error?.message ?? saved.status))
+  }
+
+  const unpublishPreview = await postWrite('globalUnpublish', { params: { kind: 'role', id: liveRoleId } })
+  const unpublishPreviewOk = unpublishPreview.body?.ok === true && typeof unpublishPreview.body?.data?.confirmation?.nonce === 'string'
+  check('全局下架：预览签发令牌（CHG-215 修的链路）', unpublishPreviewOk,
+    String(unpublishPreview.body?.error?.code ?? unpublishPreview.status))
+
+  if (unpublishPreviewOk) {
+    const confirmation = unpublishPreview.body.data.confirmation
+    const unpublished = await postWrite('globalUnpublish', {
+      params: { kind: 'role', id: liveRoleId },
+      action: 'confirm',
+      confirmation,
+      reason: '验收：下架全局角色',
+    })
+    const hiddenFile = join(ISO, 'myteam', '_hidden.json')
+    const hiddenText = existsSync(hiddenFile) ? readFileSync(hiddenFile, 'utf8') : ''
+    check('全局下架：凭令牌确认后进隐藏索引、文件仍在（下架不是删除）',
+      unpublished.body?.ok === true && existsSync(globalRolePath) && hiddenText.includes(liveRoleId),
+      `code=${String(unpublished.body?.error?.code ?? 'ok')}；文件在=${String(existsSync(globalRolePath))}`)
+
+    const replay = await postWrite('globalUnpublish', {
+      params: { kind: 'role', id: liveRoleId },
+      action: 'confirm',
+      confirmation,
+      reason: '验收：重放同一令牌',
+    })
+    check('全局下架：同一令牌重放被拒（一次性）',
+      replay.body?.ok === false && /HUMAN_CONFIRMATION/.test(String(replay.body?.error?.code)),
+      String(replay.body?.error?.code ?? 'ok'))
+  }
+
+  // ── 8. 删项目：在真宿主里点完两段确认（不可逆 —— 放最后）──────────────────
+  //
+  // 唯一不可撤销的动作。界面要求手输项目名，服务端还要再比一次 manifest；
+  // 这条链路同样是 CHG-215 才补上的（之前「删除项目数据」点确认必失败）。
+  // 它会真的删掉隔离工作区，所以必须是最后一组判据；下次运行脚本会重建工作区。
+  if (tabOpened) {
+    const clickLane = (label) => `(() => {
+      const scope = document.querySelector('[data-myteam]')
+      if (scope === null) return 'no-panel'
+      const nodes = [...scope.querySelectorAll('[role="tab"], button, a, span, div')]
+      const target = nodes.find((el) => {
+        if ((el.textContent ?? '').trim() !== ${JSON.stringify(label)}) return false
+        return ![...el.children].some((child) => (child.textContent ?? '').trim() === ${JSON.stringify(label)})
+      })
+      if (target === undefined) return 'missing'
+      target.click()
+      return 'ok'
+    })()`
+    const laneOk = await evaluate(clickLane('设置'))
+    await sleep(1500)
+    const begin = await evaluate(`(() => {
+      const scope = document.querySelector('[data-myteam]')
+      if (scope === null) return 'no-panel'
+      const button = [...scope.querySelectorAll('button')].find(
+        (el) => (el.textContent ?? '').trim() === '删除项目数据' && el.disabled !== true,
+      )
+      if (button === undefined) return 'no-button'
+      button.click()
+      return 'clicked'
+    })()`)
+    await sleep(2500)
+    const destroyText = await evaluate(`(() => {
+      const scope = document.querySelector('[data-myteam]')
+      return scope === null ? '' : (scope.textContent ?? '').replace(/\\s+/g, ' ')
+    })()`)
+    const nameMatch = /输入项目名「([^」]+)」继续/u.exec(String(destroyText))
+    check('删项目：界面先给影响面、要求手输项目名',
+      laneOk === 'ok' && begin === 'clicked' && nameMatch !== null,
+      `${String(laneOk)}/${String(begin)}；提示=${nameMatch === null ? '未出现' : nameMatch[1]}`)
+
+    if (nameMatch !== null) {
+      const projectName = nameMatch[1]
+      const inputBox = await evaluate(`(() => {
+        const scope = document.querySelector('[data-myteam]')
+        if (scope === null) return null
+        const input = [...scope.querySelectorAll('input[type="text"]')]
+          .find((el) => el.placeholder === ${JSON.stringify(projectName)})
+        if (input === undefined) return null
+        const rect = input.getBoundingClientRect()
+        return JSON.stringify({
+          x: Math.round(rect.left + rect.width / 2),
+          y: Math.round(rect.top + rect.height / 2),
+        })
+      })()`)
+      if (inputBox === null || inputBox === 'null') {
+        skip('删项目：手输项目名后点确认能真的执行', '找不到项目名输入框')
+      } else {
+        const rect = JSON.parse(inputBox)
+        for (const type of ['mousePressed', 'mouseReleased']) {
+          await cdp.send('Input.dispatchMouseEvent', { type, x: rect.x, y: rect.y, button: 'left', clickCount: 1 }, session)
+        }
+        await sleep(400)
+        await cdp.send('Input.insertText', { text: projectName }, session)
+        await sleep(700)
+        const confirm = await evaluate(`(() => {
+          const scope = document.querySelector('[data-myteam]')
+          if (scope === null) return 'no-panel'
+          const button = [...scope.querySelectorAll('button')].find(
+            (el) => (el.textContent ?? '').trim() === '删除项目数据' && el.disabled !== true,
+          )
+          if (button === undefined) return 'button-disabled'
+          button.click()
+          return 'clicked'
+        })()`)
+        // 断言判据的选择（2026-11-28 踩过一次）：
+        //   「项目数据已删除」这句文案**只在刷新成功时**才画得出来；而销毁之后工作区
+        //   目录真的没了，面板下一次刷新必然显示「读不到这份数据」，删除框随之卸载。
+        //   所以不能拿那句文案当判据 —— 真判据是「目录没了 + 界面没报没成功 + 审计有
+        //   destroyed」，三者合起来才证明这次确认真的执行了，而不是只在界面上转了个圈。
+        let afterText = ''
+        for (let round = 0; round < 15; round += 1) {
+          await sleep(800)
+          afterText = String(await evaluate(`document.body.textContent ?? ''`))
+          if (afterText.includes('项目数据已删除') || afterText.includes('没成功：')) break
+        }
+        const reportedFailure = /没成功：/.test(afterText)
+        check('删项目：真点确认后工作区真的被删掉、界面没报错',
+          confirm === 'clicked' && reportedFailure === false && existsSync(WS) === false,
+          `点击=${String(confirm)}；报错=${reportedFailure ? '有' : '无'}；目录还在=${String(existsSync(WS))}`)
+        const auditPath = join(ISO, 'myteam', 'audit', 'global-operations.jsonl')
+        const auditText = existsSync(auditPath) ? readFileSync(auditPath, 'utf8') : ''
+        check('删项目：全局审计留下 project.destroy / destroyed',
+          auditText.includes('"action":"project.destroy"') && auditText.includes('"status":"destroyed"'),
+          `${auditText.split(/\r?\n/u).filter((line) => line.trim() !== '').length} 条审计`)
+        await shot('07-project-destroyed')
+      }
+    }
+  } else {
+    skip('删项目：真宿主里点完两段确认', '本次没有建立会话，「设置」栏里的删除入口渲染不出来')
+  }
+
   await shot('04-last-lane')
 
   console.log(`\n截图：${OUT}`)

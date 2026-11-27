@@ -200,7 +200,11 @@ export function createPanelFacade(ctx: PanelHostContext): PanelFacade {
             return { ok: false, error: { code: 'INVALID_PAYLOAD', message: '确认需要 confirmation 令牌', retryable: false } }
           }
           const reason = typeof record.reason === 'string' ? record.reason : ''
-          const applied = applyPanelWrite(undefined as never, writeAuthorizer, name, {
+          // **必须 await**：applyPanelWrite 是 async。不 await 会有两个后果——
+          //  ① 返回给客户端的是 `JSON.stringify(Promise)` = `{}`，确认结果整包丢失；
+          //  ② 拒绝变成未处理拒绝，绕过下面这个 catch，把宿主打成 `fatal load failure`
+          //     （2026-11-28 一次真机重放令牌就复现了：整个 dsh web 实例直接退出）。
+          const applied = await applyPanelWrite(undefined as never, writeAuthorizer, name, {
             params,
             reason,
             confirmation: record.confirmation as never,
@@ -248,14 +252,18 @@ export function createPanelFacade(ctx: PanelHostContext): PanelFacade {
           return { ok: false, error: { code: 'INVALID_PAYLOAD', message: '确认需要 confirmation 令牌', retryable: false } }
         }
         const reason = typeof record.reason === 'string' ? record.reason : ''
-        const applied = applyPanelWrite(runtime, writeAuthorizer, name, {
+        // 同上面全局分支：不 await 就返回 `{}`，且拒绝会变成未处理拒绝打挂宿主。
+        // `rootDir` 必须在这里也注入：它原先只给了 direct 通道，于是 token 通道里的
+        // `projectDestroy` 预览拿到的是 `deps.rootDir === undefined`，界面显示
+        // 「没成功：项目根未装配，不能销毁」（2026-11-28 真机点出来的）。
+        const applied = await applyPanelWrite(runtime, writeAuthorizer, name, {
           params,
           reason,
           confirmation: record.confirmation as never,
-        }, writeDeps)
+        }, { ...writeDeps, rootDir })
         return { ok: true, data: JSON.parse(JSON.stringify(applied)) }
       }
-      const preview = previewPanelWrite(runtime, writeAuthorizer, name, params, writeDeps)
+      const preview = previewPanelWrite(runtime, writeAuthorizer, name, params, { ...writeDeps, rootDir })
       return { ok: true, data: JSON.parse(JSON.stringify(preview)) }
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error)
