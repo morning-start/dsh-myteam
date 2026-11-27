@@ -3,7 +3,7 @@
   "_scope": "扫描器的引用池只有 plugin/src 与 plugin/test，不含 tools/。所以「生产零调用、但有测试引用」里有一大类其实是 tools/myteam-*.mjs 这些 CLI 在用的导出——它们属于 keep，理由里写明是哪个脚本。",
   "maxTodo": 0,
   "entries": [
-    { "file": "plugin/src/application/commands.ts", "name": "rebaseTeamConfigCommand", "status": "keep", "reason": "配置 rebase 用例：面板写通道走 panel-writes 的等价路径，本函数由 t09 锁定语义（expectedConfigRevision 必填），保留为契约测试面" },
+    { "file": "plugin/src/application/commands/team.ts", "name": "rebaseTeamConfigCommand", "status": "keep", "reason": "配置 rebase 用例：面板写通道走 panel-writes 的等价路径，本函数由 t09 锁定语义（expectedConfigRevision 必填），保留为契约测试面（拆分后从 commands.ts 迁到 commands/team.ts）" },
     { "file": "plugin/src/application/effect-commands.ts", "name": "requestEffectCommand", "status": "keep", "reason": "Effect 状态机用例（requested→accepted→completed）：工具面与面板暂无入口，由 t10 锁定「未知结果不重放」语义" },
     { "file": "plugin/src/application/effect-commands.ts", "name": "acceptEffectCommand", "status": "keep", "reason": "同上：Effect 受理步骤，t10 覆盖" },
     { "file": "plugin/src/application/effect-commands.ts", "name": "completeEffectCommand", "status": "keep", "reason": "同上：Effect 完成步骤，t10 覆盖" },

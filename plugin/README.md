@@ -1,4 +1,4 @@
-﻿# dsh-plugin-myteam · v2
+# dsh-plugin-myteam · v2
 
 项目级多智能体团队运行时。v2 是**重写**，不是给 v1 打补丁：v1 的完整实现保存在
 Git 标签 `v1-backup`，本分支从新的分层骨架开始重新实现。
@@ -28,9 +28,15 @@ plugin/src/
 ├── contracts/      事件、批次帧、实体形状、错误码、版本与规范化 hash
 ├── domain/         纯领域规则：定义资产、任务 DAG、状态机、配置合并、权限
 ├── application/    用例命令、项目运行时、内存投影（纯 reducer）
-├── infrastructure/ 文件事件库、写者租约（未来：DSH 适配器、迁移读取器）
-└── composition/    （R4）DSH 装载与依赖装配
+│   ├── commands/       命令按聚合分文件：project / definitions / team / team-plan / task / member
+│   ├── panel-writes/   面板写通道分五步：methods / params / deps / previews / apply
+│   └── projections/    project-state：唯一内存投影
+├── infrastructure/ 文件事件库、写者租约、DSH 适配器、记忆存储、迁移读取器
+└── composition/    DSH 装载与依赖装配
 ```
+
+`commands.ts` 与 `panel-writes.ts` 是这两个子目录的**聚合入口**（只做 `export *` 重导出），
+所以按聚合找实现、按入口找整体都不用改导入路径。
 
 依赖只能向内：
 
@@ -95,7 +101,7 @@ composition → infrastructure → application → domain → contracts
 ```bash
 cd plugin
 node --test test/*.test.ts        # 348 个测试
-node ../tools/check-architecture.mjs   # ARCH_OK files=66 violations=0
+node ../tools/check-architecture.mjs   # ARCH_OK files=77 violations=0
 node ../tools/check-types.mjs     # TYPES_OK（tsc --noEmit；需先 npm ci）
 node scripts/build-lib.mjs        # 构建 lib/（根入口 index.js 转发到 lib/composition/host.mjs）；lib 不入库，安装/本地运行前必须先跑
 node ../tools/gen-panel-contract.mjs --check   # 面板契约文档与代码一致

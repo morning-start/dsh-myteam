@@ -44,7 +44,13 @@ function stringArray(source, name) {
 }
 
 const panelContract = readFileSync('plugin/src/application/panel-contract.ts', 'utf8')
-const panelWrites = readFileSync('plugin/src/application/panel-writes.ts', 'utf8')
+// 写方法表在 panel-writes 聚合里的哪个文件，是**实现细节**，不该由门禁决定：
+// 把入口（panel-writes.ts）与它的子模块拼起来读，表放哪儿都数得到。
+const PANEL_WRITES_DIR = 'plugin/src/application/panel-writes'
+const panelWrites = [
+  readFileSync('plugin/src/application/panel-writes.ts', 'utf8'),
+  ...(existsSync(PANEL_WRITES_DIR) ? walk(PANEL_WRITES_DIR) : []).map((f) => readFileSync(f, 'utf8')),
+].join('\n')
 const toolSpecs = readFileSync('plugin/src/application/tool-specs.ts', 'utf8')
 
 const readMethods = stringArray(panelContract, 'PANEL_METHODS')
