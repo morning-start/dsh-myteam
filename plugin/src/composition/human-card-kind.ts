@@ -9,6 +9,7 @@
  */
 import { ProjectHosts } from '../infrastructure/dsh/project-hosts.ts'
 import { actOnHumanCard, type HumanCardDetails } from './human-cards.ts'
+import { loadHostZod } from './host-modules.ts'
 
 export const inject = ['actionCards', 'agents', 'workingDirectory']
 
@@ -22,25 +23,21 @@ export interface CardHostContext {
   logger?: { warn(event: string, detail?: Record<string, unknown>): void }
 }
 
-/** 从宿主安装目录解析 zod（本包不依赖它）。 */
+/**
+ * 从宿主安装目录解析 zod（本包不依赖它）。
+ *
+ * ⚠️ 为什么**不写**裸包名动态导入（CHG-217）：DSH 的装载闭包里解析不到裸名
+ * `zod`——它只保证 `@deepseek-ai/*` 的一部分。裸名 import 在本地开发机上「恰好能
+ * 解析」是因为那儿有同名 `node_modules`，换到干净 profile 就炸（toolkit 的错误卡片
+ * `bare-name-dependency` 记的就是这个坑）。所以只走宿主安装目录这一条路：
+ * `loadHostZod` 内部用 `createRequire` 从 `DSH_INSTALL_DIR` 解析。
+ */
 async function loadZod(): Promise<unknown | null> {
-  try {
-    return await import('zod')
-  } catch {
-    // 落到宿主安装目录
-  }
-  const installDir = process.env.DSH_INSTALL_DIR
-  if (installDir === undefined || installDir.length === 0) return null
-  try {
-    const { createRequire } = await import('node:module')
-    const { pathToFileURL } = await import('node:url')
-    const { join } = await import('node:path')
-    const requireFromHost = createRequire(join(installDir, 'package.json'))
-    const resolved = requireFromHost.resolve('zod')
-    return await import(pathToFileURL(resolved).href)
-  } catch {
-    return null
-  }
+  const module = await loadHostZod()
+  if (module === undefined) return null
+  // zod 的 CJS 入口经 ESM 互操作后，`z` 既可能是顶层命名导出，也挂在 default 上。
+  const candidate = module as { z?: unknown; default?: { z?: unknown } }
+  return candidate.z !== undefined ? candidate.z : (candidate.default?.z ?? null)
 }
 
 export function apply(ctx: CardHostContext): (() => void) | undefined {

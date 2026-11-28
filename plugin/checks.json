@@ -43,9 +43,10 @@
         "README.md",
         "tsconfig.json",
         "test",
+        "scripts",
         ".github/workflows/release.yml"
       ],
-      "note": "test/ 是仓库内测试与视觉夹具（含无头浏览器 harness），不随包分发；package-lock.json 锁的是 devDependencies（typescript / @types/node），只用于类型门禁，宿主装载时不需要。其余为仓库元数据。"
+      "note": "test/ 是仓库内测试与视觉夹具（含无头浏览器 harness），不随包分发；scripts/ 是构建脚本（宿主装载时不需要构建产物以外的它）；package-lock.json 锁的是 devDependencies（typescript / @types/node），只用于类型门禁，宿主装载时不需要。其余为仓库元数据。"
     },
     {
       "id": "arch:layers",
@@ -71,6 +72,42 @@
       "type": "no-console",
       "root": "src",
       "layers": ["contracts", "domain", "application"]
+    },
+    {
+      "id": "inject:declared",
+      "type": "undeclared-inject",
+      "root": "src",
+      "note": "CHG-217：访问 ctx.<service> 却没在 inject 里声明的，宿主 Proxy 会在加载那一刻拒绝——整个插件行 did not activate。"
+    },
+    {
+      "id": "depends:bare-name",
+      "type": "bare-name-dependency",
+      "root": "src",
+      "note": "CHG-217：装载闭包只保证 @deepseek-ai/* 的一部分；裸名第三方包在本地「恰好能解析」，换到干净 profile 就炸。"
+    },
+    {
+      "id": "session:messages",
+      "type": "session-message-identity",
+      "root": "src",
+      "note": "CHG-217：交给会话的消息必须带 id——写入时不报错，用户下次打开会话时整段打不开。"
+    },
+    {
+      "id": "session:custom-event",
+      "type": "custom-session-event",
+      "root": "src",
+      "note": "CHG-217：session.append 的自定义事件类型必须先 augment SessionEventMap，否则写入被拒。"
+    },
+    {
+      "id": "manifest:dsh-shape",
+      "type": "manifest-shape",
+      "manifest": "package.json",
+      "note": "CHG-217：package.json 的 dsh 字段只写宿主认的键；自造字段宿主完全不读，只会误导下一个人。"
+    },
+    {
+      "id": "release:pipeline",
+      "type": "release-pipeline",
+      "workflow": "../.github/workflows/release.yml",
+      "note": "CHG-217：发版必须是 tag 驱动的那条固定流水线；publish 不能挂在 token 上，否则没配 secret 的仓库静默不发版。"
     }
   ]
 }

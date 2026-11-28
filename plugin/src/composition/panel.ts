@@ -32,6 +32,7 @@ import {
   previewPanelWrite,
 } from '../application/panel-writes.ts'
 import { ProjectHosts } from '../infrastructure/dsh/project-hosts.ts'
+import { loadHostProtocol } from './host-modules.ts'
 
 /** 与 v1 remote/service.ts 同形的 marker 键：strip 环境没有装饰器，只能手写。 */
 const REMOTE_METHOD_DESCRIPTOR = '@deepseek-ai/dsh-typert-protocol/remote-methods'
@@ -571,23 +572,15 @@ export const inject = ['agents', 'workingDirectory', 'webServer', 'connection']
 /**
  * 解析 `@deepseek-ai/dsh-typert-protocol`：它只存在于宿主安装目录，不是本包的
  * 依赖，所以先试裸包名，失败再从 `DSH_INSTALL_DIR` 的兄弟包里按需解析。
+ *
+ * CHG-217：这段逻辑与 `host-modules.ts` 收拢到一处，两处解析宿主包走同一条路。
  */
 async function loadProtocol(): Promise<unknown> {
-  try {
-    return await import('@deepseek-ai/dsh-typert-protocol')
-  } catch {
-    // 落到宿主安装目录
-  }
-  const installDir = process.env.DSH_INSTALL_DIR
-  if (installDir === undefined || installDir.length === 0) {
+  const module = await loadHostProtocol()
+  if (module === undefined) {
     throw new Error('DSH_INSTALL_DIR 未设置，无法定位 typert 协议包')
   }
-  const { createRequire } = await import('node:module')
-  const { pathToFileURL } = await import('node:url')
-  const { join } = await import('node:path')
-  const requireFromHost = createRequire(join(installDir, 'package.json'))
-  const resolved = requireFromHost.resolve('@deepseek-ai/dsh-typert-protocol')
-  return await import(pathToFileURL(resolved).href)
+  return module
 }
 
 export function apply(ctx: PanelHostContext): void {

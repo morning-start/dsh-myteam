@@ -7,7 +7,18 @@ name: Release
 #      所以打包前先跑 `npm run build`（等价于原来的 prepack，但**不再挂在安装钩子上**——
 #      安装期执行脚本会被 dsh_plugin_check 的 security:install-hooks 判 fail）。
 #   2. 本包的测试在**仓库根**（tools/ 门禁读 plugin/src），所以 checkout 后要回到仓库根跑门禁。
-#   3. 没有 NPM_TOKEN 时只发 GitHub Release，不发 npm。
+#   3. 本包的 package.json 在 plugin/ 子目录（仓库根是聚合仓，不是包），所以每一步都
+#      指向 plugin/。
+#
+# CHG-217 改了发布这一步的**语义**（原来第 3 条是「没有 NPM_TOKEN 时只发 GitHub
+# Release，不发 npm」）：
+#   原来把 publish 挂在 `if: env.NPM_TOKEN != ''` 上——仓库没配这个 secret 时，
+#   这一步被**静默跳过**且**不报错**：tag 推上去、CI 全绿、npm 上却没有这个包，
+#   用户装不到。现在发布步骤**无条件跑**，在步骤**内部**选凭据：
+#     ① 有 NPM_TOKEN → 用它；
+#     ② 没有 → 抛掉 setup-node 写的 _authToken 行，走 OIDC trusted publishing；
+#   两条路都失败就**报错**并给出两条修法，不吞。
+#   （这是 DSH 插件标准的固定流水线形态，`release:pipeline` 规则守着它。）
 
 on:
   push:
@@ -16,28 +27,38 @@ on:
 
 permissions:
   contents: write
+  # Trusted publishing + provenance：注册表拿这次 job 的 OIDC 身份核验 tarball 的
+  # 来源，凭据也是每次运行现铸的。仓库里不留长效凭据。
   id-token: write
 
 concurrency:
-  group: release-${{ github.ref }}
+  # **所有**发版共用一个 group（故意不按 ref 分组）：两个 tag 一起推时，
+  # 按 ref 分组会让它们并行发布，第二个把 `latest` dist-tag 指回旧版本。
+  group: release
   cancel-in-progress: false
 
 jobs:
   release:
     runs-on: ubuntu-latest
-    env:
-      NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v7
         with:
-          node-version: '22'
+          # Trusted publishing 需要受支持的 LTS；本包没有运行时依赖，任意受支持的 Node 都能跑。
+          node-version: 'lts/*'
           registry-url: https://registry.npmjs.org
 
-      - name: tag 必须与 package.json 版本一致
+      - name: npm 必须够新（trusted publishing 需要 ≥ 11.5.1）
         run: |
-          version=$(node -p "require('./plugin/package.json').version")
+          npm install -g npm@latest
+          npm --version
+          node -e "const v=require('child_process').execSync('npm --version').toString().trim(); const [a,b]=v.split('.').map(Number); if (a<11||(a===11&&b<5)) { console.error('npm '+v+' 不能用 trusted publishing，需要 11.5.1 及以上'); process.exit(1) }"
+
+      - name: tag 必须与 package.json 版本一致
+        working-directory: plugin
+        run: |
+          version=$(node -p "require('./package.json').version")
           tag="${GITHUB_REF_NAME#v}"
           if [ "$version" != "$tag" ]; then
             echo "::error::tag $GITHUB_REF_NAME 与 plugin/package.json 的 $version 不一致"
@@ -46,9 +67,10 @@ jobs:
           echo "releasing $version"
 
       - name: 包必须可被 dsh 装载
+        working-directory: plugin
         run: |
-          node -e "const m=require('./plugin/package.json'); if(!m.dsh?.bundle?.patch){console.error('缺少 dsh.bundle.patch：dsh plugin add 会拒绝');process.exit(1)}"
-          node -e "const m=require('./plugin/package.json'); if(m.main!=='./index.js'){console.error('main 必须是 ./index.js');process.exit(1)}"
+          node -e "const m=require('./package.json'); if(!m.dsh?.bundle?.patch){console.error('缺少 dsh.bundle.patch：dsh plugin add 会拒绝');process.exit(1)}"
+          node -e "const m=require('./package.json'); if(m.main!=='./index.js'){console.error('main 必须是 ./index.js');process.exit(1)}"
 
       - name: 构建产物（lib/ + 包内 design-v2）
         working-directory: plugin
@@ -65,22 +87,61 @@ jobs:
         working-directory: plugin
         run: |
           npm pack
+          # 市场条目指向 releases/latest/download/<name>.tgz：tag 在请求时解析，
+          # 文件名是字面量。资产名里带版本号会在下次发版时 404。
           asset=$(node -p "require('./package.json').name.replace(/^@[^/]+\//, '')")
           mkdir -p ../dist
           cp ./*.tgz "../dist/$asset.tgz"
           echo "ASSET=dist/$asset.tgz" >> "$GITHUB_ENV"
 
+      # 凭据，按优先级：
+      #   ① NPM_TOKEN —— 仓库配了这个 secret 就用它。显式，任意 npm 账号都能用。
+      #   ② OIDC trusted publishing —— 完全没有 secret：npm 用这次 job 的身份换一份
+      #      短期凭据。需要 npmjs.com 上给这个包配好 Trusted Publisher。
+      # 这一步**总是跑**：缺 token 不许把「没配 secret」变成「静默不发版」。
       - name: 发布到 npm
-        if: env.NPM_TOKEN != ''
         working-directory: plugin
         env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
-        run: npm publish --provenance --access public
+          NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
+        run: |
+          name=$(node -p "require('./package.json').name")
+          version=$(node -p "require('./package.json').version")
+          if [ -n "$NPM_TOKEN" ]; then
+            echo "用 NPM_TOKEN secret 发布"
+            export NODE_AUTH_TOKEN="$NPM_TOKEN"
+          else
+            # setup-node 往 .npmrc 写了 `_authToken=${NODE_AUTH_TOKEN}`。变量为空时
+            # 必须把这行删掉，否则 npm 会拿着空凭据去发，而不是落到 trusted publishing。
+            echo "没有 NPM_TOKEN secret：用 OIDC trusted publishing 发布"
+            if [ -f "${NPM_CONFIG_USERCONFIG:-$HOME/.npmrc}" ]; then
+              sed -i '/_authToken/d' "${NPM_CONFIG_USERCONFIG:-$HOME/.npmrc}"
+            fi
+          fi
+          # publish 外面**不套管道**：管道只报最后一条命令的退出码，
+          # `npm publish | tee` 会在发布失败时仍然成功。改成捕获输出再判真实退出码。
+          set +e
+          npm publish --provenance --access public > /tmp/publish.log 2>&1
+          status=$?
+          set -e
+          cat /tmp/publish.log
+          if [ "$status" -eq 0 ]; then
+            echo "已发布 $name@$version"
+            exit 0
+          fi
+          if grep -qi 'cannot publish over the previously published versions' /tmp/publish.log; then
+            echo "::error::$name@$version 已经在注册表里。已发布的版本不能覆盖：请改 package.json 版本号并推**新** tag。"
+          elif [ -n "$NPM_TOKEN" ]; then
+            echo "::error::用 NPM_TOKEN secret 发布失败；token 可能过期或没有 $name 的发布权限。见上方 npm 输出。"
+          else
+            echo "::error::注册表不接受这次 job 的 OIDC 身份。二选一：① 给仓库加 NPM_TOKEN secret；② 在 npmjs.com -> 该包 -> Settings -> Trusted Publisher -> GitHub Actions 里配置，workflow 文件名写 release.yml。两者都没有时 npm 把这次发布当匿名请求，答案是 404。"
+          fi
+          exit 1
 
       - name: 建 GitHub Release
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          gh release create "$GITHUB_REF_NAME" "$ASSET" \
-            --title "$GITHUB_REF_NAME" \
-            --generate-notes
+          # 幂等：重跑（或同一个 tag 推两次）不能在这里失败。
+          gh release view "$GITHUB_REF_NAME" >/dev/null 2>&1 \
+            && echo "release $GITHUB_REF_NAME 已存在" \
+            || gh release create "$GITHUB_REF_NAME" "$ASSET" --title "$GITHUB_REF_NAME" --generate-notes

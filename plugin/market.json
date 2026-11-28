@@ -1,0 +1,7 @@
+{
+  "category": "workflow",
+  "description": {
+    "en": "Project-level multi-agent team runtime for DSH, with a captain preset, member presets, a task DAG with gates, and one auditable panel.",
+    "zh": "DSH 内的项目级多智能体团队运行时：队长与成员两套 preset、带门禁的任务 DAG，以及一套可审计的面板。"
+  }
+}

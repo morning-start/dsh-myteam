@@ -1,0 +1,51 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="640" height="300" viewBox="0 0 640 300" role="img" aria-label="A captain agent plans a task DAG, dispatches it to two member agents, and reviews their submissions in one panel">
+  <title>myteam</title>
+  <defs>
+    <style>
+      .surface { fill: #f7f8fa; stroke: #d8dce3; stroke-width: 1.5; }
+      .card { fill: #ffffff; stroke: #d8dce3; stroke-width: 1.5; }
+      .cap { fill: #3f6f8f; }
+      .mem { fill: #7a9cb5; }
+      .edge { stroke: #9aa5b1; stroke-width: 1.8; fill: none; }
+      .label { font-family: system-ui, sans-serif; font-size: 13px; fill: #4a5560; }
+      .caplabel { font-family: system-ui, sans-serif; font-size: 14px; fill: #2f5f80; font-weight: 600; }
+      .gate { fill: #ffffff; stroke: #9aa5b1; stroke-width: 1.5; }
+    </style>
+  </defs>
+
+  <!-- 左侧：队长 -->
+  <rect class="surface" x="32" y="40" width="150" height="220" rx="12"/>
+  <circle class="cap" cx="107" cy="92" r="22"/>
+  <text class="caplabel" x="107" y="140" text-anchor="middle">Captain</text>
+  <rect class="card" x="52" y="162" width="110" height="30" rx="6"/>
+  <text class="label" x="107" y="182" text-anchor="middle">plan the DAG</text>
+  <rect class="card" x="52" y="202" width="110" height="30" rx="6"/>
+  <text class="label" x="107" y="222" text-anchor="middle">review results</text>
+
+  <!-- 中间：任务 DAG -->
+  <rect class="surface" x="230" y="40" width="180" height="220" rx="12"/>
+  <rect class="card" x="252" y="62" width="136" height="34" rx="6"/>
+  <text class="label" x="320" y="84" text-anchor="middle">split the login module</text>
+  <path class="edge" d="M320 96 L320 124 M320 124 L268 124 L268 146 M320 124 L372 124 L372 146"/>
+  <rect class="card" x="222" y="146" width="92" height="30" rx="6"/>
+  <text class="label" x="268" y="166" text-anchor="middle">task A</text>
+  <rect class="card" x="326" y="146" width="92" height="30" rx="6"/>
+  <text class="label" x="372" y="166" text-anchor="middle">task B</text>
+  <path class="edge" d="M268 176 L268 200 L320 200 L320 214 M372 176 L372 200 L320 200"/>
+  <polygon class="gate" points="320,212 338,230 320,248 302,230"/>
+  <text class="label" x="320" y="234" text-anchor="middle" font-size="11" fill="#4a5560">gate</text>
+
+  <!-- 右侧：两名成员 -->
+  <rect class="surface" x="458" y="40" width="150" height="220" rx="12"/>
+  <circle class="mem" cx="533" cy="86" r="19"/>
+  <text class="label" x="533" y="126" text-anchor="middle">Member A</text>
+  <rect class="card" x="478" y="142" width="110" height="30" rx="6"/>
+  <text class="label" x="533" y="162" text-anchor="middle">submit evidence</text>
+  <circle class="mem" cx="533" cy="196" r="19"/>
+  <text class="label" x="533" y="236" text-anchor="middle">Member B</text>
+
+  <!-- 派发与回收的连线 -->
+  <path class="edge" d="M182 110 L230 96"/>
+  <path class="edge" d="M410 96 L458 86"/>
+  <path class="edge" d="M410 230 L458 196"/>
+</svg>

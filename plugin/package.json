@@ -19,6 +19,14 @@
     "./package.json": "./package.json"
   },
   "icon": "./icon.svg",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/morning-start/dsh-myteam.git"
+  },
+  "publishConfig": {
+    "access": "public",
+    "provenance": true
+  },
   "engines": {
     "node": ">=22.18",
     "dsh": ">=0.2.1-rc.0 <0.3.0"
@@ -47,6 +55,8 @@
     "scripts",
     "locale",
     "design-v2",
+    "docs",
+    "market.json",
     "cordis.patch.yml",
     "icon.svg"
   ],

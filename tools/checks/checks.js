@@ -4,8 +4,9 @@
  * A `checks.json` at the project root declares the rules; `lib/rules.js` runs
  * them. The rule types that matter for a plugin project are the ones a real one
  * had to hand-write as separate scripts: relative documentation links must
- * resolve, the locale files must carry the same keys, and a layered source tree
- * must not import outward or reach for the host from an inner layer.
+ * resolve, the locale files must carry the same keys, a layered source tree
+ * must not import outward or reach for the host from an inner layer, and a
+ * message handed to the session must carry the id DSH refuses to load without.
  *
  * Keeping them as data is the point: a project states its own boundaries, and the
  * same engine, the same pass/warn/fail vocabulary, and the same report apply.
@@ -64,17 +65,4 @@ export async function runProjectChecks(root, options = {}) {
   return { ...result, target, source: path, ran: rules.length, declared: config.rules.length }
 }
 
-/** The rules a project can declare, for help text and error messages. */
-export const RULE_TYPES = [
-  'doc-links',
-  'contract-drift',
-  'locale-parity',
-  'import-boundary',
-  'no-console',
-  'file-exists',
-  'file-absent',
-  'files-listed',
-  'placeholder-free',
-  'json-field',
-  'frontmatter-name',
-]
+export { RULE_TYPES } from './rule-types.js'

@@ -13,6 +13,7 @@ import { resolve } from 'node:path'
 import { leadToolSpecs } from '../application/tool-specs.ts'
 import { ProjectHosts } from '../infrastructure/dsh/project-hosts.ts'
 import { toDshTool } from '../infrastructure/dsh/tool-adapter.ts'
+import { createAgentDispatchMessage } from './host-modules.ts'
 
 export const inject = ['tools', 'agents', 'workingDirectory', 'subagents']
 
@@ -39,6 +40,7 @@ interface HostContext {
     startActivation?(spec: unknown): Promise<{ childId: string }>
   }
   workingDirectory?: { ensure(agent: { id: string }): Promise<string> }
+  logger?: { warn(event: string, detail?: Record<string, unknown>): void }
 }
 
 /** 成员会话的默认模型：与宿主一致；取不到就让宿主自己决定。 */
@@ -105,6 +107,13 @@ export function apply(ctx: HostContext, config: CaptainHostConfig = {}): (() => 
    *   ① `subagents.sendMessage` —— 成员在队长的子代理树里时可用（会唤醒空闲成员）；
    *   ② `agent.followup` —— 老路径（`agents.create` 建的根会话成员）。
    * 都不行就返回 false，让工具如实告诉模型「没派出去」，而不是假装成功。
+   *
+   * ⚠️ ② 的消息**必须**带 id 与 source（CHG-217）：手写的 `{ role:'user', content }`
+   * 写进会话时不报错，但持久化层在**用户下次打开会话时**校验 `message.id` 与
+   * `message.source.kind`，缺一整段会话打不开（`lacks an identified message`）。
+   * 所以这里走 `createAgentDispatchMessage`——source 用 `agent-message`，因为这条
+   * 消息是**队长投给成员**的任务说明，不是真人输入；标成 `user` 会让
+   * `dsh-tool-goal` 的「直接人类授权」判定误判，给模型它本不该有的授权。
    */
   const makeDispatcher =
     (captainSessionId: string) =>
@@ -122,7 +131,8 @@ export function apply(ctx: HostContext, config: CaptainHostConfig = {}): (() => 
       const targetAgent = ctx.agents?.get(target)
       if (typeof targetAgent?.followup === 'function') {
         try {
-          targetAgent.followup({ role: 'user', content })
+          const message = await createAgentDispatchMessage(content, captainSessionId)
+          targetAgent.followup(message)
           return true
         } catch {
           return false

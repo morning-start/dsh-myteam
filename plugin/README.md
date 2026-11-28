@@ -100,8 +100,8 @@ composition → infrastructure → application → domain → contracts
 
 ```bash
 cd plugin
-node --test test/*.test.ts        # 356 个测试
-node ../tools/check-architecture.mjs   # ARCH_OK files=77 violations=0
+node --test test/*.test.ts        # 359 个测试
+node ../tools/check-architecture.mjs   # ARCH_OK files=78 violations=0
 node ../tools/check-types.mjs     # TYPES_OK（tsc --noEmit；需先 npm ci）
 node scripts/build-lib.mjs        # 构建 lib/（根入口 index.js 转发到 lib/composition/host.mjs）；lib 不入库，安装/本地运行前必须先跑
 node ../tools/gen-panel-contract.mjs --check   # 面板契约文档与代码一致

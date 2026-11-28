@@ -1,11 +1,11 @@
 {
   "schema": 1,
-  "builtAt": "2026-11-27T17:01:33.379Z",
+  "builtAt": "2026-11-28T16:01:52.290Z",
   "node": "v24.21.0",
   "entry": "./index.js",
   "entryTarget": "./lib/composition/host.mjs",
-  "modules": 77,
-  "sourceHash": "b8a350b2f6cfc73db4f6d690851ba491923e52a413f34efc85b18020f23b0c04",
+  "modules": 78,
+  "sourceHash": "a928c54201fd1c3ed499a1fc58cd7b8254e61cba2ad48329c3392bbcdbdd6f63",
   "clientFile": "client/client.js",
   "clientHash": "ffc62074e4144691e332323940bbd58fd1aeafe9df95d2359409ee5d267ee9ff",
   "files": [
@@ -41,6 +41,7 @@
     "application/session-root.ts",
     "application/task-commands.ts",
     "application/tool-specs.ts",
+    "composition/host-modules.ts",
     "composition/host.ts",
     "composition/human-actions-skill.ts",
     "composition/human-card-kind.ts",
